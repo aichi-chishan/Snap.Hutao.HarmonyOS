@@ -1,0 +1,196 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "胡桃工具箱鸿蒙版"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "胡桃工具箱"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "胡桃工具箱"
+    },
+    {
+      "name": "tab_home",
+      "value": "首页"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "祈愿"
+    },
+    {
+      "name": "tab_note",
+      "value": "便笺"
+    },
+    {
+      "name": "tab_mine",
+      "value": "我的"
+    },
+    {
+      "name": "page_title_home",
+      "value": "首页"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "祈愿记录"
+    },
+    {
+      "name": "page_title_note",
+      "value": "实时便笺"
+    },
+    {
+      "name": "page_title_user",
+      "value": "我的"
+    },
+    {
+      "name": "page_title_login",
+      "value": "登录"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "设置"
+    },
+    {
+      "name": "page_title_sign",
+      "value": "每日签到"
+    },
+    {
+      "name": "page_title_calendar",
+      "value": "活动日历"
+    },
+    {
+      "name": "page_title_announcement",
+      "value": "游戏公告"
+    },
+    {
+      "name": "common_loading",
+      "value": "加载中..."
+    },
+    {
+      "name": "common_empty",
+      "value": "暂无数据"
+    },
+    {
+      "name": "common_error",
+      "value": "加载失败，点击重试"
+    },
+    {
+      "name": "common_retry",
+      "value": "重试"
+    },
+    {
+      "name": "common_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "common_confirm",
+      "value": "确定"
+    },
+    {
+      "name": "common_refresh",
+      "value": "刷新"
+    },
+    {
+      "name": "common_all",
+      "value": "全部"
+    },
+    {
+      "name": "common_login_hint",
+      "value": "登录后使用该功能"
+    },
+    {
+      "name": "common_go_login",
+      "value": "去登录"
+    },
+    {
+      "name": "common_logged_in_as",
+      "value": "当前账号"
+    },
+    {
+      "name": "common_welcome",
+      "value": "欢迎使用胡桃工具箱"
+    },
+    {
+      "name": "login_web_title",
+      "value": "米游社网页登录"
+    },
+    {
+      "name": "login_manual_hint",
+      "value": "手动粘贴完整 Cookie"
+    },
+    {
+      "name": "login_manual_paste",
+      "value": "粘贴 Cookie"
+    },
+    {
+      "name": "login_login_btn",
+      "value": "登录"
+    },
+    {
+      "name": "login_parse_btn",
+      "value": "解析并登录"
+    },
+    {
+      "name": "login_cookie_valid",
+      "value": "我就 Cookie 校验通过"
+    },
+    {
+      "name": "card_daily_note_title",
+      "value": "实时便笺"
+    },
+    {
+      "name": "daily_note_form_name",
+      "value": "实时便笺"
+    },
+    {
+      "name": "daily_note_form_desc",
+      "value": "树脂 / 派遣 / 每日摘要"
+    },
+    {
+      "name": "setting_refresh_interval",
+      "value": "自动刷新间隔"
+    },
+    {
+      "name": "setting_auto_refresh",
+      "value": "自动刷新"
+    },
+    {
+      "name": "setting_notify",
+      "value": "通知开关"
+    },
+    {
+      "name": "setting_theme",
+      "value": "主题"
+    },
+    {
+      "name": "setting_data_manage",
+      "value": "数据管理"
+    },
+    {
+      "name": "setting_clear_gacha",
+      "value": "清空祈愿记录"
+    },
+    {
+      "name": "setting_logout",
+      "value": "退出登录"
+    },
+    {
+      "name": "setting_account",
+      "value": "账号与数据"
+    },
+    {
+      "name": "theme_system",
+      "value": "跟随系统"
+    },
+    {
+      "name": "theme_light",
+      "value": "浅色"
+    },
+    {
+      "name": "theme_dark",
+      "value": "深色"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+# ===== 构建产物 =====
+/node_modules
+/oh_modules
+/local.properties
+/.idea
+**/build
+/.hvigor
+.cxx
+/.clangd
+/.clang-format
+/.clang-tidy
+**/.test
+/.appanalyzer
+/.deveco
+/.zcode
+/.cache
+
+# ===== 本地工具（DevEco 自带 skills，非项目源码）=====
+/skills
+
+# ===== 独立数据仓库（snap-hutao-data，另行托管）=====
+/github-data
+
+# ===== 本地签名配置（含密钥，自行配置）=====
+/build-profile.json5
+
+# ===== 参考截图（Windows 版界面截图；含账号信息，不随仓库公开）=====
+/example
+
+# ===== IDE / 本地配置 =====
+*.iml
+.DS_Store
+Thumbs.db
+
+# ===== 截图/调试产物 =====
+shot_*.jpeg
+shot_*.png
+layout*.json

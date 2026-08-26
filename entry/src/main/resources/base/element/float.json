@@ -1,0 +1,40 @@
+{
+  "float": [
+    {
+      "name": "page_text_font_size",
+      "value": "50fp"
+    },
+    {
+      "name": "page_title_font_size",
+      "value": "26fp"
+    },
+    {
+      "name": "title_font_size",
+      "value": "20fp"
+    },
+    {
+      "name": "subtitle_font_size",
+      "value": "17fp"
+    },
+    {
+      "name": "body_font_size",
+      "value": "15fp"
+    },
+    {
+      "name": "caption_font_size",
+      "value": "12fp"
+    },
+    {
+      "name": "page_padding",
+      "value": "16vp"
+    },
+    {
+      "name": "card_padding",
+      "value": "14vp"
+    },
+    {
+      "name": "card_radius",
+      "value": "16vp"
+    }
+  ]
+}

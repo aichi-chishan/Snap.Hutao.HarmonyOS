@@ -1,0 +1,23 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/LoginPage",
+    "pages/UserPage",
+    "pages/SettingPage",
+    "pages/SignInPage",
+    "pages/CalendarPage",
+    "pages/AnnouncementPage",
+    "pages/AnnouncementDetailPage",
+    "pages/GeetestVerifyPage",
+    "pages/SpiralAbyssPage",
+    "pages/CharacterPage",
+    "pages/RoleCombatPage",
+    "pages/HardChallengePage",
+    "pages/CultivationPage",
+    "pages/WikiAvatarPage",
+    "pages/WikiWeaponPage",
+    "pages/WikiMonsterPage",
+    "pages/AchievementPage",
+    "pages/LaunchGamePage"
+  ]
+}

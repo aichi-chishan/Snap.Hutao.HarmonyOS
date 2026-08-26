@@ -1,0 +1,25 @@
+{
+  "forms": [
+    {
+      "name": "DailyNoteCard",
+      "displayName": "$string:daily_note_form_name",
+      "description": "$string:daily_note_form_desc",
+      "src": "./ets/widgets/pages/DailyNoteCard.ets",
+      "uiSyntax": "arkts",
+      "window": {
+        "designWidth": 720,
+        "autoDesignWidth": true
+      },
+      "colorMode": "auto",
+      "isDefault": true,
+      "updateEnabled": true,
+      "scheduledUpdateTime": "10:30",
+      "updateDuration": 30,
+      "defaultDimension": "2*2",
+      "supportDimensions": [
+        "2*2",
+        "2*4"
+      ]
+    }
+  ]
+}
