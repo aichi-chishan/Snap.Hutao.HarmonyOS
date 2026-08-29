@@ -84,6 +84,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     @StorageProp('isDarkMode') isDarkMode: boolean = false;
     /** 侧边栏折叠（仅图标），对齐 Windows CompactPaneLength=45 */
     @State sidebarFold: boolean = false;
+    /** 首页下拉刷新状态 */
+    @State homeRefreshing: boolean = false;
     /** 系统三键区（最小化/全屏/关闭）占位宽度 vp（PC 自定义窗口装饰；0=无系统三键） */
     @StorageProp('titleBtnWidthVp') titleBtnWidthVp: number = 0;
     /** 是否正在通过自绘 TitleBar 拖拽窗口（避免重复触发 startMoving） */
@@ -116,6 +118,9 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         this.challengeSnap = HomeChallengeSummary.of(this.homeVm.challenge);
         Logger.info('Index', `challengeSnap loaded=${this.challengeSnap.loaded} abyss=${this.challengeSnap.abyssFloor}/${this.challengeSnap.abyssStar} ` +
           `rc=${this.challengeSnap.roleCombatMedals}/${this.challengeSnap.roleCombatMaxRound} hc=${this.challengeSnap.hardChallengeBest}/${this.challengeSnap.hardChallengeSecond}`);
+        this.homeRefreshing = false;
+      }).catch(() => {
+        this.homeRefreshing = false;
       });
     }
 
@@ -605,7 +610,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       // 壁纸层（渐变 + 本地胡桃横幅 + 可选）
       WallpaperLayer({ bgType: this.bgType, folderPath: this.bgFolderPath })
 
-      Scroll() {
+      Refresh({ refreshing: this.homeRefreshing }) {
         Column({ space: 12 }) {
           // 欢迎横幅（对齐电脑版主页顶部）
           HomeHeroBanner({
@@ -807,6 +812,9 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       .width('100%')
       .height('100%')
       .align(Alignment.Top)
+      .onRefreshing(() => {
+        this.reloadHome();
+      })
       .backgroundColor(Color.Transparent)
     }
     .width('100%')
@@ -823,7 +831,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
    */
   @Builder
   homeTabWide() {
-    Scroll() {
+    Refresh({ refreshing: this.homeRefreshing }) {
       Column({ space: 12 }) {
         // Row1：顶部欢迎大标题（对齐 Windows 顶部大标题）
         HomeHeroBanner({
@@ -1076,6 +1084,9 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .width('100%')
     .height('100%')
     .align(Alignment.Top)
+    .onRefreshing(() => {
+      this.reloadHome();
+    })
   }
 
   /** 时后活动小标题 */
