@@ -794,6 +794,7 @@ export struct GachaLogPage {
       }
       .width('100%')
       .height(420)
+      .cachedCount(5)
       .scrollBar(BarState.Off)
     }
     .width('100%')

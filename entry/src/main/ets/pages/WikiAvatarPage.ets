@@ -246,6 +246,7 @@ export struct WikiAvatarPage {
           }
         }, (a: WikiAvatarMeta) => `a_${a.id}`)
       }
+      .cachedCount(5)
       .width('100%')
       .layoutWeight(1)
       .scrollBar(BarState.Auto)

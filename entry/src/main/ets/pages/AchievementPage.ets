@@ -334,6 +334,7 @@ export struct AchievementPage {
         }
         .width('100%')
         .layoutWeight(1)
+        .cachedCount(5)
         .padding({ left: 16, right: 16, bottom: 16 })
         .scrollBar(BarState.Off)
       }

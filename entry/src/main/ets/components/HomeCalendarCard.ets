@@ -132,8 +132,8 @@ export struct HomeCalendarCard {
     if (count > 14) {
       count = 14;
     }
+    const d: Date = new Date(now);
     for (let i = 0; i < count; i++) {
-      const d: Date = new Date(now);
       d.setDate(now.getDate() + i);
       const cell: WeekDayCell = new WeekDayCell();
       cell.index = i;

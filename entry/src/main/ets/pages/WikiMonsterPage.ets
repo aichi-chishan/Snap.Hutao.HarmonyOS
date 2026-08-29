@@ -197,6 +197,7 @@ export struct WikiMonsterPage {
           }
         }, (m: WikiMonsterMeta) => `m_${m.id}`)
       }
+      .cachedCount(5)
       .width('100%')
       .layoutWeight(1)
       .scrollBar(BarState.Auto)

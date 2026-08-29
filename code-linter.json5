@@ -28,5 +28,36 @@
     "@security/no-unsafe-dsa-key": "error",
     "@security/no-unsafe-dh-key": "error",
     "@security/no-unsafe-3des": "error"
-  }
+  },
+  "overrides": [
+    {
+      // DsSigner：米哈游 DS 签名协议强制使用 MD5（设备指纹/风控链路），算法不可更换
+      "files": [
+        "entry/src/main/ets/data/network/DsSigner.ets"
+      ],
+      "rules": {
+        "@security/no-unsafe-hash": "off"
+      }
+    },
+    {
+      // RsaEncryptor：米哈游 passport 国服接口固定 RSA1024 + PKCS#1 v1.5 公钥加密，协议约定
+      "files": [
+        "entry/src/main/ets/data/network/RsaEncryptor.ets"
+      ],
+      "rules": {
+        "@security/no-unsafe-rsa-key": "off",
+        "@security/no-unsafe-rsa-encrypt": "off"
+      }
+    },
+    {
+      // RelationalStoreHelper.query 为统一包装，按设计返回打开的结果集；
+      // 全部调用方（data/repo/*）均以 try/finally 显式 close（readItems 同）
+      "files": [
+        "entry/src/main/ets/data/db/RelationalStoreHelper.ets"
+      ],
+      "rules": {
+        "@performance/datashare-query-unrelease-check": "off"
+      }
+    }
+  ]
 }

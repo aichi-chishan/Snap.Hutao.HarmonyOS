@@ -40,8 +40,21 @@ export struct WallpaperLayer {
   ];
 
   private static dailyBackground(): Resource {
-    const day: number = new Date().getDate();
+    const day: number = WallpaperLayer.todayDay();
     return WallpaperLayer.backgrounds[day % WallpaperLayer.backgrounds.length];
+  }
+
+  /** 当日日期缓存（避免高频路径反复创建 Date；跨天由分钟级轮换路径刷新） */
+  private static cachedDay: number = -1;
+  private static cachedDayAt: number = 0;
+
+  private static todayDay(): number {
+    const nowMs: number = Date.now();
+    if (WallpaperLayer.cachedDay < 0 || nowMs - WallpaperLayer.cachedDayAt > 3_600_000) {
+      WallpaperLayer.cachedDay = new Date(nowMs).getDate();
+      WallpaperLayer.cachedDayAt = nowMs;
+    }
+    return WallpaperLayer.cachedDay;
   }
 
   aboutToAppear(): void {
