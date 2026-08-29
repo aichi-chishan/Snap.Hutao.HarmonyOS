@@ -280,6 +280,11 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       const w: number = newValue.width as number;
       this.isWide = w >= Index.WIDE_VP;
       this.isUltra = w >= 1200;
+      // 窗口不足平板宽（<840）时自动折叠侧栏（图标态）给内容让位；用户此后可手动展开，
+      // 仅在宽度变化跨越时触发，不与手动操作打架
+      if (w > 0 && w < 840) {
+        this.sidebarFold = true;
+      }
     })
   }
 
@@ -321,6 +326,11 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       const w: number = newValue.width as number;
       this.isWide = w >= Index.WIDE_VP;
       this.isUltra = w >= 1200;
+      // 窗口不足平板宽（<840）时自动折叠侧栏（图标态）给内容让位；用户此后可手动展开，
+      // 仅在宽度变化跨越时触发，不与手动操作打架
+      if (w > 0 && w < 840) {
+        this.sidebarFold = true;
+      }
     })
   }
 

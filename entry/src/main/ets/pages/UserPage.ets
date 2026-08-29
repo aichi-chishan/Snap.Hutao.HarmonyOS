@@ -192,6 +192,7 @@ export struct UserPage {
         .fontSize(12)
         .height(28)
         .backgroundColor($r('app.color.card_background'))
+        .hoverEffect(HoverEffect.Highlight)
         .fontColor($r('app.color.danger'))
         .border({ width: 1, color: $r('app.color.divider') })
         .onClick(() => {
@@ -288,6 +289,7 @@ export struct UserPage {
         .padding(10)
         .borderRadius(10)
         .backgroundColor($r('app.color.card_background'))
+        .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           this.vm.setDefaultUid(role.gameUid).then(() => {
             this.syncSnap();
@@ -353,6 +355,7 @@ export struct UserPage {
               .width('100%')
               .height(44)
               .backgroundColor($r('app.color.card_background'))
+        .hoverEffect(HoverEffect.Highlight)
               .fontColor($r('app.color.danger'))
               .border({ width: 1, color: $r('app.color.divider') })
               .onClick(() => {
