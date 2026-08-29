@@ -618,7 +618,7 @@ export struct GachaLogPage {
       // 五星头像网格（每个头像带抽数标签）
       this.avatarGrid(card.fivePulls)
     }
-    .width(this.isWide ? 360 : '100%')
+    .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
     .backgroundColor($r('app.color.card_background'))
@@ -654,20 +654,17 @@ export struct GachaLogPage {
         .padding({ top: 24, bottom: 24 })
         .textAlign(TextAlign.Center)
     } else if (this.isWide) {
-      // 宽屏：四池横排等宽（对齐 Windows 四列：角色/神铸/奔行/集录），横向不换行
-      Scroll() {
-        Row({ space: 10 }) {
-          ForEach(this.poolCards, (card: PoolCardData) => {
+      // 宽屏：四池等宽铺满整列（对齐 Windows 四列），自适应宽度、无横向滚动
+      Grid() {
+        ForEach(this.poolCards, (card: PoolCardData) => {
+          GridItem() {
             this.poolCard(card)
-          }, (card: PoolCardData) =>
-            `${card.gachaType}_${card.totalCount}_${card.fiveCount}_${card.sinceLastFive}_${card.startDate}`)
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Top)
+          }
+        }, (card: PoolCardData) =>
+          `${card.gachaType}_${card.totalCount}_${card.fiveCount}_${card.sinceLastFive}_${card.startDate}`)
       }
-      .scrollable(ScrollDirection.Horizontal)
-      .scrollBar(BarState.Auto)
-      .edgeEffect(EdgeEffect.Spring)
+      .columnsTemplate(this.poolCards.length >= 4 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr')
+      .columnsGap(10)
       .width('100%')
     } else {
       Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start, space: { main: LengthMetrics.vp(10), cross: LengthMetrics.vp(10) } }) {

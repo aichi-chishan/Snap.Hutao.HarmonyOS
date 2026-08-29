@@ -45,25 +45,49 @@ export struct HomeAnnouncementCard {
 
   @Builder
   itemRow(item: Announcement) {
-    Row({ space: 8 }) {
-      Text(item.typeName)
-        .fontSize(9)
-        .fontColor($r('app.color.app_primary'))
-        .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-        .borderRadius(6)
-        .backgroundColor($r('app.color.app_primary_bg'))
-      Text(item.title)
-        .fontSize(13)
-        .fontColor($r('app.color.text_primary'))
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .layoutWeight(1)
-      Text(HomeAnnouncementCard.formatDate(item.startTime))
-        .fontSize(12)
-        .fontColor($r('app.color.text_secondary'))
+    Row({ space: 10 }) {
+      // 封面（对齐 Windows 公告卡：官方 banner 图，无图回退类型徽章）
+      if (item.banner.length > 0) {
+        Image(item.banner)
+          .width(88)
+          .height(50)
+          .borderRadius(8)
+          .objectFit(ImageFit.Cover)
+          .backgroundColor($r('app.color.page_background'))
+      } else {
+        Text(item.typeName)
+          .fontSize(9)
+          .fontColor($r('app.color.app_primary'))
+          .padding({ left: 6, right: 6 })
+          .textAlign(TextAlign.Center)
+          .borderRadius(8)
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .width(88)
+          .height(50)
+      }
+      Column({ space: 4 }) {
+        Text(item.title)
+          .fontSize(13)
+          .fontColor($r('app.color.text_primary'))
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+        Row({ space: 6 }) {
+          Text(item.typeName)
+            .fontSize(10)
+            .fontColor($r('app.color.app_primary'))
+          Text(HomeAnnouncementCard.formatDate(item.startTime))
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+        }
+        .width('100%')
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
     }
     .width('100%')
-    .padding({ top: 7, bottom: 7 })
+    .alignItems(VerticalAlign.Center)
+    .padding({ top: 6, bottom: 6 })
     .onClick(() => {
       this.onTapAnnouncement(item.id)
     })

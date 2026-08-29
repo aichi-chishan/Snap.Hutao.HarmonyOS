@@ -10,6 +10,8 @@ import { NavIcon } from './NavIcon';
 @Component
 export struct HomeActBannerCard {
   @Prop entry: ActCalendarEntry = new ActCalendarEntry();
+  /** plain：无独立卡片壳（嵌入合框时用） */
+  @Prop plain: boolean = false;
   onTap: () => void = () => {
   };
 
@@ -30,13 +32,31 @@ export struct HomeActBannerCard {
   }
 
   build() {
-    PressCard({
-      onTap: () => {
-        this.onTap()
-      },
-      cardBg: $r('app.color.card_background'),
-      radius: 12,
-    }) {
+    if (this.plain) {
+      Column() {
+        this.bannerBody()
+      }
+      .width('100%')
+      .padding({ top: 10, bottom: 10 })
+    } else {
+      PressCard({
+        onTap: () => {
+          this.onTap()
+        },
+        cardBg: $r('app.color.card_background'),
+        radius: 12,
+      }) {
+        Column() {
+          this.bannerBody()
+        }
+        .width('100%')
+        .padding(12)
+      }
+    }
+  }
+
+  @Builder
+  bannerBody() {
       Row({ space: 10 }) {
         // 左侧类型图标块（官方素材；活动→Database，卡池→GachaLog）
         Stack({ alignContent: Alignment.Center }) {
@@ -81,9 +101,7 @@ export struct HomeActBannerCard {
         .layoutWeight(1)
       }
       .width('100%')
-      .padding(12)
     }
-  }
 
   private static timestamp(ts: number): string {
     if (ts <= 0) {

@@ -873,54 +873,96 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           subtitle: '胡桃工具箱 · 祈愿记录 / 实时便笺 / 签到日历',
         })
 
-        // Row2：祈愿横幅池卡（竖排 3 池） | 活动卡 2x2
+        // Row2：左 = 三个祈愿卡池（同框竖排） | 右 = 三个挑战/活动（同框竖排）
         Row({ space: 12 }) {
-          Column({ space: 8 }) {
+          Column() {
             if (this.poolBanners().length > 0) {
               ForEach(this.poolBanners(), (pool: ActCalendarEntry, idx: number) => {
-                HomeGachaBannerCard({
-                  pool: pool,
-                  onTap: () => {
-                    this.switchTo(1);
-                  },
+                Column() {
+                  HomeGachaBannerCard({
+                    pool: pool,
+                    plain: true,
+                    onTap: () => {
+                      this.switchTo(1);
+                    },
+                  })
+                  if (idx < this.poolBanners().length - 1) {
+                    Divider()
+                      .color($r('app.color.divider'))
+                      .margin({ top: 4, bottom: 4 })
+                  }
+                }
+                .width('100%')
+                .onClick(() => {
+                  this.switchTo(1);
                 })
               }, (pool: ActCalendarEntry, idx: number) => `pool_${idx}_${pool.name.length}`)
             } else if (this.localPoolSummaries().length > 0) {
-              // 本地祈愿统计兜底：离线也有横幅（抽数/五星/四星统计）
               ForEach(this.localPoolSummaries(), (p: HomePoolSummary, idx: number) => {
-                HomeGachaBannerCard({
-                  pool: new ActCalendarEntry(),
-                  summary: p,
-                  onTap: () => {
-                    this.switchTo(1);
-                  },
+                Column() {
+                  HomeGachaBannerCard({
+                    pool: new ActCalendarEntry(),
+                    summary: p,
+                    plain: true,
+                    onTap: () => {
+                      this.switchTo(1);
+                    },
+                  })
+                  if (idx < this.localPoolSummaries().length - 1) {
+                    Divider()
+                      .color($r('app.color.divider'))
+                      .margin({ top: 4, bottom: 4 })
+                  }
+                }
+                .width('100%')
+                .onClick(() => {
+                  this.switchTo(1);
                 })
               }, (p: HomePoolSummary, idx: number) => `lpool_${idx}_${p.gachaType}`)
             } else {
-              this.emptyWideCard('暂无祈愿横幅', '登录并同步后显示卡池横幅与活动安排', 184)
+              this.emptyWideCard('暂无祈愿卡池', '登录并同步后显示', 120)
             }
           }
           .layoutWeight(1)
+          .padding(14)
+          .borderRadius(12)
+          .backgroundColor($r('app.color.card_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
           .alignItems(HorizontalAlign.Start)
 
-          Grid() {
-            GridItem() {
-              this.actBannerGridItem(0)
-            }
-            GridItem() {
-              this.actBannerGridItem(1)
-            }
-            GridItem() {
-              this.actBannerGridItem(2)
-            }
-            GridItem() {
-              this.actBannerGridItem(3)
+          Column() {
+            if (this.actBanners().length > 0) {
+              ForEach(this.actBanners(), (act: ActCalendarEntry, idx: number) => {
+                Column() {
+                  HomeActBannerCard({
+                    entry: act,
+                    plain: true,
+                    onTap: () => {
+                      router.pushUrl({ url: 'pages/CalendarPage' });
+                    },
+                  })
+                  if (idx < this.actBanners().length - 1) {
+                    Divider()
+                      .color($r('app.color.divider'))
+                      .margin({ top: 4, bottom: 4 })
+                  }
+                }
+                .width('100%')
+                .onClick(() => {
+                  router.pushUrl({ url: 'pages/CalendarPage' });
+                })
+              }, (act: ActCalendarEntry, idx: number) => `ab_${idx}_${act.name.length}`)
+            } else {
+              this.emptyWideCard('暂无活动与挑战', '登录并同步后显示', 120)
             }
           }
-          .columnsTemplate('1fr 1fr')
-          .columnsGap(8)
-          .rowsGap(8)
-          .layoutWeight(1.2)        }
+          .layoutWeight(1)
+          .padding(14)
+          .borderRadius(12)
+          .backgroundColor($r('app.color.card_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
+          .alignItems(HorizontalAlign.Start)
+        }
         .width('100%')
         .alignItems(VerticalAlign.Top)
 
@@ -971,55 +1013,46 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .height(260)
         .alignItems(VerticalAlign.Center)
 
-        // Row3.5：周期挑战卡（深境/剧诗/幽境 三格进度）
-        HomeChallengeCard({
-          data: this.challengeSnap,
-          onTap: (index: number) => {
-            if (index === 0) {
-              router.pushUrl({ url: 'pages/SpiralAbyssPage' });
-            } else if (index === 1) {
-              router.pushUrl({ url: 'pages/RoleCombatPage' });
-            } else {
-              router.pushUrl({ url: 'pages/HardChallengePage' });
-            }
-          },
-        })
-        .width('100%')
-
-        // Row4：等高 2 列卡：日历 | 签到（对齐 Windows 周历行）
-        Row({ space: 10 }) {
-          HomeCalendarCard({
-            eventDays: this.calendarEventDays(),
-            todayActs: this.todayActNames(),
-            onTap: () => {
-              router.pushUrl({ url: 'pages/CalendarPage' });
-            },
-          })
-          .layoutWeight(1)
-          .height('100%')
-
-          HomeSignInCard({
-            uid: this.homeVm.currentUid,
-            info: this.homeVm.signInfo,
-            loaded: this.homeVm.signLoaded,
-            signing: this.homeSigning,
-            todayDay: this.todayDay,
-            onTap: () => {
-              router.pushUrl({ url: 'pages/SignInPage' });
-            },
-            onSignIn: () => {
-              this.doHomeSignIn();
-            },
-            onResignIn: () => {
-              router.pushUrl({ url: 'pages/SignInPage' });
-            },
-          })
-          .layoutWeight(1)
-          .height('100%')
+        // Row4：日历 | 每日签到 | 空 | 空（四列，与 Row3 列宽一致）
+        Grid() {
+          GridItem() {
+            HomeCalendarCard({
+              eventDays: this.calendarEventDays(),
+              todayActs: this.todayActNames(),
+              onTap: () => {
+                router.pushUrl({ url: 'pages/CalendarPage' });
+              },
+            })
+          }
+          GridItem() {
+            HomeSignInCard({
+              uid: this.homeVm.currentUid,
+              info: this.homeVm.signInfo,
+              loaded: this.homeVm.signLoaded,
+              signing: this.homeSigning,
+              todayDay: this.todayDay,
+              onTap: () => {
+                router.pushUrl({ url: 'pages/SignInPage' });
+              },
+              onSignIn: () => {
+                this.doHomeSignIn();
+              },
+              onResignIn: () => {
+                router.pushUrl({ url: 'pages/SignInPage' });
+              },
+            })
+          }
+          GridItem() {
+            Column()
+          }
+          GridItem() {
+            Column()
+          }
         }
+        .columnsTemplate('1fr 1fr 1fr 1fr')
+        .columnsGap(10)
         .width('100%')
         .height(240)
-        .alignItems(VerticalAlign.Center)
 
         // Row5：游戏公告（全宽）
         HomeAnnouncementCard({

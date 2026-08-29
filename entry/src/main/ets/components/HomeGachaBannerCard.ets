@@ -23,6 +23,8 @@ export struct HomeGachaBannerCard {
   @Prop pool: ActCalendarEntry = new ActCalendarEntry();
   /** 本地祈愿统计（pool 为空时兜底） */
   @Prop summary: HomePoolSummary | undefined = undefined;
+  /** plain：无独立卡片壳（嵌入合框时用，由外层容器统一画卡面） */
+  @Prop plain: boolean = false;
   onTap: () => void = () => {
   };
 
@@ -54,16 +56,34 @@ export struct HomeGachaBannerCard {
   }
 
   build() {
-    PressCard({
-      onTap: () => {
-        this.onTap()
-      },
-      cardBg: $r('app.color.card_background'),
-      radius: 12,
-    }) {
-      Column({ space: 8 }) {
-        // 头部：池名 + 剩余时间
-        Row({ space: 6 }) {
+    if (this.plain) {
+      Column() {
+        this.bannerBody()
+      }
+      .width('100%')
+      .padding({ top: 10, bottom: 10 })
+    } else {
+      PressCard({
+        onTap: () => {
+          this.onTap()
+        },
+        cardBg: $r('app.color.card_background'),
+        radius: 12,
+      }) {
+        Column() {
+          this.bannerBody()
+        }
+        .width('100%')
+        .padding(12)
+      }
+    }
+  }
+
+  @Builder
+  bannerBody() {
+    Column({ space: 8 }) {
+      // 头部：池名 + 剩余时间
+      Row({ space: 6 }) {
           Text(this.title())
             .fontSize(13)
             .fontWeight(FontWeight.Medium)
@@ -153,8 +173,6 @@ export struct HomeGachaBannerCard {
         }
       }
       .width('100%')
-      .padding(12)
-    }
   }
 
   /** UP 图标显示单元（解析 URL 尾段文件名，本地可离线命中） */
