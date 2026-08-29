@@ -6,6 +6,7 @@
  */
 import { GameLauncherService, GamePackage, GameLaunchResult } from '../service/GameLauncherService';
 import { PressCard } from './PressCard';
+import { NavIcon } from './NavIcon';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'HomeLaunchCard';
@@ -60,9 +61,7 @@ export struct HomeLaunchCard {
     }) {
       Column({ space: 8 }) {
         Row({ space: 8 }) {
-          Text('▶')
-            .fontSize(13)
-            .fontColor($r('app.color.app_primary'))
+          NavIcon({ name: 'LaunchGame', iconSize: 18 })
           Text('启动游戏')
             .fontSize(14)
             .fontWeight(FontWeight.Medium)

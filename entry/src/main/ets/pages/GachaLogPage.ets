@@ -17,6 +17,7 @@ import { util } from '@kit.ArkTS';
 import { GachaLogViewModel } from '../viewmodel/GachaLogViewModel';
 import { GachaType } from '../model/GachaType';
 import { GachaItem } from '../model/GachaItem';
+import { RecentGachaItem } from '../model/RefreshProgress';
 import { PoolStatistics, FiveStarDetail } from '../model/GachaStatistics';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 import { UigfService } from '../service/UigfService';
@@ -88,7 +89,7 @@ export struct GachaLogPage {
   /** 刷新进度快照 */
   @State progressText: string = '';
   @State progressCount: number = 0;
-  @State recentNames: string[] = [];
+  @State recentItems: RecentGachaItem[] = [];
   @State showProgressDetail: boolean = false;
   /** 统计/比例模式（Windows StatisticsCard 双模式） */
   @State showRatioMode: boolean = false;
@@ -147,7 +148,7 @@ export struct GachaLogPage {
   syncProgress(): void {
     this.progressText = this.vm.progress.reportText;
     this.progressCount = this.vm.progress.fetchedCount;
-    this.recentNames = this.vm.progress.recentNames.slice();
+    this.recentItems = this.vm.progress.recentItems.slice(-40).reverse();
   }
 
   /** 同步全部统计/历史快照到页面状态（@State 直接驱动） */
@@ -834,8 +835,8 @@ export struct GachaLogPage {
             .fontSize(12)
             .fontColor($r('app.color.text_primary'))
             .width('100%')
-          // 新拉取记录名称滚动展示（模拟电脑版滚动出金/出紫效果）
-          if (this.recentNames.length > 0) {
+          // 新拉取记录头像流（对齐 Windows：实时滚动物品/角色头像，星级描边 + 计数角标）
+          if (this.recentItems.length > 0) {
             Text('最新抽到')
               .fontSize(11)
               .fontWeight(FontWeight.Medium)
@@ -843,26 +844,41 @@ export struct GachaLogPage {
               .width('100%')
               .margin({ top: 2 })
             Scroll() {
-              Row({ space: 6 }) {
-                ForEach(this.recentNames, (name: string, idx: number) => {
-                  Text(name)
-                    .fontSize(11)
-                    .fontColor(name.startsWith('★') ? $r('app.color.app_primary') : $r('app.color.text_primary'))
-                    .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+              Row({ space: 8 }) {
+                ForEach(this.recentItems, (it: RecentGachaItem, idx: number) => {
+                  Column({ space: 2 }) {
+                    Stack({ alignContent: Alignment.BottomEnd }) {
+                      MetaIcon({
+                        category: it.itemType === '武器' ? 'EquipIcon' : 'AvatarIcon',
+                        name: WikiMetaService.iconOfItemName(it.name, it.itemType),
+                        iconSize: 40,
+                      })
+                      if (it.count > 1) {
+                        Text(`x${it.count}`)
+                          .fontSize(9)
+                          .fontColor(Color.White)
+                          .padding({ left: 4, right: 4, top: 1, bottom: 1 })
+                          .borderRadius(6)
+                          .backgroundColor('#B3000000')
+                      }
+                    }
+                    .width(44)
+                    .height(44)
                     .borderRadius(10)
-                    .backgroundColor(name.startsWith('★') ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
-                    .border({ width: 1, color: $r('app.color.divider') })
-                    .constraintSize({ maxWidth: 120 })
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                }, (name: string, idx: number) => `rn_${idx}_${name}`)
+                    .border({
+                      width: it.rank >= 5 ? 2 : 1,
+                      color: it.rank >= 5 ? $r('app.color.five_star') :
+                        (it.rank === 4 ? $r('app.color.four_star') : $r('app.color.divider')),
+                    })
+                  }
+                }, (it: RecentGachaItem, idx: number) => `rn_${idx}_${it.name}`)
               }
             }
             .scrollable(ScrollDirection.Horizontal)
-            .scrollBar(BarState.Auto)
+            .scrollBar(BarState.Off)
             .edgeEffect(EdgeEffect.Spring)
             .width('100%')
-            .height(32)
+            .height(58)
           } else {
             Text('暂无新记录')
               .fontSize(11)
@@ -1054,10 +1070,6 @@ export struct GachaLogPage {
         // Pivot 五个页签（总览/历史/角色/武器/倒计时）
         Row({ space: 6 }) {
           this.pivotTab(0, '总览')
-          this.pivotTab(1, '历史')
-          this.pivotTab(2, '角色')
-          this.pivotTab(3, '武器')
-          this.pivotTab(4, '倒计时')
         }
         .width('100%')
         .padding({ left: 16, right: 16, bottom: 8 })

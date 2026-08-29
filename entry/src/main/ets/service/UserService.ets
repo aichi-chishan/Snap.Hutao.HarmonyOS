@@ -172,6 +172,8 @@ export class UserService {
     } else {
       await UserRepo.insertUser(saved);
     }
+    // 登录即选中该账号（否则所有账号 is_selected=0，账号列表全部显示"切换"且无状态可变）
+    await UserRepo.selectUser(saved.id);
 
     // Cookie 密文落库
     await UserRepo.saveCookieFor(saved.id, rawCookie);

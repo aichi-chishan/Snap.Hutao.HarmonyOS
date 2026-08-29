@@ -10,7 +10,7 @@ import { GachaRepo } from '../data/repo/GachaRepo';
 import { GachaType } from '../model/GachaType';
 import { GachaItem } from '../model/GachaItem';
 import { GachaArchive } from '../model/GachaArchive';
-import { RefreshProgress } from '../model/RefreshProgress';
+import { RefreshProgress, RecentGachaItem } from '../model/RefreshProgress';
 import { User } from '../model/User';
 import { UserService } from './UserService';
 import { RegionUtil, AppConstants, RetCodes } from '../common/Constants';
@@ -143,12 +143,14 @@ export class GachaLogService {
           if (!existingIds.has(item.gachaId)) {
             newItems.push(item);
             existingIds.add(item.gachaId);
-            // 收集新拉记录名称（最近 60 条，供 UI 滚动展示）
-            if (progress.recentNames.length < 60) {
-              const label: string = item.rankType === 5
-                ? `★ ${item.name}`
-                : (item.rankType === 4 ? `◆ ${item.name}` : item.name);
-              progress.recentNames.push(label);
+            // 收集新拉记录（最近 40 条，供 UI 头像流展示）
+            if (progress.recentItems.length < 40) {
+              const ri: RecentGachaItem = new RecentGachaItem();
+              ri.name = item.name;
+              ri.itemType = item.itemType;
+              ri.rank = item.rankType;
+              ri.count = item.count;
+              progress.recentItems.push(ri);
             }
           }
         }

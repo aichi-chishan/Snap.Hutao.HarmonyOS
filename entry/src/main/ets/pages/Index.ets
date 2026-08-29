@@ -347,7 +347,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       // 返回按钮（全局返回上一步）
       Stack({ alignContent: Alignment.Center }) {
         Text('‹')
-          .fontSize(22)
+          .fontSize(20)
           .fontColor($r('app.color.text_primary'))
       }
       .width(36)
@@ -369,7 +369,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       // 三条杠（折叠侧栏：仅图标 / 图标+文字）
       Stack({ alignContent: Alignment.Center }) {
         Text('☰')
-          .fontSize(18)
+          .fontSize(20)
           .fontColor($r('app.color.text_primary'))
       }
       .width(36)
@@ -377,7 +377,9 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       .borderRadius(8)
       .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
-        this.sidebarFold = !this.sidebarFold;
+        this.getUIContext().animateTo({ curve: Motion.springSoft() }, () => {
+          this.sidebarFold = !this.sidebarFold;
+        });
       })
 
       // 版本号（胡桃 1.20.0）
@@ -469,6 +471,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           .fontSize(15)
           .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Normal)
           .fontColor(this.currentIndex === index ? $r('app.color.app_primary') : $r('app.color.text_primary'))
+          .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
       }
       Blank()
     }
@@ -517,6 +520,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           .fontSize(15)
           .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Normal)
           .fontColor(this.currentIndex === index ? $r('app.color.app_primary') : $r('app.color.text_primary'))
+          .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
       }
       Blank()
     }

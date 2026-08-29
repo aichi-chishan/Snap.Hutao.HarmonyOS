@@ -27,6 +27,7 @@ import { util } from '@kit.ArkTS';
 import { AppContextProvider } from '../../common/AppContext';
 import { PreferencesStore } from '../prefs/PreferencesStore';
 import { Logger } from '../../common/Logger';
+import { GitHubMirror } from '../../common/GitHubMirror';
 
 const TAG: string = 'GameDataUpdater';
 
@@ -297,6 +298,19 @@ export class GameDataUpdater {
    *  当前 manifest 多为小文件（元数据 JSON/图标 PNG），http 直接下载 + 临时文件原子替换已保证可靠性；
    *  后续若引入大体积资源包（立绘/桌面壁纸），可在本方法内切换为 request.agent。 */
   private static async downloadWithAgent(url: string, filePath: string): Promise<void> {
+    let lastErr: Error = new Error('unknown');
+    for (const candidate of GitHubMirror.candidates(url)) {
+      try {
+        await GameDataUpdater.downloadOnce(candidate, filePath);
+        return;
+      } catch (e) {
+        lastErr = e as Error;
+      }
+    }
+    throw lastErr;
+  }
+
+  private static async downloadOnce(url: string, filePath: string): Promise<void> {
     const req = http.createHttp();
     try {
       // expectDataType STRING 兼容二进制安全写入（UTF-8 元数据）；图片走 ARRAY_BUFFER 由调用方分派太复杂，
@@ -324,6 +338,19 @@ export class GameDataUpdater {
 
   /** 中文 UTF-8 文本 GET（清单） */
   private static async httpGetString(url: string): Promise<string> {
+    // 直连失败自动回退公共镜像（国内直连 GitHub 不稳定）
+    let lastErr: Error = new Error('unknown');
+    for (const candidate of GitHubMirror.candidates(url)) {
+      try {
+        return await GameDataUpdater.httpGetStringOnce(candidate);
+      } catch (e) {
+        lastErr = e as Error;
+      }
+    }
+    throw lastErr;
+  }
+
+  private static async httpGetStringOnce(url: string): Promise<string> {
     const req = http.createHttp();
     try {
       const resp = await req.request(url, {

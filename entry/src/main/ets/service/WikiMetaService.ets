@@ -448,6 +448,16 @@ export class WikiMetaService {
     return found;
   }
 
+  /** 抽卡记录条目 → 图标名（角色走 AvatarIcon、武器走 EquipIcon；未命中返回空） */
+  static iconOfItemName(name: string, itemType: string): string {
+    if (itemType === '武器') {
+      const w: string | undefined = WikiMetaService.weaponNameMap.get(name);
+      return w ?? '';
+    }
+    const a: string | undefined = WikiMetaService.avatarNameMap.get(name);
+    return a ?? '';
+  }
+
   /** 元素英文 → 中文 */
   static elementName(e: string): string {
     switch (e) {

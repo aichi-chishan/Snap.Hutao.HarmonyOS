@@ -14,11 +14,11 @@
     },
     {
       "name": "page_background",
-      "value": "#111113"
+      "value": "#0B0B0D"
     },
     {
       "name": "card_background",
-      "value": "#1C1C1E"
+      "value": "#1E1E23"
     },
     {
       "name": "text_primary",
@@ -30,7 +30,7 @@
     },
     {
       "name": "divider",
-      "value": "#2C2C2E"
+      "value": "#34343B"
     },
     {
       "name": "success",

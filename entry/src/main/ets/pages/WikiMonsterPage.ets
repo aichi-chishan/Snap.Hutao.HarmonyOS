@@ -17,6 +17,7 @@ export struct WikiMonsterPage {
   @State loading: boolean = true;
   @State monsters: WikiMonsterMeta[] = [];
   @State materials: Map<number, MetaMaterial> = new Map();
+  /** 选中项 describeId（monster id 有 90 个 0 值重复，不可作唯一键） */
   @State selectedId: number = 0;
   /** 当前详情对象（页面 @State 显式赋值驱动刷新） */
   @State current: WikiMonsterMeta | undefined = undefined;
@@ -46,7 +47,7 @@ export struct WikiMonsterPage {
     this.materials = await WikiMetaService.getMaterials();
     // 宽屏默认展示第一只；窄屏进入列表
     if (this.isWide && this.monsters.length > 0) {
-      this.selectedId = this.monsters[0].id;
+      this.selectedId = this.monsters[0].describeId;
       this.current = this.monsters[0];
       this.onMonsterSelected();
     } else {
@@ -297,17 +298,17 @@ export struct WikiMonsterPage {
             .width('100%')
             .padding(8)
             .borderRadius(10)
-            .backgroundColor(this.selectedId === m.id ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+            .backgroundColor(this.selectedId === m.describeId ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
             .border({
               width: 1,
-              color: this.selectedId === m.id ? $r('app.color.app_primary') : $r('app.color.divider'),
+              color: this.selectedId === m.describeId ? $r('app.color.app_primary') : $r('app.color.divider'),
               radius: 10,
             })
             .onClick(() => {
               this.select(m);
             })
           }
-        }, (m: WikiMonsterMeta) => `m_${m.id}`)
+        }, (m: WikiMonsterMeta) => `m_${m.describeId}`)
       }
       .cachedCount(5)
       .width('100%')

@@ -13,6 +13,7 @@ import { util } from '@kit.ArkTS';
 import { AppContextProvider } from '../../common/AppContext';
 import { PreferencesStore } from '../prefs/PreferencesStore';
 import { Logger } from '../../common/Logger';
+import { GitHubMirror } from '../../common/GitHubMirror';
 
 const TAG: string = 'ResourcePackService';
 /** 默认大图清单 URL（aichi-chishan/snap-hutao-data 仓库，由 github-data/gen-manifest.ps1 生成；设置页可改） */
@@ -92,27 +93,35 @@ export class ResourcePackService {
       // 已存在
     }
     const dest = `${dir}/${name}.png`;
-    const req = http.createHttp();
-    try {
-      const resp = await req.request(url, {
-        method: http.RequestMethod.GET,
-        expectDataType: http.HttpDataType.ARRAY_BUFFER,
-        connectTimeout: 20000,
-      });
-      if (resp.responseCode !== http.ResponseCode.OK) {
-        throw new Error(`http ${resp.responseCode}`);
-      }
-      const file = fileIo.openSync(dest, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
+    // 直连失败自动回退公共镜像（国内直连 GitHub 不稳定）
+    let lastErr: Error = new Error('unknown');
+    for (const candidate of GitHubMirror.candidates(url)) {
+      const req = http.createHttp();
       try {
-        fileIo.writeSync(file.fd, resp.result as ArrayBuffer);
+        const resp = await req.request(candidate, {
+          method: http.RequestMethod.GET,
+          expectDataType: http.HttpDataType.ARRAY_BUFFER,
+          connectTimeout: 20000,
+        });
+        if (resp.responseCode !== http.ResponseCode.OK) {
+          throw new Error(`http ${resp.responseCode}`);
+        }
+        const file = fileIo.openSync(dest,
+          fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
+        try {
+          fileIo.writeSync(file.fd, resp.result as ArrayBuffer);
+        } finally {
+          fileIo.closeSync(file);
+        }
+        Logger.info(TAG, `downloaded ${category}/${name}`);
+        return dest;
+      } catch (e) {
+        lastErr = e as Error;
       } finally {
-        fileIo.closeSync(file);
+        req.destroy();
       }
-      Logger.info(TAG, `downloaded ${category}/${name}`);
-      return dest;
-    } finally {
-      req.destroy();
     }
+    throw lastErr;
   }
 
   /** 下载整个清单（进度回调按条目返回） */

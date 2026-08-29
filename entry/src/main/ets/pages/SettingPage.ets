@@ -487,13 +487,13 @@ export struct SettingPage {
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.divider') })
 
-          this.sectionTitle('游戏数据更新')
+          this.sectionTitle('云资源同步（GitHub 直连失败自动走镜像加速）')
           Row() {
             Column({ space: 2 }) {
               Text('游戏数据源（GitHub）')
                 .fontSize(15)
                 .fontColor($r('app.color.text_primary'))
-              Text('自动拉取最新角色/武器/怪物/成就元数据；更新成功后各图鉴优先使用远端数据')
+              Text('角色/武器/怪物/成就元数据与常用图标已内置安装包；此处仅同步版本更新。直连失败自动回退 ghfast/ghproxy 镜像')
                 .fontSize(11)
                 .fontColor($r('app.color.text_secondary'))
             }
@@ -574,13 +574,12 @@ export struct SettingPage {
           .padding(14)
           .alignItems(VerticalAlign.Center)
 
-          this.sectionTitle('云端资源扩展包')
           Row() {
             Column({ space: 2 }) {
-              Text('角色立绘 / 名片大图')
+              Text('大图扩展包（角色立绘 / 名片，按需下载）')
                 .fontSize(15)
                 .fontColor($r('app.color.text_primary'))
-              Text('从 GitHub 清单按需下载大图到本地缓存（不占用安装包体积）')
+              Text('同一仓库 resource_manifest.json；同一镜像加速链路。体积大故不内置安装包')
                 .fontSize(11)
                 .fontColor($r('app.color.text_secondary'))
             }
