@@ -67,6 +67,7 @@ export struct PressCard {
       offsetY: 5,
     } : undefined)
     .scale({ x: this.pressScale, y: this.pressScale })
+    .hoverEffect(HoverEffect.Highlight)
     .visualEffect(new hdsEffect.HdsEffectBuilder()
       .pointLight({
         sourceType: this.pressed

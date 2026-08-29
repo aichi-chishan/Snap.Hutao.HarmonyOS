@@ -253,6 +253,7 @@ export struct SettingPage {
       .borderRadius(10)
       .backgroundColor(this.bgType === value ? $r('app.color.app_primary') : Color.Transparent)
       .border({ width: 1, color: $r('app.color.divider') })
+      .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
         this.bgType = value;
         PreferencesStore.setBackgroundImageType(value);
@@ -363,6 +364,7 @@ export struct SettingPage {
       .borderRadius(12)
       .backgroundColor(this.themeMode === mode ? $r('app.color.app_primary') : $r('app.color.card_background'))
       .border({ width: 1, color: $r('app.color.divider') })
+      .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
         this.themeMode = mode;
         this.applyTheme(mode);
@@ -380,6 +382,7 @@ export struct SettingPage {
       .border({ width: 1, color: $r('app.color.divider') })
       .layoutWeight(1)
       .textAlign(TextAlign.Center)
+      .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
         this.ambientLevel = level;
         // 三档 → 存 0/0.5/1 供 Index 映射官方材质等级
@@ -413,6 +416,7 @@ export struct SettingPage {
     .backgroundColor($r('app.color.card_background'))
     .borderRadius(12)
     .border({ width: 1, color: $r('app.color.divider') })
+    .hoverEffect(HoverEffect.Highlight)
     .onClick(action)
   }
 

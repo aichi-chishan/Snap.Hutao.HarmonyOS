@@ -43,7 +43,12 @@
 - 若为数组/Map/对象字面量，先声明 class 再 new；`@State` 数组整体赋值触发刷新。
 - 颜色组件（文本/图标）注意换行符：部分文件是 **CRLF**，用 `\r\n` 精确匹配，或读后逐行处理。
 - 新页面必须在 `resources/base/profile/main_pages.json` 注册 route，并在 `Index.ets` 的 `sideNav()`/`wideContent()` 接线。
-- 宽屏/窄屏用 `isWide = width >= 840`（onAreaChange 驱动）。
+- **多端断点规范**（onAreaChange 驱动，读**组件自身宽度**而非屏幕）：
+  - 壳层（Index 侧边栏）：窗口宽 >=720 显示宽屏壳（`WIDE_VP`）；<720 手机底部 HdsTabs。
+  - 页面/组件（内嵌页）：内容区宽 >=840 双栏宽屏（`isWide`）。
+  - 超宽（>=1200 `isUltra`）：首页入口/活动网格扩为四列。
+  - 三层阈值对象不同（窗口/内容区），720-840 之间出现"壳宽屏+内容单列"属预期（对齐 PC 窄窗口）。
+  - **PC 鼠标悬停**：可点行/卡片/按钮一律加 `.hoverEffect(HoverEffect.Highlight)`（navItem/entryTile/PressCard/QTapButton/设置行已铺）。
 - **动效统一走 `common/Motion.ets`**：spring 三档 / pageSwitch 非对称转场（宽屏内容切换经 `PageContainer`）/ riseIn 进场 / staggerDelay 错峰；导航选中指示条用 geometryTransition（切换必须经 Index.switchTo 的 animateTo 驱动）。应用级沉浸光感已开（module.json5 UIMaterial.state=enable）。
 
 ## 已知坑（Do NOT trip）

@@ -70,6 +70,7 @@ export struct QTapButton {
     .backgroundColor(this.primary ? $r('app.color.app_primary') : $r('app.color.card_background'))
     .border({ width: this.primary ? 0 : 1, color: $r('app.color.divider') })
     .opacity(this.disabled ? 0.5 : 1)
+    .hoverEffect(this.disabled ? HoverEffect.None : HoverEffect.Highlight)
     .scale({ x: this.pressScale, y: this.pressScale })
     // 官方按压光效：按下时点光源变亮（跟随手指），支持组件范围含 Row
     .visualEffect(new hdsEffect.HdsEffectBuilder()

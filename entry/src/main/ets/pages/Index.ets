@@ -86,6 +86,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     @State sidebarFold: boolean = false;
     /** 首页下拉刷新状态 */
     @State homeRefreshing: boolean = false;
+    /** 超宽（>=1200vp PC 全屏/平板横屏）：首页网格扩展列数 */
+    @State isUltra: boolean = false;
     /** 系统三键区（最小化/全屏/关闭）占位宽度 vp（PC 自定义窗口装饰；0=无系统三键） */
     @StorageProp('titleBtnWidthVp') titleBtnWidthVp: number = 0;
     /** 是否正在通过自绘 TitleBar 拖拽窗口（避免重复触发 startMoving） */
@@ -106,6 +108,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       AppStorage.setOrCreate<string>('bgFolderPath', PreferencesStore.getBackgroundFolderPath());
       // 立即检测宽屏（PC/平板>普通手机）：屏幕宽度 vp 判断，避免等待 onAreaChange 首帧
       this.isWide = Index.detectWideScreen();
+      this.isUltra = Index.detectWidthVp() >= 1200;
       this.reloadHome();
     }
 
@@ -163,18 +166,21 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       });
     }
 
-  /** 宽屏检测：屏幕宽度 vp >= WIDE_THRESHOLD 视为平板/PC */
-  private static detectWideScreen(): boolean {
+  /** 屏幕宽度 vp（异常回退 0） */
+  private static detectWidthVp(): number {
     try {
       const d: display.Display = display.getDefaultDisplaySync();
       const dp: number = d.densityPixels;
       const widthPx: number = d.width;
-      const widthVp: number = dp > 0 ? widthPx / dp : widthPx;
-      const thresholdVp = 720;
-      return widthVp >= thresholdVp;
+      return dp > 0 ? widthPx / dp : widthPx;
     } catch (e) {
-      return false;
+      return 0;
     }
+  }
+
+  /** 宽屏检测：屏幕宽度 vp >= 720 视为平板/PC（壳层侧边栏阈值；页面内容区用 840，见 AGENTS.md 断点规范） */
+  private static detectWideScreen(): boolean {
+    return Index.detectWidthVp() >= Index.WIDE_VP;
   }
 
   /** 通过自绘 TitleBar 拖拽移动窗口（接管被隐藏的系统标题栏拖拽能力） */
@@ -273,6 +279,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .onAreaChange((oldValue: Area, newValue: Area) => {
       const w: number = newValue.width as number;
       this.isWide = w >= Index.WIDE_VP;
+      this.isUltra = w >= 1200;
     })
   }
 
@@ -313,6 +320,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       // 与 phoneShell 同阈值：窗口缩到 <720vp 时切回窄屏（2in1 旋转/缩放）
       const w: number = newValue.width as number;
       this.isWide = w >= Index.WIDE_VP;
+      this.isUltra = w >= 1200;
     })
   }
 
@@ -453,6 +461,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .padding({ left: this.sidebarFold ? 12 : 4, right: this.sidebarFold ? 0 : 14, top: 10, bottom: 10 })
     .borderRadius(10)
     .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary_bg') : Color.Transparent)
+    .hoverEffect(HoverEffect.Highlight)
     .animation({ curve: Motion.springFast() })
     .onClick(() => {
       this.switchTo(index);
@@ -500,6 +509,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .padding({ left: 4, right: 14, top: 9, bottom: 9 })
     .borderRadius(10)
     .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary_bg') : Color.Transparent)
+    .hoverEffect(HoverEffect.Highlight)
     .animation({ curve: Motion.springFast() })
     .onClick(() => {
       this.switchTo(index);
@@ -708,7 +718,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
                 }
               }, (act: ActCalendarEntry) => `home_act_${act.type}_${act.name}_${act.endTime}`)
             }
-            .columnsTemplate('1fr 1fr')
+            .columnsTemplate(this.isUltra ? '1fr 1fr 1fr 1fr' : '1fr 1fr')
             .columnsGap(10)
             .rowsGap(10)
             .width('100%')
@@ -797,7 +807,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               })
             }
           }
-          .columnsTemplate('1fr 1fr')
+          .columnsTemplate(this.isUltra ? '1fr 1fr 1fr 1fr' : '1fr 1fr')
           .columnsGap(10)
           .rowsGap(10)
           .width('100%')
@@ -1009,7 +1019,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
                   }
                 }, (act: ActCalendarEntry) => `home_act_${act.type}_${act.name}_${act.endTime}`)
               }
-              .columnsTemplate('1fr 1fr')
+              .columnsTemplate(this.isUltra ? '1fr 1fr 1fr 1fr' : '1fr 1fr')
               .columnsGap(8)
               .rowsGap(8)
               .width('100%')
@@ -1066,7 +1076,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               })
             }
           }
-          .columnsTemplate('1fr 1fr')
+          .columnsTemplate(this.isUltra ? '1fr 1fr 1fr 1fr' : '1fr 1fr')
           .columnsGap(10)
           .rowsGap(10)
           .layoutWeight(1)
@@ -1251,6 +1261,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .borderRadius($r('app.float.card_radius'))
     .backgroundColor($r('app.color.card_background'))
     .transition(Motion.riseIn())
+    .hoverEffect(HoverEffect.Highlight)
     .onClick(onClick)
   }
 
