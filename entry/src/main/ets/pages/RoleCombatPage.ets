@@ -294,13 +294,22 @@ export struct RoleCombatPage {
           .width('100%')
         ForEach(round.choiceCards, (buff: RoleCombatBuff) => {
           Row({ space: 8 }) {
-            Text(buff.name.length > 0 ? buff.name.substring(0, 1) : '🎴')
-              .fontSize(12)
-              .width(28)
-              .height(28)
-              .textAlign(TextAlign.Center)
-              .borderRadius(8)
-              .backgroundColor($r('app.color.app_primary_bg'))
+            if (buff.icon.startsWith('http')) {
+              Image(buff.icon)
+                .width(28)
+                .height(28)
+                .borderRadius(8)
+                .objectFit(ImageFit.Cover)
+            } else {
+              Text('◆')
+                .fontSize(11)
+                .fontColor($r('app.color.app_primary'))
+                .width(28)
+                .height(28)
+                .textAlign(TextAlign.Center)
+                .borderRadius(8)
+                .backgroundColor($r('app.color.app_primary_bg'))
+            }
             Text(buff.name)
               .fontSize(12)
               .fontColor($r('app.color.text_primary'))

@@ -324,17 +324,30 @@ export struct GachaLogPage {
     return pull.name.substring(0, 1);
   }
 
-  /** 出金记录 → 角色头像图标名（未命中返回空，回退首字圆）；武器池出金走武器图标 */
+  /** 出金记录 → 图标名（常驻池混有武器，池类型判定不可靠：先按 itemType，未命中双表回退） */
   iconOfPull(pull: FiveStarPull): string {
+    const clean: string = GachaLogPage.cleanName(pull.name);
     if (pull.itemType === '武器') {
-      return WikiMetaService.iconOfWeaponName(GachaLogPage.cleanName(pull.name));
+      return WikiMetaService.iconOfWeaponName(clean);
     }
-    return WikiMetaService.iconOfAvatarName(GachaLogPage.cleanName(pull.name));
+    const avatar: string = WikiMetaService.iconOfAvatarName(clean);
+    if (avatar.length > 0) {
+      return avatar;
+    }
+    return WikiMetaService.iconOfWeaponName(clean);
   }
 
-  /** 出金头像分类（武器池→EquipIcon，其余 AvatarIcon） */
+  /** 出金头像分类（按实际解析出的图标名回推；武器图未命中时保持 AvatarIcon 让回退头像兜底） */
   pullCategory(pull: FiveStarPull): string {
-    return pull.itemType === '武器' ? 'EquipIcon' : 'AvatarIcon';
+    const clean: string = GachaLogPage.cleanName(pull.name);
+    if (pull.itemType === '武器') {
+      return 'EquipIcon';
+    }
+    const avatar: string = WikiMetaService.iconOfAvatarName(clean);
+    if (avatar.length > 0) {
+      return 'AvatarIcon';
+    }
+    return WikiMetaService.iconOfWeaponName(clean).length > 0 ? 'EquipIcon' : 'AvatarIcon';
   }
 
   /** 清洗抽卡记录名：剔除星级符号/空格（★/◆/空格），对齐元数据名字做 icon 映射 */
@@ -437,7 +450,7 @@ export struct GachaLogPage {
         .width('100%')
     } else {
       Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
-        ForEach(pulls, (pull: FiveStarPull) => {
+        ForEach(pulls.length > 10 ? pulls.slice(0, 10) : pulls, (pull: FiveStarPull) => {
           Stack({ alignContent: Alignment.BottomEnd }) {
             if (this.iconOfPull(pull).length > 0) {
               MetaIcon({ category: this.pullCategory(pull), name: this.iconOfPull(pull), iconSize: 40 })
@@ -465,6 +478,23 @@ export struct GachaLogPage {
           .width(40)
           .height(42)
         }, (pull: FiveStarPull) => `${pull.name}_${pull.time}_${pull.lastPull}`)
+        if (pulls.length > 10) {
+          Column({ space: 2 }) {
+            Text(`+${pulls.length - 10}`)
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.text_secondary'))
+            Text('更多')
+              .fontSize(9)
+              .fontColor($r('app.color.text_secondary'))
+          }
+          .width(40)
+          .height(42)
+          .borderRadius(10)
+          .backgroundColor($r('app.color.page_background'))
+          .alignItems(HorizontalAlign.Center)
+          .justifyContent(FlexAlign.Center)
+        }
       }
       .width('100%')
     }
@@ -593,8 +623,8 @@ export struct GachaLogPage {
     .borderRadius($r('app.float.card_radius'))
     .backgroundColor($r('app.color.card_background'))
     .border({
-      width: card.isCurrent ? 2 : 1,
-      color: card.isCurrent ? $r('app.color.app_primary') : $r('app.color.divider'),
+      width: card.isCurrent && !this.isWide ? 2 : 1,
+      color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.divider'),
     })
   }
 
@@ -1412,7 +1442,7 @@ export struct GachaLogPage {
         .padding(14)
         .borderRadius($r('app.float.card_radius'))
         .backgroundColor($r('app.color.card_background'))
-        .border({ width: 1, color: card.isCurrent ? $r('app.color.app_primary') : $r('app.color.divider') })
+        .border({ width: 1, color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.divider') })
       }, (card: PoolCardData) => `cd_${card.gachaType}`)
       }
       .width('100%')

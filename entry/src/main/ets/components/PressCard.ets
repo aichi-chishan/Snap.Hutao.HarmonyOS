@@ -58,6 +58,8 @@ export struct PressCard {
       this.content()
     }
     .width('100%')
+    // 固定高父容器（仪表板行）下撑满实现多卡等高；自适应父容器中百分比回落为内容高，无副作用
+    .height('100%')
     .borderRadius(this.radius)
     .backgroundColor(this.cardBg)
     .shadow(this.shadowEnabled ? {

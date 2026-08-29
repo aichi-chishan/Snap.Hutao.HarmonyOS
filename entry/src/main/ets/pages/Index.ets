@@ -1021,101 +1021,18 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .height(240)
         .alignItems(VerticalAlign.Center)
 
-        // Row5：公告 | 登录状态 + 功能入口网格（4 列）
-        Row({ space: 10 }) {
-          HomeAnnouncementCard({
-            items: this.homeVm.announcements,
-            loaded: this.homeVm.announcementsLoaded,
-            onTapAnnouncement: (id: number) => {
-              router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: { annId: id } });
-            },
-            onTapMore: () => {
-              router.pushUrl({ url: 'pages/AnnouncementPage' });
-            },
-          })
-          .layoutWeight(1)
-          .height('100%')
-
-          Column({ space: 10 }) {
-            LoginStatusBar()
-            if (this.homeVm.acts.length > 0) {
-              this.actListTitle()
-              Grid() {
-                ForEach(this.homeVm.acts, (act: ActCalendarEntry) => {
-                  GridItem() {
-                    HomeActCard({
-                      entry: act,
-                      onTap: () => {
-                        router.pushUrl({ url: 'pages/CalendarPage' });
-                      },
-                    })
-                  }
-                }, (act: ActCalendarEntry) => `home_act_${act.type}_${act.name}_${act.endTime}`)
-              }
-              .columnsTemplate(this.isUltra ? '1fr 1fr 1fr 1fr' : '1fr 1fr')
-              .columnsGap(8)
-              .rowsGap(8)
-              .width('100%')
-            }
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
-
-          // 功能入口（2 列网格）
-          Grid() {
-            GridItem() {
-              this.entryTile('GachaLog', '祈愿记录', '分池统计', () => {
-                this.switchTo(1);
-              })
-            }
-            GridItem() {
-              this.entryTile('AvatarProperty', '我的角色', '角色详情', () => {
-                this.switchTo(4);
-              })
-            }
-            GridItem() {
-              this.entryTile('SpiralAbyss', '深境螺旋', '当期战绩', () => {
-                this.switchTo(6);
-              })
-            }
-            GridItem() {
-              this.entryTile('RoleCombat', '幻想真境剧诗', '回合奖章', () => {
-                this.switchTo(7);
-              })
-            }
-            GridItem() {
-              this.entryTile('HardChallenge', '幽境危战', '强敌挑战', () => {
-                this.switchTo(8);
-              })
-            }
-            GridItem() {
-              this.entryTile('Cultivation', '养成计划', '材料计算', () => {
-                this.switchTo(5);
-              })
-            }
-            GridItem() {
-              this.entryTile('Achievement', '成就管理', 'UIAF 导入导出', () => {
-                this.switchTo(2);
-              })
-            }
-            GridItem() {
-              this.entryTile('WikiAvatar', '角色资料', '资料百科', () => {
-                this.switchTo(9);
-              })
-            }
-            GridItem() {
-              this.entryTile('⚙️', '设置', '主题 / 账号', () => {
-                this.switchTo(13);
-              })
-            }
-          }
-          .columnsTemplate(this.isUltra ? '1fr 1fr 1fr 1fr' : '1fr 1fr')
-          .columnsGap(10)
-          .rowsGap(10)
-          .layoutWeight(1)
-        }
+        // Row5：游戏公告（全宽）
+        HomeAnnouncementCard({
+          items: this.homeVm.announcements,
+          loaded: this.homeVm.announcementsLoaded,
+          onTapAnnouncement: (id: number) => {
+            router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: { annId: id } });
+          },
+          onTapMore: () => {
+            router.pushUrl({ url: 'pages/AnnouncementPage' });
+          },
+        })
         .width('100%')
-        .alignItems(VerticalAlign.Top)
 
         Text('.')
           .fontSize(1)

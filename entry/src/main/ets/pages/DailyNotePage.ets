@@ -8,6 +8,8 @@ import { DailyNoteViewModel } from '../viewmodel/DailyNoteViewModel';
 import { DailyNote, Expedition } from '../model/DailyNote';
 import { NotificationHelper } from '../data/local/NotificationHelper';
 import { NotifyFlags } from '../service/DailyNoteService';
+import { DailyNoteService } from '../service/DailyNoteService';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { GeetestVerifyParams } from './GeetestVerifyPage';
   import { DateUtil } from '../common/DateUtil';
   import { NavIcon } from '../components/NavIcon';
@@ -19,6 +21,10 @@ export struct DailyNotePage {
   @StorageLink('currentUid') currentUid: string = '';
   @State vm: DailyNoteViewModel = new DailyNoteViewModel();
   @State allowNotify: boolean = false;
+  /** 刷新/通知设置半屏弹窗（Windows 风格小窗） */
+  @State showNoteSettings: boolean = false;
+  @State noteAutoRefresh: boolean = PreferencesStore.getAutoRefreshEnabled();
+  @State noteInterval: number = PreferencesStore.getRefreshIntervalMinutes();
   /** 宽屏（平板/PC）：左数据面板 + 右侧立绘背景 */
   @State isWide: boolean = false;
 
@@ -205,12 +211,12 @@ export struct DailyNotePage {
       ForEach(note.expeditions, (exp: Expedition, idx: number) => {
         Row({ space: 10 }) {
           if (exp.avatarSideIcon.length > 0) {
-            Image(exp.avatarSideIcon)
-              .width(34)
-              .height(34)
-              .borderRadius(17)
-              .objectFit(ImageFit.Cover)
-              .backgroundColor($r('app.color.app_primary_bg'))
+            // UI_AvatarIcon_Side_Xxx → UI_AvatarIcon_Xxx（与其他页面同一 rawfile 图标源）
+            MetaIcon({
+              category: 'AvatarIcon',
+              name: exp.avatarSideIcon.replace('UI_AvatarIcon_Side_', 'UI_AvatarIcon_'),
+              iconSize: 34,
+            })
           } else {
             Text(exp.isFinished() ? '✔' : '…')
               .fontSize(16)
@@ -270,6 +276,17 @@ export struct DailyNotePage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
         Blank()
+        Button('刷新与通知 ⚙')
+          .fontSize(12)
+          .height(26)
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary'))
+          .margin({ right: 8 })
+          .onClick(() => {
+            this.noteAutoRefresh = PreferencesStore.getAutoRefreshEnabled();
+            this.noteInterval = PreferencesStore.getRefreshIntervalMinutes();
+            this.showNoteSettings = true;
+          })
         if (!this.allowNotify) {
           Button('授权通知')
             .fontSize(12)
@@ -497,5 +514,75 @@ export struct DailyNotePage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
+    // Windows 风格：刷新/通知设置以半屏小窗呈现（不覆盖全屏）
+    .bindSheet($$this.showNoteSettings, this.noteSettingsSheet(), {
+      title: { title: '刷新与通知' },
+      showClose: true,
+      dragBar: true,
+      detents: [SheetSize.MEDIUM, SheetSize.LARGE],
+      backgroundColor: $r('app.color.card_background'),
+    })
+  }
+
+  /** 半屏设置面板：自动刷新开关 + 刷新间隔（对齐 Windows 便笺设置弹窗） */
+  @Builder
+  noteSettingsSheet() {
+    Column({ space: 12 }) {
+      Row() {
+        Text('自动刷新')
+          .fontSize(15)
+          .fontColor($r('app.color.text_primary'))
+        Blank()
+        Toggle({ type: ToggleType.Switch, isOn: this.noteAutoRefresh })
+          .onChange((isOn: boolean) => {
+            this.noteAutoRefresh = isOn;
+            PreferencesStore.setAutoRefreshEnabled(isOn);
+            if (isOn) {
+              DailyNoteService.getInstance().startAutoRefresh(this.noteInterval);
+            } else {
+              DailyNoteService.getInstance().stopAutoRefresh();
+            }
+          })
+      }
+      .width('100%')
+
+      Column({ space: 4 }) {
+        ForEach([5, 10, 15, 30, 60] as number[], (min: number) => {
+          Row({ space: 8 }) {
+            Text(this.noteInterval === min ? '◉' : '○')
+              .fontSize(14)
+              .fontColor(this.noteInterval === min ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+            Text(`每 ${min} 分钟自动刷新`)
+              .fontSize(14)
+              .fontColor(this.noteInterval === min ? $r('app.color.app_primary') : $r('app.color.text_primary'))
+            Blank()
+            if (this.noteInterval === min) {
+              Text('✓')
+                .fontSize(13)
+                .fontColor($r('app.color.app_primary'))
+            }
+          }
+          .width('100%')
+          .padding({ left: 6, right: 6, top: 9, bottom: 9 })
+          .borderRadius(10)
+          .backgroundColor(this.noteInterval === min ? $r('app.color.app_primary_bg') : $r('app.color.page_background'))
+          .onClick(() => {
+            this.noteInterval = min;
+            PreferencesStore.setRefreshIntervalMinutes(min);
+            if (this.noteAutoRefresh) {
+              DailyNoteService.getInstance().startAutoRefresh(min);
+            }
+          })
+        }, (min: number) => `${min}`)
+      }
+      .width('100%')
+
+      Text('树脂/派遣达到阈值时发送系统通知（需先授权通知）。应用进程被系统回收后，本地通知依赖系统提醒代理能力，当前版本在进程存活/后台驻留期间可靠。')
+        .fontSize(11)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 8, bottom: 16 })
   }
 }

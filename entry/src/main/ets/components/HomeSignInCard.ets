@@ -127,10 +127,10 @@ export struct HomeSignInCard {
     .backgroundColor(isSigned ? $r('app.color.card_background') : Color.Transparent)
   }
 
-  /** 奖励网格高度：按行数动态（7 列，每行 34vp），避免多行被裁剪（对齐 Windows UniformGrid） */
+  /** 奖励网格高度：按行数动态（7 列，每行 30vp；整体控制在仪表板行 240vp 内） */
   static gridHeight(count: number): number {
     const rows: number = Math.ceil(count / 7);
-    return rows * 34;
+    return rows * 30;
   }
 
   /** 奖励名（原神通用材料名）→ rawfile ItemIcon 文件名（去 UI_ 前缀映射失败则用通用）
@@ -148,12 +148,12 @@ export struct HomeSignInCard {
       cardBg: $r('app.color.card_background'),
       radius: 12,
     }) {
-      Column({ space: 8 }) {
+      Column({ space: 6 }) {
         Row({ space: 8 }) {
           NavIcon({ name: 'CheckIn', iconSize: 20 })
           Column({ space: 0 }) {
             Text('每日签到')
-              .fontSize(15)
+              .fontSize(14)
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'))
             if (this.info !== undefined) {
@@ -198,7 +198,7 @@ export struct HomeSignInCard {
           Row({ space: 8 }) {
             Button(this.info.isTodaySigned(this.todayDay) ? '今日已签' : '签到')
               .fontSize(13)
-              .height(32)
+              .height(30)
               .layoutWeight(1)
               .backgroundColor(this.info.isTodaySigned(this.todayDay) ? $r('app.color.card_background') : $r('app.color.app_primary'))
               .fontColor(this.info.isTodaySigned(this.todayDay) ? $r('app.color.text_secondary') : Color.White)
@@ -208,7 +208,7 @@ export struct HomeSignInCard {
               })
             Button('补签')
               .fontSize(13)
-              .height(32)
+              .height(30)
               .layoutWeight(1)
               .backgroundColor($r('app.color.app_primary_bg'))
               .fontColor($r('app.color.app_primary'))

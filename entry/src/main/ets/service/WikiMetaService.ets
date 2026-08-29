@@ -39,6 +39,9 @@ export class WikiAvatarMeta {
   defenseBase: number = 0;
   promoteId: number = 0;
   growCurves: Curve3[] = [];
+  /** 名片（我的角色详情专属背景） */
+  nameCardIcon: string = '';
+  nameCardPic: string = '';
   sort: number = 0;
   begin: string = '';
   title: string = '';
@@ -133,6 +136,8 @@ export class WikiMetaService {
         a.attackBase = Number(o['attackBase'] ?? 0);
         a.defenseBase = Number(o['defenseBase'] ?? 0);
         a.promoteId = Number(o['promoteId'] ?? 0);
+        a.nameCardIcon = String(o['nameCardIcon'] ?? '');
+        a.nameCardPic = String(o['nameCardPic'] ?? '');
         const gcs = (o['growCurves'] as Object[]) ?? [];
         for (const g of gcs) {
           const go = g as Record<string, Object>;
@@ -305,6 +310,12 @@ export class WikiMetaService {
       for (const mo of list) {
         WikiMetaService.monsterNameMap.set(mo.name, mo.icon);
       }
+      const avatars: WikiAvatarMeta[] = await WikiMetaService.getAvatars();
+      for (const av of avatars) {
+        if (av.nameCardPic.length > 0) {
+          WikiMetaService.avatarNameCardPicMap.set(av.name, av.nameCardPic);
+        }
+      }
       Logger.info(TAG, `monsters loaded: ${list.length}`);
     } catch (e) {
       Logger.warn(TAG, `load monsters fail: ${(e as Error).message}`);
@@ -359,6 +370,7 @@ export class WikiMetaService {
   private static avatarNameMap: Map<string, string> = new Map();
   private static weaponNameMap: Map<string, string> = new Map();
   private static monsterNameMap: Map<string, string> = new Map();
+  private static avatarNameCardPicMap: Map<string, string> = new Map();
 
   /** 预载 id→icon 映射（轻量，页面 aboutToAppear 调用一次） */
   static async ensureIconMaps(): Promise<void> {
@@ -429,6 +441,12 @@ export class WikiMetaService {
   /** 武器中文名 → 图标名（未命中返回空） */
   static iconOfWeaponName(name: string): string {
     const n: string | undefined = WikiMetaService.weaponNameMap.get(name);
+    return n !== undefined ? n : '';
+  }
+
+  /** 角色名 → 名片大图名（NameCardPic，我的角色专属背景；未命中返回空） */
+  static nameCardPicOf(avatarName: string): string {
+    const n: string | undefined = WikiMetaService.avatarNameCardPicMap.get(avatarName);
     return n !== undefined ? n : '';
   }
 

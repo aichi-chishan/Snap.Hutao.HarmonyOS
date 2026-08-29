@@ -76,6 +76,12 @@
 - 关机、卸载系统组件、修改系统级配置等一律不做；如需用户决策，停下来问，而非擅自执行。
 - 模拟器/设备命令（`devecocli emulator stop/shake`、`hdc shell bm uninstall` 等）仅在明确需要时使用，且只影响模拟器不伤宿主机。
 
+## 素材管理（游戏版本更新时的同步流程）
+- **已内置 rawfile 的图标类目**（`entry/src/main/resources/rawfile/icons/`）：AvatarIcon / EquipIcon / MonsterIcon / Skill / Talent / ItemIcon / NameCardIcon / NameCardPic / RelicIcon —— 全部打包进安装包，**无二次下载**（ResourcePackService 已从设置页退役，仅保留代码）。
+- **新增/更新素材**：运行 `python github-data/fetch-assets.py`（源：Snap.Metadata `<local-snap-metadata-dir>/Genshin/CHS`，CDN：api.snaphutaorp.org/static/raw/{Category}/{Name}.png，8 并发、增量跳过）。脚本同时回填 avatar_meta.json 的 nameCardIcon/nameCardPic 字段。
+- **元数据更新**：同一脚本思路；重提 monster/weapon/avatar meta 后同步 github-data（aichi-chishan/snap-hutao-data 仓库）供 GameDataUpdater 热更。
+- MetaIcon 引用约定：`category` = icons 下目录名，`name` = 文件名（去 .png）。名片大图背景直接 `Image($rawfile('icons/NameCardPic/{name}.png'))`（全幅场景不走 MetaIcon）。
+
 ## 变更敏感区
 - 改导航（Index.ets）/首页卡片/背景/图标资源前，先看 `PORTING_PLAN.md` 了解 Windows 对齐目标。
 - 改登录/风控（RiskVerifier/Geetest）前，先读 `data/network/` 下相关文件，别破坏 1034 重放链。

@@ -78,7 +78,9 @@ export class CultivationViewModel {
 
   toggle(index: number): void {
     if (index >= 0 && index < this.targets.length) {
+      // 整体重赋值触发 @State 刷新（元素属性就地变更不会驱动 UI，圆点/勾选无反馈的根因）
       this.targets[index].selected = !this.targets[index].selected;
+      this.targets = this.targets.slice();
       this.updateSelected();
     }
   }

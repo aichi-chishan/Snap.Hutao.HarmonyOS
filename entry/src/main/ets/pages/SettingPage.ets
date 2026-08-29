@@ -15,7 +15,6 @@ import { GachaArchive } from '../model/GachaArchive';
 import { Logger } from '../common/Logger';
 import { AppBackButton } from '../components/AppBackButton';
 import EntryAbility from '../entryability/EntryAbility';
-import { ResourcePackService } from '../data/remote/ResourcePackService';
 import { GameDataService } from '../service/GameDataService';
 import { GameDataUpdater } from '../data/remote/GameDataUpdater';
 
@@ -43,8 +42,6 @@ export struct SettingPage {
   @StorageProp('bgType') bgType: string = 'local';
   @StorageProp('bgFolderPath') bgFolderPath: string = '';
   @StorageProp('bgCopyright') bgCopyright: string = '';
-  @State resourceBusy: boolean = false;
-  @State resourceDone: number = 0;
   /** 数据源管理（GitHub 元数据更新） */
   @State dataBusy: boolean = false;
   @State dataDone: number = 0;
@@ -262,25 +259,7 @@ export struct SettingPage {
       })
   }
 
-  /** 选择本地背景图片文件夹（FOLDER 模式） */  /** 云端资源包：检查并下载全部大图 */
-  async downloadResourcePack(): Promise<void> {
-    if (this.resourceBusy) {
-      return;
-    }
-    this.resourceBusy = true;
-    this.resourceDone = 0;
-    try {
-      const done: number = await ResourcePackService.downloadAll((d: number, total: number, name: string) => {
-        this.resourceDone = d;
-      });
-      this.toast(`资源包完成：${done} 项`);
-    } catch (e) {
-      this.toast(`下载失败：${(e as Error).message}（请确认清单地址/网络）`);
-    } finally {
-      this.resourceBusy = false;
-    }
-  }
-
+  /** 选择本地背景图片文件夹（FOLDER 模式） */
   /** 数据源管理：检查 GitHub 最新元数据版本 */
   async checkDataUpdate(): Promise<void> {
     try {
@@ -573,110 +552,6 @@ export struct SettingPage {
           .width('100%')
           .padding(14)
           .alignItems(VerticalAlign.Center)
-
-          Row() {
-            Column({ space: 2 }) {
-              Text('大图扩展包（角色立绘 / 名片，按需下载）')
-                .fontSize(15)
-                .fontColor($r('app.color.text_primary'))
-              Text('同一仓库 resource_manifest.json；同一镜像加速链路。体积大故不内置安装包')
-                .fontSize(11)
-                .fontColor($r('app.color.text_secondary'))
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1)
-          }
-          .width('100%')
-          .padding(14)
-          .backgroundColor($r('app.color.card_background'))
-          .borderRadius(12)
-          .border({ width: 1, color: $r('app.color.divider') })
-          Row() {
-            Text('清单地址')
-              .fontSize(12)
-              .fontColor($r('app.color.text_secondary'))
-            Blank()
-            Text(ResourcePackService.getManifestUrl())
-              .fontSize(10)
-              .fontColor($r('app.color.text_primary'))
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .constraintSize({ maxWidth: '62%' })
-          }
-          .width('100%')
-          .padding({ left: 14, right: 14, top: 2, bottom: 4 })
-          Row() {
-            Button('检查并下载')
-              .fontSize(13)
-              .height(34)
-              .backgroundColor($r('app.color.app_primary'))
-              .fontColor(Color.White)
-              .onClick(() => {
-                this.downloadResourcePack();
-              })
-            if (this.resourceDone > 0) {
-              Text(`已完成 ${this.resourceDone} 项`)
-                .fontSize(11)
-                .fontColor($r('app.color.text_secondary'))
-                .margin({ left: 10 })
-            } else if (this.resourceBusy) {
-              LoadingProgress()
-                .width(18)
-                .height(18)
-                .color($r('app.color.app_primary'))
-                .margin({ left: 10 })
-            }
-          }
-          .width('100%')
-          .padding(14)
-          .alignItems(VerticalAlign.Center)
-
-          this.sectionTitle('实时便笺')
-          Row() {
-            Text('自动刷新')
-              .fontSize(15)
-              .fontColor($r('app.color.text_primary'))
-            Blank()
-            Toggle({ type: ToggleType.Switch, isOn: this.autoRefresh })
-              .onChange((isOn: boolean) => {
-                this.autoRefresh = isOn;
-                PreferencesStore.setAutoRefreshEnabled(isOn);
-                this.syncAutoTimer();
-                this.toast(isOn ? '已开启自动刷新' : '已关闭自动刷新');
-              })
-          }
-          .width('100%')
-          .padding(14)
-          .backgroundColor($r('app.color.card_background'))
-          .borderRadius(12)
-          .border({ width: 1, color: $r('app.color.divider') })
-
-          Column({ space: 8 }) {
-            ForEach([5, 10, 15, 30, 60] as number[], (min: number) => {
-              Row({ space: 8 }) {
-                Text(this.interval === min ? '◉' : '○')
-                  .fontSize(14)
-                  .fontColor(this.interval === min ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
-                Text(`每 ${min} 分钟`)
-                  .fontSize(14)
-                  .fontColor($r('app.color.text_primary'))
-                Blank()
-              }
-              .width('100%')
-              .padding({ left: 4, right: 4, top: 6, bottom: 6 })
-              .onClick(() => {
-                this.interval = min;
-                PreferencesStore.setRefreshIntervalMinutes(min);
-                this.syncAutoTimer();
-                this.toast(`刷新间隔已设为 ${min} 分钟`);
-              })
-            }, (min: number) => `${min}`)
-          }
-          .width('100%')
-          .padding(14)
-          .backgroundColor($r('app.color.card_background'))
-          .borderRadius(12)
-          .border({ width: 1, color: $r('app.color.divider') })
 
           this.sectionTitle('祈愿数据管理')
           if (this.gachaRows.length === 0) {

@@ -178,7 +178,16 @@ export struct CharacterPage {
 
   @Builder
   detailPanel() {
-    Column({ space: 10 }) {
+    Stack({ alignContent: Alignment.TopStart }) {
+      // 角色专属背景：名片大图（NameCardPic，已打包 rawfile；名下无名片时不显示）
+      if (this.currentDetail !== undefined && WikiMetaService.nameCardPicOf(this.currentDetail.name).length > 0) {
+        Image($rawfile(`icons/NameCardPic/${WikiMetaService.nameCardPicOf(this.currentDetail.name)}.png`))
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
+          .opacity(0.22)
+      }
+      Column({ space: 10 }) {
       if (this.currentDetail !== undefined) {
         this.detailHeader()
         if (this.currentDetail.weapon.id > 0) {
@@ -239,21 +248,29 @@ export struct CharacterPage {
             ForEach(this.currentDetail.reliquaries, (r: Reliquary, i: number) => {
               Column({ space: 5 }) {
                 Row({ space: 8 }) {
-                  Text(`${r.posName} · ${r.name}`)
-                    .fontSize(12)
-                    .fontColor($r('app.color.text_primary'))
-                    .layoutWeight(1)
-                  Text(`★${r.rarity} +${r.level}`)
-                    .fontSize(11)
-                    .fontColor($r('app.color.text_secondary'))
-                  // 圣遗物评分徽章（Windows ReliquaryScoreCalculator：推荐词条加权；无推荐回退双爆分）
-                  Text(`${CharacterPage.relicScore(r, this.currentDetail)} 分 · ${ReliquaryScore.grade(CharacterPage.relicScore(r, this.currentDetail))}`)
-                    .fontSize(10)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor($r('app.color.app_primary'))
-                    .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                    .borderRadius(9)
-                    .backgroundColor($r('app.color.app_primary_bg'))
+                  MetaIcon({
+                    category: 'RelicIcon',
+                    name: CharacterPage.relicIconName(r.icon),
+                    iconSize: 36,
+                  })
+                  Column({ space: 2 }) {
+                    Text(`${r.posName} · ${r.name}`)
+                      .fontSize(12)
+                      .fontColor($r('app.color.text_primary'))
+                    Text(`★${r.rarity} +${r.level}`)
+                      .fontSize(11)
+                      .fontColor($r('app.color.text_secondary'))
+                    // 圣遗物评分徽章（Windows ReliquaryScoreCalculator：推荐词条加权；无推荐回退双爆分）
+                    Text(`${CharacterPage.relicScore(r, this.currentDetail)} 分 · ${ReliquaryScore.grade(CharacterPage.relicScore(r, this.currentDetail))}`)
+                      .fontSize(10)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor($r('app.color.app_primary'))
+                      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                      .borderRadius(9)
+                      .backgroundColor($r('app.color.app_primary_bg'))
+                  }
+                  .alignItems(HorizontalAlign.Start)
+                  .layoutWeight(1)
                 }
                 .width('100%')
                 if (r.mainProperty.propertyType.length > 0) {
@@ -357,6 +374,7 @@ export struct CharacterPage {
           .border({ width: 1, color: $r('app.color.divider') })
         }
       }
+      }
     }
     .width('100%')
   }
@@ -399,6 +417,20 @@ export struct CharacterPage {
     .backgroundColor($r('app.color.card_background'))
     .border({ width: 1, color: $r('app.color.divider') })
   }
+  /** 圣遗物图标名：API 可能带位置后缀 _N（CDN/打包无该变体），回退基础名 */
+  static relicIconName(icon: string): string {
+    if (icon.length === 0) {
+      return '';
+    }
+    if (/_[0-9]$/.test(icon)) {
+      const base: string = icon.substring(0, icon.lastIndexOf('_'));
+      if (base.length > 0) {
+        return base;
+      }
+    }
+    return icon;
+  }
+
   static relicScore(r: Reliquary, d: CharacterDetail): number {
     if (d.recommend.subProperties.length > 0) {
       const full: number = ReliquaryScore.calculate(r.subProperties, d.recommend.subProperties, d.recommend.energyType);
