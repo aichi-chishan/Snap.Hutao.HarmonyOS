@@ -53,6 +53,29 @@ export class ApiClient {
     return this.request(url, http.RequestMethod.POST, fullHeaders, bodyJson);
   }
 
+  /** 归一化响应头为 Record<string,string>（键保持原大小写；同名头取首个） */
+  static normalizeHeaders(raw: Object | undefined): Record<string, string> {
+    const out: Record<string, string> = {};
+    if (raw === undefined || raw === null) {
+      return out;
+    }
+    const obj = raw as Record<string, Object>;
+    for (const k of Object.keys(obj)) {
+      const v: Object = obj[k];
+      if (typeof v === 'string') {
+        out[k] = v as string;
+      } else if (Array.isArray(v)) {
+        const arr: Array<Object> = v as Array<Object>;
+        if (arr.length > 0) {
+          out[k] = String(arr[0]);
+        }
+      } else if (v !== undefined && v !== null) {
+        out[k] = String(v);
+      }
+    }
+    return out;
+  }
+
   private async request(url: string, method: http.RequestMethod,
     headers: Record<string, string>, bodyJson: string): Promise<ApiResponse> {
     const merged: Record<string, string> = this.mergeCookie(headers);
@@ -69,13 +92,15 @@ export class ApiClient {
       if (resp.responseCode === http.ResponseCode.OK) {
         const result: string = resp.result as string;
         const parsed: ApiResponse = ApiResponse.fromJson(result);
+        parsed.respHeaders = ApiClient.normalizeHeaders(resp.header);
         if (!parsed.success && parsed.retcode !== 0) {
           Logger.warn(TAG, `resp fail url=${url} retcode=${parsed.retcode} msg=${parsed.message}`);
         }
         return parsed;
       }
-      Logger.warn(TAG, `http code=${resp.responseCode} url=${url}`);
-      return ApiResponse.fail(Number(resp.responseCode), `HTTP ${resp.responseCode}`);
+      const failResp: ApiResponse = ApiResponse.fail(Number(resp.responseCode), `HTTP ${resp.responseCode}`);
+      failResp.respHeaders = ApiClient.normalizeHeaders(resp.header);
+      return failResp;
     } catch (e) {
       const err = e as BusinessError;
       Logger.warn(TAG, `request error url=${url} code=${err.code} msg=${err.message}`);

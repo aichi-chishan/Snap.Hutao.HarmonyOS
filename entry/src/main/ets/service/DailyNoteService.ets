@@ -11,7 +11,8 @@ import { DailyNoteRepo, DailyNoteRecord } from '../data/repo/DailyNoteRepo';
 import { NotificationHelper } from '../data/local/NotificationHelper';
 import { FormSnapshot } from '../data/local/FormSnapshot';
 import { DailyNote } from '../model/DailyNote';
-import { CardVerifyApi, GtChallenge, DAILY_NOTE_PATH } from '../data/network/CardVerifyApi';
+import { DAILY_NOTE_PATH } from '../data/network/CardVerifyApi';
+import { RiskVerifier } from '../data/network/RiskVerifier';
 import { RegionUtil, RetCodes } from '../common/Constants';
 import { Logger } from '../common/Logger';
 
@@ -88,12 +89,13 @@ export class DailyNoteService {
     // 拉取
     let resp: ApiResponse = await HoyolabClient.fetchDailyNote(uid, region, cookie, extra);
     if (resp.isRiskControl()) {
-      // 1034 → 注册极验，引导用户完成人机验证
-      const gtChallenge: GtChallenge = await CardVerifyApi.createVerification(cookie, DAILY_NOTE_PATH);
-      if (gtChallenge.gt.length > 0 && gtChallenge.challenge.length > 0) {
-        throw new NeedGeetestError(gtChallenge.gt, gtChallenge.challenge);
+      // 1034：自动弹统一验证窗，成功后带 challenge 服务内重放一次
+      const replayChallenge: string = await RiskVerifier.tryResolveRisk(resp, cookie, DAILY_NOTE_PATH);
+      if (replayChallenge.length === 0) {
+        throw new Error('人机验证未完成或被取消，请稍后再试');
       }
-      throw new Error('被风控拦截，且未能发起人机验证，请稍后再试');
+      extra['x-rpc-challenge'] = replayChallenge;
+      resp = await HoyolabClient.fetchDailyNote(uid, region, cookie, extra);
     }
     if (!resp.success || resp.data === undefined) {
       if (resp.retcode === RetCodes.RISK_CONTROL) {

@@ -9,6 +9,7 @@ import { HoyolabClient } from '../data/network/HoyolabClient';
 import { DsSigner } from '../data/network/DsSigner';
 import { CalBatchResult, CalAvatarConsume } from '../model/Calculate';
 import { UserService } from './UserService';
+import { RiskVerifier } from '../data/network/RiskVerifier';
 import { AppConstants } from '../common/Constants';
 import { Logger } from '../common/Logger';
 
@@ -69,10 +70,18 @@ export class CalculateService {
       'DS': ds,
       'Cookie': user.gameRecordCookie(),
     };
-    const resp: ApiResponse = await ApiClient.getInstance().postJson(URL_BATCH, data,
+    const resp0: ApiResponse = await ApiClient.getInstance().postJson(URL_BATCH, data,
       HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
-    if (resp.isRiskControl()) {
-      throw new Error('被风控拦截，请稍后再试');
+    let resp: ApiResponse = resp0;
+    if (resp0.isRiskControl()) {
+      // 1034：自动弹统一验证窗，成功后带 challenge 服务内重放一次
+      const replayChallenge: string = await RiskVerifier.tryResolveRisk(resp0, user.gameRecordCookie(), URL_BATCH);
+      if (replayChallenge.length === 0) {
+        throw new Error('人机验证未完成或被取消，请稍后再试');
+      }
+      headers['x-rpc-challenge'] = replayChallenge;
+      resp = await ApiClient.getInstance().postJson(URL_BATCH, data,
+        HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
     }
     if (!resp.success || resp.data === undefined) {
       throw new Error(resp.userFriendlyMessage());

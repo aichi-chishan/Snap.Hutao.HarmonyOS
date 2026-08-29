@@ -3,9 +3,12 @@
  * 米游社每日签到：luna/sign（DS Gen1/LK2 + Cookie）+ luna/home（奖励列表与状态）。返回码 -5003 已签等映射。
  */
 import { UserService } from './UserService';
+import { RiskVerifyService } from './RiskVerifyService';
 import { HoyolabClient } from '../data/network/HoyolabClient';
+import { RiskVerifier } from '../data/network/RiskVerifier';
 import { ApiResponse } from '../model/ApiResponse';
 import { SignInInfo } from '../model/SignInInfo';
+import { RiskUiHelper } from '../common/RiskUiHelper';
 import { RegionUtil, RetCodes } from '../common/Constants';
 import { Logger } from '../common/Logger';
 
@@ -60,7 +63,7 @@ export class SignInService {
     return info;
   }
 
-  /** 执行签到 */
+  /** 执行签到（含风控极验自动重放，对齐 Windows SignInClient.SignAsync） */
   async sign(uid: string): Promise<SignInResult> {
     const user = UserService.getInstance().getCurrentUser();
     if (user === undefined || !user.hasCookie()) {
@@ -75,7 +78,8 @@ export class SignInService {
     if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
       await UserService.getInstance().completeTokenChainPublic(user);
     }
-    const resp: ApiResponse = await HoyolabClient.signIn(uid, region, cookie);
+    let resp: ApiResponse = await HoyolabClient.signIn(uid, region, cookie);
+    resp = await SignInService.resolveSignRisk(uid, region, cookie, resp);
     const result: SignInResult = new SignInResult();
     if (resp.retcode === RetCodes.ALREADY_SIGNED) {
       result.ok = false;
@@ -97,5 +101,42 @@ export class SignInService {
     result.message = resp.userFriendlyMessage();
     Logger.warn(TAG, `sign fail retcode=${resp.retcode} msg=${resp.message}`);
     return result;
+  }
+
+  /**
+   * 签到风控处理（重放一轮）：
+   *   a) 响应体内极验 data{success:1, gt, challenge} → 弹窗验证 → challenge+validate+seccode 重放
+   *      （对齐 Windows SignInClient：SignAsync 体内 GeetestWebResponse 路径）；
+   *   b) retcode 1034 → createVerification 统一链路 → challenge 重放。
+   */
+  private static async resolveSignRisk(uid: string, region: string, cookie: string,
+    resp: ApiResponse): Promise<ApiResponse> {
+    // a) 体内极验：成功 HTTP 但 data 携带 gt/challenge
+    if (resp.success && resp.data !== undefined) {
+      const data = resp.data as Record<string, Object>;
+      const inBodySuccess: boolean = Boolean(data['success'] ?? false);
+      const gt: string = String(data['gt'] ?? '');
+      const challenge: string = String(data['challenge'] ?? '');
+      if (inBodySuccess && gt.length > 0 && challenge.length > 0) {
+        Logger.info(TAG, 'sign hit in-body geetest, launching verify');
+        const validate: string = await RiskVerifyService.getInstance().verifyGt(gt, challenge);
+        if (validate.length > 0) {
+          const replay: Record<string, string> = RiskUiHelper.riskReplayHeaders(challenge, validate);
+          return HoyolabClient.signIn(uid, region, cookie, replay);
+        }
+        const cancelled: ApiResponse = ApiResponse.fail(RetCodes.RISK_CONTROL, '人机验证未完成，签到已取消');
+        return cancelled;
+      }
+      return resp;
+    }
+    // b) retcode 1034：走 createVerification 统一链路
+    if (resp.isRiskControl()) {
+      const challenge: string = await RiskVerifier.resolveGtChallenge(cookie, 'event/luna/sign');
+      if (challenge.length > 0) {
+        Logger.info(TAG, 'sign 1034 verified, replaying');
+        return HoyolabClient.signIn(uid, region, cookie, RiskUiHelper.riskReplayHeaders(challenge));
+      }
+    }
+    return resp;
   }
 }

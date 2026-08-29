@@ -42,4 +42,21 @@ export class RiskUiHelper {
     const c: string = AppStorage.get<string>(RiskUiHelper.KEY_PENDING) ?? '';
     return c.length > 0;
   }
+
+  /**
+   * 构建风控重放头（对齐 Windows SetXrpcChallenge）：
+   *   仅 challenge → game_record 重放；
+   *   challenge+validate → 追加 x-rpc-validate 与 x-rpc-seccode（validate|jordan，签到重放）。
+   */
+  static riskReplayHeaders(challenge: string, validate?: string): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (challenge.length > 0) {
+      headers['x-rpc-challenge'] = challenge;
+    }
+    if (validate !== undefined && validate.length > 0) {
+      headers['x-rpc-validate'] = validate;
+      headers['x-rpc-seccode'] = `${validate}|jordan`;
+    }
+    return headers;
+  }
 }

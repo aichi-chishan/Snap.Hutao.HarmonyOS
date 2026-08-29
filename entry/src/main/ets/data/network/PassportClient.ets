@@ -8,7 +8,10 @@ import { http } from '@kit.NetworkKit';
 import { AppConstants } from '../../common/Constants';
 import { DsSigner } from './DsSigner';
 import { ApiResponse } from '../../model/ApiResponse';
+import { ApiClient } from './ApiClient';
 import { RsaEncryptor } from './RsaEncryptor';
+import { PreferencesStore } from '../prefs/PreferencesStore';
+import { RiskVerifyService } from '../../service/RiskVerifyService';
 import { Logger } from '../../common/Logger';
 
 const TAG: string = 'PassportClient';
@@ -90,7 +93,8 @@ export class PassportClient {
     };
   }
 
-  /** 统一 BBS 账号系请求头（验证码登录用，DS 由调用方附加） */
+  /** 统一 BBS 账号系请求头（验证码登录用，DS 由调用方附加）。
+   *  device_id 持久固定（每次随机会显著提高登录风控触发率） */
   private static bbsHeaders(): Record<string, string> {
     return {
       'User-Agent': AppConstants.UA_MOBILE,
@@ -98,7 +102,7 @@ export class PassportClient {
       'x-rpc-app_id': AppConstants.BBS_APP_ID,
       'x-rpc-app_version': AppConstants.APP_VERSION,
       'x-rpc-client_type': AppConstants.X_RPC_CLIENT_TYPE,
-      'x-rpc-device_id': `00000000-0000-0000-0000-${PassportClient.randomDeviceId53().substring(0, 12)}`,
+      'x-rpc-device_id': PreferencesStore.getBbsDeviceId(),
       'x-rpc-game_biz': 'bbs_cn',
       'x-rpc-sdk_version': '2.16.0',
     };
@@ -173,28 +177,46 @@ export class PassportClient {
 
   // ================= 手机验证码登录 =================
 
-  /** 发送手机验证码；populate Aigis 需要极验时返回 true（目前仅提示） */
+  /**
+   * 发送手机验证码（自动处理 aigis 极验，对齐 Windows UserMobileCaptchaDialog.SendMobileCaptchaAsync）：
+   * 响应带 x-rpc-aigis 头时弹统一验证窗，完成自动重放，最多 3 轮。
+   */
   static async createLoginCaptcha(mobile: string): Promise<MobileCaptcha> {
     const encMobile: string = await RsaEncryptor.encrypt(mobile);
     const encArea: string = await RsaEncryptor.encrypt('+86');
     const body: Record<string, string> = { 'area_code': encArea, 'mobile': encMobile };
-    const bodyJson: string = JSON.stringify(body);
-    const headers: Record<string, string> = await PassportClient.dsHeader(bodyJson);
-    const resp: ApiResponse = await PassportClient.postJsonRaw(
-      AppConstants.URL_CREATE_LOGIN_CAPTCHA, bodyJson, PassportClient.mergeBbs(headers));
-    if (!resp.success || resp.data === undefined) {
-      throw new Error(`发送验证码失败：${resp.userFriendlyMessage()}`);
+    let aigis: string = '';
+    for (let attempt: number = 0; attempt < 3; attempt++) {
+      const bodyJson: string = JSON.stringify(body);
+      const headers: Record<string, string> = await PassportClient.dsHeader(bodyJson);
+      if (aigis.length > 0) {
+        headers['x-rpc-aigis'] = aigis;
+      }
+      const resp: ApiResponse = await PassportClient.postJsonRaw(
+        AppConstants.URL_CREATE_LOGIN_CAPTCHA, bodyJson, PassportClient.mergeBbs(headers));
+      const rawAigis: string = resp.header('x-rpc-aigis');
+      if (resp.success && rawAigis.length === 0) {
+        const data = resp.data as Record<string, Object>;
+        const captcha: MobileCaptcha = new MobileCaptcha();
+        captcha.sentNew = Boolean(data['sent_new'] ?? false);
+        captcha.countdown = Number(data['countdown'] ?? 0);
+        captcha.actionType = String(data['action_type'] ?? '');
+        Logger.info(TAG, `createLoginCaptcha sentNew=${captcha.sentNew} cd=${captcha.countdown}`);
+        return captcha;
+      }
+      if (rawAigis.length === 0) {
+        throw new Error(`发送验证码失败：${resp.userFriendlyMessage()}`);
+      }
+      Logger.info(TAG, `createLoginCaptcha hit aigis (attempt=${attempt + 1}), launching verify`);
+      aigis = await RiskVerifyService.getInstance().verifyAigis(rawAigis);
+      if (aigis.length === 0) {
+        throw new Error('人机验证未完成，已取消发送验证码');
+      }
     }
-    const data = resp.data as Record<string, Object>;
-    const captcha: MobileCaptcha = new MobileCaptcha();
-    captcha.sentNew = Boolean(data['sent_new'] ?? false);
-    captcha.countdown = Number(data['countdown'] ?? 0);
-    captcha.actionType = String(data['action_type'] ?? '');
-    Logger.info(TAG, `createLoginCaptcha sentNew=${captcha.sentNew} cd=${captcha.countdown}`);
-    return captcha;
+    throw new Error('人机验证多次未通过，请稍后再试');
   }
 
-  /** 使用手机验证码登录，返回登录会话 */
+  /** 使用手机验证码登录（自动处理 aigis 极验，最多 3 轮），返回登录会话 */
   static async loginByMobileCaptcha(mobile: string, captcha: string, actionType: string): Promise<LoginSession> {
     const encMobile: string = await RsaEncryptor.encrypt(mobile);
     const encArea: string = await RsaEncryptor.encrypt('+86');
@@ -204,13 +226,33 @@ export class PassportClient {
       'captcha': captcha,
       'mobile': encMobile,
     };
-    const bodyJson: string = JSON.stringify(body);
-    const headers: Record<string, string> = await PassportClient.dsHeader(bodyJson);
-    const resp: ApiResponse = await PassportClient.postJsonRaw(
-      AppConstants.URL_LOGIN_BY_MOBILE_CAPTCHA, bodyJson, PassportClient.mergeBbs(headers));
-    if (!resp.success || resp.data === undefined) {
-      throw new Error(`登录失败：${resp.userFriendlyMessage()}`);
+    let aigis: string = '';
+    for (let attempt: number = 0; attempt < 3; attempt++) {
+      const bodyJson: string = JSON.stringify(body);
+      const headers: Record<string, string> = await PassportClient.dsHeader(bodyJson);
+      if (aigis.length > 0) {
+        headers['x-rpc-aigis'] = aigis;
+      }
+      const resp: ApiResponse = await PassportClient.postJsonRaw(
+        AppConstants.URL_LOGIN_BY_MOBILE_CAPTCHA, bodyJson, PassportClient.mergeBbs(headers));
+      const rawAigis: string = resp.header('x-rpc-aigis');
+      if (resp.success && rawAigis.length === 0) {
+        return PassportClient.parseLoginSession(resp);
+      }
+      if (rawAigis.length === 0) {
+        throw new Error(`登录失败：${resp.userFriendlyMessage()}`);
+      }
+      Logger.info(TAG, `loginByMobileCaptcha hit aigis (attempt=${attempt + 1}), launching verify`);
+      aigis = await RiskVerifyService.getInstance().verifyAigis(rawAigis);
+      if (aigis.length === 0) {
+        throw new Error('人机验证未完成，已取消登录');
+      }
     }
+    throw new Error('人机验证多次未通过，请稍后再试');
+  }
+
+  /** 从登录响应解析会话（token.token + user_info） */
+  private static parseLoginSession(resp: ApiResponse): LoginSession {
     const data = resp.data as Record<string, Object>;
     const session: LoginSession = new LoginSession();
     const token = data['token'] as Record<string, Object>;
@@ -223,7 +265,7 @@ export class PassportClient {
       session.mid = String(info['mid'] ?? '');
       session.accountName = String(info['account_name'] ?? '');
     }
-    Logger.info(TAG, `loginByMobileCaptcha ok stuid=${session.stuid} hasStoken=${session.stoken.length > 0}`);
+    Logger.info(TAG, `login ok stuid=${session.stuid} hasStoken=${session.stoken.length > 0}`);
     return session;
   }
 
@@ -247,7 +289,7 @@ export class PassportClient {
     return merged;
   }
 
-  /** 发送 POST JSON 并解析统一响应 */
+  /** 发送 POST JSON 并解析统一响应（保留响应头：x-rpc-aigis 极验会话依赖） */
   private static async postJsonRaw(url: string, bodyJson: string, headers: Record<string, string>): Promise<ApiResponse> {
     const fullHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
     for (const k of Object.keys(headers)) {
@@ -264,10 +306,14 @@ export class PassportClient {
         expectDataType: http.HttpDataType.STRING,
       });
       if (resp.responseCode === http.ResponseCode.OK) {
-        return ApiResponse.fromJson(resp.result as string);
+        const parsed: ApiResponse = ApiResponse.fromJson(resp.result as string);
+        parsed.respHeaders = ApiClient.normalizeHeaders(resp.header);
+        return parsed;
       }
       Logger.warn(TAG, `http code=${resp.responseCode} url=${url}`);
-      return ApiResponse.fail(Number(resp.responseCode), `HTTP ${resp.responseCode}`);
+      const failResp: ApiResponse = ApiResponse.fail(Number(resp.responseCode), `HTTP ${resp.responseCode}`);
+      failResp.respHeaders = ApiClient.normalizeHeaders(resp.header);
+      return failResp;
     } catch (e) {
       const err = e as BusinessError;
       Logger.warn(TAG, `request error url=${url} code=${err.code} msg=${err.message}`);

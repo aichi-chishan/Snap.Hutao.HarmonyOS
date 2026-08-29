@@ -18,6 +18,7 @@ export class PreferencesStore {
   static readonly KEY_AUTO_REFRESH: string = 'dailynote.auto_refresh_enabled';
   static readonly KEY_THEME_MODE: string = 'theme.mode';
   static readonly KEY_DEVICE_ID: string = 'app.device_id';
+  static readonly KEY_BBS_DEVICE_ID: string = 'app.bbs_device_id';
   static readonly KEY_AMBIENT_STRENGTH: string = 'app.ambient_strength';
   static readonly KEY_DAILY_BG_ENABLED: string = 'app.daily_bg_enabled';
   static readonly KEY_BG_IMAGE_TYPE: string = 'app.bg_image_type';
@@ -136,6 +137,18 @@ export class PreferencesStore {
       PreferencesStore.setString(PreferencesStore.KEY_DEVICE_ID, id);
     }
     return id;
+  }
+
+  /** BBS 登录链路稳定 device_id（GUID 形态）。固定设备身份可显著降低登录风控触发率 */
+  static getBbsDeviceId(): string {
+    let id: string = PreferencesStore.getString(PreferencesStore.KEY_BBS_DEVICE_ID, '');
+    if (id.length === 0) {
+      id = PreferencesStore.genDeviceId();
+      PreferencesStore.setString(PreferencesStore.KEY_BBS_DEVICE_ID, id);
+    }
+    // GUID 形态：8-4-4-4-12（genDeviceId 生成 53 位 hex，裁取 32 位按段拼接）
+    const hex: string = id.replace(/-/g, '').substring(0, 32);
+    return `${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}`;
   }
 
   static getAmbientStrength(): number {

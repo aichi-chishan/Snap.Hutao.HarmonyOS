@@ -11,6 +11,19 @@ export class ApiResponse {
   success: boolean = true;
   /** 原始响应文本（兜底排查） */
   raw: string = '';
+  /** 响应头（小写键；x-rpc-aigis 极验会话等风控链路依赖） */
+  respHeaders: Record<string, string> = {};
+
+  /** 读取指定响应头（大小写不敏感），无则返回 '' */
+  header(name: string): string {
+    const lower: string = name.toLowerCase();
+    for (const k of Object.keys(this.respHeaders)) {
+      if (k.toLowerCase() === lower) {
+        return this.respHeaders[k];
+      }
+    }
+    return '';
+  }
 
   /** 从原始响应字符串解析 */
   static fromJson(text: string): ApiResponse {

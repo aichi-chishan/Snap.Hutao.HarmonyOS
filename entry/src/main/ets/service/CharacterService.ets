@@ -119,11 +119,18 @@ export class CharacterService {
     if (challenge !== undefined && challenge.length > 0) {
       headers['x-rpc-challenge'] = challenge;
     }
-    const resp: ApiResponse = await ApiClient.getInstance().postJson(url, bodyJson,
+    const resp0: ApiResponse = await ApiClient.getInstance().postJson(url, bodyJson,
       HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
-    if (resp.isRiskControl()) {
-      // 1034：注册极验并抛异常（页面捕获后跳验证页完成；再次调用带 challenge 重放）
-      await RiskVerifier.checkForRisk(resp, cookie, url);
+    let resp: ApiResponse = resp0;
+    if (resp0.isRiskControl()) {
+      // 1034：自动弹统一验证窗，成功后带 challenge 服务内重放一次
+      const replayChallenge: string = await RiskVerifier.tryResolveRisk(resp0, cookie, url);
+      if (replayChallenge.length === 0) {
+        throw new Error('人机验证未完成或被取消，请稍后再试');
+      }
+      headers['x-rpc-challenge'] = replayChallenge;
+      resp = await ApiClient.getInstance().postJson(url, bodyJson,
+        HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
     }
     return resp;
   }

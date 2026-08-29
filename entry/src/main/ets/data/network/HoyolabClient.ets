@@ -105,8 +105,10 @@ export class HoyolabClient {
     return HoyolabClient.client.postJson(url, bodyJson, HoyolabClient.merge(HoyolabClient.baseHeaders(), headers));
   }
 
-  /** 每日签到 sign（POST Luna）。DS Gen1/LK2；body 含 act_id/region/uid */
-  static async signIn(uid: string, region: string, cookie: string): Promise<ApiResponse> {
+  /** 每日签到 sign（POST Luna）。DS Gen1/LK2；body 含 act_id/region/uid。
+   *  @param extraHeaders 可选重放头（体内极验通过后的 x-rpc-challenge/validate/seccode） */
+  static async signIn(uid: string, region: string, cookie: string,
+    extraHeaders?: Record<string, string>): Promise<ApiResponse> {
     const body: Record<string, string> = { 'act_id': AppConstants.SIGN_ACT_ID, 'region': region, 'uid': uid };
     const bodyJson: string = JSON.stringify(body);
     const t: number = DsSigner.nowTimestamp();
@@ -114,8 +116,10 @@ export class HoyolabClient {
     const ds: string = await DsSigner.signGen1(AppConstants.DS_SALT_LK2, t, r);
     const url: string = 'https://api-takumi.mihoyo.com/event/luna/sign';
     const headers: Record<string, string> = { 'DS': ds, 'Cookie': cookie, 'x-rpc-signgame': 'hk4e' };
-    Logger.info(TAG, `signIn uid=${uid} region=${region}`);
-    return HoyolabClient.client.postJson(url, bodyJson, HoyolabClient.merge(HoyolabClient.baseHeaders(), headers));
+    const mergedExtra: Record<string, string> = extraHeaders ?? {};
+    Logger.info(TAG, `signIn uid=${uid} region=${region} challenge=${mergedExtra['x-rpc-challenge'] ?? ''}`);
+    return HoyolabClient.client.postJson(url, bodyJson, HoyolabClient.merge(HoyolabClient.baseHeaders(),
+      HoyolabClient.merge(headers, mergedExtra)));
   }
 
   /** 签到活动信息 info（GET Luna：is_sign/total_sign_day）。DS Gen1/LK2 + x-rpc-signgame */

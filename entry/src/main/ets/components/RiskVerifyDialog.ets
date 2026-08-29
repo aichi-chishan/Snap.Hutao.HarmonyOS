@@ -59,19 +59,23 @@ export struct RiskVerifyDialog {
     this.statusText = '验证成功，正在提交...';
     try {
       const obj: Record<string, Object> = JSON.parse(json) as Record<string, Object>;
-      const validate: string = String(obj['validate'] ?? '');
-      const geetestChallenge: string = String(obj['challenge'] ?? this.challenge);
-      const seccode: string = String(obj['seccode'] ?? '');
+      // gt.0.5.2 getValidate() 返回 geetest_* 键（旧键名兜底）
+      const validate: string = String(obj['geetest_validate'] ?? obj['validate'] ?? '');
+      const geetestChallenge: string = String(obj['geetest_challenge'] ?? obj['challenge'] ?? this.challenge);
+      const seccode: string = String(obj['geetest_seccode'] ?? obj['seccode'] ?? '');
       if (validate.length === 0) {
-        throw new Error('验证结果为空');
+        this.statusText = '验证结果为空，请重试';
+        this.verifying = false;
+        return;
       }
       const input: GeetestValidateInput = {
         geetestChallenge: geetestChallenge,
         geetestValidate: validate,
         geetestSeccode: seccode,
       };
+      // verifyVerification 用 CookieToken 系 cookie（对齐 Windows CardClient）
       const user = UserService.getInstance().getCurrentUser();
-      const cookie: string = user !== undefined ? user.stokenCookie() : '';
+      const cookie: string = user !== undefined ? user.gameRecordCookie() : '';
       const challenge: string = await RiskVerifier.verifyXrpcChallenge(cookie, input);
       if (challenge.length === 0) {
         this.statusText = '换 challenge 失败，请重试';

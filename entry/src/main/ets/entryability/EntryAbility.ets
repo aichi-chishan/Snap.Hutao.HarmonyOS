@@ -1,11 +1,12 @@
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { display, window } from '@kit.ArkUI';
+import { ComponentContent, UIContext, display, window } from '@kit.ArkUI';
 import { RelationalStoreHelper } from '../data/db/RelationalStoreHelper';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { UserService } from '../service/UserService';
 import { NotificationHelper } from '../data/local/NotificationHelper';
 import { AppContextProvider } from '../common/AppContext';
+import { buildRiskVerifyOverlay } from '../components/RiskVerifyModal';
 
 const DOMAIN = 0x4E50;
 const TAG = 'EntryAbility';
@@ -115,8 +116,21 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate<number>('titleBtnWidthVp', widthVp);
   }
 
-  /** 透明系统栏 + 图标色随深浅色（供启动与主题切换时调用） */
-  static applySystemBarColors(mainWindow: window.Window): void {
+  /** 挂载全局人机验证浮层（窗口级 Overlay：位于一切 router 页面之上，随窗口存续） */
+  private static mountRiskVerifyOverlay(windowStage: window.WindowStage): void {
+    try {
+      const mainWindow: window.Window = windowStage.getMainWindowSync();
+      const uiContext: UIContext = mainWindow.getUIContext();
+      const content: ComponentContent<Object> =
+        new ComponentContent<Object>(uiContext, wrapBuilder(buildRiskVerifyOverlay));
+      uiContext.getOverlayManager().addComponentContent(content);
+      hilog.info(DOMAIN, TAG, 'risk verify overlay mounted');
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'mount risk overlay fail: %{public}s', JSON.stringify(e));
+    }
+  }
+
+  /** 透明系统栏 + 图标色随深浅色（供启动与主题切换时调用） */  static applySystemBarColors(mainWindow: window.Window): void {
     const isDark: boolean = AppStorage.get<boolean>('isDarkMode') ?? false;
     mainWindow.setWindowSystemBarProperties({
       statusBarColor: '#00000000',
@@ -127,8 +141,7 @@ export default class EntryAbility extends UIAbility {
     });
   }
 
-  /** 读取状态栏(TOP)/底部导航指示区(BOTTOM)高度，转换为 vp 写入 AppStorage */
-  private static publishAvoidAreas(mainWindow: window.Window): void {
+  /** 读取状态栏(TOP)/底部导航指示区(BOTTOM)高度，转换为 vp 写入 AppStorage */  private static publishAvoidAreas(mainWindow: window.Window): void {
     try {
       const systemAvoid: window.AvoidArea = mainWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
       const topPx: number = systemAvoid.topRect.height;
@@ -192,6 +205,8 @@ export default class EntryAbility extends UIAbility {
       hilog.info(DOMAIN, TAG, 'load content ok');
       // 沉浸式配置需在 loadContent 成功、窗口就绪后执行
       ability.configureImmersive(windowStage);
+      // 全局人机验证浮层（覆盖所有 router 页面，供 RiskVerifyService 弹出）
+      EntryAbility.mountRiskVerifyOverlay(windowStage);
     });
   }
 

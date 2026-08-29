@@ -10,6 +10,7 @@ import { ApiResponse } from '../../model/ApiResponse';
 import { ApiClient } from './ApiClient';
 import { AppConstants } from '../../common/Constants';
 import { DsSigner } from './DsSigner';
+import { RiskVerifyService } from '../../service/RiskVerifyService';
 import { Logger } from '../../common/Logger';
 
 const TAG: string = 'RiskVerifier';
@@ -62,8 +63,43 @@ export class RiskVerifier {
     throw new Error('被风控拦截，且未能发起人机验证，请稍后再试');
   }
 
+  /**
+   * 一站式解决 game_record 1034 风控（对齐 Windows GeetestService.TryVerifyXrpcChallengeAsync）：
+   * 弹出统一验证窗 → 极验 → verifyVerification 换 challenge。
+   * 成功返回新 challenge；用户关闭/失败返回 ''。
+   */
+  static async resolveGtChallenge(cookie: string, path: string): Promise<string> {
+    RiskVerifier.currentChallengePath = path;
+    const gtChallenge: GtChallengeData = await RiskVerifier.createVerification(cookie, path);
+    if (gtChallenge.gt.length === 0 || gtChallenge.challenge.length === 0) {
+      Logger.warn(TAG, 'resolveGtChallenge: createVerification empty');
+      return '';
+    }
+    const validate: string = await RiskVerifyService.getInstance().verifyGt(gtChallenge.gt, gtChallenge.challenge);
+    if (validate.length === 0) {
+      return '';
+    }
+    const input: GeetestValidateInput = new GeetestValidateInput();
+    input.geetestChallenge = gtChallenge.challenge;
+    input.geetestValidate = validate;
+    input.geetestSeccode = '';
+    return RiskVerifier.verifyXrpcChallenge(cookie, input);
+  }
+
+  /**
+   * 服务层统一入口：命中 1034 时自动弹统一验证窗并换 challenge。
+   * 返回重放用 challenge（用户取消/验证失败为 ''）；未命中风控也返回 ''（不抛异常，调用方自行重放）。
+   */
+  static async tryResolveRisk(resp: ApiResponse, cookie: string, path: string): Promise<string> {
+    if (!resp.isRiskControl()) {
+      return '';
+    }
+    return RiskVerifier.resolveGtChallenge(cookie, path);
+  }
+
   /** 注册极验（createVerification?is_high=true，头带 challenge_game/path） */
   static async createVerification(cookie: string, path: string): Promise<GtChallengeData> {
+    RiskVerifier.currentChallengePath = path;
     const query: Record<string, string> = { 'is_high': 'true' };
     const sorted: string = DsSigner.sortQuery(query);
     const t: number = DsSigner.nowTimestamp();
@@ -93,12 +129,14 @@ export class RiskVerifier {
     return result;
   }
 
-  /** 极验通过后换 x-rpc-challenge（POST verifyVerification） */
+  /** 极验通过后换 x-rpc-challenge（POST verifyVerification，带 challenge_game/path 头，对齐 Windows CardClient.VerifyVerificationAsync） */
   static async verifyXrpcChallenge(cookie: string, gv: GeetestValidateInput): Promise<string> {
+    const validate: string = gv.geetestValidate;
+    const seccode: string = gv.geetestSeccode.length > 0 ? gv.geetestSeccode : `${validate}|jordan`;
     const body: Record<string, string> = {
       'geetest_challenge': gv.geetestChallenge,
-      'geetest_validate': gv.geetestValidate,
-      'geetest_seccode': gv.geetestSeccode,
+      'geetest_validate': validate,
+      'geetest_seccode': seccode,
     };
     const bodyJson: string = JSON.stringify(body);
     const t: number = DsSigner.nowTimestamp();
@@ -109,6 +147,8 @@ export class RiskVerifier {
       'DS': ds,
       'Cookie': cookie,
       'Content-Type': 'application/json',
+      'x-rpc-challenge_game': '2',
+      'x-rpc-challenge_path': RiskVerifier.currentChallengePath,
       'x-rpc-app_version': AppConstants.APP_VERSION,
       'x-rpc-client_type': AppConstants.X_RPC_CLIENT_TYPE,
       'User-Agent': AppConstants.UA_MOBILE,
@@ -124,4 +164,7 @@ export class RiskVerifier {
     Logger.info(TAG, `verifyVerification ok challenge len=${challenge.length}`);
     return challenge;
   }
+
+  /** createVerification/verifyVerification 需带触发风控的接口 path（checkForRisk 时记录） */
+  private static currentChallengePath: string = '';
 }
