@@ -87,6 +87,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     @State sidebarFold: boolean = false;
     /** 首页下拉刷新状态 */
     @State homeRefreshing: boolean = false;
+    /** 主页数据在途加载标记（reloadHome 防抖） */
+    private homeReloading: boolean = false;
     /** 超宽（>=1200vp PC 全屏/平板横屏）：首页网格扩展列数 */
     @State isUltra: boolean = false;
     /** 系统三键区（最小化/全屏/关闭）占位宽度 vp（PC 自定义窗口装饰；0=无系统三键） */
@@ -115,6 +117,10 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
 
     /** 聚合加载主页仪表盘数据（祈愿/便笺/签到/活动/公告） */
     reloadHome(): void {
+      if (this.homeReloading) {
+        return; // 在途加载中：避免连点/快速切页重复拉网络
+      }
+      this.homeReloading = true;
       this.todayDay = new Date().getDate();
       const uid: string = AppStorage.get<string>('currentUid') ?? '';
       this.homeVm.load(uid).then(() => {
@@ -123,8 +129,10 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         Logger.info('Index', `challengeSnap loaded=${this.challengeSnap.loaded} abyss=${this.challengeSnap.abyssFloor}/${this.challengeSnap.abyssStar} ` +
           `rc=${this.challengeSnap.roleCombatMedals}/${this.challengeSnap.roleCombatMaxRound} hc=${this.challengeSnap.hardChallengeBest}/${this.challengeSnap.hardChallengeSecond}`);
         this.homeRefreshing = false;
+        this.homeReloading = false;
       }).catch(() => {
         this.homeRefreshing = false;
+        this.homeReloading = false;
       });
     }
 

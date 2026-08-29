@@ -244,7 +244,7 @@ export struct RoleCombatPage {
                 .backgroundColor($r('app.color.app_primary'))
             }
             Text(`Lv.${avatar.level}`)
-              .fontSize(9)
+              .fontSize(10)
               .fontColor($r('app.color.text_secondary'))
           }
         }, (avatar: RoleCombatAvatar) => `rc_av_${avatar.avatarId}_${round.roundId}_${avatar.image}`)
@@ -372,7 +372,7 @@ export struct RoleCombatPage {
                   .backgroundColor($r('app.color.app_primary'))
               }
               Text(`Lv.${avatar.level}`)
-                .fontSize(9)
+                .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))
             }
           }, (avatar: RoleCombatAvatar) => `rc_bk_${avatar.avatarId}_${avatar.image}`)

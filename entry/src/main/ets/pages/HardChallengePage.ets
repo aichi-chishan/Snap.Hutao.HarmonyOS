@@ -143,7 +143,7 @@ export struct HardChallengePage {
           .backgroundColor($r('app.color.app_primary'))
       }
       Text(avatar.name.length > 4 ? `${avatar.name.substring(0, 4)}…` : avatar.name)
-        .fontSize(9)
+        .fontSize(10)
         .fontColor($r('app.color.text_secondary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })

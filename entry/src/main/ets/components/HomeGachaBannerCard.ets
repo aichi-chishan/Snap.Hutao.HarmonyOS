@@ -113,7 +113,7 @@ export struct HomeGachaBannerCard {
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.five_star'))
               Text('五星')
-                .fontSize(9)
+                .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))
             }
             .alignItems(HorizontalAlign.Start)
@@ -123,7 +123,7 @@ export struct HomeGachaBannerCard {
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.four_star'))
               Text('四星')
-                .fontSize(9)
+                .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))
             }
             .alignItems(HorizontalAlign.Start)
@@ -133,7 +133,7 @@ export struct HomeGachaBannerCard {
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.text_primary'))
               Text('总抽')
-                .fontSize(9)
+                .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))
             }
             .alignItems(HorizontalAlign.Start)

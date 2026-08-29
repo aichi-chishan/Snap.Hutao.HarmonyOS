@@ -184,7 +184,7 @@ export struct HomeCalendarCard {
           ForEach(this.weekDays(), (cell: WeekDayCell) => {
             Column({ space: 2 }) {
               Text(cell.label)
-                .fontSize(9)
+                .fontSize(10)
                 .fontColor(cell.isToday ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
               Text(`${cell.dayNum}`)
                 .fontSize(14)

@@ -177,8 +177,8 @@ initGeetest({
           .fontColor($r('app.color.text_primary'))
           .margin({ left: 10 })
         Blank()
-        Text(`风控路径\n${this.challenge.length > 0 ? '已完成验证' : ''}`)
-          .fontSize(9)
+        Text(this.challenge.length > 0 ? '✓ 验证流程就绪' : '待发起验证')
+          .fontSize(11)
           .fontColor($r('app.color.text_secondary'))
       }
       .width('100%')

@@ -323,7 +323,7 @@ export struct CharacterPage {
                     .borderRadius(7)
                     .backgroundColor(c.isActived ? $r('app.color.app_primary_bg') : $r('app.color.page_background'))
                   Text(c.name.length > 8 ? `${c.name.substring(0, 8)}…` : c.name)
-                    .fontSize(9)
+                    .fontSize(10)
                     .fontColor($r('app.color.text_secondary'))
                     .maxLines(1)
                 }

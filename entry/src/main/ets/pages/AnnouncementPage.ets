@@ -126,7 +126,7 @@ export struct AnnouncementPage {
         // 类型徽章
         if (item.typeName.length > 0) {
           Text(item.typeName)
-            .fontSize(9)
+            .fontSize(10)
             .fontColor(Color.White)
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
             .borderRadius(6)
