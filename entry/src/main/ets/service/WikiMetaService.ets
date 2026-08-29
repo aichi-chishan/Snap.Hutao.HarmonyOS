@@ -302,6 +302,9 @@ export class WikiMetaService {
         list.push(m);
       }
       WikiMetaService.monsters = list;
+      for (const mo of list) {
+        WikiMetaService.monsterNameMap.set(mo.name, mo.icon);
+      }
       Logger.info(TAG, `monsters loaded: ${list.length}`);
     } catch (e) {
       Logger.warn(TAG, `load monsters fail: ${(e as Error).message}`);
@@ -355,6 +358,7 @@ export class WikiMetaService {
   private static weaponIconMap: Map<number, string> = new Map();
   private static avatarNameMap: Map<string, string> = new Map();
   private static weaponNameMap: Map<string, string> = new Map();
+  private static monsterNameMap: Map<string, string> = new Map();
 
   /** 预载 id→icon 映射（轻量，页面 aboutToAppear 调用一次） */
   static async ensureIconMaps(): Promise<void> {
@@ -426,6 +430,22 @@ export class WikiMetaService {
   static iconOfWeaponName(name: string): string {
     const n: string | undefined = WikiMetaService.weaponNameMap.get(name);
     return n !== undefined ? n : '';
+  }
+
+  /** 怪物中文名 → MonsterIcon 图标名（未命中返回空；剧诗/幽境敌人头像用） */
+  static iconOfMonsterName(name: string): string {
+    const n: string | undefined = WikiMetaService.monsterNameMap.get(name);
+    if (n !== undefined) {
+      return n;
+    }
+    // API 名可能带词缀后缀或截断：前缀互含兜底
+    let found: string = '';
+    WikiMetaService.monsterNameMap.forEach((icon: string, key: string) => {
+      if (found.length === 0 && name.length > 0 && (key.startsWith(name) || name.startsWith(key))) {
+        found = icon;
+      }
+    });
+    return found;
   }
 
   /** 元素英文 → 中文 */

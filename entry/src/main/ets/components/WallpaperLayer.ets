@@ -1,11 +1,10 @@
 /**
  * WallpaperLayer.ets
  * 全屏壁纸层（对齐 Windows BackgroundImageService，无胡桃云依赖）：
- * - none：无背景图片，仅主题渐变（亮=橙白 / 暗=橙黑）
+ * - none：无背景图片，主题纯色底（与窗口底色同色系）
  * - local：本地随机图片（用户目录递归扫描 8 种格式随机取 1，5 分钟轮换；
- *   未选目录时回退内置每日一图打包图，按日期轮换）
- * - bing：必应每日一图（直连 cn.bing.com，当日结果落盘缓存不重复下载）
- * 图片上层保留主题化遮罩（深色压暗/浅色提亮），Stretch 对齐 UniformToFill(ImageFit.Cover)。
+ *   未选目录或目录无图片时与 none 相同显示主题纯色底，保证两种模式观感一致）
+ * 图片上层保留主题化遮罩（深色压暗/浅色提亮），ImageFit.Cover。
  */
 import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
@@ -20,7 +19,7 @@ const IMAGE_EXTS: string[] = ['.bmp', '.gif', '.ico', '.jpg', '.jpeg', '.png', '
 export struct WallpaperLayer {
   /** 是否深色模式（AppStorage isDarkMode，主题切换实时更新；@Watch 触发重渲） */
   @StorageProp('isDarkMode') @Watch('onDarkChanged') isDark: boolean = false;
-  /** 背景来源：none / local / bing */
+  /** 背景来源：none / local */
   @Prop @Watch('onBgChanged') bgType: string = 'local';
   /** 本地图片目录（local 生效；空回退内置图） */
   @Prop @Watch('onBgChanged') folderPath: string = '';
@@ -31,31 +30,6 @@ export struct WallpaperLayer {
   private localPool: string[] = [];
   /** 轮换计时器 */
   private rotateTimer: number = -1;
-
-  /** 内置背景图片（无目录时回退，按日期轮换） */
-  private static readonly backgrounds: Resource[] = [
-    $r('app.media.daily_bg_1'),
-    $r('app.media.daily_bg_2'),
-    $r('app.media.daily_bg_3'),
-  ];
-
-  private static dailyBackground(): Resource {
-    const day: number = WallpaperLayer.todayDay();
-    return WallpaperLayer.backgrounds[day % WallpaperLayer.backgrounds.length];
-  }
-
-  /** 当日日期缓存（避免高频路径反复创建 Date；跨天由分钟级轮换路径刷新） */
-  private static cachedDay: number = -1;
-  private static cachedDayAt: number = 0;
-
-  private static todayDay(): number {
-    const nowMs: number = Date.now();
-    if (WallpaperLayer.cachedDay < 0 || nowMs - WallpaperLayer.cachedDayAt > 3_600_000) {
-      WallpaperLayer.cachedDay = new Date(nowMs).getDate();
-      WallpaperLayer.cachedDayAt = nowMs;
-    }
-    return WallpaperLayer.cachedDay;
-  }
 
   aboutToAppear(): void {
     this.loadImage();
@@ -94,19 +68,10 @@ export struct WallpaperLayer {
   }
 
   private loadImage(): void {
-    if (this.bgType === 'none') {
+    if (this.bgType !== 'local' || this.folderPath.length === 0) {
+      // none / local 未选目录：主题纯色底（观感一致）
       this.hasImage = false;
       this.imgSrc = '';
-      return;
-    }
-    if (this.bgType === 'bing') {
-      this.loadBing();
-      return;
-    }
-    // local
-    if (this.folderPath.length === 0) {
-      this.imgSrc = WallpaperLayer.dailyBackground();
-      this.hasImage = true;
       return;
     }
     this.localPool = WallpaperLayer.scanImages(this.folderPath);
@@ -115,8 +80,9 @@ export struct WallpaperLayer {
 
   private pickLocalRandom(): void {
     if (this.localPool.length === 0) {
-      this.imgSrc = WallpaperLayer.dailyBackground();
-      this.hasImage = true;
+      // 目录无图片：与 none 一致（主题纯色底）
+      this.hasImage = false;
+      this.imgSrc = '';
       return;
     }
     const idx: number = Math.floor(Math.random() * this.localPool.length);
@@ -154,83 +120,6 @@ export struct WallpaperLayer {
     return out;
   }
 
-  /** 必应每日一图：当日缓存命中直接用，否则直连拉取并落盘 */
-  private async loadBing(): Promise<void> {
-    const now: Date = new Date();
-    const day: string = `${now.getFullYear()}${WallpaperLayer.pad(now.getMonth() + 1)}${WallpaperLayer.pad(now.getDate())}`;
-    const cachePath: string = `${AppContextProvider.getCacheDir()}/wallpaper_bing_${day}.jpg`;
-    try {
-      fileIo.accessSync(cachePath);
-      this.imgSrc = `file://${cachePath}`;
-      this.hasImage = true;
-      return;
-    } catch (e) {
-      // 不存在则下载
-    }
-    try {
-      // 1) 取元数据
-      const metaReq: http.HttpRequest = http.createHttp();
-      let imgUrl: string = '';
-      let copyright: string = '';
-      try {
-        const resp = await metaReq.request('https://cn.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1', {
-          method: http.RequestMethod.GET,
-          expectDataType: http.HttpDataType.STRING,
-          connectTimeout: 10000,
-        });
-        if (resp.responseCode !== http.ResponseCode.OK) {
-          throw new Error(`meta http ${resp.responseCode}`);
-        }
-        const root: Record<string, Object> = JSON.parse(resp.result as string) as Record<string, Object>;
-        const images: Object[] = (root['images'] as Object[]) ?? [];
-        if (images.length === 0) {
-          throw new Error('empty images');
-        }
-        const first: Record<string, Object> = images[0] as Record<string, Object>;
-        const url: string = String(first['url'] ?? '');
-        if (url.length === 0) {
-          throw new Error('empty url');
-        }
-        imgUrl = url.startsWith('http') ? url : `https://cn.bing.com${url}`;
-        copyright = String(first['copyright'] ?? '');
-      } finally {
-        metaReq.destroy();
-      }
-      // 2) 下载图片
-      const imgReq: http.HttpRequest = http.createHttp();
-      try {
-        const imgResp = await imgReq.request(imgUrl, {
-          method: http.RequestMethod.GET,
-          expectDataType: http.HttpDataType.ARRAY_BUFFER,
-          connectTimeout: 10000,
-        });
-        if (imgResp.responseCode !== http.ResponseCode.OK) {
-          throw new Error(`img http ${imgResp.responseCode}`);
-        }
-        const file: fileIo.File = fileIo.openSync(cachePath, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
-        try {
-          fileIo.writeSync(file.fd, imgResp.result as ArrayBuffer);
-        } finally {
-          fileIo.closeSync(file);
-        }
-      } finally {
-        imgReq.destroy();
-      }
-      AppStorage.setOrCreate<string>('bgCopyright', copyright);
-      this.imgSrc = `file://${cachePath}`;
-      this.hasImage = true;
-      Logger.info(TAG, `bing wallpaper cached: ${cachePath}`);
-    } catch (e) {
-      Logger.warn(TAG, `bing wallpaper fail: ${(e as Error).message}`);
-      // 失败回退主题渐变
-      this.hasImage = false;
-    }
-  }
-
-  private static pad(n: number): string {
-    return n < 10 ? `0${n}` : `${n}`;
-  }
-
   build() {
     Stack({ alignContent: Alignment.BottomStart }) {
       // 基底必须用纯色（禁止 linearGradient）：部分合成器/软渲染路径对渐变着色器
@@ -243,7 +132,7 @@ export struct WallpaperLayer {
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
           .backgroundColor(this.isDark ? '#1B1B20' : '#F2F0EC')
       } else {
-        // local/bing：中性底（图片下层兜底；浅色用中性灰白，避免暖黄底透色）
+        // local：中性底（图片下层兜底；浅色用中性灰白，避免暖黄底透色）
         Column()
           .width('100%')
           .height('100%')

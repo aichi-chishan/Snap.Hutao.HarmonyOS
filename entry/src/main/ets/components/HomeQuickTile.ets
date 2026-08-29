@@ -29,7 +29,7 @@ export struct HomeQuickTile {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
         Text(this.label)
-          .fontSize(11)
+          .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })

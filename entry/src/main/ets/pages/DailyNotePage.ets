@@ -434,18 +434,6 @@ export struct DailyNotePage {
 
         // 宽屏：右侧立绘渐变背景 + 左侧数据面板限宽；窄屏：单列
         Stack({ alignContent: Alignment.Center }) {
-          if (this.isWide) {
-            // 右侧立绘背景（渐变 + 本地胡桃横幅，对齐 Windows 版背景氛围）
-            Column()
-              .width('100%')
-              .height('100%')
-              .backgroundColor($r('app.color.ambient_gradient_mid'))
-            Image($r('app.media.hutao_daily_banner'))
-              .width('100%')
-              .height('100%')
-              .objectFit(ImageFit.Cover)
-              .opacity(0.14)
-          }
           Scroll(this.settingRef) {
             Column({ space: 10 }) {
               this.autoRefreshBar()

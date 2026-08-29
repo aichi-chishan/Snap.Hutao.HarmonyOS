@@ -73,7 +73,7 @@ export struct HomeGachaBannerCard {
             .layoutWeight(1)
           if (this.remainText().length > 0) {
             Text(this.remainText())
-              .fontSize(11)
+              .fontSize(12)
               .fontFamily('HarmonyOS Sans')
               .fontColor($r('app.color.text_secondary'))
               .maxLines(1)
@@ -145,7 +145,7 @@ export struct HomeGachaBannerCard {
         // 日期区间（网络卡池）
         if (this.pool.startTime > 0 || this.pool.endTime > 0) {
           Text(`${HomeGachaBannerCard.timestamp(this.pool.startTime)} 至 ${HomeGachaBannerCard.timestamp(this.pool.endTime)}`)
-            .fontSize(10)
+            .fontSize(12)
             .fontColor($r('app.color.text_secondary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })

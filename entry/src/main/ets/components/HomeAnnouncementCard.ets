@@ -59,7 +59,7 @@ export struct HomeAnnouncementCard {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .layoutWeight(1)
       Text(HomeAnnouncementCard.formatDate(item.startTime))
-        .fontSize(10)
+        .fontSize(12)
         .fontColor($r('app.color.text_secondary'))
     }
     .width('100%')

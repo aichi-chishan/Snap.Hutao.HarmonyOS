@@ -158,7 +158,7 @@ export struct HomeSignInCard {
               .fontColor($r('app.color.text_primary'))
             if (this.info !== undefined) {
               Text(`本月已签 ${this.info.signedDays} 天`)
-                .fontSize(10)
+                .fontSize(12)
                 .fontColor($r('app.color.text_secondary'))
             }
           }
@@ -166,7 +166,7 @@ export struct HomeSignInCard {
           .layoutWeight(1)
           if (this.uid.length > 0) {
             Text(this.uid)
-              .fontSize(11)
+              .fontSize(12)
               .fontColor($r('app.color.app_primary'))
           }
         }

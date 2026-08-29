@@ -57,14 +57,14 @@ export struct HomeActBannerCard {
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .layoutWeight(1)
             Text(this.entry.statusText(Date.now()))
-              .fontSize(10)
+              .fontSize(12)
               .fontWeight(FontWeight.Medium)
               .fontColor(this.isOngoing() ? $r('app.color.success') : $r('app.color.notice_on'))
           }
           .width('100%')
 
           Text(this.remainText())
-            .fontSize(10)
+            .fontSize(12)
             .fontColor($r('app.color.text_secondary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })

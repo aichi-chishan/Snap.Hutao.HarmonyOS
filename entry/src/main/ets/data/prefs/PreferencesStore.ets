@@ -173,7 +173,8 @@ export class PreferencesStore {
   static getBackgroundImageType(): string {
     const saved: string = PreferencesStore.getString(PreferencesStore.KEY_BG_IMAGE_TYPE, '');
     if (saved.length > 0) {
-      return saved;
+      // 必应每日一图已下线（直连图源不稳定），旧值迁移为 none
+      return saved === 'bing' ? 'none' : saved;
     }
     // 默认 none：主题渐变（最稳妥，避免本地/内置图与浅色主题叠加产生偏色）
     return 'none';

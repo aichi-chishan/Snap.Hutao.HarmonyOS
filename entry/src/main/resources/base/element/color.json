@@ -91,6 +91,10 @@
     {
       "name": "ambient_gradient_end",
       "value": "#FFFFFF"
+    },
+    {
+      "name": "danger_bg",
+      "value": "#1AE53935"
     }
   ]
 }

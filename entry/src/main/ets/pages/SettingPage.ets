@@ -445,7 +445,6 @@ export struct SettingPage {
             Row({ space: 8 }) {
               this.bgTypeChip('none', '无背景图片')
               this.bgTypeChip('local', '本地随机图片')
-              this.bgTypeChip('bing', '必应每日一图')
             }
             .width('100%')
 
@@ -455,7 +454,7 @@ export struct SettingPage {
                   Text('自定义背景图片文件夹')
                     .fontSize(14)
                     .fontColor($r('app.color.text_primary'))
-                  Text(this.bgFolderPath.length > 0 ? this.bgFolderPath : '未选择（使用内置每日一图）')
+                  Text(this.bgFolderPath.length > 0 ? this.bgFolderPath : '未选择（显示主题纯色底）')
                     .fontSize(11)
                     .fontColor($r('app.color.text_secondary'))
                     .maxLines(1)
@@ -477,24 +476,7 @@ export struct SettingPage {
               .padding({ top: 4, bottom: 4 })
             }
 
-            if (this.bgType === 'bing') {
-              Row() {
-                Text('图片版权信息')
-                  .fontSize(14)
-                  .fontColor($r('app.color.text_primary'))
-                Blank()
-                Text(this.bgCopyright.length > 0 ? this.bgCopyright : '加载后显示')
-                  .fontSize(11)
-                  .fontColor($r('app.color.text_secondary'))
-                  .maxLines(2)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  .constraintSize({ maxWidth: '60%' })
-              }
-              .width('100%')
-              .padding({ top: 4, bottom: 4 })
-            }
-
-            Text('直连 cn.bing.com / 本地目录，无胡桃云依赖；胡桃每日一图与官方启动器壁纸为胡桃云专属，不提供')
+            Text('本地目录递归扫描图片，5 分钟轮换；未选目录或目录无图片时显示主题纯色底（与无背景图片一致）')
               .fontSize(10)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')

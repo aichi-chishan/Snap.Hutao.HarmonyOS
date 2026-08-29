@@ -107,8 +107,8 @@ export class HardChallengeRoot {
           item.scheduleId = HardChallengeRoot.number(s['schedule_id'], 0);
           item.startTime = HardChallengeRoot.number(s['start_time'], 0);
           item.endTime = HardChallengeRoot.number(s['end_time'], 0);
-          item.startDateTime = HardChallengeRoot.str(s['start_date_time']);
-          item.endDateTime = HardChallengeRoot.str(s['end_date_time']);
+          item.startDateTime = HardChallengeRoot.dtStr(s['start_date_time']);
+          item.endDateTime = HardChallengeRoot.dtStr(s['end_date_time']);
           item.isValid = HardChallengeRoot.bool(s['is_valid']);
           item.name = HardChallengeRoot.str(s['name']);
           root.data.schedule.push(item);
@@ -231,6 +231,24 @@ export class HardChallengeRoot {
       return '';
     }
     return String(v);
+  }
+
+  /** 米哈游日期对象 {year,month,day,...} → "YYYY/MM/DD"；字符串原样返回 */
+  private static dtStr(v: Object): string {
+    if (v === undefined || v === null) {
+      return '';
+    }
+    if (typeof v === 'string') {
+      return String(v);
+    }
+    const o = v as Record<string, Object>;
+    const y: number = Number(o['year'] ?? 0);
+    const mo: number = Number(o['month'] ?? 0);
+    const d: number = Number(o['day'] ?? 0);
+    if (y <= 0) {
+      return '';
+    }
+    return `${y}/${mo}/${d}`;
   }
 
   private static bool(v: Object): boolean {

@@ -95,7 +95,7 @@ export struct HomeAchievementCard {
                   .fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.text_primary'))
                 Text(`/ ${this.stats.total}`)
-                  .fontSize(10)
+                  .fontSize(12)
                   .fontColor($r('app.color.text_secondary'))
               }
             }
@@ -113,7 +113,7 @@ export struct HomeAchievementCard {
                 .color($r('app.color.app_primary'))
                 .backgroundColor($r('app.color.divider'))
               Text(`原石 ${this.stats.primogemsEarned} / ${this.stats.primogemsTotal}`)
-                .fontSize(11)
+                .fontSize(12)
                 .fontColor($r('app.color.text_secondary'))
             }
             .alignItems(HorizontalAlign.Start)

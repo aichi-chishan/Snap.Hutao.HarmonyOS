@@ -181,8 +181,8 @@ export class RoleCombatRoot {
       item.schedule.scheduleId = RoleCombatRoot.number(schedule['schedule_id'], 0);
       item.schedule.startTime = RoleCombatRoot.number(schedule['start_time'], 0);
       item.schedule.endTime = RoleCombatRoot.number(schedule['end_time'], 0);
-      item.schedule.startDateTime = RoleCombatRoot.str(schedule['start_date_time']);
-      item.schedule.endDateTime = RoleCombatRoot.str(schedule['end_date_time']);
+      item.schedule.startDateTime = RoleCombatRoot.dtStr(schedule['start_date_time']);
+      item.schedule.endDateTime = RoleCombatRoot.dtStr(schedule['end_date_time']);
     }
     return item;
   }
@@ -297,6 +297,24 @@ export class RoleCombatRoot {
       return '';
     }
     return String(v);
+  }
+
+  /** 米哈游日期对象 {year,month,day,...} → "YYYY/MM/DD"；字符串原样返回 */
+  private static dtStr(v: Object): string {
+    if (v === undefined || v === null) {
+      return '';
+    }
+    if (typeof v === 'string') {
+      return String(v);
+    }
+    const o = v as Record<string, Object>;
+    const y: number = Number(o['year'] ?? 0);
+    const mo: number = Number(o['month'] ?? 0);
+    const d: number = Number(o['day'] ?? 0);
+    if (y <= 0) {
+      return '';
+    }
+    return `${y}/${mo}/${d}`;
   }
 
   private static bool(v: Object): boolean {

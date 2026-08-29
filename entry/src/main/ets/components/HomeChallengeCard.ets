@@ -32,14 +32,14 @@ export struct HomeChallengeCard {
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1)
           Text('点击进入 ›')
-            .fontSize(11)
+            .fontSize(12)
             .fontColor($r('app.color.app_primary'))
         }
         .width('100%')
 
         if (!this.data.loaded) {
           Text('加载中...')
-            .fontSize(11)
+            .fontSize(12)
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
             .padding({ top: 10, bottom: 10 })
@@ -94,7 +94,7 @@ export struct HomeChallengeCard {
       Row({ space: 3 }) {
         NavIcon({ name: iconName, iconSize: 12 })
         Text(label)
-          .fontSize(10)
+          .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })

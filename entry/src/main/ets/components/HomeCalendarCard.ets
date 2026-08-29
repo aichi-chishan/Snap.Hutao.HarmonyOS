@@ -174,7 +174,7 @@ export struct HomeCalendarCard {
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1)
           Text('查看全部 ›')
-            .fontSize(11)
+            .fontSize(12)
             .fontColor($r('app.color.app_primary'))
         }
         .width('100%')
@@ -208,7 +208,7 @@ export struct HomeCalendarCard {
             GridItem() {
               Column({ space: 3 }) {
                 Text(cell.label)
-                  .fontSize(10)
+                  .fontSize(12)
                   .fontColor(cell.isToday ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
                 Circle()
                   .width(5)
@@ -232,7 +232,7 @@ export struct HomeCalendarCard {
         if (this.todayMaterials().length > 0) {
           Row({ space: 6 }) {
             Text('今日获取')
-              .fontSize(10)
+              .fontSize(12)
               .fontColor($r('app.color.text_secondary'))
             ForEach(this.todayMaterials(), (m: DailyMaterial, idx: number) => {
               Column({ space: 2 }) {
@@ -252,7 +252,7 @@ export struct HomeCalendarCard {
         if (this.todayBirthdays().length > 0) {
           Row({ space: 6 }) {
             Text('今日生日')
-              .fontSize(10)
+              .fontSize(12)
               .fontColor($r('app.color.text_secondary'))
             ForEach(this.todayBirthdays(), (b: BirthdayCell, idx: number) => {
               Column({ space: 2 }) {
@@ -271,7 +271,7 @@ export struct HomeCalendarCard {
         // 今日活动名称
         if (this.todayActs.length > 0) {
           Text(`今日活动：${this.todayActs.slice(0, 2).join(' / ')}`)
-            .fontSize(10)
+            .fontSize(12)
             .fontColor($r('app.color.app_primary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })

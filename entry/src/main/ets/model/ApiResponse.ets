@@ -88,7 +88,7 @@ export class ApiResponse {
       case RetCodes.NOTE_BANNED:
         return '实时便笺服务暂不可用（账号可能被限制），请稍后再试';
       case 410:
-        return '祈愿接口已失效或鉴权过期，请重新登录后刷新；若仍失败请升级应用';
+        return '祈愿鉴权已失效（authkey 过期）。请到「账号与数据」退出后重新登录（重新登录会获取完整权限凭证），再回来点刷新；若仍失败请通过祈愿页「导入 URL」兜底';
       case 403:
         return '请求被拒绝（403），可能被风控或访问频率限制，请稍后再试';
       case 429:

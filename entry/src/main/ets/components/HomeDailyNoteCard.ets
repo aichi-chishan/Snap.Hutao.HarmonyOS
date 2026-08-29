@@ -46,7 +46,7 @@ export struct HomeDailyNoteCard {
         .fontSize(13)
         .fontColor($r('app.color.text_secondary'))
       Text('登录后自动拉取树脂/派遣/宝钱')
-        .fontSize(11)
+        .fontSize(12)
         .fontColor($r('app.color.text_secondary'))
     }
     .width('100%')
@@ -78,7 +78,7 @@ export struct HomeDailyNoteCard {
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(sub)
-          .fontSize(10)
+          .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -112,7 +112,7 @@ export struct HomeDailyNoteCard {
             .layoutWeight(1)
           if (this.refreshTime.length > 0) {
             Text(`刷新 ${this.refreshTime}`)
-              .fontSize(10)
+              .fontSize(12)
               .fontColor($r('app.color.text_secondary'))
           }
         }
@@ -164,7 +164,7 @@ export struct HomeDailyNoteCard {
                 .fontColor($r('app.color.text_primary'))
               ForEach(this.note.expeditions, (exp: Expedition, idx: number) => {
                 Text(exp.isFinished() ? '已归' : '进行中')
-                  .fontSize(10)
+                  .fontSize(12)
                   .fontColor(exp.isFinished() ? $r('app.color.success') : $r('app.color.notice_on'))
                   .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                   .borderRadius(6)

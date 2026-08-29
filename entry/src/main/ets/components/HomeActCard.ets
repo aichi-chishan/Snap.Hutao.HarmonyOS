@@ -44,7 +44,7 @@ export struct HomeActCard {
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .width('100%')
             Text(this.isCardPool() ? `${this.entry.versionName}` : this.entry.desc.length > 12 ? `${this.entry.desc.substring(0, 12)}…` : this.entry.desc)
-              .fontSize(10)
+              .fontSize(12)
               .fontColor($r('app.color.text_secondary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -53,7 +53,7 @@ export struct HomeActCard {
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1)
           Text(this.statusText())
-            .fontSize(10)
+            .fontSize(12)
             .fontWeight(FontWeight.Medium)
             .fontColor(this.entry.isOngoing(Date.now()) ? $r('app.color.success') : $r('app.color.notice_on'))
         }
@@ -71,7 +71,7 @@ export struct HomeActCard {
             }, (icon: string, idx: number) => `act_av_${idx}_${icon}`)
             Blank()
             Text(HomeActCard.formatDate(this.entry.endTime))
-              .fontSize(10)
+              .fontSize(12)
               .fontColor($r('app.color.text_secondary'))
           }
           .width('100%')
@@ -79,7 +79,7 @@ export struct HomeActCard {
           Row() {
             Blank()
             Text(HomeActCard.formatDate(this.entry.endTime))
-              .fontSize(10)
+              .fontSize(12)
               .fontColor($r('app.color.text_secondary'))
           }
           .width('100%')

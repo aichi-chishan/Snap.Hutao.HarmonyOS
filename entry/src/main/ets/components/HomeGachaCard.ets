@@ -45,7 +45,7 @@ export struct HomeGachaCard {
         .fontSize(13)
         .fontColor($r('app.color.text_secondary'))
       Text('进入祈愿页拉取抽卡历史后可在此查看')
-        .fontSize(11)
+        .fontSize(12)
         .fontColor($r('app.color.text_secondary'))
     }
     .width('100%')
@@ -70,7 +70,7 @@ export struct HomeGachaCard {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
         Text('抽')
-          .fontSize(11)
+          .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 12 })
       }
@@ -157,7 +157,7 @@ export struct HomeGachaCard {
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1)
           Text(this.uid)
-            .fontSize(11)
+            .fontSize(12)
             .fontColor($r('app.color.app_primary'))
         }
         .width('100%')

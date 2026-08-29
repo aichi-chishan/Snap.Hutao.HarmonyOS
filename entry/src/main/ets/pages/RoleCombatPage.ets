@@ -259,17 +259,25 @@ export struct RoleCombatPage {
         Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
           ForEach(round.enemies, (enemy: RoleCombatEnemy) => {
             Column({ space: 3 }) {
-              Text(enemy.name.length > 0 ? enemy.name.substring(0, 1) : '👹')
-                .fontSize(12)
-                .width(32)
-                .height(32)
-                .textAlign(TextAlign.Center)
-                .borderRadius(16)
-                .backgroundColor($r('app.color.notice_bg'))
-              Text(enemy.name.length > 5 ? `${enemy.name.substring(0, 5)}…` : enemy.name)
-                .fontSize(9)
+              if (WikiMetaService.iconOfMonsterName(enemy.name).length > 0) {
+                MetaIcon({
+                  category: 'MonsterIcon',
+                  name: WikiMetaService.iconOfMonsterName(enemy.name),
+                  iconSize: 32,
+                })
+              } else {
+                Text(enemy.name.length > 0 ? enemy.name.substring(0, 1) : '妖')
+                  .fontSize(12)
+                  .width(32)
+                  .height(32)
+                  .textAlign(TextAlign.Center)
+                  .borderRadius(16)
+                  .backgroundColor($r('app.color.notice_bg'))
+              }
+              Text(enemy.name.length > 6 ? `${enemy.name.substring(0, 6)}…` : enemy.name)
+                .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))
-                .width(40)
+                .width(52)
                 .textAlign(TextAlign.Center)
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })

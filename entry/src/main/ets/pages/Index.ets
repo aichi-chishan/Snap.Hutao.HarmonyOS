@@ -17,6 +17,7 @@ import { HomeGachaCard } from '../components/HomeGachaCard';
 import { HomeDailyNoteCard } from '../components/HomeDailyNoteCard';
 import { HomeSignInCard } from '../components/HomeSignInCard';
 import { HomeAchievementCard } from '../components/HomeAchievementCard';
+import { HomeLaunchCard } from '../components/HomeLaunchCard';
 import { HomeActCard } from '../components/HomeActCard';
 import { HomeAnnouncementCard } from '../components/HomeAnnouncementCard';
 import { HomeGachaBannerCard } from '../components/HomeGachaBannerCard';
@@ -224,6 +225,10 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     this.getUIContext().animateTo({ curve: Motion.springSoft() }, () => {
       this.currentIndex = index;
     });
+    // 切回主页自动拉新数据（对齐 Windows；替代下拉刷新——模拟器 Refresh+Scroll 嵌套渲染异常）
+    if (index === 0) {
+      this.reloadHome();
+    }
   }
 
   build() {
@@ -630,7 +635,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       // 壁纸层（渐变 + 本地胡桃横幅 + 可选）
       WallpaperLayer({ bgType: this.bgType, folderPath: this.bgFolderPath })
 
-      Refresh({ refreshing: this.homeRefreshing }) {
+      Scroll() {
         Column({ space: 12 }) {
           // 欢迎横幅（对齐电脑版主页顶部）
           HomeHeroBanner({
@@ -832,9 +837,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       .width('100%')
       .height('100%')
       .align(Alignment.Top)
-      .onRefreshing(() => {
-        this.reloadHome();
-      })
       .backgroundColor(Color.Transparent)
     }
     .width('100%')
@@ -851,7 +853,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
    */
   @Builder
   homeTabWide() {
-    Refresh({ refreshing: this.homeRefreshing }) {
+    Scroll() {
       Column({ space: 12 }) {
         // Row1：顶部欢迎大标题（对齐 Windows 顶部大标题）
         HomeHeroBanner({
@@ -910,8 +912,16 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .width('100%')
         .alignItems(VerticalAlign.Top)
 
-        // Row3：等高 4 列卡（对齐 Windows 启动/保底/成就/便笺/刷新行）
+        // Row3：等高 4 列卡（对齐 Windows：启动游戏 | 保底计数 | 成就统计 | 实时便笺）
         Row({ space: 10 }) {
+          HomeLaunchCard({
+            onLaunched: (ok: boolean, message: string) => {
+              this.getUIContext().getPromptAction().showToast({ message: message, duration: 2200 });
+            },
+          })
+          .layoutWeight(1)
+          .height('100%')
+
           HomeGachaCard({
             uid: this.homeVm.currentUid,
             pools: this.homeVm.gachaPools,
@@ -944,24 +954,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           .layoutWeight(1)
           .height('100%')
 
-          HomeSignInCard({
-            uid: this.homeVm.currentUid,
-            info: this.homeVm.signInfo,
-            loaded: this.homeVm.signLoaded,
-            signing: this.homeSigning,
-            todayDay: this.todayDay,
-            onTap: () => {
-              router.pushUrl({ url: 'pages/SignInPage' });
-            },
-            onSignIn: () => {
-              this.doHomeSignIn();
-            },
-            onResignIn: () => {
-              router.pushUrl({ url: 'pages/SignInPage' });
-            },
-          })
-          .layoutWeight(1)
-          .height('100%')
         }
         .width('100%')
         .height(260)
@@ -982,7 +974,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         })
         .width('100%')
 
-        // Row4：等高 2 列卡：日历 | 公告
+        // Row4：等高 2 列卡：日历 | 签到（对齐 Windows 周历行）
         Row({ space: 10 }) {
           HomeCalendarCard({
             eventDays: this.calendarEventDays(),
@@ -994,6 +986,31 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           .layoutWeight(1)
           .height('100%')
 
+          HomeSignInCard({
+            uid: this.homeVm.currentUid,
+            info: this.homeVm.signInfo,
+            loaded: this.homeVm.signLoaded,
+            signing: this.homeSigning,
+            todayDay: this.todayDay,
+            onTap: () => {
+              router.pushUrl({ url: 'pages/SignInPage' });
+            },
+            onSignIn: () => {
+              this.doHomeSignIn();
+            },
+            onResignIn: () => {
+              router.pushUrl({ url: 'pages/SignInPage' });
+            },
+          })
+          .layoutWeight(1)
+          .height('100%')
+        }
+        .width('100%')
+        .height(240)
+        .alignItems(VerticalAlign.Center)
+
+        // Row5：公告 | 登录状态 + 功能入口网格（4 列）
+        Row({ space: 10 }) {
           HomeAnnouncementCard({
             items: this.homeVm.announcements,
             loaded: this.homeVm.announcementsLoaded,
@@ -1006,13 +1023,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           })
           .layoutWeight(1)
           .height('100%')
-        }
-        .width('100%')
-        .height(240)
-        .alignItems(VerticalAlign.Center)
 
-        // Row5：登录状态 + 功能入口网格（4 列）
-        Row({ space: 10 }) {
           Column({ space: 10 }) {
             LoginStatusBar()
             if (this.homeVm.acts.length > 0) {
@@ -1104,9 +1115,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .width('100%')
     .height('100%')
     .align(Alignment.Top)
-    .onRefreshing(() => {
-      this.reloadHome();
-    })
   }
 
   /** 时后活动小标题 */

@@ -15,8 +15,8 @@ import { PreferencesStore } from '../prefs/PreferencesStore';
 import { Logger } from '../../common/Logger';
 
 const TAG: string = 'ResourcePackService';
-/** 铁拳默认清单 URL（上传大图扩展包后替换 OWNER；设置页可改） */
-const DEFAULT_MANIFEST = 'https://raw.githubusercontent.com/OWNER/snap-hutao-data/main/resource_manifest.json';
+/** 默认大图清单 URL（aichi-chishan/snap-hutao-data 仓库，由 github-data/gen-manifest.ps1 生成；设置页可改） */
+const DEFAULT_MANIFEST = 'https://raw.githubusercontent.com/aichi-chishan/snap-hutao-data/main/resource_manifest.json';
 
 /** 资源条目 */
 export class RemoteResourceItem {

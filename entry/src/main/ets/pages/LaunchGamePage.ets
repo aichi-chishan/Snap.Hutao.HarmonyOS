@@ -150,14 +150,19 @@ export struct LaunchGamePage {
             .width('100%')
 
             if (this.message.length > 0) {
-              Text(this.message)
-                .fontSize(12)
-                .fontColor($r('app.color.danger'))
-                .width('100%')
-                .padding(12)
-                .borderRadius(10)
-                .backgroundColor($r('app.color.danger'))
-                .opacity(0.9)
+              Row({ space: 8 }) {
+                Circle({ width: 6, height: 6 })
+                  .fill($r('app.color.danger'))
+                Text(this.message)
+                  .fontSize(12)
+                  .fontColor($r('app.color.danger'))
+                  .layoutWeight(1)
+              }
+              .width('100%')
+              .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+              .borderRadius(10)
+              .backgroundColor($r('app.color.danger_bg'))
+              .border({ width: 1, color: $r('app.color.danger') })
             }
 
             // 已检测到的游戏列表
