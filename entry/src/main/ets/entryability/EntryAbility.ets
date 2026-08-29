@@ -58,6 +58,20 @@ export default class EntryAbility extends UIAbility {
       // 曾经为"透传桌面"设过透明（#00000000），但模拟器/部分合成器对透明窗口的 alpha 合成
       // 不完整：应用内半透明像素会被未初始化缓冲污染（整窗发黄）。
       // HarmonyOS 也无窗口级桌面模糊 API，透明透色没有实际收益 → 改为跟随主题的不透明底色。
+      // 自由窗口最小尺寸：防止缩得过窄导致手机布局断裂（最小 360x640vp；
+      // setWindowLimits 单位为 px，按设备真实密度换算）
+      try {
+        const density: number = display.getDefaultDisplaySync().densityPixels;
+        const d: number = density > 0 ? density : 2;
+        mainWindow.setWindowLimits({
+          maxWidth: Math.round(2560 * d),
+          maxHeight: Math.round(1600 * d),
+          minWidth: Math.round(360 * d),
+          minHeight: Math.round(640 * d),
+        });
+      } catch (e) {
+        hilog.warn(DOMAIN, TAG, 'setWindowLimits min size unsupported');
+      }
       // 自定义窗口装饰：三键区高度与自绘 TitleBar(40vp) 对齐；隐藏标题栏仅留三键
       let decorButtons: boolean = false;
       try {
