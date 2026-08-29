@@ -37,17 +37,17 @@ export struct PressCard {
   /** 按压缩放（回弹） */
   @State pressScale: number = 1;
 
-  /** 处理按压状态：切换光源 + 触发弹性缩放动画 */
+  /** 处理按压状态：光源与缩放在同一 animateTo 闭包内切换（避免动画间隙更新状态） */
   private handleTouch(type: TouchType): void {
     const uiContext = this.getUIContext();
     if (type === TouchType.Down) {
-      this.pressed = true;
       uiContext.animateTo({ duration: 90, curve: Curve.EaseOut }, () => {
+        this.pressed = true;
         this.pressScale = this.pressScaleTo;
       });
     } else if (type === TouchType.Up || type === TouchType.Cancel) {
-      this.pressed = false;
       uiContext.animateTo({ duration: 260, curve: curves.springCurve(0.1, 1, 228, 30) }, () => {
+        this.pressed = false;
         this.pressScale = 1;
       });
     }

@@ -12,6 +12,14 @@
     "deliveryWithInstall": true,
     "installationFree": false,
     "pages": "$profile:main_pages",
+    // 应用级沉浸光感：Dialog/Toast/Select/Menu 等默认开启沉浸式系统材质
+    // （targetSdkVersion ≥ 26.0.0；低版本系统自动忽略，不影响运行）
+    "metadata": [
+      {
+        "name": "ohos.arkui.UIMaterial.state",
+        "value": "enable"
+      }
+    ],
     "requestPermissions": [
       {
         "name": "ohos.permission.INTERNET"

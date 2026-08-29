@@ -6,8 +6,10 @@
  * 状态栏：自动读取本机状态栏高度（topAvoidVp），背景延伸、内容整体下移不重叠。
  */
 import { router } from '@kit.ArkUI';
-import { display, window } from '@kit.ArkUI';
+import { curves, display, uiMaterial, window } from '@kit.ArkUI';
 import { HdsTabs, HdsTabsController, hdsMaterial, SystemMaterialParams } from '@kit.UIDesignKit';
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { Motion } from '../common/Motion';
 import { LoginStatusBar } from '../components/LoginStatusBar';
 import { WallpaperLayer } from '../components/WallpaperLayer';
 import { HomeHeroBanner } from '../components/HomeHeroBanner';
@@ -39,6 +41,7 @@ import { WikiMonsterPage } from './WikiMonsterPage';
 import { AchievementPage } from './AchievementPage';
 import { LaunchGamePage } from './LaunchGamePage';
 import { NavIcon } from '../components/NavIcon';
+import { PageContainer } from '../components/PageContainer';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { HomeViewModel, HomePoolSummary, HomeChallengeSummary } from '../viewmodel/HomeViewModel';
 import { Logger } from '../common/Logger';
@@ -68,6 +71,11 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     @State isWide: boolean = false;
     /** 沉浸光感材质等级：-1=关闭；0=自适应(ADAPTIVE)；1=精细；2=柔和；3=平滑 */
     @State materialLevelIdx: number = 0;
+    /** API 26 沉浸光感可用性（运行时门控；低版本回退 scrim 半透明） */
+    private immersive: boolean = Motion.detectImmersive();
+    /** 宽屏侧栏/标题栏沉浸材质（仅 API 26+ 生效） */
+    private panelMaterial: uiMaterial.Material | undefined = Motion.detectImmersive()
+      ? new uiMaterial.ImmersiveMaterial({ style: uiMaterial.ImmersiveStyle.ULTRA_THIN }) : undefined;
     /** 每日背景开关 */
     /** 背景来源（none/local/bing，对齐 Windows 背景图片设置） */
     @StorageProp('bgType') bgType: string = 'local';
@@ -200,6 +208,13 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     return cfg;
   }
 
+  /** 宽屏内容切换（统一入口）：animateTo 驱动 geometryTransition 指示条与页面转场 */
+  private switchTo(index: number): void {
+    this.getUIContext().animateTo({ curve: Motion.springSoft() }, () => {
+      this.currentIndex = index;
+    });
+  }
+
   build() {
     if (this.isWide) {
       this.wideShell()
@@ -319,7 +334,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           router.back();
         } else {
           // 内嵌页面（侧边栏切换）：回主页
-          this.currentIndex = 0;
+          this.switchTo(0);
         }
       })
 
@@ -404,7 +419,9 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .width(this.sidebarFold ? 52 : 208)
     .height('100%')
     .scrollBar(BarState.Off)
-    .backgroundColor(('app.color.nav_scrim'))
+    // API 26+ 沉浸光感侧栏（低版本回退 scrim 半透明）
+    .systemMaterial(this.panelMaterial)
+    .backgroundColor(this.immersive ? Color.Transparent : ('app.color.nav_scrim'))
     .border({ width: { right: 1 }, color: ('app.color.nav_border') })
   }
 
@@ -417,6 +434,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .height(18)
         .borderRadius(2)
         .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary') : Color.Transparent)
+        .geometryTransition(this.currentIndex === index ? 'navIndicator' : '')
       NavIcon({ name: 'Announcement', iconSize: 24 })
       if (!this.sidebarFold) {
         Text('主页')
@@ -430,9 +448,9 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .padding({ left: this.sidebarFold ? 12 : 4, right: this.sidebarFold ? 0 : 14, top: 10, bottom: 10 })
     .borderRadius(10)
     .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary_bg') : Color.Transparent)
-    .animation({ duration: 180, curve: Curve.EaseOut })
+    .animation({ curve: Motion.springFast() })
     .onClick(() => {
-      this.currentIndex = index;
+      this.switchTo(index);
     })
   }
 
@@ -450,12 +468,13 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
   @Builder
   navItem(index: number, icon: string, label: string) {
     Row({ space: 10 }) {
-      // 左侧强调色指示条（对齐 Windows NavigationView 选中态）
+      // 左侧强调色指示条（对齐 Windows NavigationView 选中态；geometryTransition 弹性形变滑动）
       Column()
         .width(3)
         .height(18)
         .borderRadius(2)
         .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary') : Color.Transparent)
+        .geometryTransition(this.currentIndex === index ? 'navIndicator' : '')
       if (Index.isEmoji(icon)) {
         Text(icon)
           .fontSize(18)
@@ -476,9 +495,9 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .padding({ left: 4, right: 14, top: 9, bottom: 9 })
     .borderRadius(10)
     .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary_bg') : Color.Transparent)
-    .animation({ duration: 180, curve: Curve.EaseOut })
+    .animation({ curve: Motion.springFast() })
     .onClick(() => {
-      this.currentIndex = index;
+      this.switchTo(index);
     })
   }
 
@@ -495,44 +514,72 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
   wideContent() {
     Column() {
       if (this.currentIndex === 0) {
-        this.homeTabWide()
+        PageContainer() {
+          this.homeTabWide()
+          }
       } else if (this.currentIndex === 1) {
-        this.gachaTab()
+        PageContainer() {
+          this.gachaTab()
+          }
       } else if (this.currentIndex === 2) {
-        AchievementPage({ embedMode: true })
+        PageContainer() {
+          AchievementPage({ embedMode: true })
+          }
       } else if (this.currentIndex === 3) {
-        this.noteTab()
+        PageContainer() {
+          this.noteTab()
+          }
       } else if (this.currentIndex === 4) {
-        CharacterPage({ embedMode: true })
+        PageContainer() {
+          CharacterPage({ embedMode: true })
+          }
       } else if (this.currentIndex === 5) {
-        CultivationPage({ embedMode: true })
+        PageContainer() {
+          CultivationPage({ embedMode: true })
+          }
       } else if (this.currentIndex === 6) {
-        SpiralAbyssPage({ embedMode: true })
+        PageContainer() {
+          SpiralAbyssPage({ embedMode: true })
+          }
       } else if (this.currentIndex === 7) {
-        RoleCombatPage({ embedMode: true })
+        PageContainer() {
+          RoleCombatPage({ embedMode: true })
+          }
       } else if (this.currentIndex === 8) {
-        HardChallengePage({ embedMode: true })
+        PageContainer() {
+          HardChallengePage({ embedMode: true })
+          }
       } else if (this.currentIndex === 9) {
-        WikiAvatarPage({ embedMode: true })
+        PageContainer() {
+          WikiAvatarPage({ embedMode: true })
+          }
       } else if (this.currentIndex === 10) {
-        WikiWeaponPage({ embedMode: true })
+        PageContainer() {
+          WikiWeaponPage({ embedMode: true })
+          }
       } else if (this.currentIndex === 11) {
-        WikiMonsterPage({ embedMode: true })
+        PageContainer() {
+          WikiMonsterPage({ embedMode: true })
+          }
       } else if (this.currentIndex === 12) {
-        UserPage({ embedMode: true })
+        PageContainer() {
+          UserPage({ embedMode: true })
+          }
       } else if (this.currentIndex === 14) {
-        LaunchGamePage({ embedMode: true })
+        PageContainer() {
+          LaunchGamePage({ embedMode: true })
+          }
       } else {
-        SettingPage({ embedMode: true })
+        PageContainer() {
+          SettingPage({ embedMode: true })
+          }
       }
     }
     .layoutWeight(1)
     .height('100%')
     .backgroundColor(Color.Transparent)
-    .animation({ duration: 180, curve: Curve.EaseOut })
   }
 
-  /** 底部页签：图标+文字，选中项显示圆弧胶囊高亮（随 currentIndex 状态切换） */
   @Builder
   bottomTab(index: number, icon: string, label: string) {
     Column({ space: 2 }) {
@@ -549,7 +596,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .width('100%')
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
-    .animation({ duration: 200, curve: Curve.EaseOut })
+    .animation({ curve: Motion.springFast() })
   }
 
   @Builder
@@ -576,7 +623,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             loaded: this.homeVm.gachaLoaded,
             onTap: () => {
               if (this.isWide) {
-                this.currentIndex = 1;
+                this.switchTo(1);
               } else {
                 this.controller.changeIndex(1);
               }
@@ -591,7 +638,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             loaded: this.homeVm.noteLoaded,
             onTap: () => {
               if (this.isWide) {
-                this.currentIndex = 3;
+                this.switchTo(3);
               } else {
                 this.controller.changeIndex(2);
               }
@@ -620,7 +667,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           HomeAchievementCard({
             onTap: () => {
               if (this.isWide) {
-                this.currentIndex = 2;
+                this.switchTo(2);
               } else {
                 router.pushUrl({ url: 'pages/AchievementPage' });
               }
@@ -686,7 +733,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             GridItem() {
               this.entryTile('GachaLog', '祈愿记录', '分池统计 / 出金历史', () => {
                 if (this.isWide) {
-                  this.currentIndex = 1;
+                  this.switchTo(1);
                 } else {
                   this.controller.changeIndex(1);
                 }
@@ -695,7 +742,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             GridItem() {
               this.entryTile('DailyNote', '实时便笺', '树脂 / 派遣 / 通知', () => {
                 if (this.isWide) {
-                  this.currentIndex = 3;
+                  this.switchTo(3);
                 } else {
                   this.controller.changeIndex(2);
                 }
@@ -704,7 +751,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             GridItem() {
               this.entryTile('AvatarProperty', '我的角色', '角色列表 / 详情', () => {
                 if (this.isWide) {
-                  this.currentIndex = 3;
+                  this.switchTo(3);
                 } else {
                   router.pushUrl({ url: 'pages/CharacterPage' });
                 }
@@ -713,7 +760,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             GridItem() {
               this.entryTile('SpiralAbyss', '深境螺旋', '当期 / 上期战绩', () => {
                 if (this.isWide) {
-                  this.currentIndex = 4;
+                  this.switchTo(4);
                 } else {
                   router.pushUrl({ url: 'pages/SpiralAbyssPage' });
                 }
@@ -792,7 +839,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
                 HomeGachaBannerCard({
                   pool: pool,
                   onTap: () => {
-                    this.currentIndex = 1;
+                    this.switchTo(1);
                   },
                 })
               }, (pool: ActCalendarEntry, idx: number) => `pool_${idx}_${pool.name.length}`)
@@ -803,7 +850,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
                   pool: new ActCalendarEntry(),
                   summary: p,
                   onTap: () => {
-                    this.currentIndex = 1;
+                    this.switchTo(1);
                   },
                 })
               }, (p: HomePoolSummary, idx: number) => `lpool_${idx}_${p.gachaType}`)
@@ -843,7 +890,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             total: this.homeVm.gachaTotal,
             loaded: this.homeVm.gachaLoaded,
             onTap: () => {
-              this.currentIndex = 1;
+              this.switchTo(1);
             },
           })
           .layoutWeight(1)
@@ -851,7 +898,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
 
           HomeAchievementCard({
             onTap: () => {
-              this.currentIndex = 2;
+              this.switchTo(2);
             },
           })
           .layoutWeight(1)
@@ -863,7 +910,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             refreshTime: this.homeVm.noteRefreshTime,
             loaded: this.homeVm.noteLoaded,
             onTap: () => {
-              this.currentIndex = 3;
+              this.switchTo(3);
             },
           })
           .layoutWeight(1)
@@ -967,47 +1014,47 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           Grid() {
             GridItem() {
               this.entryTile('GachaLog', '祈愿记录', '分池统计', () => {
-                this.currentIndex = 1;
+                this.switchTo(1);
               })
             }
             GridItem() {
               this.entryTile('AvatarProperty', '我的角色', '角色详情', () => {
-                this.currentIndex = 4;
+                this.switchTo(4);
               })
             }
             GridItem() {
               this.entryTile('SpiralAbyss', '深境螺旋', '当期战绩', () => {
-                this.currentIndex = 6;
+                this.switchTo(6);
               })
             }
             GridItem() {
               this.entryTile('RoleCombat', '幻想真境剧诗', '回合奖章', () => {
-                this.currentIndex = 7;
+                this.switchTo(7);
               })
             }
             GridItem() {
               this.entryTile('HardChallenge', '幽境危战', '强敌挑战', () => {
-                this.currentIndex = 8;
+                this.switchTo(8);
               })
             }
             GridItem() {
               this.entryTile('Cultivation', '养成计划', '材料计算', () => {
-                this.currentIndex = 5;
+                this.switchTo(5);
               })
             }
             GridItem() {
               this.entryTile('Achievement', '成就管理', 'UIAF 导入导出', () => {
-                this.currentIndex = 2;
+                this.switchTo(2);
               })
             }
             GridItem() {
               this.entryTile('WikiAvatar', '角色资料', '资料百科', () => {
-                this.currentIndex = 9;
+                this.switchTo(9);
               })
             }
             GridItem() {
               this.entryTile('⚙️', '设置', '主题 / 账号', () => {
-                this.currentIndex = 13;
+                this.switchTo(13);
               })
             }
           }
@@ -1192,6 +1239,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .padding(10)
     .borderRadius($r('app.float.card_radius'))
     .backgroundColor($r('app.color.card_background'))
+    .transition(Motion.riseIn())
     .onClick(onClick)
   }
 
