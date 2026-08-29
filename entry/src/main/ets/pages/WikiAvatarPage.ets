@@ -48,6 +48,7 @@ export struct WikiAvatarPage {
     if (this.isWide && this.avatars.length > 0) {
       this.selectedId = this.avatars[0].id;
       this.current = this.avatars[0];
+      this.onAvatarSelected();
     } else {
       this.selectedId = 0;
       this.current = undefined;

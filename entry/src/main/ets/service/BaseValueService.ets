@@ -102,6 +102,50 @@ export class BaseValueService {
     return out;
   }
 
+  /**
+   * 怪物某等级基础属性（无突破）：值 = 基础值 × MonsterCurve[level][v]
+   */
+  static async monsterBaseValues(growCurves: Curve3[], hpBase: number, attackBase: number, defenseBase: number,
+    level: number): Promise<MonsterBaseValues> {
+    const out: MonsterBaseValues = new MonsterBaseValues();
+    const curves: Curves = await BaseValueService.getMonsterCurves();
+    const curveLevel: Map<number, number> | undefined = curves.get(level);
+    for (const g of growCurves) {
+      const co: number = (curveLevel !== undefined ? curveLevel.get(g.v) : undefined) ?? 0;
+      if (g.t === 1) {
+        out.hp = Math.round(hpBase * co);
+      } else if (g.t === 4) {
+        out.atk = Math.round(attackBase * co);
+      } else if (g.t === 7) {
+        out.def = Math.round(defenseBase * co);
+      }
+    }
+    return out;
+  }
+
+  private static async getMonsterCurves(): Promise<Curves> {
+    if (BaseValueService.monsterCurves !== undefined) {
+      return BaseValueService.monsterCurves;
+    }
+    const raw = JSON.parse(util.TextDecoder.create('utf-8').decodeToString(
+      await AppContextProvider.getResourceManager().getRawFileContent('metadata/MonsterCurve.json'))) as Object[];
+    const map: Curves = new Map();
+    for (const levelRow of raw) {
+      const ro = levelRow as Record<string, Object>;
+      const level = Number(ro['Level'] ?? 0);
+      const inner: Map<number, number> = new Map();
+      const curvesArr = (ro['Curves'] as Object[]) ?? [];
+      for (const c of curvesArr) {
+        const co = c as Record<string, Object>;
+        inner.set(Number(co['Type'] ?? 0), Number(co['Value'] ?? 0));
+      }
+      map.set(level, inner);
+    }
+    BaseValueService.monsterCurves = map;
+    Logger.info(TAG, `monsterCurves: ${map.size} levels`);
+    return map;
+  }
+
   private static async getAvatarCurves(): Promise<Curves> {
     if (BaseValueService.avatarCurves !== undefined) {
       return BaseValueService.avatarCurves;
@@ -293,6 +337,13 @@ export class AvatarGrowInfo {
   defenseBase: number = 0;
   promoteId: number = 0;
   growCurves: Curve3[] = [];
+}
+
+/** 怪物基础属性计算结果 */
+export class MonsterBaseValues {
+  hp: number = 0;
+  atk: number = 0;
+  def: number = 0;
 }
 
 /** 角色基础属性计算结果 */

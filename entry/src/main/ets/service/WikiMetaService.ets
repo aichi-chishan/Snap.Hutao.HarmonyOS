@@ -86,6 +86,8 @@ export class WikiMonsterMeta {
   hpBase: number = 0;
   attackBase: number = 0;
   defenseBase: number = 0;
+  /** 基础属性成长曲线（数值滑条卡） */
+  growCurves: Curve3[] = [];
   /** 8 项抗性(%): 火/水/草/雷/冰/岩/风/物理 */
   subHurts: number[] = [];
 }
@@ -280,6 +282,15 @@ export class WikiMetaService {
         const drops = (o['drops'] as Object[]) ?? [];
         for (const dr of drops) {
           m.drops.push(Number(dr));
+        }
+        const mgs = (o['growCurves'] as Object[]) ?? [];
+        for (const g of mgs) {
+          const go = g as Record<string, Object>;
+          const c: Curve3 = new Curve3();
+          c.i = Number(go['i'] ?? 0);
+          c.t = Number(go['t'] ?? 0);
+          c.v = Number(go['v'] ?? 0);
+          m.growCurves.push(c);
         }
         m.hpBase = Number(o['hpBase'] ?? 0);
         m.attackBase = Number(o['attackBase'] ?? 0);

@@ -6,6 +6,7 @@
 import { WikiMetaService, WikiMonsterMeta, MetaMaterial } from '../service/WikiMetaService';
 import { AppBackButton } from '../components/AppBackButton';
 import { MetaIcon } from '../components/MetaIcon';
+import { BaseValueService, MonsterBaseValues } from '../service/BaseValueService';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 
 @Entry
@@ -21,6 +22,11 @@ export struct WikiMonsterPage {
   @State current: WikiMonsterMeta | undefined = undefined;
   @State keyword: string = '';
   @State isWide: boolean = false;
+  /** 基础属性滑条状态（对齐 Windows 数值曲线，1-110 级） */
+  @State curLevel: number = 1;
+  @State curHp: number = 0;
+  @State curAtk: number = 0;
+  @State curDef: number = 0;
   /** 列表懒加载数据源 */
   private listSource: SimpleDataSource<WikiMonsterMeta> = new SimpleDataSource([]);
 
@@ -42,6 +48,7 @@ export struct WikiMonsterPage {
     if (this.isWide && this.monsters.length > 0) {
       this.selectedId = this.monsters[0].id;
       this.current = this.monsters[0];
+      this.onMonsterSelected();
     } else {
       this.selectedId = 0;
       this.current = undefined;
@@ -52,8 +59,113 @@ export struct WikiMonsterPage {
 
   /** 点击列表行：显式赋值页面 @State */
   select(m: WikiMonsterMeta): void {
+    this.onMonsterSelected();
     this.selectedId = m.id;
     this.current = m;
+  }
+
+  /** 重置滑条并重算基础属性（切换怪物时） */
+  onMonsterSelected(): void {
+    this.curLevel = 1;
+    this.calcMonsterBase();
+  }
+
+  /** 依据当前怪物+等级重算 生命/攻击/防御（无突破，曲线最高 110 级取数值区间） */
+  calcMonsterBase(): void {
+    const cur: WikiMonsterMeta | undefined = this.current;
+    if (cur === undefined || cur.growCurves.length === 0) {
+      this.curHp = 0;
+      this.curAtk = 0;
+      this.curDef = 0;
+      return;
+    }
+    if (this.curLevel > 110) {
+      this.curLevel = 110;
+    }
+    BaseValueService.monsterBaseValues(cur.growCurves, cur.hpBase, cur.attackBase, cur.defenseBase,
+      this.curLevel).then((v: MonsterBaseValues) => {
+      if (this.current !== undefined && this.current.id === cur.id) {
+        this.curHp = v.hp;
+        this.curAtk = v.atk;
+        this.curDef = v.def;
+      }
+    }).catch(() => {
+    });
+  }
+
+  /** 基础属性卡：等级滑条 + 生命/攻击/防御（对齐 Windows 怪物数值曲线 1-110 级） */
+  @Builder
+  monsterBaseCard() {
+    Column({ space: 10 }) {
+      Text('基础属性')
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .width('100%')
+
+      Text(`等级 ${this.curLevel}`)
+        .fontSize(13)
+        .fontColor($r('app.color.text_primary'))
+        .width('100%')
+
+      Slider({
+        value: this.curLevel,
+        min: 1,
+        max: 110,
+        step: 1,
+        style: SliderStyle.OutSet,
+      })
+        .width('100%')
+        .blockColor($r('app.color.app_primary'))
+        .selectedColor($r('app.color.app_primary'))
+        .onChange((value: number) => {
+          this.curLevel = Math.round(value);
+          this.calcMonsterBase();
+        })
+
+      Row({ space: 12 }) {
+        Column({ space: 2 }) {
+          Text('生命值')
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+          Text(`${this.curHp}`)
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary'))
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Center)
+
+        Column({ space: 2 }) {
+          Text('攻击力')
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+          Text(`${this.curAtk}`)
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary'))
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Center)
+
+        Column({ space: 2 }) {
+          Text('防御力')
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+          Text(`${this.curDef}`)
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary'))
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Center)
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(14)
+    .borderRadius($r('app.float.card_radius'))
+    .backgroundColor($r('app.color.card_background'))
   }
 
   matName(id: number): string {
@@ -278,6 +390,11 @@ export struct WikiMonsterPage {
             .padding(14)
             .borderRadius($r('app.float.card_radius'))
             .backgroundColor($r('app.color.card_background'))
+          }
+
+          // 基础属性卡（数值曲线）
+          if (this.current!.growCurves.length > 0) {
+            this.monsterBaseCard()
           }
 
           // 抗性卡
