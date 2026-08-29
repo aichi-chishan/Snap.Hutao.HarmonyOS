@@ -33,6 +33,7 @@
 Thumbs.db
 
 # ===== 截图/调试产物 =====
+/.debug/
 shot_*.jpeg
 shot_*.png
 layout*.json
