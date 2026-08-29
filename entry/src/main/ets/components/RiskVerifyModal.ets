@@ -229,5 +229,7 @@ export struct RiskVerifyModal {
     .width('100%')
     .height('100%')
     .hitTestBehavior(this.isShow ? HitTestMode.Default : HitTestMode.None)
+    // 隐藏态彻底脱离渲染树与命中测试（部分版本 OverlayManager 空内容仍参与命中）
+    .visibility(this.isShow ? Visibility.Visible : Visibility.None)
   }
 }

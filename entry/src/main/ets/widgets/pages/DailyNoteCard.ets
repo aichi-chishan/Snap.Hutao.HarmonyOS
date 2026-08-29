@@ -39,11 +39,11 @@ struct DailyNoteCard {
         Text('树脂')
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
-          .fontColor(('app.color.text_primary'))
+          .fontColor($r('app.color.text_primary'))
         Blank()
         Text(this.nickname)
           .fontSize(11)
-          .fontColor(('app.color.text_secondary'))
+          .fontColor($r('app.color.text_secondary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
@@ -55,21 +55,21 @@ struct DailyNoteCard {
         Progress({ value: this.resinNum(), total: this.maxResinNum(), type: ProgressType.Ring })
           .width(62)
           .height(62)
-          .color(('app.color.app_primary'))
+          .color($r('app.color.app_primary'))
           .style({ strokeWidth: 7 })
         Column({ space: 2 }) {
           Row() {
             Text(this.resin)
               .fontSize(26)
               .fontWeight(FontWeight.Bold)
-              .fontColor(('app.color.text_primary'))
+              .fontColor($r('app.color.text_primary'))
             Text(`/ ${this.maxResin}`)
               .fontSize(16)
-              .fontColor(('app.color.text_secondary'))
+              .fontColor($r('app.color.text_secondary'))
           }
           Text(this.resinRecoveryText)
             .fontSize(12)
-            .fontColor(('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary'))
             .maxLines(1)
         }
         .alignItems(HorizontalAlign.Start)
@@ -82,7 +82,7 @@ struct DailyNoteCard {
       Row({ space: 8 }) {
         Text(this.dailyText)
           .fontSize(12)
-          .fontColor(('app.color.text_primary'))
+          .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -94,7 +94,7 @@ struct DailyNoteCard {
       Row({ space: 8 }) {
         Text(this.expeditionText)
           .fontSize(12)
-          .fontColor(('app.color.text_tertiary'))
+          .fontColor($r('app.color.text_tertiary'))
           .layoutWeight(1)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -106,11 +106,11 @@ struct DailyNoteCard {
       Row() {
         Text(`洞天 ${this.homeCoinText}`)
           .fontSize(11)
-          .fontColor(('app.color.text_secondary'))
+          .fontColor($r('app.color.text_secondary'))
         Blank()
         Text(`更新 ${this.refreshText}`)
           .fontSize(11)
-          .fontColor(('app.color.text_hint'))
+          .fontColor($r('app.color.text_hint'))
       }
       .width('100%')
       .height(18)
@@ -118,7 +118,7 @@ struct DailyNoteCard {
     .width('100%')
     .height('100%')
     .padding(12)
-    .backgroundColor(('app.color.card_background'))
+    .backgroundColor($r('app.color.card_background'))
     .borderRadius(16)
   }
 }

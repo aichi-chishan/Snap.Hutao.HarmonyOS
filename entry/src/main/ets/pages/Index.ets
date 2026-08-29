@@ -258,7 +258,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     })
     .barFloatingStyle({
       barBottomMargin: 20,
-      gradientMask: { maskColor: ('app.color.mask_scrim'), maskHeight: 96 },
+      gradientMask: { maskColor: $r('app.color.mask_scrim'), maskHeight: 96 },
       systemMaterialEffect: this.materialEffect(),
     })
     .barBackgroundColor('#00FFFFFF')
@@ -421,8 +421,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .scrollBar(BarState.Off)
     // API 26+ 沉浸光感侧栏（低版本回退 scrim 半透明）
     .systemMaterial(this.panelMaterial)
-    .backgroundColor(this.immersive ? Color.Transparent : ('app.color.nav_scrim'))
-    .border({ width: { right: 1 }, color: ('app.color.nav_border') })
+    .backgroundColor(this.immersive ? Color.Transparent : $r('app.color.nav_scrim'))
+    .border({ width: { right: 1 }, color: $r('app.color.nav_border') })
   }
 
   /** 主页导航项（置顶，Windows Announcement 彩色图标；选中态=左侧强调色指示条） */

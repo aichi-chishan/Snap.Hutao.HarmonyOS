@@ -233,35 +233,22 @@ export struct WallpaperLayer {
 
   build() {
     Stack({ alignContent: Alignment.BottomStart }) {
-      // none：应用级磨砂玻璃（对齐 Windows Acrylic 视觉，无背景图时也能透出"窗口后内容"的观感）
-      // 注意：HarmonyOS 无窗口级桌面透传模糊 API（组件 backdropBlur 仅模糊应用内内容），
-      // 此处用「低饱和渐变 + 半透明遮罩 + 主题化亮度」模拟 Acrylic，保证内容可读性。
+      // 基底必须用纯色（禁止 linearGradient）：部分合成器/软渲染路径对渐变着色器
+      // 支持不完整，会把整块渐变输出为纯黄（历史"浅色模式整窗发黄"的根因）。
+      // 纯色与窗口底色（EntryAbility.applyWindowBackdrop）同色系，视觉无缝。
       if (this.bgType === 'none') {
         Column()
           .width('100%')
           .height('100%')
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-          .linearGradient({
-            angle: 135,
-            colors: [
-              [this.isDark ? '#1E1E22' : '#F2F0EC', 0.0],
-              [this.isDark ? '#141418' : '#E8E6E2', 1.0],
-            ],
-          })
-          .opacity(0.92)
+          .backgroundColor(this.isDark ? '#1B1B20' : '#F2F0EC')
       } else {
-        // local/bing：主题渐变底（图片下层兜底；浅色用中性灰白，避免暖黄底透色）
+        // local/bing：中性底（图片下层兜底；浅色用中性灰白，避免暖黄底透色）
         Column()
           .width('100%')
           .height('100%')
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-          .linearGradient({
-            angle: 180,
-            colors: [
-              [this.isDark ? '#14100C' : '#F5F4F2', 0.0],
-              [this.isDark ? '#0B0B0C' : '#EDECEA', 1.0],
-            ],
-          })
+          .backgroundColor(this.isDark ? '#14100C' : '#F5F4F2')
       }
       // 背景图片（ImageFit.Cover = UniformToFill；none 时无图）
       if (this.hasImage) {
@@ -281,18 +268,6 @@ export struct WallpaperLayer {
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
           .backgroundColor(this.isDark ? '#00000033' : '#FFFFFF99')
       }
-      // 底部柔光增强氛围
-      Column()
-        .width('100%')
-        .height('100%')
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-        .linearGradient({
-          angle: 180,
-          colors: [
-            [this.isDark ? '#00000000' : '#FFFFFF24', 0.0],
-            [this.isDark ? '#00000066' : '#FFFFFF00', 1.0],
-          ],
-        })
     }
     .width('100%')
     .height('100%')

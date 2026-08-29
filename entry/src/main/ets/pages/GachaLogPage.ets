@@ -720,7 +720,7 @@ export struct GachaLogPage {
         `卡池：${poolName}\n` +
         `时间：${item.time}`,
       buttons: [
-        { text: '知道了', color: ('app.color.app_primary') },
+        { text: '知道了', color: $r('app.color.app_primary') },
       ],
     });
   }
@@ -891,7 +891,7 @@ export struct GachaLogPage {
         `已拉取：${this.progressCount} 条\n` +
         `${this.progressText}`,
       buttons: [
-        { text: '知道了', color: ('app.color.app_primary') },
+        { text: '知道了', color: $r('app.color.app_primary') },
       ],
     });
   }

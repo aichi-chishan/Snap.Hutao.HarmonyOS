@@ -101,8 +101,8 @@ export struct SettingPage {
       title: '删除祈愿数据',
       message: `确定删除 UID ${row.uid} 的 ${row.count} 条祈愿记录？`,
       buttons: [
-        { text: '取消', color: ('app.color.text_secondary') },
-        { text: '删除', color: ('app.color.danger') },
+        { text: '取消', color: $r('app.color.text_secondary') },
+        { text: '删除', color: $r('app.color.danger') },
       ],
     }).then((dlg: ShowDialogSuccessResponse) => {
       if (dlg.index === 1) {
@@ -120,8 +120,8 @@ export struct SettingPage {
       title: '清空全部祈愿数据',
       message: '将删除所有 UID 的全部祈愿记录，且不可恢复。确定继续？',
       buttons: [
-        { text: '取消', color: ('app.color.text_secondary') },
-        { text: '清空', color: ('app.color.danger') },
+        { text: '取消', color: $r('app.color.text_secondary') },
+        { text: '清空', color: $r('app.color.danger') },
       ],
     }).then((dlg: ShowDialogSuccessResponse) => {
       if (dlg.index === 1) {
@@ -195,9 +195,10 @@ export struct SettingPage {
           }
         }, 150);
       }
-      // 状态栏图标色同步深浅色
+      // 状态栏图标色 + 窗口根底色同步深浅色
       window.getLastWindow(host).then((win: window.Window) => {
         EntryAbility.applySystemBarColors(win);
+        EntryAbility.applyWindowBackdrop(win);
       }).catch(() => {
       });
     } catch (e) {

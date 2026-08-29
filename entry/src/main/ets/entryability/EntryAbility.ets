@@ -32,6 +32,8 @@ export default class EntryAbility extends UIAbility {
         const mainWindow: window.Window | undefined = this.windowStage?.getMainWindowSync();
         if (mainWindow !== undefined) {
           EntryAbility.applySystemBarColors(mainWindow);
+          // 窗口根底色随主题同步（不透明，修复透明窗口合成异常发黄问题）
+          EntryAbility.applyWindowBackdrop(mainWindow);
         }
       } catch (e) {
         hilog.warn(DOMAIN, TAG, 'config update bar color fail');
@@ -52,13 +54,10 @@ export default class EntryAbility extends UIAbility {
   private configureImmersive(windowStage: window.WindowStage): void {
     try {
       const mainWindow: window.Window = windowStage.getMainWindowSync();
-      // 关键：窗口根背景设透明（默认是不透明 #FFF0F0F0/#FF1A1A1A，会挡住桌面，导致无法透传）。
-      // 设透明后，WallpaperLayer 的模糊+半透明遮罩才能透出桌面内容，实现"透传桌面+模糊+调暗"。
-      try {
-        mainWindow.setWindowBackgroundColor('#00000000');
-      } catch (e) {
-        hilog.warn(DOMAIN, TAG, 'setWindowBackgroundColor transparent unsupported');
-      }
+      // 窗口根背景必须为不透明主题色（setWindowLayoutFullScreen 就绪后设置，见下方 then）。
+      // 曾经为"透传桌面"设过透明（#00000000），但模拟器/部分合成器对透明窗口的 alpha 合成
+      // 不完整：应用内半透明像素会被未初始化缓冲污染（整窗发黄）。
+      // HarmonyOS 也无窗口级桌面模糊 API，透明透色没有实际收益 → 改为跟随主题的不透明底色。
       // 自定义窗口装饰：三键区高度与自绘 TitleBar(40vp) 对齐；隐藏标题栏仅留三键
       let decorButtons: boolean = false;
       try {
@@ -86,6 +85,8 @@ export default class EntryAbility extends UIAbility {
       mainWindow.setWindowLayoutFullScreen(true).then(() => {
         // 状态栏图标色随深浅色切换（浅色=深图标 / 深色=白图标）
         EntryAbility.applySystemBarColors(mainWindow);
+        // 窗口根底色随主题（不透明；窗口就绪后设置，过早调用报 1300002）
+        EntryAbility.applyWindowBackdrop(mainWindow);
       }).catch((e: Error) => {
         hilog.warn(DOMAIN, TAG, 'setWindowLayoutFullScreen fail: %{public}s', e.message);
       });
@@ -130,7 +131,18 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
-  /** 透明系统栏 + 图标色随深浅色（供启动与主题切换时调用） */  static applySystemBarColors(mainWindow: window.Window): void {
+  /** 窗口根背景：跟随主题的不透明色（与 WallpaperLayer none 渐变底一致，主题切换实时同步） */
+  static applyWindowBackdrop(mainWindow: window.Window): void {
+    const isDark: boolean = AppStorage.get<boolean>('isDarkMode') ?? false;
+    try {
+      mainWindow.setWindowBackgroundColor(isDark ? '#FF141418' : '#FFF2F0EC');
+    } catch (e) {
+      hilog.warn(DOMAIN, TAG, 'setWindowBackgroundColor fail: %{public}s', JSON.stringify(e));
+    }
+  }
+
+  /** 透明系统栏 + 图标色随深浅色（供启动与主题切换时调用） */
+  static applySystemBarColors(mainWindow: window.Window): void {
     const isDark: boolean = AppStorage.get<boolean>('isDarkMode') ?? false;
     mainWindow.setWindowSystemBarProperties({
       statusBarColor: '#00000000',
@@ -141,7 +153,8 @@ export default class EntryAbility extends UIAbility {
     });
   }
 
-  /** 读取状态栏(TOP)/底部导航指示区(BOTTOM)高度，转换为 vp 写入 AppStorage */  private static publishAvoidAreas(mainWindow: window.Window): void {
+  /** 读取状态栏(TOP)/底部导航指示区(BOTTOM)高度，转换为 vp 写入 AppStorage */
+  private static publishAvoidAreas(mainWindow: window.Window): void {
     try {
       const systemAvoid: window.AvoidArea = mainWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
       const topPx: number = systemAvoid.topRect.height;

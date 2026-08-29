@@ -225,8 +225,8 @@ export struct AchievementPage {
       title: '删除档案',
       message: `确定删除「${this.currentName()}」及其全部完成记录？`,
       buttons: [
-        { text: '取消', color: ('app.color.text_secondary') },
-        { text: '删除', color: ('app.color.danger') },
+        { text: '取消', color: $r('app.color.text_secondary') },
+        { text: '删除', color: $r('app.color.danger') },
       ],
     }).then((dlg: ShowDialogSuccessResponse) => {
       if (dlg.index === 1) {

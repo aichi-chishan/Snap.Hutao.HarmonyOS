@@ -439,14 +439,7 @@ export struct DailyNotePage {
             Column()
               .width('100%')
               .height('100%')
-              .linearGradient({
-                angle: 135,
-                colors: [
-                  [('app.color.ambient_gradient_start'), 0.0],
-                  [('app.color.ambient_gradient_mid'), 0.5],
-                  [('app.color.ambient_gradient_end'), 1.0],
-                ],
-              })
+              .backgroundColor($r('app.color.ambient_gradient_mid'))
             Image($r('app.media.hutao_daily_banner'))
               .width('100%')
               .height('100%')

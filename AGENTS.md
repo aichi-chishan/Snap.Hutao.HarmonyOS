@@ -4,7 +4,9 @@
 
 ## 项目定位
 - 移植 Windows 版胡桃工具箱（Snap.Hutao，见 GitHub DGP-Studio/Snap.Hutao）到鸿蒙，PC/Pad 力求还原，手机优化布局。
-- **这是 API 23 的鸿蒙 APP**（compatibleSdkVersion = 6.1.0(23)，targetSdkVersion = 26.0.0，runtimeOS = HarmonyOS）。设备类型：phone / tablet / 2in1。
+- **这是 API 24 起的鸿蒙 APP**（compatibleSdkVersion = 6.1.1(24)，targetSdkVersion = 26.0.0，runtimeOS = HarmonyOS）。设备类型：phone / tablet / 2in1。
+- **build-profile.json5 不入库**（含本地签名），API 版本改动只存在本地；换机后需手动把 compatibleSdkVersion 改回 6.1.1(24)。
+- API 26 能力（沉浸光感 systemMaterial/ImmersiveMaterial、deviceInfo.apiAvailable('26.0.0')）必须**运行时门控**，低版本回退（参考 Motion.detectImmersive / Index.panelMaterial）。
 - **不移植**：所有胡桃云服务器功能（通行证/云备份/云统计/云攻略/云壁纸/反馈页）与注入类功能（背包内存读取/插件/游戏内悬浮/注册表切号/启动游戏进程链）。
 - 仅国服（米哈游 API 用国服端点）。
 
@@ -12,7 +14,8 @@
 - **35 个鸿蒙开发 skill** 在 `skills/` 目录：`hmos-arkui-develop-skill`、`hmos-arkts-syntax-checker`、`hmos-multidevice-*`、`hmos-arkui-mvvm-pattern`、`hmos-*crash-analysis` 等。改 UI/ArkTS/多设备适配前先查相关 skill。
 - **DevEco CLI**：`devecocli`（npm 全局，`PATH` 含 npm 全局目录）。常用：`devecocli build` / `devecocli check lint` / `devecocli emulator list|start|stop` / `devecocli skills list|add`。
 - 编译：`hvigorw.bat assembleHap --mode module -p module=entry@default -p product=default --no-daemon`（DevEco Studio 自带，也可 `devecocli build`）。
-- 模拟器：`devecocli emulator start "MateBook Pro"`（2in1）；hdc 在 SDK 的 `openharmony/toolchains/hdc.exe`。
+- 模拟器：`devecocli emulator start "MateBook Pro 24"`（2in1，HarmonyOS 6.1.1(24)，**唯一能装当前包的镜像**；API 23 镜像装不上 compatibleSdkVersion 24 的包）；hdc 在 SDK 的 `openharmony/toolchains/hdc.exe`。
+- **hdc 注意（Git Bash）**：`file send` 源路径必须是**裸文件名**（cd 到 outputs 目录后 `hdc file send entry-default-signed.hap /data/local/tmp/entry.hap`），相对子路径会被追加成目录树；`bm install -p /data/...` 要加 `MSYS_NO_PATHCONV=1` 防止路径被转换。
 
 ## 目录结构
 - `entry/src/main/ets/pages/`：页面（ArkTS @Entry/@Component），多数带 `@Prop embedMode`（宽屏内嵌去返回栏）。
@@ -41,8 +44,14 @@
 - 颜色组件（文本/图标）注意换行符：部分文件是 **CRLF**，用 `\r\n` 精确匹配，或读后逐行处理。
 - 新页面必须在 `resources/base/profile/main_pages.json` 注册 route，并在 `Index.ets` 的 `sideNav()`/`wideContent()` 接线。
 - 宽屏/窄屏用 `isWide = width >= 840`（onAreaChange 驱动）。
+- **动效统一走 `common/Motion.ets`**：spring 三档 / pageSwitch 非对称转场（宽屏内容切换经 `PageContainer`）/ riseIn 进场 / staggerDelay 错峰；导航选中指示条用 geometryTransition（切换必须经 Index.switchTo 的 animateTo 驱动）。应用级沉浸光感已开（module.json5 UIMaterial.state=enable）。
 
 ## 已知坑（Do NOT trip）
+- **整窗发黄（已根治，勿回退）**：
+  1. **禁止用 linearGradient 做大面积背景**——模拟器/软渲染路径对渐变着色器支持异常，会把整块渐变输出为纯黄 (255,255,0)。基底一律用纯色 `backgroundColor`（WallpaperLayer / EntryAbility.applyWindowBackdrop 已改，同色系衔接）。
+  2. **颜色资源必须 `$r('app.color.x')`**——裸字符串 `('app.color.x')` 是无效色（透明/异常），曾让侧栏/按钮/桌面卡片全部失效（已全量修复，新代码勿再犯）。
+  3. 窗口根背景必须**不透明主题色**（`setWindowBackgroundColor(透明)` 会让半透明像素叠上未初始化缓冲；且要在 `setWindowLayoutFullScreen` 就绪后调用，过早报 1300002）。
+- **风控统一链路（勿绕过）**：1034/aigis/签到体内极验一律走 `RiskVerifyService`（Promise）+ 全局浮层 `RiskVerifyModal`（EntryAbility 挂 OverlayManager）；服务层重放用 `RiskVerifier.tryResolveRisk` / `RiskUiHelper.riskReplayHeaders`（game_record 只带 challenge；签到带 challenge+validate+seccode=validate|jordan）。极验结果键名是 `geetest_*`。页面旧的 RiskVerifyDialog/GeetestVerifyPage 仅作兜底。
 - **空 UID 归档坑**：未登录时 `GachaRepo.getOrCreateArchive('')` 会建空归档覆盖默认 UID 逻辑。`HomeViewModel`/`GachaLogViewModel` 已在 uid 为空时跳过创建。改动相关逻辑必须守住这点。
 - **主题三态**：跟随系统 = `EntryAbility.onConfigurationUpdate` 监听系统 → 写 `AppStorage.isDarkMode`；设置页 `applyTheme` 需同步 `themeMode` state。三态（浅/深/跟随系统）判定别写死。
 - **`@Entry` + `@Prop embedMode`** 编译会有 WARN（非错误），可用。
