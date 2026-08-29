@@ -2,13 +2,14 @@
  * WikiAvatarPage.ets（@Entry）
  * 角色资料（对齐 Windows WikiAvatarPage）：列表/详情双栏（宽屏）/ 单栏切换（窄屏）。
  * 数据：本地元数据 rawfile/metadata/avatar_meta.json（Snap.Metadata 公开仓库提取）；
- * 图标：rawfile/icons（离线）。区块：简介(元素/武器/生日/命座/CV)、养成材料、天赋技能、命座、料理、语音、故事。
+ * 图标：rawfile/icons（离线）。区块：简介(元素/武器/生日/命座/CV)、养成材料、基础属性曲线(滑条+突破)、天赋技能、命座、料理、语音、故事。
  */
 import { router } from '@kit.ArkUI';
 import { WikiMetaService, WikiAvatarMeta, MetaSkill, MetaText, MetaMaterial } from '../service/WikiMetaService';
 import { AppBackButton } from '../components/AppBackButton';
 import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
+import { BaseValueService, AvatarGrowInfo, AvatarBaseValues } from '../service/BaseValueService';
 
 @Entry
 @Component
@@ -27,6 +28,13 @@ export struct WikiAvatarPage {
   @State isWide: boolean = false;
   /** 角色列表懒加载数据源（140+ 项全量渲染开销大，LazyForEach 只画可视区） */
   private listSource: SimpleDataSource<WikiAvatarMeta> = new SimpleDataSource([]);
+  /** 基础属性滑条状态（对齐 Windows BaseValueSlider） */
+  @State curLevel: number = 1;
+  @State curPromoted: boolean = false;
+  @State curHp: number = 0;
+  @State curAtk: number = 0;
+  @State curDef: number = 0;
+  @State curBonusText: string = '';
 
   aboutToAppear(): void {
     this.load();
@@ -52,6 +60,53 @@ export struct WikiAvatarPage {
   select(a: WikiAvatarMeta): void {
     this.selectedId = a.id;
     this.current = a;
+    this.onAvatarSelected();
+  }
+
+  /** 重置滑条并重算基础属性（切换角色时） */
+  onAvatarSelected(): void {
+    this.curLevel = 1;
+    this.curPromoted = false;
+    this.calcAvatarBase();
+  }
+
+  /** 依据当前角色+等级+突破重算 生命/攻击/防御/突破属性 */
+  calcAvatarBase(): void {
+    const cur: WikiAvatarMeta | undefined = this.current;
+    if (cur === undefined || cur.growCurves.length === 0) {
+      this.curHp = 0;
+      this.curAtk = 0;
+      this.curDef = 0;
+      this.curBonusText = '';
+      return;
+    }
+    const maxLv: number = BaseValueService.avatarMaxLevel(cur.quality);
+    if (this.curLevel > maxLv) {
+      this.curLevel = maxLv;
+    }
+    const info: AvatarGrowInfo = new AvatarGrowInfo();
+    info.hpBase = cur.hpBase;
+    info.attackBase = cur.attackBase;
+    info.defenseBase = cur.defenseBase;
+    info.promoteId = cur.promoteId;
+    info.growCurves = cur.growCurves;
+    BaseValueService.avatarBaseValues(info, this.curLevel, this.curPromoted).then((v: AvatarBaseValues) => {
+      // 异步返回时角色可能已切换，校验后再落地
+      if (this.current !== undefined && this.current.id === cur.id) {
+        this.curHp = v.hp;
+        this.curAtk = v.atk;
+        this.curDef = v.def;
+        this.curBonusText = v.bonusType > 0
+          ? `${BaseValueService.fightPropName(v.bonusType)} ${BaseValueService.fightPropText(v.bonusType, v.bonusValue)}`
+          : '';
+      }
+    }).catch(() => {
+    });
+  }
+
+  /** 当前角色最大等级 */
+  avatarMaxLevel(): number {
+    return BaseValueService.avatarMaxLevel(this.current?.quality ?? 0);
   }
 
   filtered(): WikiAvatarMeta[] {
@@ -278,6 +333,7 @@ export struct WikiAvatarPage {
       Scroll() {
         Column({ space: 12 }) {
           this.profileCard()
+          this.baseValueCard()
           this.skillsCard()
           this.talentsCard()
           if (this.current!.cook !== null) {
@@ -299,6 +355,86 @@ export struct WikiAvatarPage {
       .layoutWeight(1)
       .scrollBar(BarState.Auto)
     }
+  }
+
+  /** 基础属性卡：等级滑条 + 突破开关 + 生命/攻击/防御/突破加成（对齐 Windows BaseValueSlider） */
+  @Builder
+  baseValueCard() {
+    Column({ space: 10 }) {
+      Text('基础属性')
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .width('100%')
+
+      Row() {
+        Text(`等级 ${this.curLevel}`)
+          .fontSize(13)
+          .fontColor($r('app.color.text_primary'))
+        Blank()
+        if (this.curBonusText.length > 0) {
+          Text(this.curBonusText)
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.app_primary'))
+        }
+      }
+      .width('100%')
+
+      Slider({
+        value: this.curLevel,
+        min: 1,
+        max: this.avatarMaxLevel(),
+        step: 1,
+        style: SliderStyle.OutSet,
+      })
+        .width('100%')
+        .blockColor($r('app.color.app_primary'))
+        .selectedColor($r('app.color.app_primary'))
+        .onChange((value: number) => {
+          this.curLevel = Math.round(value);
+          this.calcAvatarBase();
+        })
+
+      Row({ space: 12 }) {
+        this.propCell('生命值', this.curHp)
+        this.propCell('攻击力', this.curAtk)
+        this.propCell('防御力', this.curDef)
+      }
+      .width('100%')
+
+      Row() {
+        Text('是否突破')
+          .fontSize(12)
+          .fontColor($r('app.color.text_primary'))
+        Blank()
+        Toggle({ type: ToggleType.Switch, isOn: this.curPromoted })
+          .onChange((isOn: boolean) => {
+            this.curPromoted = isOn;
+            this.calcAvatarBase();
+          })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(14)
+    .borderRadius($r('app.float.card_radius'))
+    .backgroundColor($r('app.color.card_background'))
+  }
+
+  @Builder
+  propCell(label: string, value: number) {
+    Column({ space: 2 }) {
+      Text(label)
+        .fontSize(11)
+        .fontColor($r('app.color.text_secondary'))
+      Text(`${value}`)
+        .fontSize(16)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.text_primary'))
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Center)
   }
 
   @Builder

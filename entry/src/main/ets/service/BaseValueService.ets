@@ -20,6 +20,140 @@ export class BaseValueService {
   private static avatarPromotes: Promotes | undefined = undefined;
   private static monsterCurves: Curves | undefined = undefined;
 
+  /** 角色品质 → 最大等级（4/5 星 90；对齐 Windows GetMaxLevelByQuality） */
+  static avatarMaxLevel(quality: number): number {
+    return quality >= 4 ? 90 : 70;
+  }
+
+  /** 战斗属性中文名（1 生命/4 攻击/7 防御 + 突破属性） */
+  static fightPropName(t: number): string {
+    switch (t) {
+      case 1: return '生命值';
+      case 4: return '攻击力';
+      case 7: return '防御力';
+      case 20: return '暴击率';
+      case 22: return '暴击伤害';
+      case 26: return '元素充能效率';
+      case 28: return '治疗加成';
+      case 30: return '物理伤害加成';
+      case 40: return '风元素伤害加成';
+      case 41: return '岩元素伤害加成';
+      case 42: return '雷元素伤害加成';
+      case 43: return '草元素伤害加成';
+      case 44: return '水元素伤害加成';
+      case 45: return '火元素伤害加成';
+      case 46: return '冰元素伤害加成';
+      default: return '';
+    }
+  }
+
+  /** 百分比型战斗属性集合（值按 ×100 显示） */
+  private static isPercentProp(t: number): boolean {
+    return t === 20 || t === 22 || t === 26 || t === 28 || t === 30
+      || (t >= 40 && t <= 46);
+  }
+
+  /** 格式化属性值（百分比型 → "+4.8%"；平面型 → 四舍五入整数） */
+  static fightPropText(t: number, v: number): string {
+    if (BaseValueService.isPercentProp(t)) {
+      return `+${Math.round(v * 1000) / 10}%`;
+    }
+    return `${Math.round(v)}`;
+  }
+
+  /**
+   * 角色某等级基础属性（对齐 Windows BaseValueInfoConverter）：
+   *   值 = 基础值 × AvatarCurve[v][level] + AvatarPromote[promoteId][pl].AddProperties[t]
+   * 同时挑出突破加成属性（AddProperties 中非生命/攻击/防御的最大值项）。
+   */
+  static async avatarBaseValues(info: AvatarGrowInfo, level: number, promoted: boolean): Promise<AvatarBaseValues> {
+    const out: AvatarBaseValues = new AvatarBaseValues();
+    out.maxLevel = BaseValueService.avatarMaxLevel(5);
+    const curves: Curves = await BaseValueService.getAvatarCurves();
+    const promotes: Promotes = await BaseValueService.getAvatarPromotes();
+    const pl: number = BaseValueService.promoteLevel(level, out.maxLevel, promoted);
+    const curveLevel: Map<number, number> | undefined = curves.get(level);
+    const pMap: Map<number, Map<number, number>> | undefined = promotes.get(info.promoteId);
+    const pLevelMap: Map<number, number> | undefined = pMap !== undefined ? pMap.get(pl) : undefined;
+
+    for (const g of info.growCurves) {
+      const co: number = (curveLevel !== undefined ? curveLevel.get(g.v) : undefined) ?? 0;
+      const add: number = (pLevelMap !== undefined ? pLevelMap.get(g.t) : undefined) ?? 0;
+      if (g.t === 1) {
+        out.hp = Math.round(info.hpBase * co + add);
+      } else if (g.t === 4) {
+        out.atk = Math.round(info.attackBase * co + add);
+      } else if (g.t === 7) {
+        out.def = Math.round(info.defenseBase * co + add);
+      }
+    }
+    // 突破加成属性：非 1/4/7 的最大值项（暴击/暴伤/充能/治疗/元素伤等）
+    if (pLevelMap !== undefined) {
+      pLevelMap.forEach((v: number, t: number) => {
+        if (t === 1 || t === 4 || t === 7) {
+          return;
+        }
+        if (v > out.bonusValue) {
+          out.bonusType = t;
+          out.bonusValue = v;
+        }
+      });
+    }
+    return out;
+  }
+
+  private static async getAvatarCurves(): Promise<Curves> {
+    if (BaseValueService.avatarCurves !== undefined) {
+      return BaseValueService.avatarCurves;
+    }
+    const raw = JSON.parse(util.TextDecoder.create('utf-8').decodeToString(
+      await AppContextProvider.getResourceManager().getRawFileContent('metadata/AvatarCurve.json'))) as Object[];
+    const map: Curves = new Map();
+    for (const levelRow of raw) {
+      const ro = levelRow as Record<string, Object>;
+      const level = Number(ro['Level'] ?? 0);
+      const inner: Map<number, number> = new Map();
+      const curvesArr = (ro['Curves'] as Object[]) ?? [];
+      for (const c of curvesArr) {
+        const co = c as Record<string, Object>;
+        inner.set(Number(co['Type'] ?? 0), Number(co['Value'] ?? 0));
+      }
+      map.set(level, inner);
+    }
+    BaseValueService.avatarCurves = map;
+    Logger.info(TAG, `avatarCurves: ${map.size} levels`);
+    return map;
+  }
+
+  private static async getAvatarPromotes(): Promise<Promotes> {
+    if (BaseValueService.avatarPromotes !== undefined) {
+      return BaseValueService.avatarPromotes;
+    }
+    const raw = JSON.parse(util.TextDecoder.create('utf-8').decodeToString(
+      await AppContextProvider.getResourceManager().getRawFileContent('metadata/AvatarPromote.json'))) as Object[];
+    const map: Promotes = new Map();
+    for (const row of raw) {
+      const ro = row as Record<string, Object>;
+      const promoteId = Number(ro['Id'] ?? 0);
+      const level = Number(ro['Level'] ?? 0);
+      let idMap: Map<number, Map<number, number>> | undefined = map.get(promoteId);
+      if (idMap === undefined) {
+        idMap = new Map();
+        map.set(promoteId, idMap);
+      }
+      const props: Map<number, number> = new Map();
+      const adds = (ro['AddProperties'] as Object[]) ?? [];
+      for (const add of adds) {
+        const ao = add as Record<string, Object>;
+        props.set(Number(ao['Type'] ?? 0), Number(ao['Value'] ?? 0));
+      }
+      idMap.set(level, props);
+    }
+    BaseValueService.avatarPromotes = map;
+    Logger.info(TAG, `avatarPromotes: ${map.size} ids`);
+    return map;
+  }
+
   /** 品质 → 最大等级（>=4星90，否则70；对齐 Windows GetMaxLevelByQuality） */
   static weaponMaxLevel(rankLevel: number): number {
     return rankLevel >= 4 ? 90 : 70;
@@ -150,6 +284,26 @@ export class GrowCurveItem {
   rankLevel: number = 0;
   promoteId: number = 0;
   growCurves: Curve3[] = [];
+}
+
+/** 角色成长信息（WikiAvatarMeta 传入，避免服务层反向解析 3MB 元数据） */
+export class AvatarGrowInfo {
+  hpBase: number = 0;
+  attackBase: number = 0;
+  defenseBase: number = 0;
+  promoteId: number = 0;
+  growCurves: Curve3[] = [];
+}
+
+/** 角色基础属性计算结果 */
+export class AvatarBaseValues {
+  hp: number = 0;
+  atk: number = 0;
+  def: number = 0;
+  /** 突破加成属性 id（非生命/攻击/防御；0=无） */
+  bonusType: number = 0;
+  bonusValue: number = 0;
+  maxLevel: number = 90;
 }
 
 /** 单条曲线 */

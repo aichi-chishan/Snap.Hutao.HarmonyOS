@@ -6,6 +6,7 @@
 import { util } from '@kit.ArkTS';
 import { AppContextProvider } from '../common/AppContext';
 import { Logger } from '../common/Logger';
+import { Curve3 } from './BaseValueService';
 
 const TAG: string = 'WikiMetaService';
 
@@ -32,6 +33,12 @@ export class WikiAvatarMeta {
   sideIcon: string = '';
   quality: number = 0;
   weapon: number = 0;
+  /** 基础属性曲线（数值滑条卡；1 级基础值 + 突破组 + 成长曲线） */
+  hpBase: number = 0;
+  attackBase: number = 0;
+  defenseBase: number = 0;
+  promoteId: number = 0;
+  growCurves: Curve3[] = [];
   sort: number = 0;
   begin: string = '';
   title: string = '';
@@ -120,6 +127,19 @@ export class WikiMetaService {
         a.quality = Number(o['quality'] ?? 0);
         a.weapon = Number(o['weapon'] ?? 0);
         a.sort = Number(o['sort'] ?? 0);
+        a.hpBase = Number(o['hpBase'] ?? 0);
+        a.attackBase = Number(o['attackBase'] ?? 0);
+        a.defenseBase = Number(o['defenseBase'] ?? 0);
+        a.promoteId = Number(o['promoteId'] ?? 0);
+        const gcs = (o['growCurves'] as Object[]) ?? [];
+        for (const g of gcs) {
+          const go = g as Record<string, Object>;
+          const c: Curve3 = new Curve3();
+          c.i = Number(go['i'] ?? 0);
+          c.t = Number(go['t'] ?? 0);
+          c.v = Number(go['v'] ?? 0);
+          a.growCurves.push(c);
+        }
         a.begin = String(o['begin'] ?? '');
         a.title = String(o['title'] ?? '');
         a.detail = WikiMetaService.cleanText(String(o['detail'] ?? ''));
