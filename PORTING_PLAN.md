@@ -103,8 +103,8 @@ Windows 五选项及可移植性：
 
 Windows 结构：CommandBar(列表/网格切换+多条件搜索+加入养成计划) + SplitView 左列表右详情。
 - 角色资料详情：简介(元素/武器类型/大头像/称号/生日/所属/命定座/四语CV)、养成材料、**属性基础数值曲线(等级滑条+突破+突破加成属性)**✅已实现、天赋三段+被动、命座 6、料理、语音表、故事 ✅全部已实现（立绘 FlipView/名片/攻略外链未做，属可选增强）
-- 武器资料：抽卡头图、描述、属性曲线(90/70)、精炼 1-5、养成材料
-- 怪物资料：描述、词缀、数值曲线(110 级)、**8 项抗性**、掉落物
+- 武器资料：抽卡头图、描述、属性曲线(90/70)、精炼 1-5（描述已回填 236/246 把）✅全部已实现、养成材料
+- 怪物资料：描述、词缀、数值曲线(110 级滑条)✅已实现、**8 项抗性**、掉落物 ✅全部已实现
 - 数据源：Snap.Metadata 仓库 JSON（Avatar/Avatar.json 散装、Weapon.json、Monster.json、Curve/Promote 曲线表）
 
 鸿蒙动作：从 Snap.Metadata 公开仓库（github.com/SnapHutaoRemasteringProject/Snap.Metadata 或 gitcode 镜像）提取并精简打包：Avatar 精简字段(icon/name/quality/vision/weapon/birth/cv/skills/talents/cultivationItems)、Weapon 全量、Monster 全量(含 SubHurts 抗性/Drops) + 曲线表 → rawfile/metadata/*.json（估 5-15MB）。Wiki 三页改读本地元数据，UI 按 SplitView 结构重写，图片走第五节方案。
