@@ -192,7 +192,15 @@ export struct CharacterPage {
         this.detailHeader()
         if (this.currentDetail.weapon.id > 0) {
           Row({ space: 10 }) {
-            NavIcon({ name: 'AvatarProperty', iconSize: 22 })
+            if (WikiMetaService.iconOfWeapon(this.currentDetail.weapon.id).length > 0) {
+              MetaIcon({
+                category: 'EquipIcon',
+                name: WikiMetaService.iconOfWeapon(this.currentDetail.weapon.id),
+                iconSize: 40,
+              })
+            } else {
+              NavIcon({ name: 'AvatarProperty', iconSize: 22 })
+            }
             Text(`武器 Lv.${this.currentDetail.weapon.level} ★${this.currentDetail.weapon.rarity} · 精炼${this.currentDetail.weapon.affixLevel}`)
               .fontSize(14)
               .fontColor($r('app.color.text_primary'))

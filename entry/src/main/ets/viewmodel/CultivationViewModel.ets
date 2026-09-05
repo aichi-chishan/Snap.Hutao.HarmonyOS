@@ -6,6 +6,7 @@ import { CharacterListItem } from '../model/CharacterData';
 import { CharacterService } from '../service/CharacterService';
 import { CalculateService, CalAvatarDelta, CalSkillDelta, CalWeaponDelta } from '../service/CalculateService';
 import { CalBatchResult, CalItem } from '../model/Calculate';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 
 /** 养成候选角色 */
 export class CultivateTarget {
@@ -66,6 +67,28 @@ export class CultivationViewModel {
         t.weaponPromoteLevel = 0;
         list.push(t);
       }
+      // 恢复本地持久化的选择与目标等级（对齐 Windows 养成目标本地保存）
+      const saved: string = PreferencesStore.getString('cultivation_selected', '');
+      const savedLevels: string = PreferencesStore.getString('cultivation_levels', '');
+      if (saved.length > 0) {
+        const sel: Set<string> = new Set(JSON.parse(saved) as Array<string>);
+        let lvMap: Map<string, number> = new Map();
+        if (savedLevels.length > 0) {
+          const lvObj = JSON.parse(savedLevels) as Record<string, number>;
+          for (const k of Object.keys(lvObj)) {
+            lvMap.set(k, Number(lvObj[k]));
+          }
+        }
+        for (let i = 0; i < list.length; i++) {
+          const key: string = String(list[i].avatarId);
+          if (sel.has(key)) {
+            list[i].selected = true;
+            if (lvMap.has(key)) {
+              list[i].targetLevel = lvMap.get(key) as number;
+            }
+          }
+        }
+      }
       this.targets = list;
       this.updateSelected();
     } catch (e) {
@@ -82,12 +105,29 @@ export class CultivationViewModel {
       this.targets[index].selected = !this.targets[index].selected;
       this.targets = this.targets.slice();
       this.updateSelected();
+      this.persistSelection();
     }
+  }
+
+  /** 选择与目标等级持久化（JSON 落偏好文件，进入页面恢复） */
+  persistSelection(): void {
+    const sel: string[] = [];
+    const lvObj: Record<string, number> = {};
+    for (const t of this.targets) {
+      if (t.selected) {
+        sel.push(String(t.avatarId));
+        lvObj[String(t.avatarId)] = t.targetLevel;
+      }
+    }
+    PreferencesStore.setString('cultivation_selected', JSON.stringify(sel));
+    PreferencesStore.setString('cultivation_levels', JSON.stringify(lvObj));
   }
 
   setTargetLevel(index: number, level: number): void {
     if (index >= 0 && index < this.targets.length) {
       this.targets[index].targetLevel = level;
+      this.targets = this.targets.slice();
+      this.persistSelection();
     }
   }
 
