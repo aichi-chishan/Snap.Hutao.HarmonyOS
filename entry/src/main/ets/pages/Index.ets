@@ -7,7 +7,7 @@
  */
 import { router } from '@kit.ArkUI';
 import { curves, display, uiMaterial, window } from '@kit.ArkUI';
-import { HdsTabs, HdsTabsController, hdsMaterial, SystemMaterialParams } from '@kit.UIDesignKit';
+import { HdsTabs, HdsTabsController, HdsSideBar, hdsMaterial, SystemMaterialParams } from '@kit.UIDesignKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { Motion } from '../common/Motion';
 import { LoginStatusBar } from '../components/LoginStatusBar';
@@ -66,6 +66,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     @StorageLink('gachaDataVersion') @Watch('onGachaDataChanged') gachaDataVersion: number = 0;
     @StorageProp('topAvoidVp') topAvoidVp: number = 0;
     @StorageProp('bottomAvoidVp') bottomAvoidVp: number = 0;
+    @StorageProp('isDarkMode') isDark: boolean = false;
     /** 当前选中页签（窄屏 0-3 / 宽屏 0-7） */
     @State currentIndex: number = 0;
     /** 宽屏侧边栏（>=840vp 平板/PC 显示） */
@@ -89,6 +90,10 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     @State homeRefreshing: boolean = false;
     /** 主页数据在途加载标记（reloadHome 防抖） */
     private homeReloading: boolean = false;
+    /** HdsSideBar 显示/隐藏事件回调（类字段箭头：允许引用 this） */
+    private onSideBarToggle = (show: boolean): void => {
+      this.sidebarFold = !show;
+    };
     /** 超宽（>=1200vp PC 全屏/平板横屏）：首页网格扩展列数 */
     @State isUltra: boolean = false;
     /** 系统三键区（最小化/全屏/关闭）占位宽度 vp（PC 自定义窗口装饰；0=无系统三键） */
@@ -312,20 +317,24 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         // 顶部 TitleBar：返回按钮 / 三条杠（折叠侧栏） / 版本号 / 窗口控制按钮
         this.topBar()
 
-        Row() {
-          // 左侧导航（可折叠：图标-ONLY 或 图标+文字）
-          this.sideNav()
-
-          // 右侧内容区（嵌入页面组件）
-          Column() {
-            this.wideContent()
-          }
-          .layoutWeight(1)
-          .height('100%')
-        }
+        // HDS 侧边栏（6.0.0(20)+）：isSideBarBlur 提供窗口获焦时的实时毛玻璃（API 23/24 光感正路），
+        // 自带展开/收起动画与拖拽手柄；面板内容复用既有 sideNav（图标+分组+指示条+悬停反馈）
+        HdsSideBar({
+          isShowSideBar: !this.sidebarFold,
+          $isShowSideBar: this.onSideBarToggle,
+          sideBarWidth: 208,
+          minSideBarWidth: 200,
+          maxSideBarWidth: 280,
+          isSideBarBlur: true,
+          autoHide: false,
+          sideBarColor: ('app.color.nav_scrim'),
+          contentColor: Color.Transparent,
+          sideBarContainerType: SideBarContainerType.Embed,
+          sideBarPanelBuilder: this.sideNav,
+          contentPanelBuilder: this.contentArea,
+        })
         .layoutWeight(1)
         .width('100%')
-        .alignItems(VerticalAlign.Top)
       }
       .width('100%')
       .height('100%')
@@ -385,9 +394,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       .borderRadius(8)
       .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
-        this.getUIContext().animateTo({ curve: Motion.springSoft() }, () => {
-          this.sidebarFold = !this.sidebarFold;
-        });
+        // HdsSideBar 自带展开/收起动画，无需外部 animateTo
+        this.sidebarFold = !this.sidebarFold;
       })
 
       // 版本号（胡桃 1.20.0）
@@ -405,6 +413,13 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .height('100%')
     }
     .width('100%')
+    // 标题栏实时磨砂（Acrylic 观感；对齐 Windows 标题栏材质）
+    .backgroundEffect({
+      radius: 40,
+      color: this.isDark ? '#80141418' : '#80F2F0EC',
+      saturation: 1.2,
+      brightness: this.isDark ? 0.9 : 1.1,
+    })
     .height(40)
     .padding({ left: 6, right: 0 })
     .alignItems(VerticalAlign.Center)
@@ -454,12 +469,12 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       }
       .width('100%')
     }
-    .width(this.sidebarFold ? 52 : 208)
+    .width('100%')
     .height('100%')
     .scrollBar(BarState.Off)
-    // API 26+ 沉浸光感侧栏（低版本回退 scrim 半透明）
+    // API 26+ 沉浸光感侧栏（systemMaterial）；API 23/24 由 HdsSideBar 的 isSideBarBlur 提供实时毛玻璃
     .systemMaterial(this.panelMaterial)
-    .backgroundColor(this.immersive ? Color.Transparent : $r('app.color.nav_scrim'))
+    .backgroundColor(Color.Transparent)
     .border({ width: { right: 1 }, color: $r('app.color.nav_border') })
   }
 
@@ -474,17 +489,15 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary') : Color.Transparent)
         .geometryTransition(this.currentIndex === index ? 'navIndicator' : '')
       NavIcon({ name: 'Announcement', iconSize: 24 })
-      if (!this.sidebarFold) {
-        Text('主页')
-          .fontSize(15)
-          .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Normal)
-          .fontColor(this.currentIndex === index ? $r('app.color.app_primary') : $r('app.color.text_primary'))
-          .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
-      }
+      Text('主页')
+        .fontSize(15)
+        .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Normal)
+        .fontColor(this.currentIndex === index ? $r('app.color.app_primary') : $r('app.color.text_primary'))
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
       Blank()
     }
-    .width(this.sidebarFold ? 52 : '100%')
-    .padding({ left: this.sidebarFold ? 12 : 4, right: this.sidebarFold ? 0 : 14, top: 10, bottom: 10 })
+    .width('100%')
+    .padding({ left: 4, right: 14, top: 10, bottom: 10 })
     .borderRadius(10)
     .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary_bg') : Color.Transparent)
     .hoverEffect(HoverEffect.Highlight)
@@ -496,13 +509,11 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
 
   @Builder
   navSectionTitle(title: string) {
-    if (!this.sidebarFold) {
-      Text(title)
-        .fontSize(11)
-        .fontColor($r('app.color.text_secondary'))
-        .width('100%')
-        .padding({ left: 14, right: 14, top: 12, bottom: 4 })
-    }
+    Text(title)
+      .fontSize(11)
+      .fontColor($r('app.color.text_secondary'))
+      .width('100%')
+      .padding({ left: 14, right: 14, top: 12, bottom: 4 })
   }
 
   @Builder
@@ -523,13 +534,11 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       } else {
         NavIcon({ name: icon, iconSize: 22 })
       }
-      if (!this.sidebarFold) {
-        Text(label)
-          .fontSize(15)
-          .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Normal)
-          .fontColor(this.currentIndex === index ? $r('app.color.app_primary') : $r('app.color.text_primary'))
-          .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
-      }
+      Text(label)
+        .fontSize(15)
+        .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Normal)
+        .fontColor(this.currentIndex === index ? $r('app.color.app_primary') : $r('app.color.text_primary'))
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
       Blank()
     }
     .width('100%')
@@ -548,6 +557,16 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     // emoji 码点判断：首个字符 FD 以上（>0x1F000）或常见 emoji 区
     const code: number = icon.length > 0 ? icon.codePointAt(0) ?? 0 : 0;
     return code > 0x2100;
+  }
+
+  /** HdsSideBar 内容面板（右列） */
+  @Builder
+  contentArea() {
+    Column() {
+      this.wideContent()
+    }
+    .width('100%')
+    .height('100%')
   }
 
   /** 宽屏内容区：直接内嵌页面组件（embedMode 去返回栏），背景透传全屏壁纸层，

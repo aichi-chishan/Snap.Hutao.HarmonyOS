@@ -45,6 +45,7 @@ function immersiveAvailable(): boolean {
 
 @Component
 export struct RiskVerifyModal {
+  @StorageProp('isDarkMode') isDark: boolean = false;
   @StorageLink(KEY_RISK_SHOW) isShow: boolean = false;
   @StorageLink(KEY_RISK_REQ) req: RiskVerifyRequest = new RiskVerifyRequest();
   @State statusText: string = '';
@@ -205,9 +206,15 @@ export struct RiskVerifyModal {
         .constraintSize({ maxWidth: 420 })
         .padding({ left: 18, right: 12, top: 16, bottom: 14 })
         .borderRadius(24)
-        // API 26+ 沉浸光感材质（低版本自动回退纯色卡面）
+        // API 26+ 沉浸光感材质；API 23/24 用 backgroundEffect 实时磨砂玻璃（材质观感一致）
         .systemMaterial(this.material)
-        .backgroundColor(this.material !== undefined ? Color.Transparent : $r('app.color.card_background'))
+        .backgroundColor(this.material !== undefined ? Color.Transparent : (this.isDark ? '#B31E1E22' : '#B3F2F0EC'))
+        .backgroundEffect(this.material !== undefined ? undefined : {
+          radius: 48,
+          color: this.isDark ? '#801E1E22' : '#80F2F0EC',
+          saturation: 1.2,
+          brightness: this.isDark ? 0.9 : 1.1,
+        })
         .shadow({ radius: 40, color: 'rgba(0,0,0,0.35)', offsetY: 12 })
         .alignItems(HorizontalAlign.Start)
         .transition(TransitionEffect.asymmetric(
