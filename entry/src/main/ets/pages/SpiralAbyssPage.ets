@@ -4,6 +4,7 @@
  */
 import { router } from '@kit.ArkUI';
 import { SpiralAbyssViewModel } from '../viewmodel/SpiralAbyssViewModel';
+import { AbyssHistoryEntry } from '../data/repo/SpiralAbyssRepo';
 import { SpiralAbyssData, SpiralAbyssFloor, SpiralAbyssLevel, SpiralAbyssAvatar, SpiralAbyssBattle, SpiralAbyssRank } from '../model/SpiralAbyss';
 import { RiskUiHelper, RiskVerifyParams } from '../common/RiskUiHelper';
 import { AppBackButton } from '../components/AppBackButton';
@@ -13,6 +14,7 @@ import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
 import { DateUtil } from '../common/DateUtil';
 import { MetaIcon } from '../components/MetaIcon';
 import { WikiMetaService } from '../service/WikiMetaService';
+import { TowerMetadataService, TowerBuff, TowerWaveView, ChamberWaves, TowerMonsterView } from '../service/TowerMetadataService';
 
 @Entry
 @Component
@@ -42,6 +44,8 @@ export struct SpiralAbyssPage {
   }
 
   reload(): void {
+    this.vm.loadHistoryList().then(() => {
+    });
     this.vm.load(this.currentUid).then(() => {
     });
   }
@@ -167,6 +171,53 @@ export struct SpiralAbyssPage {
                   .fontSize(10)
                   .fontColor($r('app.color.text_secondary'))
               }
+            }
+            .width('100%')
+            // 敌人波次（对齐 Windows BattleWave：Tower 元数据解析，同步缓存直读）
+            Column({ space: 4 }) {
+              ForEach(this.wavesFor(floor.index, level.index, battle.index),
+                (w: TowerWaveView, wi: number) => {
+                  Column({ space: 4 }) {
+                    Text(w.label)
+                      .fontSize(10)
+                      .fontColor($r('app.color.text_secondary'))
+                      .width('100%')
+                    Row({ space: 4 }) {
+                      ForEach(w.monsters, (mo: TowerMonsterView, mi: number) => {
+                        Stack({ alignContent: Alignment.BottomEnd }) {
+                          if (mo.icon.length > 0) {
+                            MetaIcon({ category: 'MonsterIcon', name: mo.icon, iconSize: 28 })
+                              .borderRadius(14)
+                              .clip(true)
+                          } else {
+                            Text(mo.name.substring(0, 1))
+                              .fontSize(12)
+                              .width(28)
+                              .height(28)
+                              .textAlign(TextAlign.Center)
+                              .borderRadius(14)
+                              .backgroundColor($r('app.color.notice_bg'))
+                          }
+                          if (mo.count > 1) {
+                            Text(`x${mo.count}`)
+                              .fontSize(8)
+                              .fontColor(Color.White)
+                              .padding({ left: 3, right: 3 })
+                              .borderRadius(5)
+                              .backgroundColor('#99000000')
+                          }
+                        }
+                      }, (mo: TowerMonsterView, mi: number) => `tw_${wi}_${mi}_${mo.name}`)
+                      Blank()
+                      Text(`Lv.${w.monsterLevel}`)
+                        .fontSize(10)
+                        .fontColor($r('app.color.text_secondary'))
+                    }
+                    .width('100%')
+                  }
+                  .width('100%')
+                  .padding({ top: 4, bottom: 4 })
+                }, (w: TowerWaveView, wi: number) => `twl_${wi}_${w.label}`)
             }
             .width('100%')
           }, (battle: SpiralAbyssBattle, bi: number) => `${bi}_${battle.index}`)
@@ -299,6 +350,27 @@ export struct SpiralAbyssPage {
   }
 
   /** Enka 官方头像（按角色 id，icon 缺失时兜底） */
+  /** 某间某半的敌人波次（Tower 元数据；未预载返回空集合） */
+  wavesFor(floorIndex: number, chamberIndex: number, battleIndex: number): TowerWaveView[] {
+    if (this.vm.abyss === undefined) {
+      return [];
+    }
+    const cw: ChamberWaves = TowerMetadataService.wavesOf(this.vm.abyss.scheduleId, floorIndex, chamberIndex);
+    return battleIndex === 1 ? cw.upper : cw.lower;
+  }
+
+  /** 渊月祝福（塔元数据优先，API 解析兜底） */
+  abyssBuff(): TowerBuff {
+    const tower: TowerBuff = TowerMetadataService.buffOf(this.vm.abyss !== undefined ? this.vm.abyss.scheduleId : 0);
+    if (tower.name.length > 0) {
+      return tower;
+    }
+    const out: TowerBuff = new TowerBuff();
+    out.name = this.vm.abyss !== undefined ? this.vm.abyss.buffName : '';
+    out.description = this.vm.abyss !== undefined ? this.vm.abyss.buffDesc : '';
+    return out;
+  }
+
   /** 战斗时间格式化（yyyy/MM/dd HH:mm） */
   static formatBattleTime(ts: number): string {
     const d: Date = new Date(ts);
@@ -323,6 +395,53 @@ export struct SpiralAbyssPage {
         }
         .width('100%')
         .padding({ left: 16, right: 16, top: 4, bottom: 4 })
+
+        // 期数历史（本地累积存档，对齐 Windows 左侧期数列表）
+        if (this.vm.history.length > 0) {
+          Scroll() {
+            Row({ space: 8 }) {
+              if (this.vm.fromHistory) {
+                Text('⟲ 实时')
+                  .fontSize(12)
+                  .fontColor($r('app.color.app_primary'))
+                  .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                  .borderRadius(14)
+                  .backgroundColor($r('app.color.app_primary_bg'))
+                  .border({ width: 1, color: $r('app.color.app_primary') })
+                  .onClick(() => {
+                    this.vm.backToLive(this.currentUid).then(() => {
+                    });
+                  })
+              }
+              ForEach(this.vm.history, (h: AbyssHistoryEntry, hi: number) => {
+                Text(`第 ${h.scheduleId} 期 ★${h.totalStar}`)
+                  .fontSize(12)
+                  .fontColor(!this.vm.fromHistory && this.vm.abyss !== undefined
+                    && this.vm.abyss.scheduleId === h.scheduleId
+                    ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+                  .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                  .borderRadius(14)
+                  .backgroundColor(!this.vm.fromHistory && this.vm.abyss !== undefined
+                    && this.vm.abyss.scheduleId === h.scheduleId
+                    ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+                  .border({
+                    width: 1,
+                    color: !this.vm.fromHistory && this.vm.abyss !== undefined
+                      && this.vm.abyss.scheduleId === h.scheduleId
+                      ? $r('app.color.app_primary') : $r('app.color.divider'),
+                  })
+                  .onClick(() => {
+                    this.vm.loadFromHistory(h.scheduleId).then(() => {
+                    });
+                  })
+              }, (h: AbyssHistoryEntry, hi: number) => `ah_${h.scheduleId}_${h.totalStar}_${hi}`)
+            }
+          }
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
+          .width('100%')
+          .padding({ left: 16, right: 16, bottom: 4 })
+        }
 
         Scroll() {
           Column({ space: 10 }) {
@@ -365,31 +484,29 @@ export struct SpiralAbyssPage {
                   .width('100%')
                   .padding({ top: 20, bottom: 20 })
               }
-              // 渊月祝福卡（对齐 Windows 攻辉之月）
-              if (this.vm.abyss.buffName.length > 0) {
-                Column({ space: 6 }) {
-                  Row({ space: 8 }) {
-                    Text('◆')
-                      .fontSize(13)
-                      .fontColor($r('app.color.app_primary'))
-                    Text(this.vm.abyss.buffName)
-                      .fontSize(15)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor($r('app.color.text_primary'))
-                      .layoutWeight(1)
-                  }
-                  .width('100%')
-                  Text(this.vm.abyss.buffDesc)
-                    .fontSize(12)
-                    .fontColor($r('app.color.text_secondary'))
-                    .width('100%')
+              // 渊月祝福卡（对齐 Windows 攻辉之月；塔元数据优先，API 解析兜底）
+              Column({ space: 6 }) {
+                Row({ space: 8 }) {
+                  Text('◆')
+                    .fontSize(13)
+                    .fontColor($r('app.color.app_primary'))
+                  Text(this.abyssBuff().name)
+                    .fontSize(15)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor($r('app.color.text_primary'))
+                    .layoutWeight(1)
                 }
                 .width('100%')
-                .padding(14)
-                .borderRadius(12)
-                .backgroundColor($r('app.color.card_background'))
-                .border({ width: 1, color: $r('app.color.divider') })
+                Text(this.abyssBuff().description)
+                  .fontSize(12)
+                  .fontColor($r('app.color.text_secondary'))
+                  .width('100%')
               }
+              .width('100%')
+              .padding(14)
+              .borderRadius(12)
+              .backgroundColor($r('app.color.card_background'))
+              .border({ width: 1, color: $r('app.color.divider') })
               ForEach(this.vm.abyss.floors, (floor: SpiralAbyssFloor, fi: number) => {
                 this.floorSection(floor)
               }, (floor: SpiralAbyssFloor, fi: number) => `${fi}_${floor.index}`)

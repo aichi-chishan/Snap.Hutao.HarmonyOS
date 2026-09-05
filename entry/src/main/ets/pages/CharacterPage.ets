@@ -4,6 +4,7 @@
  * 宽屏：左列表 + 右详情；窄屏：列表 + 详情顺序展示。
  */
 import { router, display } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
 import { CharacterViewModel } from '../viewmodel/CharacterViewModel';
 import { CharacterListItem, CharacterDetail, Reliquary, RelicProperty, BaseProperty, Constellation, avatarIconUrl } from '../model/CharacterData';
 import { ReliquaryScore } from '../common/ReliquaryScore';
@@ -190,6 +191,50 @@ export struct CharacterPage {
       Column({ space: 10 }) {
       if (this.currentDetail !== undefined) {
         this.detailHeader()
+        // 名片 + 攻略外链（对齐 Windows：名片展示 + 米游社/B站攻略入口）
+        if (WikiMetaService.nameCardPicOf(this.currentDetail.name).length > 0) {
+          Column({ space: 6 }) {
+            Row({ space: 8 }) {
+              NavIcon({ name: 'Database', iconSize: 20 })
+              Text('名片')
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.text_primary'))
+                .layoutWeight(1)
+            }
+            .width('100%')
+            Image($rawfile(`icons/NameCardPic/${WikiMetaService.nameCardPicOf(this.currentDetail.name)}.png`))
+              .width('100%')
+              .borderRadius(10)
+              .objectFit(ImageFit.Cover)
+          }
+          .width('100%')
+          .padding(12)
+          .borderRadius(12)
+          .backgroundColor($r('app.color.card_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
+        }
+        Row({ space: 10 }) {
+          Button('米游社攻略')
+            .fontSize(13)
+            .height(34)
+            .layoutWeight(1)
+            .backgroundColor($r('app.color.app_primary_bg'))
+            .fontColor($r('app.color.app_primary'))
+            .onClick(() => {
+              this.openStrategy('mys');
+            })
+          Button('B站攻略')
+            .fontSize(13)
+            .height(34)
+            .layoutWeight(1)
+            .backgroundColor($r('app.color.app_primary_bg'))
+            .fontColor($r('app.color.app_primary'))
+            .onClick(() => {
+              this.openStrategy('bili');
+            })
+        }
+        .width('100%')
         if (this.currentDetail.weapon.id > 0) {
           Row({ space: 10 }) {
             if (WikiMetaService.iconOfWeapon(this.currentDetail.weapon.id).length > 0) {
@@ -425,6 +470,29 @@ export struct CharacterPage {
     .backgroundColor($r('app.color.card_background'))
     .border({ width: 1, color: $r('app.color.divider') })
   }
+  /** 攻略外链：米游社/B站搜索当前角色（openLink 拉起浏览器） */
+  openStrategy(target: string): void {
+    if (this.currentDetail === undefined) {
+      return;
+    }
+    const name: string = this.currentDetail.name;
+    const url: string = target === 'mys'
+      ? `https://www.miyoushe.com/ys/search?keyword=${encodeURIComponent(name + ' 攻略')}`
+      : `https://search.bilibili.com/all?keyword=${encodeURIComponent('原神 ' + name + ' 攻略')}`;
+    try {
+      const host = this.getUIContext().getHostContext();
+      if (host === undefined) {
+        return;
+      }
+      const ui = host as common.UIAbilityContext;
+      ui.openLink(url).catch((e: Error) => {
+        this.toast(`打开失败：${e.message}`);
+      });
+    } catch (e) {
+      this.toast(`打开失败：${(e as Error).message}`);
+    }
+  }
+
   /** 圣遗物图标名：API 可能带位置后缀 _N（CDN/打包无该变体），回退基础名 */
   static relicIconName(icon: string): string {
     if (icon.length === 0) {

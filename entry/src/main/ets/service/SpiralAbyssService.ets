@@ -69,6 +69,7 @@ export class SpiralAbyssService {
       throw new Error(resp.userFriendlyMessage());
     }
     const data: SpiralAbyssData = SpiralAbyssData.fromJson(resp.data);
+    data.rawJson = resp.raw;
     Logger.info(TAG, `abyss schedule=${scheduleType} star=${data.totalStar} floor=${data.maxFloor}`);
     return data;
   }

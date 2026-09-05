@@ -82,6 +82,14 @@ export class RelationalStoreHelper {
         gacha_id TEXT
       )`,
       `CREATE INDEX IF NOT EXISTS idx_gacha_items_archive_type ON gacha_items (archive_id, gacha_type)`,
+      `CREATE TABLE IF NOT EXISTS abyss_history (
+        schedule_id INTEGER PRIMARY KEY,
+        start_time INTEGER,
+        end_time INTEGER,
+        total_star INTEGER,
+        raw_json TEXT,
+        record_time INTEGER
+      )`,
       `CREATE TABLE IF NOT EXISTS daily_notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,

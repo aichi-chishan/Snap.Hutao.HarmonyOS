@@ -4,6 +4,8 @@
  */
 import { SpiralAbyssData } from '../model/SpiralAbyss';
 import { SpiralAbyssService } from '../service/SpiralAbyssService';
+import { SpiralAbyssRepo, AbyssHistoryEntry } from '../data/repo/SpiralAbyssRepo';
+import { TowerMetadataService } from '../service/TowerMetadataService';
 import { RiskControlError } from '../data/network/RiskVerifier';
 import { RiskUiHelper } from '../common/RiskUiHelper';
 
@@ -15,6 +17,10 @@ export class SpiralAbyssViewModel {
   loaded: boolean = false;
   /** 1=当期 2=上期 */
   scheduleType: number = 1;
+  /** 本地累积的期数历史（新期在前） */
+  history: AbyssHistoryEntry[] = [];
+  /** 当前 abyss 是否来自历史存档（false=实时数据） */
+  fromHistory: boolean = false;
   /** 风控需人机验证（true 时 UI 跳转极验页） */
   needRiskVerify: boolean = false;
   riskGt: string = '';
@@ -32,7 +38,13 @@ export class SpiralAbyssViewModel {
       const challenge: string = RiskUiHelper.consumePendingChallenge();
       this.abyss = await SpiralAbyssService.getInstance().fetch(uid, this.scheduleType,
         challenge.length > 0 ? challenge : undefined);
+      this.fromHistory = false;
       this.message = '';
+      // 塔元数据预载（波次/祝福渲染依赖）+ 期数历史入库
+      await TowerMetadataService.preload();
+      await SpiralAbyssRepo.saveHistory(this.abyss.scheduleId, this.abyss.startTime,
+        this.abyss.endTime, this.abyss.totalStar, this.abyss.rawJson);
+      this.history = await SpiralAbyssRepo.listHistory();
     } catch (e) {
       if (e instanceof RiskControlError) {
         this.needRiskVerify = true;
@@ -56,6 +68,31 @@ export class SpiralAbyssViewModel {
       return;
     }
     this.scheduleType = type;
+    await this.load(uid);
+  }
+
+  /** 刷新本地期数历史列表（进页时） */
+  async loadHistoryList(): Promise<void> {
+    await TowerMetadataService.preload();
+    this.history = await SpiralAbyssRepo.listHistory();
+  }
+
+  /** 回看历史期数（本地存档重建，不发网络请求） */
+  async loadFromHistory(scheduleId: number): Promise<void> {
+    const raw: string = await SpiralAbyssRepo.getRawJson(scheduleId);
+    if (raw.length === 0) {
+      return;
+    }
+    this.abyss = SpiralAbyssData.fromJson(JSON.parse(raw));
+    this.fromHistory = true;
+    this.message = `历史存档 · 第 ${scheduleId} 期`;
+    this.loaded = true;
+    await TowerMetadataService.preload();
+  }
+
+  /** 回到实时数据（按当前 scheduleType 重新拉取） */
+  async backToLive(uid: string): Promise<void> {
+    this.fromHistory = false;
     await this.load(uid);
   }
 

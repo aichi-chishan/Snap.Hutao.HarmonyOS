@@ -32,6 +32,9 @@
 .DS_Store
 Thumbs.db
 
+# ===== Mimosa 安全钩子状态 =====
+/.mimosa/
+
 # ===== AI 工具开发文档（本地） =====
 /spec/
 

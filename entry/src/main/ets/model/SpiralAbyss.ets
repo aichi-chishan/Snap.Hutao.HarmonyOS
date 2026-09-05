@@ -138,6 +138,8 @@ export class SpiralAbyssData {
   totalStar: number = 0;
   isUnlock: boolean = false;
   floors: SpiralAbyssFloor[] = [];
+  /** 原始响应 JSON（深渊期数历史入库用，service 填充） */
+  rawJson: string = '';
   /** 渊月祝福（对齐 Windows 攻辉之月卡：名称 + 效果描述） */
   buffName: string = '';
   buffDesc: string = '';
