@@ -71,6 +71,9 @@ export struct NavIcon {
     if (name === 'SpiralAbyss') {
       return $r('app.media.nav_SpiralAbyss');
     }
+    if (name === 'TravelersDiary') {
+      return $r('app.media.nav_TravelersDiary');
+    }
     if (name === 'WikiAvatar') {
       return $r('app.media.nav_WikiAvatar');
     }

@@ -1,23 +1,24 @@
 {
   "src": [
+    "pages/AchievementPage",
+    "pages/AnnouncementDetailPage",
+    "pages/AnnouncementPage",
+    "pages/CalendarPage",
+    "pages/CharacterPage",
+    "pages/CultivationPage",
+    "pages/GeetestVerifyPage",
+    "pages/HardChallengePage",
     "pages/Index",
+    "pages/LaunchGamePage",
+    "pages/LedgerPage",
     "pages/LoginPage",
-    "pages/UserPage",
+    "pages/RoleCombatPage",
     "pages/SettingPage",
     "pages/SignInPage",
-    "pages/CalendarPage",
-    "pages/AnnouncementPage",
-    "pages/AnnouncementDetailPage",
-    "pages/GeetestVerifyPage",
     "pages/SpiralAbyssPage",
-    "pages/CharacterPage",
-    "pages/RoleCombatPage",
-    "pages/HardChallengePage",
-    "pages/CultivationPage",
+    "pages/UserPage",
     "pages/WikiAvatarPage",
-    "pages/WikiWeaponPage",
     "pages/WikiMonsterPage",
-    "pages/AchievementPage",
-    "pages/LaunchGamePage"
+    "pages/WikiWeaponPage"
   ]
 }

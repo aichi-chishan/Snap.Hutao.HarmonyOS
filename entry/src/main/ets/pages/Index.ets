@@ -18,6 +18,7 @@ import { HomeDailyNoteCard } from '../components/HomeDailyNoteCard';
 import { HomeSignInCard } from '../components/HomeSignInCard';
 import { HomeAchievementCard } from '../components/HomeAchievementCard';
 import { HomeLaunchCard } from '../components/HomeLaunchCard';
+import { HomeTravelersDiaryCard } from '../components/HomeTravelersDiaryCard';
 import { HomeActCard } from '../components/HomeActCard';
 import { HomeAnnouncementCard } from '../components/HomeAnnouncementCard';
 import { HomeGachaBannerCard } from '../components/HomeGachaBannerCard';
@@ -39,6 +40,7 @@ import { CultivationPage } from './CultivationPage';
 import { WikiAvatarPage } from './WikiAvatarPage';
 import { WikiWeaponPage } from './WikiWeaponPage';
 import { WikiMonsterPage } from './WikiMonsterPage';
+import { LedgerPage } from './LedgerPage';
 import { AchievementPage } from './AchievementPage';
 import { LaunchGamePage } from './LaunchGamePage';
 import { NavIcon } from '../components/NavIcon';
@@ -459,6 +461,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         this.navItem(9, 'WikiAvatar', '角色资料')
         this.navItem(10, 'WikiWeapon', '武器资料')
         this.navItem(11, 'WikiMonster', '怪物资料')
+        this.navItem(15, 'TravelersDiary', '旅行者札记')
 
         this.navSectionTitle('系统')
         this.navItem(12, 'Passport', '账号与数据')
@@ -629,6 +632,10 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       } else if (this.currentIndex === 14) {
         PageContainer() {
           LaunchGamePage({ embedMode: true })
+          }
+      } else if (this.currentIndex === 15) {
+        PageContainer() {
+          LedgerPage({ embedMode: true })
           }
       } else {
         PageContainer() {
@@ -1062,7 +1069,11 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             })
           }
           GridItem() {
-            Column()
+            HomeTravelersDiaryCard({
+              onTap: () => {
+                this.switchTo(15);
+              },
+            })
           }
           GridItem() {
             Column()
