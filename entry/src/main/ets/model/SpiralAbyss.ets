@@ -107,6 +107,28 @@ export class SpiralAbyssRank {
 
 /** 深渊整体数据 */
 export class SpiralAbyssData {
+  /** 多语言字段取值：优先 zh-cn，回退首个字符串值 */
+  static pickText(v: Object): string {
+    if (v === undefined || v === null) {
+      return '';
+    }
+    if (typeof v === 'string') {
+      return String(v);
+    }
+    const o = v as Record<string, Object>;
+    const zh = o['zh-cn'];
+    if (zh !== undefined && zh !== null) {
+      return String(zh);
+    }
+    for (const k of Object.keys(o)) {
+      const val = o[k];
+      if (typeof val === 'string' && (val as string).length > 0) {
+        return String(val);
+      }
+    }
+    return '';
+  }
+
   scheduleId: number = 0;
   startTime: number = 0;
   endTime: number = 0;
@@ -116,6 +138,9 @@ export class SpiralAbyssData {
   totalStar: number = 0;
   isUnlock: boolean = false;
   floors: SpiralAbyssFloor[] = [];
+  /** 渊月祝福（对齐 Windows 攻辉之月卡：名称 + 效果描述） */
+  buffName: string = '';
+  buffDesc: string = '';
   /** 本期统计排行（对齐 Windows 详情页 5 卡：满星/击败/伤害/承伤/普攻/元素爆发） */
   revealRank: SpiralAbyssRank[] = [];
   defeatRank: SpiralAbyssRank[] = [];
@@ -147,6 +172,16 @@ export class SpiralAbyssData {
       for (let i = 0; i < floors.length; i++) {
         s.floors.push(SpiralAbyssFloor.fromJson(floors[i]));
       }
+    }
+
+    // 渊月祝福（buff 为多语言对象：name/description 取 zh-cn 或首个字符串值）
+    const buffArr = obj['buff'] as Array<Object>;
+    if (buffArr !== undefined && buffArr !== null && buffArr.length > 0) {
+      const b0 = buffArr[0] as Record<string, Object>;
+      const nm = b0['name'];
+      const ds = b0['description'];
+      s.buffName = SpiralAbyssData.pickText(nm);
+      s.buffDesc = SpiralAbyssData.pickText(ds);
     }
     return s;
   }

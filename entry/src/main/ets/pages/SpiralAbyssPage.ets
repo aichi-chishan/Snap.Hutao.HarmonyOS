@@ -161,6 +161,12 @@ export struct SpiralAbyssPage {
                   this.avatarChip(av)
                 }, (av: SpiralAbyssAvatar, ai: number) => `${ai}_${av.id}`)
               }
+              Blank()
+              if (battle.timestamp > 0) {
+                Text(SpiralAbyssPage.formatBattleTime(battle.timestamp))
+                  .fontSize(10)
+                  .fontColor($r('app.color.text_secondary'))
+              }
             }
             .width('100%')
           }, (battle: SpiralAbyssBattle, bi: number) => `${bi}_${battle.index}`)
@@ -293,6 +299,13 @@ export struct SpiralAbyssPage {
   }
 
   /** Enka 官方头像（按角色 id，icon 缺失时兜底） */
+  /** 战斗时间格式化（yyyy/MM/dd HH:mm） */
+  static formatBattleTime(ts: number): string {
+    const d: Date = new Date(ts);
+    const p: (n: number) => string = (n: number): string => n < 10 ? `0${n}` : `${n}`;
+    return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
   static avatarUrl(id: number): string {
     return `https://enka.network/ui/UI_AvatarIcon_${id}.png`;
   }
@@ -351,6 +364,31 @@ export struct SpiralAbyssPage {
                   .fontColor($r('app.color.text_secondary'))
                   .width('100%')
                   .padding({ top: 20, bottom: 20 })
+              }
+              // 渊月祝福卡（对齐 Windows 攻辉之月）
+              if (this.vm.abyss.buffName.length > 0) {
+                Column({ space: 6 }) {
+                  Row({ space: 8 }) {
+                    Text('◆')
+                      .fontSize(13)
+                      .fontColor($r('app.color.app_primary'))
+                    Text(this.vm.abyss.buffName)
+                      .fontSize(15)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor($r('app.color.text_primary'))
+                      .layoutWeight(1)
+                  }
+                  .width('100%')
+                  Text(this.vm.abyss.buffDesc)
+                    .fontSize(12)
+                    .fontColor($r('app.color.text_secondary'))
+                    .width('100%')
+                }
+                .width('100%')
+                .padding(14)
+                .borderRadius(12)
+                .backgroundColor($r('app.color.card_background'))
+                .border({ width: 1, color: $r('app.color.divider') })
               }
               ForEach(this.vm.abyss.floors, (floor: SpiralAbyssFloor, fi: number) => {
                 this.floorSection(floor)
