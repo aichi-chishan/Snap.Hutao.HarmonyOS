@@ -100,10 +100,19 @@ export struct LedgerPage {
 
   build() {
     Column() {
-      if (!this.embedMode) {
-        AppBackButton()
-      } else {
+      if (this.embedMode) {
         PageHeader({ title: '旅行者札记' })
+      } else {
+        Row({ space: 10 }) {
+          AppBackButton()
+          Text('旅行者札记')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary'))
+          Blank()
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 8 })
       }
       if (!this.isLoggedIn) {
         this.loginGuide()

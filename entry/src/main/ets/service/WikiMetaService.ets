@@ -450,6 +450,20 @@ export class WikiMetaService {
     return n !== undefined ? n : '';
   }
 
+  /** 角色名 → 天赋/技能列表（我的角色详情天赋区用；未命中返回空数组） */
+  static skillsOfAvatar(name: string): MetaSkill[] {
+    // 遍历缓存的角色列表（getAvatars 已缓存，不重复解析）
+    const avatars = WikiMetaService.avatars;
+    if (avatars !== undefined) {
+      for (const a of avatars) {
+        if (a.name === name) {
+          return a.skills;
+        }
+      }
+    }
+    return [];
+  }
+
   /** 怪物中文名 → MonsterIcon 图标名（未命中返回空；剧诗/幽境敌人头像用） */
   static iconOfMonsterName(name: string): string {
     const n: string | undefined = WikiMetaService.monsterNameMap.get(name);

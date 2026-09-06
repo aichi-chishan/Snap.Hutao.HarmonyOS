@@ -15,7 +15,7 @@ import { NavIcon } from '../components/NavIcon';
 import { AssetIcon } from '../components/AssetIcon';
 import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
 import { MetaIcon } from '../components/MetaIcon';
-import { WikiMetaService } from '../service/WikiMetaService';
+import { WikiMetaService, MetaSkill } from '../service/WikiMetaService';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'CharacterPage';
@@ -235,6 +235,52 @@ export struct CharacterPage {
             })
         }
         .width('100%')
+        // 天赋/技能（本地元数据：普攻/战技/爆发/被动，对齐 Windows 角色详情天赋区）
+        if (WikiMetaService.skillsOfAvatar(this.currentDetail.name).length > 0) {
+          Column({ space: 8 }) {
+            Text('天赋')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'))
+              .width('100%')
+            ForEach(WikiMetaService.skillsOfAvatar(this.currentDetail.name), (sk: MetaSkill) => {
+              Column({ space: 3 }) {
+                Row({ space: 8 }) {
+                  if (sk.i.length > 0) {
+                    MetaIcon({ category: 'Skill', name: sk.i, iconSize: 28 })
+                  }
+                  Column({ space: 2 }) {
+                    Text(sk.n)
+                      .fontSize(13)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor($r('app.color.text_primary'))
+                    if (sk.k.length > 0) {
+                      Text(CharacterPage.kindLabel(sk.k))
+                        .fontSize(10)
+                        .fontColor($r('app.color.app_primary'))
+                    }
+                  }
+                  .alignItems(HorizontalAlign.Start)
+                  .layoutWeight(1)
+                }
+                .width('100%')
+                Text(sk.d)
+                  .fontSize(11)
+                  .fontColor($r('app.color.text_secondary'))
+                  .width('100%')
+              }
+              .width('100%')
+              .padding({ top: 6, bottom: 6 })
+              .borderRadius(10)
+              .backgroundColor($r('app.color.page_background'))
+            }, (sk: MetaSkill) => `sk_${sk.n}`)
+          }
+          .width('100%')
+          .padding(12)
+          .borderRadius(12)
+          .backgroundColor($r('app.color.card_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
+        }
         if (this.currentDetail.weapon.id > 0) {
           Row({ space: 10 }) {
             if (WikiMetaService.iconOfWeapon(this.currentDetail.weapon.id).length > 0) {
@@ -470,6 +516,16 @@ export struct CharacterPage {
     .backgroundColor($r('app.color.card_background'))
     .border({ width: 1, color: $r('app.color.divider') })
   }
+  static kindLabel(k: string): string {
+    switch (k) {
+      case 'A': return '普攻';
+      case 'E': return '战技';
+      case 'Q': return '元素爆发';
+      case 'P': return '被动';
+      default: return '其他';
+    }
+  }
+
   /** 攻略外链：米游社/B站搜索当前角色（openLink 拉起浏览器） */
   openStrategy(target: string): void {
     if (this.currentDetail === undefined) {
