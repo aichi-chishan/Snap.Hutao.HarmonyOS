@@ -943,6 +943,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             }
           }
           .layoutWeight(1)
+          .height('100%')
           .padding(14)
           .borderRadius(12)
           .backgroundColor($r('app.color.card_background'))
@@ -976,6 +977,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             }
           }
           .layoutWeight(1)
+          .height('100%')
           .padding(14)
           .borderRadius(12)
           .backgroundColor($r('app.color.card_background'))
@@ -983,6 +985,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           .alignItems(HorizontalAlign.Start)
         }
         .width('100%')
+        .height(360)
         .alignItems(VerticalAlign.Top)
 
         // Row3：等高 4 列卡（对齐 Windows：启动游戏 | 保底计数 | 成就统计 | 实时便笺）

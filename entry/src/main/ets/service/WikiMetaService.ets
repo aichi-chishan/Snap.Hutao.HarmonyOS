@@ -193,7 +193,7 @@ export class WikiMetaService {
     return list;
   }
 
-  /** 清洗米哈游富文本标记：<color=#>…</color> → 内容；{LINK#id}…(/LINK) → 内容；保留其余 */
+  /** 清洗米哈游富文本标记：<color=#>…</color> → 内容；{LINK#id}…{/LINK} 或 (/LINK) → 内容；{TIMEZONE} 剔除 */
   static cleanText(t: string): string {
     if (t.length === 0) {
       return t;
@@ -202,10 +202,15 @@ export class WikiMetaService {
     // <color=#XXXXXX> 与 </color> → 剥离标签保留内容
     s = s.replace(/<color[^>]*>/g, '');
     s = s.replace(/<\/color>/g, '');
-    // {LINK#xxx} 与 (/LINK) → 剥离标记保留内容
+    // {LINK#xxx} 与 {/LINK}（新数据闭合格式）与 (/LINK) → 剥离标记保留内容
     s = s.replace(/\{LINK#[^}]*\}/g, '');
+    s = s.replace(/\{\/LINK\}/g, '');
     s = s.replace(/\(\/LINK\)/g, '');
-    // 保留 {param} 占位符（由 UI 按需替换）；剥离多余空白首尾
+    // {TIMEZONE} 等占位 → 剔除
+    s = s.replace(/\{TIMEZONE\}/g, '');
+    // 剥离后可能残留连续空行，压缩
+    s = s.replace(/\n{3,}/g, '\n\n');
+    // 剥离多余空白首尾
     return s.trim();
   }
 
@@ -507,7 +512,9 @@ export class WikiMetaService {
 
   /** 元素英文 → 中文 */
   static elementName(e: string): string {
-    switch (e) {
+    // 大小写归一（元数据与 API 大小写可能不一致）
+    const key: string = e.length > 0 ? e.charAt(0).toUpperCase() + e.slice(1).toLowerCase() : e;
+    switch (key) {
       case 'Pyro': return '火';
       case 'Hydro': return '水';
       case 'Anemo': return '风';
