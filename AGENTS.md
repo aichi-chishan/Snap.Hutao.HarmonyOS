@@ -78,7 +78,7 @@
 
 ## 素材管理（游戏版本更新时的同步流程）
 - **已内置 rawfile 的图标类目**（`entry/src/main/resources/rawfile/icons/`）：AvatarIcon / EquipIcon / MonsterIcon / Skill / Talent / ItemIcon / NameCardIcon / NameCardPic / RelicIcon —— 全部打包进安装包，**无二次下载**（ResourcePackService 已从设置页退役，仅保留代码）。
-- **新增/更新素材**：运行 `python github-data/fetch-assets.py`（源：Snap.Metadata `<local-snap-metadata-dir>/Genshin/CHS`，CDN：api.snaphutaorp.org/static/raw/{Category}/{Name}.png，8 并发、增量跳过）。脚本同时回填 avatar_meta.json 的 nameCardIcon/nameCardPic 字段。
+- **新增/更新素材**：运行 `python github-data/fetch-assets.py`（源：Snap.Metadata 本地检出目录下的 `Genshin/CHS`，CDN：api.snaphutaorp.org/static/raw/{Category}/{Name}.png，8 并发、增量跳过）。脚本同时回填 avatar_meta.json 的 nameCardIcon/nameCardPic 字段。
 - **元数据更新**：同一脚本思路；重提 monster/weapon/avatar meta 后同步 github-data（aichi-chishan/snap-hutao-data 仓库）供 GameDataUpdater 热更。
 - MetaIcon 引用约定：`category` = icons 下目录名，`name` = 文件名（去 .png）。名片大图背景直接 `Image($rawfile('icons/NameCardPic/{name}.png'))`（全幅场景不走 MetaIcon）。
 
