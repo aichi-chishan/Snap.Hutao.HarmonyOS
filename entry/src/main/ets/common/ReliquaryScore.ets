@@ -6,17 +6,24 @@
  *  - 暴击率 ×2.0、暴击伤害 ×1.0、元素精通 ×0.33、充能 ×1.1979、
  *    HP%/ATK% ×1.33、DEF% ×1.06、ATK 固定 ×0.398×0.5、HP 固定 ×0.026×0.66、DEF 固定 ×0.335×0.66
  *  - 无推荐词条时回退"双爆分"（crit×2 + critHurt×1）
+ *  - isCritEffective（Windows AvatarIds.IsCritEffective，最新新增）：
+ *    仅珊瑚宫心海（天赋降低自身暴击率，无法暴击）双爆无效，其余角色双爆强制有效
  */
 import { Reliquary, RelicProperty } from '../model/CharacterData';
 
+/** 珊瑚宫心海（双爆无效特例） */
+const KOKOMI_ID: number = 10000002;
+
 export class ReliquaryScore {
   /** 完整评分（Windows Calculate 等价物，分值 ×10 取 1 位小数为展示惯例由调用方处理） */
-  static calculate(subProps: RelicProperty[], recommended: string[], energyType: string): number {
-    // 无推荐词条 → 回退双爆分（Windows 默认配置也仅有双爆路径）
-    const hasCritHurt: boolean = recommended.indexOf('FIGHT_PROP_CRITICAL_HURT') >= 0;
+  static calculate(subProps: RelicProperty[], recommended: string[], energyType: string,
+    isCritEffective: boolean = true): number {
+    const hasCritHurt: boolean = isCritEffective
+      || recommended.indexOf('FIGHT_PROP_CRITICAL_HURT') >= 0;
     let total: number = 0;
     for (const sp of subProps) {
-      const weight: number = ReliquaryScore.weight(sp.propertyType, recommended, hasCritHurt, energyType);
+      const weight: number = ReliquaryScore.weight(sp.propertyType, recommended, hasCritHurt, energyType,
+        isCritEffective);
       if (weight <= 0) {
         continue;
       }
@@ -26,9 +33,15 @@ export class ReliquaryScore {
     return total;
   }
 
-  /** 权重（Windows GetWeight） */
-  private static weight(prop: string, recommended: string[], hasCritHurt: boolean, energyType: string): number {
+  /** 权重（Windows GetWeight；isCritEffective 时双爆权重强制 1.0） */
+  private static weight(prop: string, recommended: string[], hasCritHurt: boolean, energyType: string,
+    isCritEffective: boolean): number {
     const isRecommended: boolean = recommended.indexOf(prop) >= 0;
+    if (isCritEffective
+      && (prop === 'FIGHT_PROP_CRITICAL' || prop === 'FIGHT_PROP_CRITICAL_HURT')) {
+      // 非心海角色双爆强制有效：避免米游社推荐副属性缺失双爆时评分失真
+      return 1.0;
+    }
     if (prop === 'FIGHT_PROP_CHARGE_EFFICIENCY' && !isRecommended) {
       // 充能非推荐：按能量类型特判
       if (energyType !== 'SPECIAL_ENERGY_NONE' && energyType.length > 0 && energyType !== 'NONE') {
@@ -76,8 +89,11 @@ export class ReliquaryScore {
     }
   }
 
-  /** 双爆分（无推荐词条兜底） */
-  static doubleCritScore(r: Reliquary): number {
+  /** 双爆分（无推荐词条兜底；心海双爆无效 → 0 分） */
+  static doubleCritScore(r: Reliquary, isCritEffective: boolean = true): number {
+    if (!isCritEffective) {
+      return 0;
+    }
     let crit: number = 0;
     let critHurt: number = 0;
     for (const sp of r.subProperties) {
@@ -88,6 +104,11 @@ export class ReliquaryScore {
       }
     }
     return Math.round((crit * 2 + critHurt) * 10) / 10;
+  }
+
+  /** 角色双爆是否有效（Windows AvatarIds.IsCritEffective：仅心海无效） */
+  static isCritEffective(avatarId: number): boolean {
+    return avatarId !== KOKOMI_ID;
   }
 
   /** 等级评价（双爆分口径） */

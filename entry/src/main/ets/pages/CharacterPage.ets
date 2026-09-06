@@ -509,12 +509,14 @@ export struct CharacterPage {
 
   static relicScore(r: Reliquary, d: CharacterDetail): number {
     if (d.recommend.subProperties.length > 0) {
-      const full: number = ReliquaryScore.calculate(r.subProperties, d.recommend.subProperties, d.recommend.energyType);
+      const effective: boolean = ReliquaryScore.isCritEffective(d.id);
+      const full: number = ReliquaryScore.calculate(r.subProperties, d.recommend.subProperties,
+        d.recommend.energyType, effective);
       if (full > 0) {
         return Math.round(full * 10) / 10;
       }
     }
-    return ReliquaryScore.doubleCritScore(r);
+    return ReliquaryScore.doubleCritScore(r, ReliquaryScore.isCritEffective(d.id));
   }
 
   /** 属性类型 → 中文标签（兼容：字符串 FIGHT_PROP_* 与数字 FightProperty 枚举） */
