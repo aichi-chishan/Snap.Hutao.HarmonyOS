@@ -292,7 +292,7 @@ export struct CharacterPage {
             } else {
               NavIcon({ name: 'AvatarProperty', iconSize: 22 })
             }
-            Text(`武器 Lv.${this.currentDetail.weapon.level} ★${this.currentDetail.weapon.rarity} · 精炼${this.currentDetail.weapon.affixLevel}`)
+            Text(`${WikiMetaService.nameOfWeapon(this.currentDetail.weapon.id)} · Lv.${this.currentDetail.weapon.level} ★${this.currentDetail.weapon.rarity} · 精炼${this.currentDetail.weapon.affixLevel}`)
               .fontSize(14)
               .fontColor($r('app.color.text_primary'))
               .layoutWeight(1)

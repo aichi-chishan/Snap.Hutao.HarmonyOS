@@ -480,6 +480,21 @@ export class WikiMetaService {
     return found;
   }
 
+  /** 武器 id → 武器名（我的角色武器行显示；未命中返回空） */
+  static nameOfWeapon(id: number): string {
+    const weapons = WikiMetaService.getWeaponsCache();
+    for (const w of weapons) {
+      if (w.id === id) {
+        return w.name;
+      }
+    }
+    return '';
+  }
+
+  private static getWeaponsCache(): WikiWeaponMeta[] {
+    return WikiMetaService.weapons ?? [];
+  }
+
   /** 抽卡记录条目 → 图标名（角色走 AvatarIcon、武器走 EquipIcon；未命中返回空） */
   static iconOfItemName(name: string, itemType: string): string {
     if (itemType === '武器') {

@@ -116,6 +116,22 @@ export struct LedgerPage {
       }
       if (!this.isLoggedIn) {
         this.loginGuide()
+      } else if (this.currentUid.length === 0) {
+        Column({ space: 12 }) {
+          NavIcon({ name: 'TravelersDiary', iconSize: 56 })
+          Text('请先在「账号与数据」绑定角色')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary'))
+          Button('去「账号与数据」选择')
+            .backgroundColor($r('app.color.app_primary'))
+            .fontColor(Color.White)
+            .onClick(() => {
+              router.pushUrl({ url: 'pages/UserPage' });
+            })
+        }
+        .width('100%')
+        .padding({ top: 80, bottom: 80 })
       } else if (this.loading && this.ledger === undefined) {
         this.loadingView()
       } else if (this.ledger === undefined) {

@@ -17,6 +17,10 @@ export struct HomeTravelersDiaryCard {
   @State loaded: boolean = false;
 
   aboutToAppear(): void {
+    if (this.currentUid.length === 0) {
+      this.loaded = true;
+      return;
+    }
     LedgerService.getInstance().fetchMonth(0, this.currentUid).then((l: Ledger) => {
       this.ledger = l;
       this.loaded = true;
@@ -45,7 +49,9 @@ export struct HomeTravelersDiaryCard {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
           Blank()
-          Text(this.loaded ? (this.ledger !== undefined ? this.ledger.nickname : '未获取') : '...')
+          Text(this.loaded
+            ? (this.currentUid.length === 0 ? '未登录' : (this.ledger !== undefined ? this.ledger.nickname : '未获取'))
+            : '...')
             .fontSize(11)
             .fontColor($r('app.color.text_secondary'))
         }
