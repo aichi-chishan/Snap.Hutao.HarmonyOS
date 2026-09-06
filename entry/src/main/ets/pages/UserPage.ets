@@ -237,6 +237,23 @@ export struct UserPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
         Blank()
+        // 对齐 Windows RefreshCookieTokenCommand：SToken 换新 cookie_token/ltoken
+        Button('刷新凭证')
+          .fontSize(12)
+          .height(26)
+          .margin({ right: 8 })
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary'))
+          .onClick(() => {
+            const user: User | undefined = this.vm.currentUser;
+            if (user === undefined) {
+              this.toast('未登录');
+              return;
+            }
+            UserService.getInstance().refreshCookieTokenForced(user).then((ok: boolean) => {
+              this.toast(ok ? '凭证已刷新' : '刷新失败：SToken 已失效，请重新登录');
+            });
+          })
         Button('刷新角色')
           .fontSize(12)
           .height(26)

@@ -69,6 +69,18 @@ export class LedgerService {
         throw new Error('人机验证未完成或被取消，请稍后再试');
       }
     }
+    // Cookie 鉴权失效（-100/10001）：强制换新凭证后重试一次（对齐 Windows CookieToken 刷新）
+    if (!resp.success && UserService.isCookieAuthError(resp)) {
+      resp = await UserService.retryWithRefreshedCookie(user, (): Promise<ApiResponse> => {
+        const retryHeaders: Record<string, string> = {
+          'DS': headers['DS'],
+          'Cookie': user.gameRecordCookie(),
+          'Referer': 'https://webstatic.mihoyo.com/',
+        };
+        return ApiClient.getInstance().get(url,
+          HoyolabClient.merge(retryHeaders, HoyolabClient.getBaseHeaders()));
+      });
+    }
     if (!resp.success || resp.data === undefined) {
       throw new Error(resp.userFriendlyMessage());
     }

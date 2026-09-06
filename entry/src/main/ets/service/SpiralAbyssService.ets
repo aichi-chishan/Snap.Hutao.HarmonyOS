@@ -65,6 +65,18 @@ export class SpiralAbyssService {
       resp = await ApiClient.getInstance().get(url,
         HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
     }
+    // Cookie 鉴权失效（-100/10001）：强制换新凭证后重试一次（对齐 Windows CookieToken 刷新）
+    if (!resp.success && UserService.isCookieAuthError(resp)) {
+      resp = await UserService.retryWithRefreshedCookie(user, (): Promise<ApiResponse> => {
+        const retryHeaders: Record<string, string> = { 'Cookie': user.gameRecordCookie() };
+        if (headers['x-rpc-challenge'] !== undefined) {
+          retryHeaders['x-rpc-challenge'] = headers['x-rpc-challenge'];
+        }
+        retryHeaders['DS'] = headers['DS'];
+        return ApiClient.getInstance().get(url,
+          HoyolabClient.merge(HoyolabClient.getBaseHeaders(), retryHeaders));
+      });
+    }
     if (!resp.success || resp.data === undefined) {
       throw new Error(resp.userFriendlyMessage());
     }

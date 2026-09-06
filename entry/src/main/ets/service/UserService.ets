@@ -254,6 +254,22 @@ export class UserService {
    *  说明：这两个接口需要 DS Gen2/PROD 签名 + 完整 passport(XRpc2) 头；
    *  缺 app_id/game_biz/sdk_version 等头会被米哈游拒绝导致拿不到 cookie_token。 */
   private async completeTokenChain(user: User): Promise<void> {
+    await this.completeTokenChainInner(user, false);
+  }
+
+  /** 强制刷新 Cookie 凭证（对齐 Windows RefreshCookieTokenAsync：忽略现有 token 换新并落库）。
+   *  返回 true 表示刷新后 cookie_token 非空（SToken 失效时返回 false，需重新登录）。 */
+  async refreshCookieTokenForced(user: User): Promise<boolean> {
+    if (user.stoken.length === 0 && user.stokenV2.length === 0) {
+      return false;
+    }
+    await this.completeTokenChainInner(user, true);
+    await UserRepo.saveCookieFor(user.id, user.fullCookie());
+    ApiClient.getInstance().setCookie(user.fullCookie());
+    return user.cookieToken.length > 0;
+  }
+
+  private async completeTokenChainInner(user: User, forceRefresh: boolean): Promise<void> {
     if (user.stoken.length === 0 && user.stokenV2.length === 0) {
       return;
     }
@@ -270,8 +286,8 @@ export class UserService {
     const fullHeaders: Record<string, string> = HoyolabClient.merge(passportHeaders, {
       'Cookie': stokenCookie,
     });
-    // 1) 补 cookie_token
-    if (user.cookieToken.length === 0) {
+    // 1) 补 cookie_token（forceRefresh=true 时忽略已有值强制换新）
+    if (forceRefresh || user.cookieToken.length === 0) {
       try {
         const dsHeaders: Record<string, string> = await this.buildProdDsHeader();
         fullHeaders['DS'] = dsHeaders['DS'];
@@ -299,8 +315,8 @@ export class UserService {
         Logger.warn(TAG, 'complete cookie_token fail');
       }
     }
-    // 2) 补 ltoken
-    if (user.ltoken.length === 0) {
+    // 2) 补 ltoken（forceRefresh=true 时同步换新）
+    if (forceRefresh || user.ltoken.length === 0) {
       try {
         const dsHeaders: Record<string, string> = await this.buildProdDsHeader();
         fullHeaders['DS'] = dsHeaders['DS'];
@@ -336,6 +352,24 @@ export class UserService {
     const r: string = DsSigner.randomLowerAlphaNumeric();
     const ds: string = await DsSigner.signGen2(AppConstants.DS_SALT_PROD, t, r, '{}', '');
     return { 'DS': ds };
+  }
+
+  /** Cookie 鉴权失效判定（Windows 同款 retcode：-100 / 10001） */
+  static isCookieAuthError(resp: ApiResponse): boolean {
+    return resp.retcode === RetCodes.COOKIE_EXPIRED || resp.retcode === RetCodes.NOT_LOGGED_IN;
+  }
+
+  /** Cookie 鉴权失效时：用 SToken 强制换新 cookie_token/ltoken 并重试一次原请求。
+   *  onRetry 由调用方提供（重新执行原 GET）。返回最终响应。 */
+  static async retryWithRefreshedCookie(
+    user: User, onRetry: () => Promise<ApiResponse>): Promise<ApiResponse> {
+    const ok: boolean = await UserService.getInstance().refreshCookieTokenForced(user);
+    if (!ok) {
+      const fail: ApiResponse = ApiResponse.fail(RetCodes.COOKIE_EXPIRED,
+        'SToken 已失效，请到「账号与数据」重新登录');
+      return fail;
+    }
+    return onRetry();
   }
 
   /** 公开封装：补齐当前用户 Token 链（供各 Service 在缺 cookie_token 时调用） */

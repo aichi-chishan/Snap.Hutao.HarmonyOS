@@ -97,6 +97,16 @@ export class DailyNoteService {
       extra['x-rpc-challenge'] = replayChallenge;
       resp = await HoyolabClient.fetchDailyNote(uid, region, cookie, extra);
     }
+    // Cookie 鉴权失效（-100/10001）：强制换新凭证后重试一次（对齐 Windows CookieToken 刷新）
+    if (!resp.success && UserService.isCookieAuthError(resp)) {
+      resp = await UserService.retryWithRefreshedCookie(user, (): Promise<ApiResponse> => {
+        const retryExtra: Record<string, string> = {};
+        for (const k of Object.keys(extra)) {
+          retryExtra[k] = extra[k];
+        }
+        return HoyolabClient.fetchDailyNote(uid, region, user.gameRecordCookie(), retryExtra);
+      });
+    }
     if (!resp.success || resp.data === undefined) {
       if (resp.retcode === RetCodes.RISK_CONTROL) {
         throw new Error('被风控拦截，请稍后再试');
