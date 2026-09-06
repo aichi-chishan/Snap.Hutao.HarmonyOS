@@ -10,6 +10,8 @@ HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），�
 ![API](https://img.shields.io/badge/API--24-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+> 🗺️ 后续完善计划（功能补全 / 体验优化 / 工程化 / 性能）见 [ROADMAP.md](ROADMAP.md)
+
 > ⚠️ **免责声明**：本项目与米哈游 / HoYoverse 无任何关联，仅供学习交流使用。
 > 不包含任何注入、内存读取、进程注入类功能；不包含胡桃云（通行证 / 云备份等）在线服务。
 
