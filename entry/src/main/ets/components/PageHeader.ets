@@ -20,8 +20,12 @@ export struct PageHeader {
   /** 状态栏避让高度（embedMode 时忽略） */
   @Prop topAvoidVp: number = 0;
 
-  /** 标题内联衬线（供左侧额外元素如返回气泡之后） */
-  @BuilderParam actions: () => void;
+  /** 标题内联衬线（供左侧额外元素如返回气泡之后）；默认空实现（未传 builder 不崩溃） */
+  @BuilderParam actions: () => void = PageHeader.emptyActions;
+
+  @Builder
+  static emptyActions() {
+  }
 
   build() {
     Row() {
