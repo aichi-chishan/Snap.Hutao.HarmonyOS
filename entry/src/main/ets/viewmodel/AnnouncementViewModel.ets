@@ -3,7 +3,10 @@
  * 公告页状态容器：按 type 分组的页签 + 当前组列表（对齐 Windows AnnouncementWrapper）。
  */
 import { AnnouncementService } from '../service/AnnouncementService';
+import { MiyoliveService } from '../service/MiyoliveService';
 import { Announcement, AnnouncementGroup } from '../model/Announcement';
+import { MiyoliveCode } from '../model/MiyoliveCode';
+import { Logger } from '../common/Logger';
 
 @Observed
 export class AnnouncementViewModel {
@@ -13,6 +16,8 @@ export class AnnouncementViewModel {
   currentIndex: number = 0;
   /** 当前页签展示列表（全部组时按时间倒序合并） */
   filtered: Announcement[] = [];
+  /** 前瞻直播兑换码（无直播/拉取失败为空，对齐 Windows RedeemCodes） */
+  redeemCodes: MiyoliveCode[] = [];
   loading: boolean = false;
   message: string = '';
   loaded: boolean = false;
@@ -21,6 +26,8 @@ export class AnnouncementViewModel {
 
   async load(): Promise<void> {
     this.loading = true;
+    // 兑换码并行拉取（失败静默，不阻塞公告加载）
+    this.loadRedeemCodes();
     try {
       const groups: AnnouncementGroup[] = await AnnouncementService.getInstance().fetchGroups('cn_gf01', 60);
       // 全部组（typeId=0）置顶，其余保持 API 顺序（Windows Pivot 顺序）
@@ -56,6 +63,16 @@ export class AnnouncementViewModel {
   selectGroup(index: number): void {
     this.currentIndex = index;
     this.applyFilter();
+  }
+
+  /** 拉取前瞻直播兑换码（失败保持空，不提示） */
+  private async loadRedeemCodes(): Promise<void> {
+    try {
+      const codes: MiyoliveCode[] = await MiyoliveService.getInstance().fetchRedeemCodes();
+      this.redeemCodes = codes;
+    } catch (e) {
+      Logger.warn('AnnouncementViewModel', `redeem codes fail: ${(e as Error).message}`);
+    }
   }
 
   private applyFilter(): void {

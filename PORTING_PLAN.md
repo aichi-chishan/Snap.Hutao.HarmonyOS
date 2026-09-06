@@ -131,8 +131,21 @@ Windows 结构：CommandBar(列表/网格切换+多条件搜索+加入养成计�
 | 深境螺旋 / 幻想真境剧诗 / 幽境危战 | ✅ |
 | 角色资料 / 武器资料（精炼）/ 怪物资料（抗性/掉落/数值曲线） | ✅ |
 | 账号多用户（登录/切换/删除，登录即选中） | ✅ |
-| 设置（主题/背景/云资源同步/自动刷新/清空数据） | ✅ |
-| 风控全链路（1034/aigis/签到极验/统一浮层） | ✅ |
+| 设置（主题/背景/云资源同步/自动刷新/清空数据/无感验证接口） | ✅ |
+| 风控全链路（1034/aigis/签到极验/统一浮层 + 自定义组合接口前置） | ✅ |
 
 未实现的可选增强（数据/接口受限，已在文中标注）：角色立绘 FlipView 浏览、名片展示、米游社/B站攻略外链、
 祈愿"历史记录列表"页签（用户选择保留总览精简形态）。
+
+---
+
+## 九、增量对齐（2026-09-06，对照 Remastered-latest 源码）
+
+| 功能 | 鸿蒙实现 | 对齐点（Windows 源） |
+|---|---|---|
+| 应用图标 | AppScope/entry background(600²，完整 Windows 图标内切圆居中+浅底) + foreground(透明层) + startIcon(512² 原样) | `Assets/Square150x150Logo.scale-400.png` 原图，圆蒙版下栗色描边完整可见 |
+| 千星奇域（颂愿）祈愿 | GachaType 1000/2000、`getBeyondGachaLog` 端点、size=5、op_gacha_type 解析、gacha_items.schedule_id 迁移、祈愿页"颂愿"模式切换 | `BeyondGachaLog` / `GachaLogTypedQueryOptions.BeyondSize=5` / `BeyondGachaLogItem.op_gacha_type` |
+| UIGF v4.2 | 导出 hk4e + hk4e_ugc（op_gacha_type/schedule_id）；导入兼容 v4.2/v4.0/v3.x | `Service\UIGF` v4.2 `Hk4eUgcEntry/Hk4eUGCItem` |
+| 极验自定义组合接口 | 设置→无感验证→设定验证请求接口；{0}=gt {1}=challenge 模板 GET，成功用返回的新 challenge 重放；触发风控时前置自动尝试 | `GeetestService.TryVerifyGtChallengeAsync` + `CustomGeetestClient` + `GeetestCustomCompositeUrl` |
+| 前瞻直播兑换码 | 公告页"兑换码"入口：miyoushe home/new 定位直播（lives[0].live_url 或 navigator 直播兑换码/前瞻直播）→ act_id 提取 → miyolive refreshCode（x-rpc-act_id 头）→ code_list 弹层+复制 | `AnnouncementViewModel` 直播兑换码链路 + `MiyoliveClient.RefreshCodeAsync` |
+| 五星明细归类 | 祈愿出金历史 item_type 改用服务端实际记录（常驻/颂愿池混有武器，不再按池名猜） | 对齐 Windows 角色/武器类型判定 |

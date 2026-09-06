@@ -161,6 +161,12 @@ export class RelationalStoreHelper {
     for (let i = 0; i < statements.length; i++) {
       await store.executeSql(statements[i]);
     }
+    // 迁移：gacha_items 增加 schedule_id（千星奇域 + UIGF v4.2 导出需要；已存在时忽略报错）
+    try {
+      await store.executeSql('ALTER TABLE gacha_items ADD COLUMN schedule_id INTEGER DEFAULT 0');
+    } catch (e) {
+      // 列已存在
+    }
     // 历史数据清理：删除空 uid 祈愿归档（曾因未登录时装载误建，覆盖默认 UID 逻辑）
     try {
       await store.executeSql(

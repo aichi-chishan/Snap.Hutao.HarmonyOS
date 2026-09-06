@@ -135,6 +135,7 @@ export class GachaRepo {
           'item_type': it.itemType,
           'rank_type': it.rankType,
           'gacha_id': it.gachaId,
+          'schedule_id': it.scheduleId,
         };
         batch.push(values);
       }
@@ -191,6 +192,7 @@ export class GachaRepo {
         it.itemType = rs.getString(rs.getColumnIndex('item_type'));
         it.rankType = rs.getLong(rs.getColumnIndex('rank_type'));
         it.gachaId = rs.getString(rs.getColumnIndex('gacha_id'));
+        it.scheduleId = rs.getLong(rs.getColumnIndex('schedule_id'));
         list.push(it);
       }
     } finally {

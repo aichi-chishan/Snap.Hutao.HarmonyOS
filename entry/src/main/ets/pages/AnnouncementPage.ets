@@ -3,9 +3,11 @@
  * 游戏公告：动态类型页签（Windows Announcement Pivot style）+ 网格卡片，点击打开详情。
  */
 import { router } from '@kit.ArkUI';
+import { pasteboard } from '@kit.BasicServicesKit';
 import { AnnouncementViewModel } from '../viewmodel/AnnouncementViewModel';
 import { Announcement, AnnouncementGroup } from '../model/Announcement';
 import { AnnouncementDetailParams } from '../model/RouteParams';
+import { MiyoliveCode } from '../model/MiyoliveCode';
 import { DateUtil } from '../common/DateUtil';
 import { Loading } from '../components/Loading';
 import { EmptyState } from '../components/EmptyState';
@@ -19,6 +21,8 @@ export struct AnnouncementPage {
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
   @State vm: AnnouncementViewModel = new AnnouncementViewModel();
+  /** 前瞻直播兑换码弹层（对齐 Windows AnnouncementPage 兑换码 Flyout） */
+  @State showCodeSheet: boolean = false;
 
   aboutToAppear(): void {
     this.vm.load().then(() => {
@@ -27,6 +31,79 @@ export struct AnnouncementPage {
 
   toast(msg: string): void {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1500 });
+  }
+
+  /** 复制兑换码到剪贴板 */
+  async copyCode(code: string): Promise<void> {
+    const pd: pasteboard.PasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, code);
+    await pasteboard.getSystemPasteboard().setData(pd);
+    this.toast(`已复制：${code}`);
+  }
+
+  /** 兑换码弹层（标题+码+复制，对齐 Windows Flyout 行布局） */
+  @Builder
+  codeSheet() {
+    Column({ space: 10 }) {
+      Text('前瞻直播兑换码')
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .width('100%')
+      Scroll() {
+        Column({ space: 8 }) {
+          ForEach(this.vm.redeemCodes, (c: MiyoliveCode) => {
+            Row({ space: 10 }) {
+              Column({ space: 2 }) {
+                Text(c.title)
+                  .fontSize(12)
+                  .fontColor($r('app.color.text_secondary'))
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                Text(c.code)
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor($r('app.color.text_primary'))
+                  .letterSpacing(1)
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+              Text('复制')
+                .fontSize(12)
+                .fontColor($r('app.color.app_primary'))
+                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                .borderRadius(10)
+                .border({ width: 1, color: $r('app.color.app_primary') })
+                .hoverEffect(HoverEffect.Highlight)
+                .onClick(() => {
+                  this.copyCode(c.code);
+                })
+            }
+            .width('100%')
+            .padding(10)
+            .borderRadius(10)
+            .backgroundColor($r('app.color.page_background'))
+            .border({ width: 1, color: $r('app.color.divider') })
+          }, (c: MiyoliveCode) => `code_${c.code}`)
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .constraintSize({ maxHeight: 320 })
+      .scrollBar(BarState.Auto)
+      Button('关闭')
+        .fontSize(13)
+        .height(34)
+        .width('100%')
+        .backgroundColor($r('app.color.card_background'))
+        .fontColor($r('app.color.text_primary'))
+        .onClick(() => {
+          this.showCodeSheet = false;
+        })
+    }
+    .width(360)
+    .padding(16)
+    .borderRadius(16)
+    .backgroundColor($r('app.color.card_background'))
   }
 
   @Builder
@@ -41,6 +118,19 @@ export struct AnnouncementPage {
         .fontColor($r('app.color.text_primary'))
         .margin({ left: this.embedMode ? 0 : 10 })
       Blank()
+      if (this.vm.redeemCodes.length > 0) {
+        Button('兑换码')
+          .fontSize(12)
+          .height(28)
+          .margin({ right: 8 })
+          .backgroundColor(this.showCodeSheet ? $r('app.color.app_primary') : $r('app.color.card_background'))
+          .fontColor(this.showCodeSheet ? Color.White : $r('app.color.app_primary'))
+          .border({ width: 1, color: $r('app.color.app_primary') })
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.showCodeSheet = !this.showCodeSheet;
+          })
+      }
       Button('刷新')
         .fontSize(12)
         .height(28)
@@ -174,9 +264,10 @@ export struct AnnouncementPage {
   }
 
   build() {
-    Column() {
-      this.header()
-      this.categoryTabs()
+    Stack() {
+      Column() {
+        this.header()
+        this.categoryTabs()
       Scroll() {
         Column({ space: 10 }) {
           if (this.vm.loading) {
@@ -211,6 +302,22 @@ export struct AnnouncementPage {
       .width('100%')
       .height('100%')
       .align(Alignment.Top)
+      }
+      .width('100%')
+      .height('100%')
+      // 兑换码弹层（遮罩 + 居中卡片）
+      if (this.showCodeSheet) {
+        Column() {
+          this.codeSheet()
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor('#66000000')
+        .onClick(() => {
+          this.showCodeSheet = false;
+        })
+      }
     }
     .width('100%')
     .height('100%')

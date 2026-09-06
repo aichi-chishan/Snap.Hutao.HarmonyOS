@@ -10,7 +10,7 @@ import { ApiResponse } from '../../model/ApiResponse';
 import { ApiClient } from './ApiClient';
 import { AppConstants } from '../../common/Constants';
 import { DsSigner } from './DsSigner';
-import { RiskVerifyService } from '../../service/RiskVerifyService';
+import { RiskVerifyService, GeetestSolveResult } from '../../service/RiskVerifyService';
 import { Logger } from '../../common/Logger';
 
 const TAG: string = 'RiskVerifier';
@@ -75,13 +75,15 @@ export class RiskVerifier {
       Logger.warn(TAG, 'resolveGtChallenge: createVerification empty');
       return '';
     }
-    const validate: string = await RiskVerifyService.getInstance().verifyGt(gtChallenge.gt, gtChallenge.challenge);
-    if (validate.length === 0) {
+    // verifyGtFull 先尝试自定义组合接口（成功时返回新 challenge），失败弹统一验证窗
+    const solved: GeetestSolveResult = await RiskVerifyService.getInstance()
+      .verifyGtFull(gtChallenge.gt, gtChallenge.challenge);
+    if (solved.validate.length === 0) {
       return '';
     }
     const input: GeetestValidateInput = new GeetestValidateInput();
-    input.geetestChallenge = gtChallenge.challenge;
-    input.geetestValidate = validate;
+    input.geetestChallenge = solved.challenge;
+    input.geetestValidate = solved.validate;
     input.geetestSeccode = '';
     return RiskVerifier.verifyXrpcChallenge(cookie, input);
   }

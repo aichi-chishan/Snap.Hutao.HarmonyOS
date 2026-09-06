@@ -18,6 +18,9 @@ import { Logger } from '../common/Logger';
 
 const TAG: string = 'GachaLogService';
 const GACHA_HOST: string = 'https://public-operation-hk4e.mihoyo.com/gacha_info/api/getGachaLog';
+const BEYOND_HOST: string = 'https://public-operation-hk4e.mihoyo.com/gacha_info/api/getBeyondGachaLog';
+/** 千星奇域分页大小（对齐 Windows GachaLogTypedQueryOptions.BeyondSize） */
+const BEYOND_PAGE_SIZE: number = 5;
 
 export class RefreshResult {
   ok: boolean = false;
@@ -183,6 +186,79 @@ export class GachaLogService {
       await this.delay();
     }
 
+    // 千星奇域（颂愿）：独立端点 + size=5，同样 end_id 游标去重合并
+    if (!aborted) {
+      for (let i = 0; i < GachaType.BEYOND_ORDER.length; i++) {
+        const gachaType: number = GachaType.BEYOND_ORDER[i];
+        const poolName: string = GachaType.nameOf(gachaType);
+        progress.currentPoolName = poolName;
+        progress.reportText = `正在拉取：${poolName}（千星奇域）`;
+        onProgress(progress);
+
+        const existingIds: Set<string> = new Set<string>();
+        const ids: string[] = await GachaRepo.getAllGachaIds(archive.id, gachaType);
+        for (let j = 0; j < ids.length; j++) {
+          existingIds.add(ids[j]);
+        }
+
+        let endId: string = '';
+        const newItems: GachaItem[] = [];
+        let pageGuard: number = 0;
+        while (true) {
+          pageGuard++;
+          if (pageGuard > 999) {
+            break;
+          }
+          const resp: ApiResponse = await this.fetchPage(authInfo, gachaType, endId, true);
+          if (!resp.success) {
+            // 颂愿池失败不中止整体刷新（老客户端/未开放时可能不可用），仅记录
+            Logger.warn(TAG, `beyond pool ${gachaType} fail retcode=${resp.retcode}`);
+            progress.reportText = `${poolName}：拉取失败，已跳过`;
+            onProgress(progress);
+            break;
+          }
+          const list: GachaItem[] = this.parseList(resp.data, true);
+          if (list.length === 0) {
+            break;
+          }
+          for (let k = 0; k < list.length; k++) {
+            const item: GachaItem = list[k];
+            item.archiveId = archive.id;
+            if (!existingIds.has(item.gachaId)) {
+              newItems.push(item);
+              existingIds.add(item.gachaId);
+              if (progress.recentItems.length < 40) {
+                const ri: RecentGachaItem = new RecentGachaItem();
+                ri.name = item.name;
+                ri.itemType = item.itemType;
+                ri.rank = item.rankType;
+                ri.count = item.count;
+                progress.recentItems.push(ri);
+              }
+            }
+          }
+          totalFetched += list.length;
+          progress.fetchedCount = totalFetched;
+          progress.reportText = `${poolName}：已拉取 ${totalFetched} 条`;
+          onProgress(progress);
+          if (list.length < BEYOND_PAGE_SIZE) {
+            break;
+          }
+          endId = list[list.length - 1].gachaId;
+          if (endId.length === 0) {
+            break;
+          }
+          await this.delay();
+        }
+
+        if (newItems.length > 0) {
+          await GachaRepo.insertItems(newItems);
+          Logger.info(TAG, `beyond pool ${gachaType} inserted ${newItems.length} new`);
+        }
+        await this.delay();
+      }
+    }
+
     progress.done = true;
     progress.running = false;
     if (aborted) {
@@ -203,10 +279,12 @@ export class GachaLogService {
     return r;
   }
 
-  private async fetchPage(authInfo: GachaAuthInfo, gachaType: number, endId: string): Promise<ApiResponse> {
-    let url: string = `${GACHA_HOST}?lang=${authInfo.lang}&auth_appid=${AppConstants.GACHA_AUTH_APPID}` +
+  private async fetchPage(authInfo: GachaAuthInfo, gachaType: number, endId: string, isBeyond: boolean = false): Promise<ApiResponse> {
+    const host: string = isBeyond ? BEYOND_HOST : GACHA_HOST;
+    const size: number = isBeyond ? BEYOND_PAGE_SIZE : AppConstants.GACHA_PAGE_SIZE;
+    let url: string = `${host}?lang=${authInfo.lang}&auth_appid=${AppConstants.GACHA_AUTH_APPID}` +
       `&authkey=${encodeURIComponent(authInfo.authkey)}&authkey_ver=${authInfo.authkeyVer}` +
-      `&sign_type=${authInfo.signType}&gacha_type=${gachaType}&size=${AppConstants.GACHA_PAGE_SIZE}`;
+      `&sign_type=${authInfo.signType}&gacha_type=${gachaType}&size=${size}`;
     if (endId.length > 0) {
       url += `&end_id=${endId}`;
     }
@@ -227,7 +305,7 @@ export class GachaLogService {
     return ApiClient.getInstance().get(url, headers);
   }
 
-  private parseList(data: Object | undefined): GachaItem[] {
+  private parseList(data: Object | undefined, isBeyond: boolean = false): GachaItem[] {
     if (data === undefined) {
       return [];
     }
@@ -238,7 +316,7 @@ export class GachaLogService {
       return items;
     }
     for (let i = 0; i < list.length; i++) {
-      const it: GachaItem = GachaItem.fromServer(list[i]);
+      const it: GachaItem = GachaItem.fromServer(list[i], isBeyond);
       if (it.gachaId.length > 0) {
         items.push(it);
       }

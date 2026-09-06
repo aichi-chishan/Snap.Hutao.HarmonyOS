@@ -95,6 +95,8 @@ export struct GachaLogPage {
   @State showRatioMode: boolean = false;
   /** Pivot 当前页 */
   @State pivotIndex: number = 0;
+  /** 颂愿（千星奇域）模式：切换后页签/卡片/历史只显示颂愿池（对齐 Windows IsBeyondMode） */
+  @State beyondMode: boolean = false;
   /** 角色/武器聚合快照 */
   @State charCounts: ItemCountEntry[] = [];
   @State weaponCounts: ItemCountEntry[] = [];
@@ -169,15 +171,15 @@ export struct GachaLogPage {
       if (pool.totalCount <= 0) {
         continue;
       }
-      const items: GachaItem[] = pool.fiveHistory;
-      for (let j = 0; j < items.length; j++) {
-        const item: GachaItem = items[j];
-        const isChar: boolean = pool.typeName.indexOf('角色') >= 0 ||
-          pool.typeName.indexOf('集录') >= 0 || pool.typeName.indexOf('新手') >= 0;
+      // 五星明细按服务端实际 item_type 归桶（常驻/颂愿池混有武器，按池名判断不可靠）
+      const details: FiveStarDetail[] = pool.fiveDetails;
+      for (let j = 0; j < details.length; j++) {
+        const detail: FiveStarDetail = details[j];
+        const isChar: boolean = detail.itemType.indexOf('武器') < 0;
         if (isChar) {
-          GachaLogPage.accumulate(charMap, item.name, item.itemType, 5);
+          GachaLogPage.accumulate(charMap, detail.name, detail.itemType, 5);
         } else {
-          GachaLogPage.accumulate(weaponMap, item.name, item.itemType, 5);
+          GachaLogPage.accumulate(weaponMap, detail.name, detail.itemType, 5);
         }
       }
     }
@@ -240,6 +242,10 @@ export struct GachaLogPage {
       const pool: PoolStatistics = pools[i];
       // 无数据池不展示卡片（宽屏多列展示有数据的池，同电脑版）
       if (pool.totalCount <= 0) {
+        continue;
+      }
+      // 颂愿池仅在颂愿模式展示，常规池仅在常规模式展示
+      if (GachaType.isBeyond(pool.gachaType) !== this.beyondMode) {
         continue;
       }
       const card: PoolCardData = new PoolCardData();
@@ -390,7 +396,7 @@ export struct GachaLogPage {
   poolTabs() {
     Scroll() {
       Row({ space: 8 }) {
-        ForEach(GachaType.QUERY_ORDER, (type: number) => {
+        ForEach(this.beyondMode ? GachaType.BEYOND_ORDER : GachaType.QUERY_ORDER, (type: number) => {
           Text(GachaType.nameOf(type))
             .fontSize(12)
             .fontColor(this.vm.currentPoolType === type ? Color.White : $r('app.color.text_primary'))
@@ -412,6 +418,35 @@ export struct GachaLogPage {
     .edgeEffect(EdgeEffect.Spring)
     .width('100%')
     .height(40)
+  }
+
+  /** 颂愿（千星奇域）模式切换 chip（对齐 Windows SwitchToBeyondGachaMode） */
+  @Builder
+  beyondToggleChip() {
+    Text(this.beyondMode ? '颂愿·开' : '颂愿')
+      .fontSize(12)
+      .fontWeight(this.beyondMode ? FontWeight.Bold : FontWeight.Normal)
+      .fontColor(this.beyondMode ? Color.White : $r('app.color.text_secondary'))
+      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+      .borderRadius(14)
+      .backgroundColor(this.beyondMode ? $r('app.color.app_primary') : $r('app.color.card_background'))
+      .border({
+        width: 1,
+        color: this.beyondMode ? $r('app.color.app_primary') : $r('app.color.divider')
+      })
+      .hoverEffect(HoverEffect.Highlight)
+      .onClick(() => {
+        this.toggleBeyondMode();
+      })
+  }
+
+  /** 切换颂愿模式：换默认选中池并重建快照 */
+  toggleBeyondMode(): void {
+    this.beyondMode = !this.beyondMode;
+    const target: number = this.beyondMode ? GachaType.UGC_STANDARD : GachaType.AVATAR_EVENT;
+    this.vm.selectPool(target).then(() => {
+      this.syncAll();
+    });
   }
 
   @Builder
@@ -957,7 +992,7 @@ export struct GachaLogPage {
     }
   }
 
-  /** 选择文件导入 UIGF（v4.0 / v3.x） */
+  /** 选择文件导入 UIGF（v4.2 / v4.0 / v3.x） */
   async uigfImport(): Promise<void> {
     try {
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker();
@@ -988,7 +1023,7 @@ export struct GachaLogPage {
     }
   }
 
-  /** 导出全部祈愿数据为 UIGF v4.0 文件 */
+  /** 导出全部祈愿数据为 UIGF v4.2 文件（含千星奇域） */
   async uigfExport(): Promise<void> {
     try {
       const json: string = await UigfService.getInstance().buildExportJson();
@@ -1005,7 +1040,7 @@ export struct GachaLogPage {
       } finally {
         fileIo.closeSync(file);
       }
-      this.toast('导出成功（UIGF v4.0）');
+      this.toast('导出成功（UIGF v4.2）');
     } catch (e) {
       this.toast(`导出失败：${(e as Error).message}`);
     }
@@ -1094,9 +1129,11 @@ export struct GachaLogPage {
         .padding({ left: 16, right: 16, top: 10, bottom: 8 })
         .alignItems(VerticalAlign.Center)
 
-        // Pivot 五个页签（总览/历史/角色/武器/倒计时）
+        // Pivot 五个页签（总览/历史/角色/武器/倒计时）+ 颂愿模式切换
         Row({ space: 6 }) {
           this.pivotTab(0, '总览')
+          Blank()
+          this.beyondToggleChip()
         }
         .width('100%')
         .padding({ left: 16, right: 16, bottom: 8 })

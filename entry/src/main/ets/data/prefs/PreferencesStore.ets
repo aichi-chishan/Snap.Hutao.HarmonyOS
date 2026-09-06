@@ -25,6 +25,8 @@ export class PreferencesStore {
   static readonly KEY_BG_FOLDER_PATH: string = 'app.bg_folder_path';
   static readonly KEY_DEVICE_FP: string = 'app.device_fp';
   static readonly KEY_DEVICE_FP_TIME: string = 'app.device_fp_time';
+  /** 极验自定义组合接口（{0}=gt {1}=challenge），留空禁用（对齐 Windows GeetestCustomCompositeUrl） */
+  static readonly KEY_GEETEST_CUSTOM_URL: string = 'risk.geetest_custom_composite_url';
 
   // ---- defaults ----
   static readonly DEFAULT_REFRESH_INTERVAL: number = 30;

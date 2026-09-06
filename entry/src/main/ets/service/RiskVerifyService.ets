@@ -10,6 +10,9 @@
  *   verifyAigis→ 组装好的 x-rpc-aigis 重放头值（取消/失败为 ''）
  */
 import { AigisSession, AigisChallenge } from '../data/network/AigisSession';
+import { ApiClient } from '../data/network/ApiClient';
+import { ApiResponse } from '../model/ApiResponse';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'RiskVerifyService';
@@ -30,6 +33,12 @@ export class RiskVerifyRequest {
   seq: number = 0;
 }
 
+/** 极验解题结果（challenge 为重放应使用的值：弹窗路径=原 challenge，自定义接口=返回的新 challenge） */
+export class GeetestSolveResult {
+  challenge: string = '';
+  validate: string = '';
+}
+
 type ValidateCallback = (validate: string) => void;
 
 export class RiskVerifyService {
@@ -45,6 +54,8 @@ export class RiskVerifyService {
 
   /**
    * 发起 gt 极验（1034/签到体内）。返回 geetest_validate；用户关闭或失败返回 ''。
+   * 配置了自定义组合接口时先尝试自动过验（对齐 Windows GeetestService.TryVerifyGtChallengeAsync 的
+   * CustomGeetestClient 前置尝试），失败仍走弹窗。
    */
   verifyGt(gt: string, challenge: string): Promise<string> {
     const req: RiskVerifyRequest = new RiskVerifyRequest();
@@ -55,24 +66,95 @@ export class RiskVerifyService {
   }
 
   /**
-   * 解析 aigis 响应头并弹窗验证。返回组装好的 x-rpc-aigis 重放头值；无需验证/取消返回 ''。
+   * 发起 gt 极验并返回完整解题结果（challenge + validate）。
+   * 自定义接口成功时 challenge 为接口返回的新 challenge（重放须用它，对齐 Windows GeetestData.Challenge）；
+   * 弹窗路径 challenge 为原始值。
    */
-  verifyAigis(rawHeader: string): Promise<string> {
+  async verifyGtFull(gt: string, challenge: string): Promise<GeetestSolveResult> {
+    const solved: GeetestSolveResult | undefined = await this.tryCustomSolve(gt, challenge);
+    if (solved !== undefined) {
+      return solved;
+    }
+    const req: RiskVerifyRequest = new RiskVerifyRequest();
+    req.kind = 'gt';
+    req.gt = gt;
+    req.challenge = challenge;
+    const validate: string = await this.show(req, (v: string): string => v);
+    const result: GeetestSolveResult = new GeetestSolveResult();
+    result.challenge = challenge;
+    result.validate = validate;
+    return result;
+  }
+
+  /**
+   * 解析 aigis 响应头并弹窗验证。返回组装好的 x-rpc-aigis 重放头值；无需验证/取消返回 ''。
+   * 配置自定义组合接口时先尝试自动过验，成功直接组装返回（不弹窗）。
+   */
+  async verifyAigis(rawHeader: string): Promise<string> {
     const session: AigisChallenge | undefined = AigisSession.parse(rawHeader);
     if (session === undefined) {
-      return Promise.resolve('');
+      return '';
+    }
+    const solved: GeetestSolveResult | undefined = await this.tryCustomSolve(session.gt, session.challenge);
+    if (solved !== undefined) {
+      return AigisSession.buildAigisHeader(session.sessionId, solved.challenge, solved.validate);
     }
     const req: RiskVerifyRequest = new RiskVerifyRequest();
     req.kind = 'aigis';
     req.gt = session.gt;
     req.challenge = session.challenge;
     req.sessionId = session.sessionId;
-    return this.show(req, (validate: string): string => {
-      if (validate.length === 0) {
+    const validate: string = await this.show(req, (v: string): string => {
+      if (v.length === 0) {
         return '';
       }
-      return AigisSession.buildAigisHeader(session.sessionId, session.challenge, validate);
+      return AigisSession.buildAigisHeader(session.sessionId, session.challenge, v);
     });
+    return validate;
+  }
+
+  /** 用户配置的极验自定义组合接口模板（空串禁用） */
+  static getCustomCompositeUrl(): string {
+    try {
+      return PreferencesStore.getString(PreferencesStore.KEY_GEETEST_CUSTOM_URL, '');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /**
+   * 尝试自定义组合接口自动过验（对齐 Windows CustomGeetestClient.VerifyAsync）。
+   * 模板含 {0}=gt {1}=challenge；响应 {code:0, data:{challenge, validate}} 视为成功。
+   */
+  private async tryCustomSolve(gt: string, challenge: string): Promise<GeetestSolveResult | undefined> {
+    const template: string = RiskVerifyService.getCustomCompositeUrl();
+    if (template.length === 0 || template.indexOf('{0}') < 0 || template.indexOf('{1}') < 0) {
+      return undefined;
+    }
+    const url: string = template.replace('{0}', encodeURIComponent(gt))
+      .replace('{1}', encodeURIComponent(challenge));
+    try {
+      const resp: ApiResponse = await ApiClient.getInstance().get(url, {});
+      if (!resp.success || resp.data === undefined) {
+        Logger.info(TAG, `custom geetest solve fail retcode=${resp.retcode}`);
+        return undefined;
+      }
+      const data = resp.data as Record<string, Object>;
+      const outChallenge: string = String(data['challenge'] ?? '');
+      const validate: string = String(data['validate'] ?? '');
+      if (outChallenge.length === 0 || validate.length === 0) {
+        Logger.info(TAG, 'custom geetest solve: empty challenge/validate');
+        return undefined;
+      }
+      Logger.info(TAG, `custom geetest solve ok challenge=${outChallenge.substring(0, 8)}...`);
+      const r: GeetestSolveResult = new GeetestSolveResult();
+      r.challenge = outChallenge;
+      r.validate = validate;
+      return r;
+    } catch (e) {
+      Logger.warn(TAG, `custom geetest solve error: ${(e as Error).message}`);
+      return undefined;
+    }
   }
 
   /** UI 弹窗完成：传入 geetest_validate（空串表示取消/失败） */

@@ -13,21 +13,28 @@ export class GachaItem {
   name: string = '';
   itemType: string = '';
   rankType: number = 0;
+  /** 卡池期次（UIGF v4.2 导出用） */
+  scheduleId: number = 0;
   /** 服务端游标 id（去重/end_id） */
   gachaId: string = '';
 
-  /** 从 getGachaLog 列表项解析 */
-  static fromServer(obj: Object): GachaItem {
+  /** 从 getGachaLog/getBeyondGachaLog 列表项解析（颂愿池 gacha_type 键为 op_gacha_type） */
+  static fromServer(obj: Object, isBeyond: boolean = false): GachaItem {
     const item = obj as Record<string, Object>;
     const gachaItem: GachaItem = new GachaItem();
     gachaItem.gachaId = String(item['id'] ?? '');
-    gachaItem.gachaType = Number(item['gacha_type'] ?? 0);
+    if (isBeyond) {
+      gachaItem.gachaType = Number(item['op_gacha_type'] ?? 0);
+    } else {
+      gachaItem.gachaType = Number(item['gacha_type'] ?? 0);
+    }
     gachaItem.itemId = Number(item['item_id'] ?? 0);
     gachaItem.count = Number(item['count'] ?? 1);
     gachaItem.time = String(item['time'] ?? '');
     gachaItem.name = String(item['name'] ?? '');
     gachaItem.itemType = String(item['item_type'] ?? '');
     gachaItem.rankType = Number(item['rank_type'] ?? 0);
+    gachaItem.scheduleId = Number(item['schedule_id'] ?? 0);
     return gachaItem;
   }
 

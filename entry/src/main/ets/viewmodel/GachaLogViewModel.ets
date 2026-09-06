@@ -82,11 +82,15 @@ export class GachaLogViewModel {
     if (this.currentArchiveId > 0) {
       const pools: PoolStatistics[] = [];
       let total: number = 0;
-      for (let i = 0; i < GachaType.QUERY_ORDER.length; i++) {
-        const type: number = GachaType.QUERY_ORDER[i];
+      // 常规池 + 千星奇域颂愿池一起聚合（颂愿卡片仅在颂愿模式展示）
+      const allTypes: number[] = GachaType.QUERY_ORDER.concat(GachaType.BEYOND_ORDER);
+      for (let i = 0; i < allTypes.length; i++) {
+        const type: number = allTypes[i];
         try {
           const pool: PoolStatistics = await this.buildPoolStats(this.currentArchiveId, type);
-          total += pool.totalCount;
+          if (GachaType.isStandard(type)) {
+            total += pool.totalCount;
+          }
           pools.push(pool);
         } catch (e) {
           Logger.warn(TAG, `buildPoolStats type=${type} fail: ${(e as Error).message}`);
@@ -137,6 +141,7 @@ export class GachaLogViewModel {
     let sinceLastFour: number = 0;
     const fiveNames: string[] = [];
     const fiveTimes: string[] = [];
+    const fiveItemTypes: string[] = [];
     // 五星出金之间的抽数序列（升序遍历）
     const fiveSpans: number[] = [];
     let spanSinceLastFive: number = 0;
@@ -145,6 +150,7 @@ export class GachaLogViewModel {
         fiveStar++;
         fiveNames.push(items[i].name);
         fiveTimes.push(items[i].time);
+        fiveItemTypes.push(items[i].itemType);
         fiveSpans.push(spanSinceLastFive + 1);
         spanSinceLastFive = 0;
       } else if (items[i].rankType === 4) {
@@ -196,7 +202,7 @@ export class GachaLogViewModel {
       pool.lastFiveName = fiveNames[fiveNames.length - 1];
       pool.lastFiveTime = fiveTimes[fiveTimes.length - 1];
     }
-    // 出金历史（倒序）+ 每角色用抽数明细
+    // 出金历史（倒序）+ 每角色用抽数明细（itemType 优先用服务端实际记录）
     for (let i = fiveNames.length - 1; i >= 0; i--) {
       const copied: GachaItem = new GachaItem();
       copied.name = fiveNames[i];
@@ -208,7 +214,9 @@ export class GachaLogViewModel {
       detail.time = fiveTimes[i];
       detail.lastPull = fiveSpans.length > i ? fiveSpans[i] : 0;
       detail.isUp = GachaLogViewModel.isLikelyUp(gachaType, i, fiveNames.length);
-      detail.itemType = gachaType === GachaType.WEAPON_EVENT ? '武器' : '角色';
+      detail.itemType = fiveItemTypes.length > i && fiveItemTypes[i].length > 0
+        ? fiveItemTypes[i]
+        : (gachaType === GachaType.WEAPON_EVENT ? '武器' : '角色');
       pool.fiveDetails.push(detail);
     }
     Logger.info(TAG, `pool ${gachaType} stats: ${pool.toString()}`);

@@ -17,6 +17,7 @@ import { AppBackButton } from '../components/AppBackButton';
 import EntryAbility from '../entryability/EntryAbility';
 import { GameDataService } from '../service/GameDataService';
 import { GameDataUpdater } from '../data/remote/GameDataUpdater';
+import { RiskVerifyService } from '../service/RiskVerifyService';
 
 const TAG: string = 'SettingPage';
 
@@ -52,6 +53,9 @@ export struct SettingPage {
   /** 数据源 URL 编辑弹窗 */
   @State showUrlEdit: boolean = false;
   @State urlInput: string = '';
+  /** 极验自定义组合接口编辑弹窗（对齐 Windows 无感验证 GeetestCustomUrlDialog） */
+  @State showGeetestEdit: boolean = false;
+  @State geetestInput: string = '';
   @StorageProp('isLoggedIn') isLoggedIn: boolean = false;
   /** 祈愿归档（数据管理） */
   @State gachaRows: GachaArchiveRow[] = [];
@@ -71,7 +75,16 @@ export struct SettingPage {
     }
     this.dailyBgEnabled = PreferencesStore.getDailyBgEnabled();
     this.dataUrl = GameDataUpdater.manifestUrl();
+    this.geetestInput = RiskVerifyService.getCustomCompositeUrl();
     this.loadGachaRows();
+  }
+
+  /** 保存极验自定义组合接口（留空禁用） */
+  applyGeetestUrl(): void {
+    const template: string = this.geetestInput.trim();
+    PreferencesStore.setString(PreferencesStore.KEY_GEETEST_CUSTOM_URL, template);
+    this.showGeetestEdit = false;
+    this.toast(template.length > 0 ? '已保存，触发人机验证时优先尝试自动过验' : '已清除，恢复弹窗验证');
   }
 
   /** 载入祈愿归档与各归档记录数 */
@@ -621,6 +634,38 @@ export struct SettingPage {
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.divider') })
 
+          this.sectionTitle('无感验证')
+          Row() {
+            Column({ space: 2 }) {
+              Text('设定验证请求接口')
+                .fontSize(15)
+                .fontColor($r('app.color.text_primary'))
+              Text(this.geetestInput.length > 0 ? this.geetestInput : '设定当请求触发人机验证时使用的验证接口（留空使用弹窗验证）')
+                .fontSize(11)
+                .fontColor($r('app.color.text_secondary'))
+                .maxLines(2)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text(this.geetestInput.length > 0 ? '已配置' : '配置')
+              .fontSize(12)
+              .fontColor($r('app.color.app_primary'))
+              .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+              .borderRadius(10)
+              .border({ width: 1, color: $r('app.color.app_primary') })
+          }
+          .width('100%')
+          .padding(14)
+          .borderRadius(12)
+          .backgroundColor($r('app.color.card_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.geetestInput = RiskVerifyService.getCustomCompositeUrl();
+            this.showGeetestEdit = true;
+          })
+
           this.sectionTitle('账号')
           this.rowItem('账号与数据', '多账号管理与角色绑定', () => {
             router.pushUrl({ url: 'pages/UserPage' });
@@ -709,6 +754,60 @@ export struct SettingPage {
         .backgroundColor('#66000000')
         .onClick(() => {
           this.showUrlEdit = false;
+        })
+      }
+      if (this.showGeetestEdit) {
+        Column() {
+          Column({ space: 12 }) {
+            Text('设定验证请求接口')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'))
+              .width('100%')
+            Text('极验自定义组合接口：{0} 在实际请求时替换为 gt，{1} 替换为 challenge，通过 GET 方式请求；返回 {code:0, data:{challenge, validate}} 视为成功。留空禁用。')
+              .fontSize(11)
+              .fontColor($r('app.color.text_secondary'))
+              .width('100%')
+            TextInput({ placeholder: 'https://your.api/geetest?gt={0}&challenge={1}', text: this.geetestInput })
+              .fontSize(12)
+              .height(40)
+              .width('100%')
+              .onChange((v: string) => {
+                this.geetestInput = v;
+              })
+            Row({ space: 10 }) {
+              Button('取消')
+                .fontSize(13)
+                .height(34)
+                .layoutWeight(1)
+                .backgroundColor($r('app.color.card_background'))
+                .fontColor($r('app.color.text_primary'))
+                .onClick(() => {
+                  this.showGeetestEdit = false;
+                })
+              Button('保存')
+                .fontSize(13)
+                .height(34)
+                .layoutWeight(1)
+                .backgroundColor($r('app.color.app_primary'))
+                .fontColor(Color.White)
+                .onClick(() => {
+                  this.applyGeetestUrl();
+                })
+            }
+            .width('100%')
+          }
+          .width('100%')
+          .padding(16)
+          .borderRadius(16)
+          .backgroundColor($r('app.color.card_background'))
+        }
+        .width('100%')
+        .padding({ left: 20, right: 20 })
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor('#66000000')
+        .onClick(() => {
+          this.showGeetestEdit = false;
         })
       }
     }
