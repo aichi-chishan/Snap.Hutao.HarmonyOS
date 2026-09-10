@@ -18,6 +18,8 @@ interface CardMessageParams {
 
 interface CardMessageAction {
   action: string;
+  abilityName: string;
+  moduleName: string;
   params: CardMessageParams;
 }
 
@@ -40,9 +42,16 @@ struct DailyNoteCard {
     return Number.isNaN(n) ? 0 : n;
   }
 
-  /** 手动刷新：message 事件 → FormExtensionAbility.onFormEvent（拉取最新便笺并回推卡片） */
+  /** 手动刷新：message 事件 → FormExtensionAbility.onFormEvent（拉取最新便笺并回推卡片）。
+   *  先本地置"刷新中…"给即时反馈，提供方回推的数据/提示会覆盖它。 */
   private requestRefresh(): void {
-    const action: CardMessageAction = { action: 'message', params: { method: 'refresh' } };
+    this.tipText = '刷新中…';
+    const action: CardMessageAction = {
+      action: 'message',
+      abilityName: 'DailyNoteFormExtensionAbility',
+      moduleName: 'entry',
+      params: { method: 'refresh' },
+    };
     postCardAction(this, action);
   }
 
