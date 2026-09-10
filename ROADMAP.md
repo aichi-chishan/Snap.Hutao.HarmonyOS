@@ -6,6 +6,20 @@
 
 ---
 
+## 本轮（2026-09-10）已修复
+
+| 项 | 根因 | 修复 |
+|---|---|---|
+| 实时便笺自动刷新后界面数值不变 | 服务层定时器只落库 + 推卡片，从不通知 UI；且定时器只在便笺页被打开时才启动（冷启动后进主页则永不刷新） | 新增 AppStorage 版本戳 `dailyNoteVersion`（服务层刷新成功自增，便笺页/主页 `@Watch` 重读本地缓存）；`EntryAbility` 启动/回前台调用 `DailyNoteService.bootstrapAutoRefresh()`（按偏好起定时器 + 缓存过期即补刷）；服务层加刷新重入保护、失败原因写入 `dailyNoteLastError` 并在便笺页顶部提示 |
+| 主页便笺卡数值不刷新（刷新时间变了、树脂没变） | **ArkUI @Builder 传参规则**：`block(category,icon,text,sub,dot,wide)` 六参数按值传递，@Builder 内部 UI 不参与刷新 | 改为常量槽位 `block(slot, wide)` + 渲染期私有方法读组件状态；同类问题一并修 `HomeChallengeCard.slotCell` / `HomeSignInCard.awardCell` / `DailyNotePage.headerIconButton` |
+| 桌面卡片无法手动刷新 | 卡片只有静态展示，没有交互入口；`onFormEvent` 未实现 | 卡片标题栏加 ⟳：`postCardAction(message)` → `onFormEvent` → 补齐卡片进程运行时（偏好/DB/会话）→ `DailyNoteService.refreshForCard`（带 15s 超时，避免风控弹窗挂起卡片进程）→ 回推卡片；失败原因写卡片 `tipText` |
+| 浅色模式整窗发黄 / 深色遮罩失效 | **8 位色值顺序搞错**：`'#FFFFFF99'` 想表达 60% 白，实际按 `#AARRGGBB` 解析为**不透明 #FFFF99**（淡黄）；`'#00000033'` 被解析为**全透明** | WallpaperLayer 遮罩改资源色 `wallpaper_mask`（浅 `#99FFFFFF` / 深 `#33000000`）；底色统一 `wallpaper_base`（浅 `#F2F0EC` / 深 `#141418`，与窗口底色同色系）；AGENTS.md 记录规则 |
+| 便笺「已满还需 1931514天18小时」 | `resin_recovery_time` 是**距回满的秒数**（Windows: `DeserializeTime.AddSeconds`），代码当成时间戳解析 | 按秒数 + 拉取时刻锚点计算剩余时间；从库里读出来同样成立；异常态显示「即将回满」 |
+| 便笺页「每日委托 0/0」（主页卡却正常） | 表里没有 daily_task 列，`rowToRecord` 未还原子对象；接口也可能不返回 daily_task | `fromJson` 与 `rowToRecord` 均用顶层 finished/total_task_num 兜底 |
+| 风控弹窗可能永久挂起 | `RiskVerifyService.show` 的 Promise 无超时，应用后台/无窗口时永不 resolve，阻塞后续验证 | 加 180s 兜底超时（自动按"取消"结束，调用方已按空结果处理） |
+
+---
+
 ## P0 稳定与质量还债
 
 | 项 | 说明 | 规模 |
@@ -16,6 +30,8 @@
 | 死代码清理 | `ResourcePackService` / `StandardIconService` 已从设置页退役（素材全内置后无用武之地）；`MetaIcon.remoteFallback` 云端兜底链是否保留需决策。删除前确认无隐藏引用 | S |
 | DB 迁移框架化 | 目前 `try { ALTER ... } catch(已存在)` 散落在 `RelationalStoreHelper`。改为 user_version 驱动的有序迁移列表，新迁移只追加不改旧 | S |
 | 真机回归清单 | 把每轮发版前的手工验证步骤固化成文档：登录/风控/刷新/导入导出/深浅色/三断点（720/840/1200）矩阵，放 `docs/` 或本文件附录 | S |
+| @Builder 多参传递全量审计 | 官方规则：@Builder 传两个及以上参数时内部 UI 不随状态刷新。本轮已修便笺链路的 4 处，仍需排查：`SpiralAbyssPage.overviewCell`/`rankRow`、`RoleCombatPage.statCell`/`statValueCell`、`WikiAvatarPage.propCell`、`WikiMonsterPage.monStat`、`GachaLogPage.avatarSection`/`rankGroup`（判据：参数里是否含会变的字段 / ForEach 键值是否含变动字段） | M |
+| WallpaperLayer 观感复核 | 修正色值顺序后，浅色遮罩（60% 白）与图片 opacity 0.5 的实际观感需真机确认是否需要下调遮罩强度；`local` 模式未选目录时与 `none` 观感是否一致 | S |
 | 风控兜底页复检 | `GeetestVerifyPage` / `RiskVerifyDialog` 仅作兜底保留（AGENTS.md 约定），确认统一浮层主链路覆盖后评估是否可退场 | S |
 
 ---

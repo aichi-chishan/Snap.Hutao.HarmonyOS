@@ -47,6 +47,11 @@ export class PreferencesStore {
     Logger.info(TAG, 'preferences initialized');
   }
 
+  /** 是否已完成初始化（Form 卡片进程可能早于 EntryAbility 启动，调用前需判断） */
+  static isReady(): boolean {
+    return PreferencesStore.prefs !== undefined;
+  }
+
   private static getStore(): preferences.Preferences {
     if (PreferencesStore.prefs === undefined) {
       throw new Error('preferences not initialized');

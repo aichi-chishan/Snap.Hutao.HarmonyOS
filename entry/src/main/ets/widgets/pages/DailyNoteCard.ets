@@ -5,11 +5,22 @@
  * 数据链路（API 23+ V2 卡片，依据官方《卡片状态变量迁移》文档）：
  * FormExtensionAbility 通过 createFormBindingData/updateForm 推送的数据键：
  *   nickname / resin / maxResin / expeditionText / dailyText / homeCoinText
- *   / refreshText / resinRecoveryText
+ *   / refreshText / resinRecoveryText / tipText
+ * 手动刷新：卡片右上角 ⟳ → postCardAction(message) → FormExtensionAbility.onFormEvent。
  * 卡片侧使用 @Entry @ComponentV2（无需 LocalStorage），@Local 变量名与推送键一一对应，
  * 系统按变量名匹配注入刷新数据。注意：@ComponentV2 不支持 LocalStorage 相关能力，
  * 严禁回退为 @Entry(storage) + storage.get('formData') 的写法。
  */
+/** 卡片 → FormExtensionAbility 的 message 事件参数（ArkTS 禁止未类型化对象字面量） */
+interface CardMessageParams {
+  method: string;
+}
+
+interface CardMessageAction {
+  action: string;
+  params: CardMessageParams;
+}
+
 @Entry
 @ComponentV2
 struct DailyNoteCard {
@@ -21,10 +32,18 @@ struct DailyNoteCard {
   @Local homeCoinText: string = '--';
   @Local refreshText: string = '--';
   @Local resinRecoveryText: string = '--';
+  /** 卡片内状态提示（刷新中/失败原因），由提供方推送；空串表示无提示 */
+  @Local tipText: string = '';
 
   private resinNum(): number {
     const n: number = Number(this.resin);
     return Number.isNaN(n) ? 0 : n;
+  }
+
+  /** 手动刷新：message 事件 → FormExtensionAbility.onFormEvent（拉取最新便笺并回推卡片） */
+  private requestRefresh(): void {
+    const action: CardMessageAction = { action: 'message', params: { method: 'refresh' } };
+    postCardAction(this, action);
   }
 
   private maxResinNum(): number {
@@ -46,6 +65,19 @@ struct DailyNoteCard {
           .fontColor($r('app.color.text_secondary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
+        // 手动刷新按钮（对齐系统卡片交互：点击触发提供方拉取最新数据）
+        Text('⟳')
+          .fontSize(13)
+          .fontColor($r('app.color.app_primary'))
+          .width(22)
+          .height(22)
+          .textAlign(TextAlign.Center)
+          .borderRadius(11)
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .margin({ left: 6 })
+          .onClick(() => {
+            this.requestRefresh();
+          })
       }
       .width('100%')
       .height(20)
@@ -102,12 +134,23 @@ struct DailyNoteCard {
       .width('100%')
       .height(22)
 
-      // 洞天 + 更新时间
+      // 洞天 / 状态提示 + 更新时间
       Row() {
-        Text(`洞天 ${this.homeCoinText}`)
-          .fontSize(11)
-          .fontColor($r('app.color.text_secondary'))
-        Blank()
+        if (this.tipText.length > 0) {
+          Text(this.tipText)
+            .fontSize(11)
+            .fontColor($r('app.color.app_primary'))
+            .layoutWeight(1)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        } else {
+          Text(`洞天 ${this.homeCoinText}`)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .layoutWeight(1)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
         Text(`更新 ${this.refreshText}`)
           .fontSize(11)
           .fontColor($r('app.color.text_hint'))

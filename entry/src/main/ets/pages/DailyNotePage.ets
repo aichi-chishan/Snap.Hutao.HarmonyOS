@@ -20,13 +20,25 @@ export struct DailyNotePage {
   @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
   @StorageLink('currentUid') currentUid: string = '';
   @State vm: DailyNoteViewModel = new DailyNoteViewModel();
+  @StorageLink('dailyNoteVersion') @Watch('onNoteVersion') noteVersion: number = 0;
   @State allowNotify: boolean = false;
   /** 刷新/通知设置半屏弹窗（Windows 风格小窗） */
   @State showNoteSettings: boolean = false;
   @State noteAutoRefresh: boolean = PreferencesStore.getAutoRefreshEnabled();
   @State noteInterval: number = PreferencesStore.getRefreshIntervalMinutes();
+  /** 最近一次后台（自动）刷新失败原因：风控拦截/网络异常时给用户可见反馈 */
+  @StorageLink('dailyNoteLastError') lastNoteError: string = '';
   /** 宽屏（平板/PC）：左数据面板 + 右侧立绘背景 */
   @State isWide: boolean = false;
+
+  /** 服务层刷新成功（自动刷新定时器 / 桌面卡片手动刷新）→ 重读本地缓存，界面数值即时同步 */
+  onNoteVersion(): void {
+    if (!this.isLoggedIn || this.currentUid.length === 0) {
+      return;
+    }
+    this.vm.reloadFromCache(this.currentUid).then(() => {
+    });
+  }
 
   aboutToAppear(): void {
     this.vm.syncAutoRefresh();
@@ -57,24 +69,49 @@ export struct DailyNotePage {
 
   /** 便笺内容区滚动控制器（通知设置按钮跳转用） */
   private settingRef: Scroller = new Scroller();
+  /** 顶部操作按钮槽位（@Builder 多参数不参与刷新：只传常量槽位，文案/状态在渲染期读 vm） */
+  private static readonly SLOT_REFRESH: number = 0;
+  private static readonly SLOT_NOTIFY_SETTING: number = 1;
+
+  private headerLabel(slot: number): string {
+    if (slot === DailyNotePage.SLOT_REFRESH) {
+      return this.vm.isRefreshing ? '刷新中...' : '立即刷新';
+    }
+    return '通知设置';
+  }
+
+  private onHeaderAction(slot: number): void {
+    if (slot === DailyNotePage.SLOT_REFRESH) {
+      this.vm.refresh(this.currentUid).then((ok: boolean) => {
+        this.toast(ok ? '已刷新' : this.vm.message);
+      });
+      return;
+    }
+    const anim: ScrollAnimationOptions = { duration: 200, curve: Curve.EaseOut };
+    const so: ScrollOptions = { xOffset: 0, yOffset: 0, animation: anim };
+    this.settingRef.scrollTo(so);
+  }
+
   /** 顶部操作按钮：官方图标+文字小按钮（对齐 Windows 立即刷新/通知设置样式） */
   @Builder
-  headerIconButton(iconName: string, label: string, secondary: boolean, onTap: () => void) {
+  headerIconButton(slot: number) {
     Row({ space: 4 }) {
-      if (iconName.length > 0) {
-        NavIcon({ name: iconName, iconSize: 14 })
+      if (slot === DailyNotePage.SLOT_REFRESH) {
+        NavIcon({ name: 'DailyNote', iconSize: 14 })
       }
-      Text(label)
+      Text(this.headerLabel(slot))
         .fontSize(12)
-        .fontColor(secondary ? $r('app.color.text_secondary') : Color.White)
+        .fontColor(slot === DailyNotePage.SLOT_REFRESH ? Color.White : $r('app.color.text_secondary'))
     }
     .justifyContent(FlexAlign.Center)
     .alignItems(VerticalAlign.Center)
     .height(28)
     .padding({ left: 12, right: 12 })
     .borderRadius(14)
-    .backgroundColor(secondary ? $r('app.color.card_background') : $r('app.color.app_primary'))
-    .onClick(onTap)
+    .backgroundColor(slot === DailyNotePage.SLOT_REFRESH ? $r('app.color.app_primary') : $r('app.color.card_background'))
+    .onClick(() => {
+      this.onHeaderAction(slot);
+    })
   }
 
   toast(msg: string): void {
@@ -434,16 +471,8 @@ export struct DailyNotePage {
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.text_primary'))
           Blank()
-          this.headerIconButton('DailyNote', this.vm.isRefreshing ? '刷新中...' : '立即刷新', false, () => {
-            this.vm.refresh(this.currentUid).then((ok: boolean) => {
-              this.toast(ok ? '已刷新' : this.vm.message);
-            });
-          })
-          this.headerIconButton('', '通知设置', true, () => {
-            const anim: ScrollAnimationOptions = { duration: 200, curve: Curve.EaseOut };
-            const so: ScrollOptions = { xOffset: 0, yOffset: 0, animation: anim };
-            this.settingRef.scrollTo(so);
-          })
+          this.headerIconButton(DailyNotePage.SLOT_REFRESH)
+          this.headerIconButton(DailyNotePage.SLOT_NOTIFY_SETTING)
         }
         .width('100%')
         .padding({ left: 16, right: 16, top: 10, bottom: 8 })
@@ -454,6 +483,29 @@ export struct DailyNotePage {
           Scroll(this.settingRef) {
             Column({ space: 10 }) {
               this.autoRefreshBar()
+              if (this.lastNoteError.length > 0) {
+                Row({ space: 6 }) {
+                  Text('⚠')
+                    .fontSize(12)
+                    .fontColor($r('app.color.danger'))
+                  Text(this.lastNoteError)
+                    .fontSize(11)
+                    .fontColor($r('app.color.danger'))
+                    .layoutWeight(1)
+                  Text('立即刷新')
+                    .fontSize(11)
+                    .fontColor($r('app.color.app_primary'))
+                    .onClick(() => {
+                      this.vm.refresh(this.currentUid).then((ok: boolean) => {
+                        this.toast(ok ? '已刷新' : this.vm.message);
+                      });
+                    })
+                }
+                .width('100%')
+                .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+                .borderRadius(8)
+                .backgroundColor($r('app.color.danger_bg'))
+              }
               if (this.vm.note === undefined) {
                 Column({ space: 12 }) {
                   LoadingProgress()

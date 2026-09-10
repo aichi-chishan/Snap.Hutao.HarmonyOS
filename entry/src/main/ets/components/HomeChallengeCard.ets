@@ -45,9 +45,9 @@ export struct HomeChallengeCard {
             .padding({ top: 10, bottom: 10 })
         } else {
           Row({ space: 8 }) {
-            this.slotCell(0, 'SpiralAbyss', '深境螺旋', this.abyssText())
-            this.slotCell(1, 'RoleCombat', '幻想真境剧诗', this.roleCombatText())
-            this.slotCell(2, 'HardChallenge', '幽境危战', this.hardChallengeText())
+            this.slotCell(HomeChallengeCard.SLOT_ABYSS)
+            this.slotCell(HomeChallengeCard.SLOT_ROLE_COMBAT)
+            this.slotCell(HomeChallengeCard.SLOT_HARD)
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
@@ -88,19 +88,45 @@ export struct HomeChallengeCard {
     return m > 0 ? `${m}分${s}秒` : `${s}秒`;
   }
 
+  /** 槽位常量（@Builder 多参数不参与刷新：数值在渲染期经方法读 this.data） */
+  private static readonly SLOT_ABYSS: number = 0;
+  private static readonly SLOT_ROLE_COMBAT: number = 1;
+  private static readonly SLOT_HARD: number = 2;
+
+  private slotIcon(slot: number): string {
+    if (slot === HomeChallengeCard.SLOT_ABYSS) {
+      return 'SpiralAbyss';
+    }
+    return slot === HomeChallengeCard.SLOT_ROLE_COMBAT ? 'RoleCombat' : 'HardChallenge';
+  }
+
+  private slotLabel(slot: number): string {
+    if (slot === HomeChallengeCard.SLOT_ABYSS) {
+      return '深境螺旋';
+    }
+    return slot === HomeChallengeCard.SLOT_ROLE_COMBAT ? '幻想真境剧诗' : '幽境危战';
+  }
+
+  private slotValue(slot: number): string {
+    if (slot === HomeChallengeCard.SLOT_ABYSS) {
+      return this.abyssText();
+    }
+    return slot === HomeChallengeCard.SLOT_ROLE_COMBAT ? this.roleCombatText() : this.hardChallengeText();
+  }
+
   @Builder
-  slotCell(index: number, iconName: string, label: string, value: string) {
+  slotCell(slot: number) {
     Column({ space: 3 }) {
       Row({ space: 3 }) {
-        NavIcon({ name: iconName, iconSize: 12 })
-        Text(label)
+        NavIcon({ name: this.slotIcon(slot), iconSize: 12 })
+        Text(this.slotLabel(slot))
           .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       .width('100%')
-      Text(value)
+      Text(this.slotValue(slot))
         .fontSize(12)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.app_primary'))
@@ -114,7 +140,7 @@ export struct HomeChallengeCard {
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Start)
     .onClick(() => {
-      this.onTap(index);
+      this.onTap(slot);
     })
   }
 }

@@ -41,16 +41,43 @@ export class DateUtil {
     return `${d.getFullYear()}-${DateUtil.pad2(d.getMonth() + 1)}-${DateUtil.pad2(d.getDate())}`;
   }
 
-  /** ISO 字符串 → 毫秒时间戳（服务端返回的 'yyyy-MM-dd HH:mm:ss' 或 ISO8601） */
+  /** 服务端时间字段 → 毫秒时间戳。
+   *  兼容三种形态：Unix 秒字符串（便笺 resin_recovery_time/home_coin_recovery_time）、
+   *  Unix 毫秒字符串，以及 'yyyy-MM-dd HH:mm:ss' / ISO8601。
+   *  注：纯数字串直接交给 Date 解析在部分运行时会被当作年份，得到天文数字（曾导致
+   *  "已满还需 1931514天18小时"），必须先按时间戳处理。 */
   static parseToMs(text: string): number {
     if (!text || text.length === 0) {
       return 0;
     }
+    const trimmed: string = text.trim();
+    if (DateUtil.isAllDigits(trimmed)) {
+      const n: number = Number(trimmed);
+      if (!Number.isNaN(n) && n > 0) {
+        // 13 位及以上视为毫秒；10 位（秒）换算成毫秒
+        return n < 100000000000 ? Math.floor(n * 1000) : n;
+      }
+      return 0;
+    }
     // 兼容 'yyyy-MM-dd HH:mm:ss'（无 TimeZone，按本地解析）
-    const normalized: string = text.replace(' ', 'T');
+    const normalized: string = trimmed.replace(' ', 'T');
     const d: Date = new Date(normalized);
     const ms: number = d.getTime();
     return Number.isNaN(ms) ? 0 : ms;
+  }
+
+  /** 纯数字串判断（不依赖正则，ArkTS 下遍历即可） */
+  private static isAllDigits(text: string): boolean {
+    if (text.length === 0) {
+      return false;
+    }
+    for (let i = 0; i < text.length; i++) {
+      const c: number = text.charCodeAt(i);
+      if (c < 48 || c > 57) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /** 剩余时长（毫秒）→ 'x天x小时x分' */

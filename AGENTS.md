@@ -52,10 +52,14 @@
 - **动效统一走 `common/Motion.ets`**：spring 三档 / pageSwitch 非对称转场（宽屏内容切换经 `PageContainer`）/ riseIn 进场 / staggerDelay 错峰；导航选中指示条用 geometryTransition（切换必须经 Index.switchTo 的 animateTo 驱动）。应用级沉浸光感已开（module.json5 UIMaterial.state=enable）。
 
 ## 已知坑（Do NOT trip）
-- **整窗发黄（已根治，勿回退）**：
-  1. **禁止用 linearGradient 做大面积背景**——模拟器/软渲染路径对渐变着色器支持异常，会把整块渐变输出为纯黄 (255,255,0)。基底一律用纯色 `backgroundColor`（WallpaperLayer / EntryAbility.applyWindowBackdrop 已改，同色系衔接）。
-  2. **颜色资源必须 `$r('app.color.x')`**——裸字符串 `('app.color.x')` 是无效色（透明/异常），曾让侧栏/按钮/桌面卡片全部失效（已全量修复，新代码勿再犯）。
-  3. 窗口根背景必须**不透明主题色**（`setWindowBackgroundColor(透明)` 会让半透明像素叠上未初始化缓冲；且要在 `setWindowLayoutFullScreen` 就绪后调用，过早报 1300002）。
+- **整窗发黄（真因已定位：8 位色值顺序）**：
+  1. **8 位 hex 是 `#AARRGGBB`，不是 CSS 的 `#RRGGBBAA`** —— 历史 bug：WallpaperLayer 遮罩写 `'#FFFFFF99'` 想表达"60% 白"，被解析为**不透明 `#FFFF99`（淡黄）** → 浅色模式整窗发黄（曾被误判为 linearGradient 问题）。深色那份 `'#00000033'` 同样被解析为**全透明**（A=00），遮罩完全失效。现已改为资源色 `wallpaper_base` / `wallpaper_mask`（base/dark 双定义，遮罩浅色 `#99FFFFFF`、深色 `#33000000`）。**新增半透明色一律用 `#AARRGGBB`**。
+  2. 大面积背景仍**禁止 linearGradient**，基底一律纯色 `backgroundColor`（模拟器软渲染对渐变着色器支持不稳）。
+  3. **颜色资源必须 `$r('app.color.x')`**——裸字符串 `('app.color.x')` 是无效色（透明/异常），曾让侧栏/按钮/桌面卡片全部失效（已全量修复，新代码勿再犯）。
+  4. 窗口根背景必须**不透明主题色**（`setWindowBackgroundColor(透明)` 会让半透明像素叠上未初始化缓冲；且要在 `setWindowLayoutFullScreen` 就绪后调用，过早报 1300002）。窗口底色与 `wallpaper_base` 同色系：浅 `#FFF2F0EC` / 深 `#FF141418`。
+- **@Builder 传参刷新规则（踩过：便笺卡数值不刷新）**：官方文档明确"**@Builder 按引用传递且仅传入一个参数时才触发动态渲染**"，传两个及以上参数时 @Builder 内部 UI 不随状态刷新。因此：
+  - 会变的文案/图标/红点**不能作为 @Builder 参数**传入，要在渲染期用私有方法读组件状态（参考 `HomeDailyNoteCard.block(slot, wide)`、`HomeChallengeCard.slotCell(slot)`、`HomeSignInCard.awardCell(reward)`、`DailyNotePage.headerIconButton(slot)`）；
+  - 参数只放**常量槽位**；`ForEach` 里用多参 @Builder 时，键值生成函数必须包含会变的字段（如 ``cd_${card.gachaType}_${card.totalCount}``），否则数据变了组件被复用、数值停留在首次渲染。
 - **风控统一链路（勿绕过）**：1034/aigis/签到体内极验一律走 `RiskVerifyService`（Promise）+ 全局浮层 `RiskVerifyModal`（EntryAbility 挂 OverlayManager）；服务层重放用 `RiskVerifier.tryResolveRisk` / `RiskUiHelper.riskReplayHeaders`（game_record 只带 challenge；签到带 challenge+validate+seccode=validate|jordan）。极验结果键名是 `geetest_*`。页面旧的 RiskVerifyDialog/GeetestVerifyPage 仅作兜底。
 - **空 UID 归档坑**：未登录时 `GachaRepo.getOrCreateArchive('')` 会建空归档覆盖默认 UID 逻辑。`HomeViewModel`/`GachaLogViewModel` 已在 uid 为空时跳过创建。改动相关逻辑必须守住这点。
 - **主题三态**：跟随系统 = `EntryAbility.onConfigurationUpdate` 监听系统 → 写 `AppStorage.isDarkMode`；设置页 `applyTheme` 需同步 `themeMode` state。三态（浅/深/跟随系统）判定别写死。

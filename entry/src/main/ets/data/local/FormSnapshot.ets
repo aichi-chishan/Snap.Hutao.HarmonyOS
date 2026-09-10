@@ -24,6 +24,8 @@ export class FormSnapshot {
         'homeCoinText': homeCoinText,
         'refreshText': FormSnapshot.formatTime(refreshMs),
         'resinRecoveryText': resinRecoveryText,
+        // 刷新成功清空上一次的失败提示（卡片手动刷新用）
+        'tipText': '',
       };
       const path: string = `${AppContextProvider.getFilesDir()}/${FILE_NAME}`;
       const file = fileIo.openSync(path, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
@@ -46,6 +48,7 @@ export class FormSnapshot {
       'homeCoinText': '--',
       'refreshText': '--',
       'resinRecoveryText': '--',
+      'tipText': '',
     };
     try {
       const path: string = `${AppContextProvider.getFilesDir()}/${FILE_NAME}`;

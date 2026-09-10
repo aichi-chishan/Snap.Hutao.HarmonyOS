@@ -66,6 +66,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     @StorageProp('isLoggedIn') @Watch('onLoginChanged') boundLoggedIn: boolean = false;
     /** 祈愿数据版本戳（祈愿页刷新成功后 bump；主页祈愿卡订阅重读本地库） */
     @StorageLink('gachaDataVersion') @Watch('onGachaDataChanged') gachaDataVersion: number = 0;
+    /** 便笺数据版本戳（服务层自动刷新/桌面卡片刷新成功后 bump；主页便笺卡订阅重读本地库） */
+    @StorageLink('dailyNoteVersion') @Watch('onNoteDataChanged') noteDataVersion: number = 0;
     @StorageProp('topAvoidVp') topAvoidVp: number = 0;
     @StorageProp('bottomAvoidVp') bottomAvoidVp: number = 0;
     @StorageProp('isDarkMode') isDark: boolean = false;
@@ -143,6 +145,13 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     onGachaDataChanged(): void {
       const uid: string = AppStorage.get<string>('currentUid') ?? '';
       this.homeVm.reloadGacha(uid).then(() => {
+      });
+    }
+
+    /** 便笺刷新成功：主页便笺卡重读本地库（不触发其他数据源网络请求） */
+    onNoteDataChanged(): void {
+      const uid: string = AppStorage.get<string>('currentUid') ?? '';
+      this.homeVm.reloadNote(uid).then(() => {
       });
     }
 

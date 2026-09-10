@@ -5,6 +5,7 @@ import { RelationalStoreHelper } from '../data/db/RelationalStoreHelper';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { UserService } from '../service/UserService';
 import { NotificationHelper } from '../data/local/NotificationHelper';
+import { DailyNoteService } from '../service/DailyNoteService';
 import { AppContextProvider } from '../common/AppContext';
 import { buildRiskVerifyOverlay } from '../components/RiskVerifyModal';
 
@@ -149,7 +150,7 @@ export default class EntryAbility extends UIAbility {
   static applyWindowBackdrop(mainWindow: window.Window): void {
     const isDark: boolean = AppStorage.get<boolean>('isDarkMode') ?? false;
     try {
-      mainWindow.setWindowBackgroundColor(isDark ? '#FF141418' : '#FFF2F0EC');
+      mainWindow.setWindowBackgroundColor(isDark ? '#FF141418' : '#FFFFFFFF');
     } catch (e) {
       hilog.warn(DOMAIN, TAG, 'setWindowBackgroundColor fail: %{public}s', JSON.stringify(e));
     }
@@ -195,6 +196,10 @@ export default class EntryAbility extends UIAbility {
       await NotificationHelper.init();
       // 恢复登录态（预登录态）：AppStorage currentUser/currentUid/isLoggedIn
       await UserService.getInstance().restoreSession();
+      // 便笺自动刷新：按偏好启动定时器，缓存过期则后台补一次（不 await，避免阻塞首帧）
+      DailyNoteService.getInstance().bootstrapAutoRefresh().catch((e: Error) => {
+        hilog.warn(DOMAIN, TAG, 'bootstrap auto refresh fail: %{public}s', e.message);
+      });
     } catch (e) {
       hilog.error(DOMAIN, TAG, 'init fail: %{public}s', JSON.stringify(e));
     }
@@ -243,6 +248,10 @@ export default class EntryAbility extends UIAbility {
 
   onForeground(): void {
     hilog.info(DOMAIN, TAG, 'Ability onForeground');
+    // 回前台：定时器在后台可能被系统冻结，重新对齐并按需补刷（缓存超过刷新间隔才拉）
+    DailyNoteService.getInstance().bootstrapAutoRefresh().catch((e: Error) => {
+      hilog.warn(DOMAIN, TAG, 'foreground auto refresh fail: %{public}s', e.message);
+    });
   }
 
   onBackground(): void {

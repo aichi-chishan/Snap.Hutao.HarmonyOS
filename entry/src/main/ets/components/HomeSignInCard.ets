@@ -83,9 +83,15 @@ export struct HomeSignInCard {
     .justifyContent(FlexAlign.Center)
   }
 
-  /** 单个奖励格 */
+  /** 该日奖励是否已领取（渲染期读取组件状态，签到/刷新后格子状态实时变化；
+   *  注意 @Builder 多参数按值传递不参与刷新，故 isSigned 不能作为参数传入） */
+  private isDaySigned(day: number): boolean {
+    return this.info !== undefined && day <= this.info.signedDays;
+  }
+
+  /** 单个奖励格（参数只保留 ForEach 项，领取状态在渲染期计算） */
   @Builder
-  awardCell(reward: SignInReward, isSigned: boolean) {
+  awardCell(reward: SignInReward) {
     Column({ space: 2 }) {
       Stack({ alignContent: Alignment.Center }) {
         if (reward.icon.startsWith('http')) {
@@ -95,13 +101,13 @@ export struct HomeSignInCard {
             .objectFit(ImageFit.Contain)
             .borderRadius(7)
             .backgroundColor($r('app.color.app_primary_bg'))
-            .opacity(isSigned ? 0.35 : 1)
+            .opacity(this.isDaySigned(reward.day) ? 0.35 : 1)
         } else {
           // 图标为物品 ID/名：尝试 rawfile ItemIcon 材料映射，未命中显示礼包图标
           MetaIcon({ category: 'ItemIcon', name: HomeSignInCard.itemIconOf(reward.name), iconSize: 26, remoteFallback: true })
-            .opacity(isSigned ? 0.35 : 1)
+            .opacity(this.isDaySigned(reward.day) ? 0.35 : 1)
         }
-        if (isSigned) {
+        if (this.isDaySigned(reward.day)) {
           Text('✓')
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
@@ -119,12 +125,12 @@ export struct HomeSignInCard {
       .height(26)
       Text(`${reward.day}日`)
         .fontSize(9)
-        .fontColor(isSigned ? $r('app.color.text_secondary') : $r('app.color.text_primary'))
-        .opacity(isSigned ? 0.6 : 1)
+        .fontColor(this.isDaySigned(reward.day) ? $r('app.color.text_secondary') : $r('app.color.text_primary'))
+        .opacity(this.isDaySigned(reward.day) ? 0.6 : 1)
     }
     .padding(2)
     .borderRadius(8)
-    .backgroundColor(isSigned ? $r('app.color.card_background') : Color.Transparent)
+    .backgroundColor(this.isDaySigned(reward.day) ? $r('app.color.card_background') : Color.Transparent)
   }
 
   /** 奖励网格高度：按行数动态（7 列，每行 30vp；整体控制在仪表板行 240vp 内） */
@@ -181,7 +187,7 @@ export struct HomeSignInCard {
           Grid() {
             ForEach(this.info.rewards, (reward: SignInReward) => {
               GridItem() {
-                this.awardCell(reward, this.info !== undefined && reward.day <= this.info.signedDays)
+                this.awardCell(reward)
               }
             }, (reward: SignInReward) => `sign_${reward.day}_${reward.count}`)
           }

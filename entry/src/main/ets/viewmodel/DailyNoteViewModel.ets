@@ -46,6 +46,17 @@ export class DailyNoteViewModel {
     this.loaded = true;
   }
 
+  /** 服务层刷新成功（自动刷新定时器 / 桌面卡片手动刷新）后重读本地缓存，保持界面数值同步 */
+  async reloadFromCache(uid: string): Promise<void> {
+    if (uid.length > 0) {
+      this.currentUid = uid;
+    }
+    if (this.currentUid.length === 0) {
+      return;
+    }
+    await this.load(this.currentUid);
+  }
+
   /** 手动刷新（可携带风控验证后 challenge 重放） */
   async refresh(uid: string, challenge?: string): Promise<boolean> {
     if (this.isRefreshing) {

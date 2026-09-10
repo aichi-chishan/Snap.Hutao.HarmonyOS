@@ -47,6 +47,9 @@ export class RiskVerifyService {
     return RiskVerifyService.instance;
   }
 
+  /** 兜底超时：UI 未响应（应用后台/无窗口，如桌面卡片进程）时不永久挂起，避免阻塞后续验证 */
+  private static readonly VERIFY_TIMEOUT_MS: number = 180000;
+
   private seq: number = 0;
   private pendingResolve: ValidateCallback | undefined = undefined;
   /** 当前请求（保存 challenge/sessionId 供结果组装） */
@@ -196,7 +199,16 @@ export class RiskVerifyService {
     AppStorage.setOrCreate<RiskVerifyRequest>(KEY_RISK_REQ, req);
     AppStorage.setOrCreate<boolean>(KEY_RISK_SHOW, true);
     return new Promise<string>((resolve: (value: string) => void) => {
+      const seq: number = this.seq;
+      const guard: number = setTimeout(() => {
+        // 仅当仍是本次请求且尚未有人作答时才判超时（避免误杀后续验证）
+        if (this.seq === seq && this.pendingResolve !== undefined) {
+          Logger.warn(TAG, 'verify timeout, auto cancel');
+          this.submitValidate('');
+        }
+      }, RiskVerifyService.VERIFY_TIMEOUT_MS);
       this.pendingResolve = (validate: string): void => {
+        clearTimeout(guard);
         this.pendingResolve = undefined;
         this.currentReq = undefined;
         AppStorage.setOrCreate<boolean>(KEY_RISK_SHOW, false);

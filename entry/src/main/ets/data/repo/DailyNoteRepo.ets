@@ -110,9 +110,16 @@ export class DailyNoteRepo {
     note.currentResin = rs.getLong(rs.getColumnIndex('current_resin'));
     note.maxResin = rs.getLong(rs.getColumnIndex('max_resin'));
     note.resinRecoveryTime = rs.getString(rs.getColumnIndex('resin_recovery_time'));
+    const resinSec: number = Number(note.resinRecoveryTime);
+    note.resinRecoverySecond = Number.isNaN(resinSec) ? 0 : resinSec;
     note.finishedTaskNum = rs.getLong(rs.getColumnIndex('finished_task_num'));
     note.totalTaskNum = rs.getLong(rs.getColumnIndex('total_task_num'));
     note.isExtraTaskRewardReceived = rs.getLong(rs.getColumnIndex('is_extra_task_reward_received')) === 1;
+    // 表里没有 daily_task 独立列：用顶层每日委托字段还原子对象，
+    // 否则便笺页「每日委托」从库里读出来恒为 0/0（与主页卡不一致）
+    note.dailyTask.finishedTaskNum = note.finishedTaskNum;
+    note.dailyTask.totalTaskNum = note.totalTaskNum;
+    note.dailyTask.isExtraTaskRewardReceived = note.isExtraTaskRewardReceived;
     note.remainResinDiscountNum = rs.getLong(rs.getColumnIndex('remain_resin_discount_num'));
     note.resinDiscountNumLimit = rs.getLong(rs.getColumnIndex('limit_resin_discount_num'));
     note.currentHomeCoin = rs.getLong(rs.getColumnIndex('current_home_coin'));

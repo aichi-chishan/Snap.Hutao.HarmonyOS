@@ -181,6 +181,11 @@ export class HomeViewModel {
     }
   }
 
+  /** 便笺刷新后重读本地缓存（服务层自动刷新/桌面卡片刷新触发，不重复拉网络） */
+  async reloadNote(uid: string): Promise<void> {
+    await this.loadNote(uid);
+  }
+
   /** 便笺：本地缓存 */
   private async loadNote(uid: string): Promise<void> {
     try {

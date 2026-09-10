@@ -95,6 +95,14 @@
     {
       "name": "danger_bg",
       "value": "#2AEF5350"
+    },
+    {
+      "name": "wallpaper_base",
+      "value": "#141418"
+    },
+    {
+      "name": "wallpaper_mask",
+      "value": "#33000000"
     }
   ]
 }

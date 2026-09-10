@@ -103,8 +103,10 @@ export class DailyNote {
     const note: DailyNote = new DailyNote();
     note.currentResin = number(obj['current_resin'], 0);
     note.maxResin = number(obj['max_resin'], 160);
+    // 注意：resin_recovery_time 是「距树脂回满的秒数」（对齐 Windows DailyNote.ResinRecoveryTime:int），
+    // 不是 Unix 时间戳；home_coin_recovery_time 同理。锚点为本次拉取时间 refreshTime。
     note.resinRecoveryTime = str(obj['resin_recovery_time']);
-    note.resinRecoverySecond = number(obj['resin_recovery_second'], 0);
+    note.resinRecoverySecond = number(obj['resin_recovery_time'], 0);
     note.finishedTaskNum = number(obj['finished_task_num'], 0);
     note.totalTaskNum = number(obj['total_task_num'], 0);
     note.isExtraTaskRewardReceived = bool(obj['is_extra_task_reward_received']);
@@ -147,6 +149,13 @@ export class DailyNote {
       note.dailyTask.isExtraTaskRewardReceived = bool(dt['is_extra_task_reward_received']);
       note.dailyTask.status = number(dt['status'], 0);
     }
+    // 接口部分版本不返回 daily_task 子对象（或字段缺失）：用顶层 finished/total_task_num 兜底，
+    // 否则便笺页「每日委托」恒显示 0/0（主页卡用的是顶层字段，两处会不一致）。
+    if (note.dailyTask.totalTaskNum <= 0 && note.totalTaskNum > 0) {
+      note.dailyTask.finishedTaskNum = note.finishedTaskNum;
+      note.dailyTask.totalTaskNum = note.totalTaskNum;
+      note.dailyTask.isExtraTaskRewardReceived = note.isExtraTaskRewardReceived;
+    }
     return note;
   }
 
@@ -172,29 +181,37 @@ export class DailyNote {
     if (ms > 0) {
       return `已满还需 ${DateUtil.countdownText(ms)}`;
     }
-    if (this.resinRecoveryTime.length > 0) {
-      const to: number = DateUtil.parseToMs(this.resinRecoveryTime);
-      if (to > 0) {
-        return `已满还需 ${DateUtil.remainingBetween(Date.now(), to)}`;
-      }
+    if (this.resinRecoverySeconds() > 0) {
+      // 已到恢复时刻但快照未更新（下一次自动刷新会拉正）
+      return '即将回满';
     }
     return '--';
   }
 
+  /** 回满剩余秒数（resin_recovery_time；兼容历史库里存的字符串形态） */
+  resinRecoverySeconds(): number {
+    if (this.resinRecoverySecond > 0) {
+      return this.resinRecoverySecond;
+    }
+    const n: number = Number(this.resinRecoveryTime);
+    if (!Number.isNaN(n) && n > 0) {
+      // 兼容曾被误存为毫秒时间戳的旧数据
+      return n > 100000000000 ? Math.floor(n / 1000) : n;
+    }
+    return 0;
+  }
+
+  /** 距树脂回满的剩余毫秒（秒数 + 拉取时刻锚点；从库里读出来同样可算） */
   private resinRecoveryRemainMs(): number {
     if (this.currentResin >= this.maxResin) {
       return 0;
     }
-    if (this.resinRecoverySecond > 0) {
-      return this.resinRecoverySecond * 1000;
+    const sec: number = this.resinRecoverySeconds();
+    if (sec <= 0) {
+      return 0;
     }
-    if (this.resinRecoveryTime.length > 0) {
-      const to: number = DateUtil.parseToMs(this.resinRecoveryTime);
-      if (to > 0) {
-        return Math.max(0, to - Date.now());
-      }
-    }
-    return 0;
+    const anchor: number = this.refreshTime > 0 ? this.refreshTime : Date.now();
+    return Math.max(0, anchor + sec * 1000 - Date.now());
   }
 
   /** 洞天宝钱是否达到阈值 */

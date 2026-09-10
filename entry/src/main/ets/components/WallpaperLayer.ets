@@ -32,6 +32,7 @@ export struct WallpaperLayer {
   private rotateTimer: number = -1;
 
   aboutToAppear(): void {
+    Logger.info(TAG, `aboutToAppear bgType=${this.bgType} folder=${this.folderPath} isDark=${this.isDark}`);
     this.loadImage();
     // 本地随机：5 分钟轮换（对齐 Windows Period=0:5:0）
     if (this.bgType === 'local' && this.folderPath.length > 0) {
@@ -122,24 +123,14 @@ export struct WallpaperLayer {
 
   build() {
     Stack({ alignContent: Alignment.BottomStart }) {
-      // 基底必须用纯色（禁止 linearGradient）：部分合成器/软渲染路径对渐变着色器
-      // 支持不完整，会把整块渐变输出为纯黄（历史"浅色模式整窗发黄"的根因）。
-      // 纯色与窗口底色（EntryAbility.applyWindowBackdrop）同色系，视觉无缝。
-      if (this.bgType === 'none') {
-        Column()
-          .width('100%')
-          .height('100%')
-          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-          .backgroundColor(this.isDark ? '#1B1B20' : '#F2F0EC')
-      } else {
-        // local：中性底（图片下层兜底；浅色用中性灰白，避免暖黄底透色）
-        Column()
-          .width('100%')
-          .height('100%')
-          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-          .backgroundColor(this.isDark ? '#14100C' : '#F5F4F2')
-      }
-      // 背景图片（ImageFit.Cover = UniformToFill；none 时无图）
+      // 基底一律纯色（禁止 linearGradient）并与窗口底色同色系（EntryAbility.applyWindowBackdrop），
+      // 配色走资源色 wallpaper_base（base/dark 双份），主题切换实时生效。
+      Column()
+        .width('100%')
+        .height('100%')
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+        .backgroundColor($r('app.color.wallpaper_base'))
+      // 背景图片（ImageFit.Cover = UniformToFill；未选目录/目录无图时不渲染）
       if (this.hasImage) {
         Image(this.imgSrc)
           .width('100%')
@@ -148,14 +139,15 @@ export struct WallpaperLayer {
           .opacity(this.isDark ? 0.38 : 0.5)
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
           .backgroundBlurStyle(BlurStyle.Regular)
-      }
-      // 主题化遮罩层（none 时以模糊+半透明调暗即足）
-      if (this.bgType !== 'none') {
+        // 主题化遮罩：浅色提亮 / 深色压暗，保证前景文字对比度。
+        // ⚠ 8 位色值顺序是 #AARRGGBB（不是 CSS 的 #RRGGBBAA）：
+        //   历史 bug —— 曾写 '#FFFFFF99' 想表达"60% 白"，实际被解析为不透明 #FFFF99，
+        //   浅色模式下整窗发黄（曾被误判为 linearGradient 问题）。
         Column()
           .width('100%')
           .height('100%')
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-          .backgroundColor(this.isDark ? '#00000033' : '#FFFFFF99')
+          .backgroundColor($r('app.color.wallpaper_mask'))
       }
     }
     .width('100%')
