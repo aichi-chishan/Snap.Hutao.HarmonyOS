@@ -5,6 +5,7 @@
 import { router, ShowDialogSuccessResponse } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { ConfigurationConstant } from '@kit.AbilityKit';
+import { bundleManager } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { fileIo, picker } from '@kit.CoreFileKit';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
@@ -18,6 +19,7 @@ import EntryAbility from '../entryability/EntryAbility';
 import { GameDataService } from '../service/GameDataService';
 import { GameDataUpdater } from '../data/remote/GameDataUpdater';
 import { RiskVerifyService } from '../service/RiskVerifyService';
+import { ApiClient } from '../data/network/ApiClient';
 
 const TAG: string = 'SettingPage';
 
@@ -56,6 +58,9 @@ export struct SettingPage {
   /** 极验自定义组合接口编辑弹窗（对齐 Windows 无感验证 GeetestCustomUrlDialog） */
   @State showGeetestEdit: boolean = false;
   @State geetestInput: string = '';
+  /** 应用版本与更新检查（GitHub Releases） */
+  @State appVersion: string = '';
+  @State updating: boolean = false;
   @StorageProp('isLoggedIn') isLoggedIn: boolean = false;
   /** 祈愿归档（数据管理） */
   @State gachaRows: GachaArchiveRow[] = [];
@@ -76,7 +81,90 @@ export struct SettingPage {
     this.dailyBgEnabled = PreferencesStore.getDailyBgEnabled();
     this.dataUrl = GameDataUpdater.manifestUrl();
     this.geetestInput = RiskVerifyService.getCustomCompositeUrl();
+    this.loadAppVersion();
     this.loadGachaRows();
+  }
+
+  /** 当前应用版本号（bundleManager versionName） */
+  private loadAppVersion(): void {
+    try {
+      const info = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
+      this.appVersion = info.versionName;
+    } catch (e) {
+      Logger.warn('SettingPage', `versionName fail: ${(e as Error).message}`);
+    }
+  }
+
+  /**
+   * 应用更新检查：GitHub Releases latest 与当前 versionName 比对。
+   * GitHub API 响应无 retcode → ApiResponse.success=true、data 为完整 JSON。
+   */
+  async checkAppUpdate(): Promise<void> {
+    if (this.updating) {
+      return;
+    }
+    this.updating = true;
+    try {
+      const resp = await ApiClient.getInstance().get(
+        'https://api.github.com/repos/aichi-chishan/Snap.Hutao.HarmonyOS/releases/latest',
+        { 'Accept': 'application/vnd.github+json', 'User-Agent': 'Snap.Hutao.HarmonyOS' });
+      if (!resp.success || resp.data === undefined) {
+        this.toast(resp.retcode === 404 ? '仓库还没有发布版本' : `检查失败：${resp.message}`);
+        return;
+      }
+      const data = resp.data as Record<string, Object>;
+      const tag: string = String(data['tag_name'] ?? '').replace(/^v/i, '');
+      const htmlUrl: string = String(data['html_url'] ?? '');
+      if (tag.length === 0) {
+        this.toast('仓库还没有发布版本');
+        return;
+      }
+      if (tag === this.appVersion) {
+        this.toast(`已是最新版本 v${this.appVersion}`);
+        return;
+      }
+      this.confirmOpenUrl(`发现新版本 v${tag}（当前 v${this.appVersion}），是否打开发布页？`, htmlUrl);
+    } catch (e) {
+      this.toast(`检查失败：${(e as Error).message}`);
+    } finally {
+      this.updating = false;
+    }
+  }
+
+  /** 确认后用浏览器打开链接 */
+  private confirmOpenUrl(message: string, url: string): void {
+    this.getUIContext().showAlertDialog({
+      title: '发现新版本',
+      message: message,
+      primaryButton: {
+        value: '取消',
+        action: () => {
+        }
+      },
+      secondaryButton: {
+        value: '打开发布页',
+        action: () => {
+          try {
+            const host = this.getHostContext();
+            if (host === undefined) {
+              return;
+            }
+            (host as common.UIAbilityContext).openLink(url).catch((e: Error) => {
+              this.toast(`打开失败：${e.message}`);
+            });
+          } catch (e) {
+            this.toast(`打开失败：${(e as Error).message}`);
+          }
+        }
+      },
+      cancel: () => {
+      }
+    });
+  }
+
+  private getHostContext(): common.UIAbilityContext | undefined {
+    const ctx = this.getUIContext().getHostContext();
+    return ctx !== undefined ? ctx as common.UIAbilityContext : undefined;
   }
 
   /** 保存极验自定义组合接口（留空禁用） */
@@ -690,8 +778,36 @@ export struct SettingPage {
           }
 
           this.sectionTitle('关于')
-          this.rowItem('胡桃工具箱（鸿蒙版）', '仅支持国服 · 本地数据存储', () => {
-            this.toast('胡桃工具箱 Snap.Hutao.HarmonyOS');
+          this.rowItem(`胡桃工具箱（鸿蒙版）${this.appVersion.length > 0 ? ` v${this.appVersion}` : ''}`,
+            '仅支持国服 · 本地数据存储', () => {
+            this.toast(`胡桃工具箱 Snap.Hutao.HarmonyOS v${this.appVersion}`);
+          })
+          Row() {
+            Column({ space: 2 }) {
+              Text('检查应用更新')
+                .fontSize(15)
+                .fontColor($r('app.color.text_primary'))
+              Text('对比 GitHub Releases 最新版本（元数据热更见「云资源同步」）')
+                .fontSize(11)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text(this.updating ? '检查中...' : '检查')
+              .fontSize(12)
+              .fontColor($r('app.color.app_primary'))
+              .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+              .borderRadius(10)
+              .border({ width: 1, color: $r('app.color.app_primary') })
+          }
+          .width('100%')
+          .padding(14)
+          .borderRadius(12)
+          .backgroundColor($r('app.color.card_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.checkAppUpdate();
           })
         }
         .width('100%')

@@ -102,11 +102,37 @@ export class MetaMaterial {
   r: number = 0;
 }
 
+/** 名片条目（对齐 Snap.Metadata Namecard；Picture 与 avatar_meta.nameCardPic 同名） */
+export class NameCardMeta {
+  name: string = '';
+  description: string = '';
+  icon: string = '';
+  picture: string = '';
+}
+
+/** 祈愿卡池期次（对齐 Snap.Metadata GachaEvent，时间已转 epoch ms） */
+export class GachaEventMeta {
+  name: string = '';
+  version: string = '';
+  order: number = 0;
+  /** 起始 epoch ms */
+  from: number = 0;
+  /** 结束 epoch ms */
+  to: number = 0;
+  /** 卡池类型（301 角色 / 400 角色二 UP / 302 武器 / 500 集录） */
+  type: number = 0;
+  upOrange: number[] = [];
+  upPurple: number[] = [];
+}
+
 export class WikiMetaService {
   private static avatars: WikiAvatarMeta[] | undefined = undefined;
   private static weapons: WikiWeaponMeta[] | undefined = undefined;
   private static monsters: WikiMonsterMeta[] | undefined = undefined;
   private static materials: Map<number, MetaMaterial> | undefined = undefined;
+  private static nameCards: NameCardMeta[] | undefined = undefined;
+  private static nameCardByPic: Map<string, NameCardMeta> = new Map();
+  private static gachaEvents: GachaEventMeta[] | undefined = undefined;
 
   private static async readRawJson(name: string): Promise<Record<string, Object> | Object[]> {
     const rm = AppContextProvider.getResourceManager();
@@ -467,6 +493,83 @@ export class WikiMetaService {
       }
     }
     return [];
+  }
+
+  /** 名片列表（懒加载 metadata/NameCard.json；description 经富文本清洗） */
+  static async getNameCards(): Promise<NameCardMeta[]> {
+    if (WikiMetaService.nameCards !== undefined) {
+      return WikiMetaService.nameCards;
+    }
+    try {
+      const arr = await WikiMetaService.readRawJson('NameCard.json') as Object[];
+      const list: NameCardMeta[] = [];
+      for (const raw of arr) {
+        const o: Record<string, Object> = raw as Record<string, Object>;
+        const c: NameCardMeta = new NameCardMeta();
+        c.name = String(o['Name'] ?? '');
+        c.description = WikiMetaService.cleanText(String(o['Description'] ?? ''));
+        c.icon = String(o['Icon'] ?? '');
+        c.picture = String(o['Picture'] ?? '');
+        if (c.picture.length > 0) {
+          WikiMetaService.nameCardByPic.set(c.picture, c);
+        }
+        list.push(c);
+      }
+      WikiMetaService.nameCards = list;
+      Logger.info(TAG, `namecards loaded: ${list.length}`);
+    } catch (e) {
+      Logger.warn(TAG, `load namecards fail: ${(e as Error).message}`);
+      WikiMetaService.nameCards = [];
+    }
+    return WikiMetaService.nameCards;
+  }
+
+  /** 名片大图名 → 名片条目（名称/描述/图标；未命中返回 undefined） */
+  static async getNameCardByPic(pic: string): Promise<NameCardMeta | undefined> {
+    if (WikiMetaService.nameCards === undefined) {
+      await WikiMetaService.getNameCards();
+    }
+    return WikiMetaService.nameCardByPic.get(pic);
+  }
+
+  /** 祈愿卡池期次列表（懒加载 metadata/GachaEvent.json，按开始时间升序） */
+  static async getGachaEvents(): Promise<GachaEventMeta[]> {
+    if (WikiMetaService.gachaEvents !== undefined) {
+      return WikiMetaService.gachaEvents;
+    }
+    try {
+      const arr = await WikiMetaService.readRawJson('GachaEvent.json') as Object[];
+      const list: GachaEventMeta[] = [];
+      for (const raw of arr) {
+        const o: Record<string, Object> = raw as Record<string, Object>;
+        const e: GachaEventMeta = new GachaEventMeta();
+        e.name = String(o['Name'] ?? '');
+        e.version = String(o['Version'] ?? '');
+        e.order = Number(o['Order'] ?? 0);
+        // ISO8601 含时区（+08:00），Date.parse 直接解析
+        e.from = Date.parse(String(o['From'] ?? ''));
+        e.to = Date.parse(String(o['To'] ?? ''));
+        e.type = Number(o['Type'] ?? 0);
+        const upsO = (o['UpOrangeList'] as Object[]) ?? [];
+        for (const id of upsO) {
+          e.upOrange.push(Number(id));
+        }
+        const upsP = (o['UpPurpleList'] as Object[]) ?? [];
+        for (const id of upsP) {
+          e.upPurple.push(Number(id));
+        }
+        if (e.from > 0 && e.to > 0) {
+          list.push(e);
+        }
+      }
+      list.sort((a: GachaEventMeta, b: GachaEventMeta) => a.from - b.from);
+      WikiMetaService.gachaEvents = list;
+      Logger.info(TAG, `gacha events loaded: ${list.length}`);
+    } catch (e) {
+      Logger.warn(TAG, `load gacha events fail: ${(e as Error).message}`);
+      WikiMetaService.gachaEvents = [];
+    }
+    return WikiMetaService.gachaEvents;
   }
 
   /** 怪物中文名 → MonsterIcon 图标名（未命中返回空；剧诗/幽境敌人头像用） */

@@ -22,6 +22,8 @@ import { PoolStatistics, FiveStarDetail } from '../model/GachaStatistics';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 import { UigfService } from '../service/UigfService';
 import { WikiMetaService } from '../service/WikiMetaService';
+import { GachaHistoryService, HistoryWishView, HistoryUpItem } from '../service/GachaHistoryService';
+import { Loading } from '../components/Loading';
 import { MetaIcon } from '../components/MetaIcon';
 import { NavIcon } from '../components/NavIcon';
 import { Logger } from '../common/Logger';
@@ -138,6 +140,10 @@ export struct GachaLogPage {
   @State poolColumnCount: number = 1;
   /** 已折叠统计详情的池（对齐 Windows Expander 收起；不在表内 = 初始展开） */
   @State poolCollapsed: number[] = [];
+  /** 期次汇总（对齐 Windows PivotHistory，懒构建：首次切到历史页签时构建） */
+  @State historyWishes: HistoryWishView[] = [];
+  private historyLoading: boolean = false;
+  private historyLoadedFor: number = -1;
   /** 刷新进度快照 */
   @State progressText: string = '';
   @State progressCount: number = 0;
@@ -185,6 +191,9 @@ export struct GachaLogPage {
 
   /** 装载数据并同步统计/历史 */
   reloadData(): void {
+    // 归档可能变化（重登录/切换 UID/刷新入库），期次汇总缓存失效，切到历史页签时重建
+    this.historyLoadedFor = -1;
+    this.historyWishes = [];
     this.vm.load(this.currentUid).then(() => {
       this.initialized = true;
       this.syncAll();
@@ -1324,6 +1333,9 @@ export struct GachaLogPage {
         this.toast(result.ok ? result.message : `导入失败：${result.message}`);
         if (result.ok && result.inserted > 0) {
           await this.vm.load(this.vm.currentUid.length > 0 ? this.vm.currentUid : result.uid);
+          // 新数据入库，期次汇总缓存失效
+          this.historyLoadedFor = -1;
+          this.historyWishes = [];
           this.syncAll();
         }
       } finally {
@@ -1431,6 +1443,9 @@ export struct GachaLogPage {
                 return;
               }
               this.vm.refresh().then((ok: boolean) => {
+                // 新数据入库，期次汇总缓存失效（历史页签重建）
+                this.historyLoadedFor = -1;
+                this.historyWishes = [];
                 this.syncAll();
                 this.toast(ok ? this.vm.message : this.vm.message);
               });
@@ -1440,10 +1455,20 @@ export struct GachaLogPage {
         .padding({ left: 16, right: 16, top: 10, bottom: 8 })
         .alignItems(VerticalAlign.Center)
 
-        // Pivot 五个页签（总览/历史/角色/武器/倒计时）+ 颂愿模式切换
-        Row({ space: 6 }) {
-          this.pivotTab(0, '总览')
-          Blank()
+        // Pivot 五个页签（总览/历史/角色/武器/倒计时）+ 颂愿模式切换（页签可横向滚动防窄屏溢出）
+        Row({ space: 8 }) {
+          Scroll() {
+            Row({ space: 6 }) {
+              this.pivotTab(0, '总览')
+              this.pivotTab(1, '历史')
+              this.pivotTab(2, '角色')
+              this.pivotTab(3, '武器')
+              this.pivotTab(4, '倒计时')
+            }
+          }
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
+          .layoutWeight(1)
           this.beyondToggleChip()
         }
         .width('100%')
@@ -1467,6 +1492,7 @@ export struct GachaLogPage {
             if (this.pivotIndex === 0) {
               this.poolCardsArea()
             } else if (this.pivotIndex === 1) {
+              this.historyWishSection()
               this.recentSection()
             } else if (this.pivotIndex === 2) {
               this.avatarSection(this.charCounts, true)
@@ -1507,8 +1533,161 @@ export struct GachaLogPage {
       .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
         this.pivotIndex = index;
+        if (index === 1) {
+          this.loadHistoryWishes();
+        }
         this.syncAll();
       })
+  }
+
+  /** 期次汇总（对齐 Windows PivotHistory：版本+池名+UP 五星/四星获取数+时间跨度） */
+  async loadHistoryWishes(): Promise<void> {
+    if (this.vm.currentArchiveId <= 0 || this.historyLoading) {
+      return;
+    }
+    if (this.historyLoadedFor === this.vm.currentArchiveId && this.historyWishes.length > 0) {
+      return;
+    }
+    this.historyLoading = true;
+    try {
+      const views: HistoryWishView[] = await GachaHistoryService.getInstance()
+        .buildHistory(this.vm.currentArchiveId);
+      this.historyWishes = views;
+      this.historyLoadedFor = this.vm.currentArchiveId;
+    } catch (e) {
+      Logger.warn(GACHA_TAG, `history wishes fail: ${(e as Error).message}`);
+    } finally {
+      this.historyLoading = false;
+    }
+  }
+
+  /** 期次卡头时间跨度文案（对齐 FormattedTimeSpan：yyyy/MM/dd - yyyy/MM/dd） */
+  private static wishSpanText(view: HistoryWishView): string {
+    if (view.from <= 0 || view.to <= 0) {
+      return '';
+    }
+    return `${GachaLogPage.wishDay(view.from)} - ${GachaLogPage.wishDay(view.to)}`;
+  }
+
+  private static wishDay(ms: number): string {
+    const d: Date = new Date(ms);
+    const m: string = `${d.getMonth() + 1}`.padStart(2, '0');
+    const day: string = `${d.getDate()}`.padStart(2, '0');
+    return `${d.getFullYear()}/${m}/${day}`;
+  }
+
+  /** 期次 UP 条目（图标 + 获取数；对齐 HistoryWishItemTemplate：上图标下计数） */
+  @Builder
+  wishUpCell(up: HistoryUpItem) {
+    Column({ space: 2 }) {
+      if (up.icon.length > 0) {
+        MetaIcon({ category: up.category, name: up.icon, iconSize: 40 })
+      } else {
+        Text(up.name)
+          .fontSize(9)
+          .fontColor($r('app.color.text_secondary'))
+          .width(40)
+          .height(40)
+          .textAlign(TextAlign.Center)
+      }
+      Text(`${up.count}`)
+        .fontSize(11)
+        .fontColor($r('app.color.text_primary'))
+        .maxLines(1)
+    }
+    .width(44)
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  historyWishSection() {
+    Column({ space: 10 }) {
+      Row({ space: 6 }) {
+        Text('期次历史')
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.text_primary'))
+        Text(`${this.historyWishes.length}`)
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+        Blank()
+        Text('按卡池期次汇总')
+          .fontSize(10)
+          .fontColor($r('app.color.text_secondary'))
+      }
+      .width('100%')
+
+      if (this.historyLoading) {
+        Loading()
+      } else if (this.historyWishes.length === 0) {
+        Text(this.vm.currentArchiveId > 0
+          ? '暂无期次记录（需常规池抽卡数据）'
+          : '未登录归档，先在上方刷新或导入祈愿数据')
+          .fontSize(12)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+          .padding({ top: 6, bottom: 6 })
+          .textAlign(TextAlign.Center)
+      } else {
+        ForEach(this.historyWishes, (view: HistoryWishView) => {
+          Column({ space: 8 }) {
+            Row({ space: 6 }) {
+              Text(view.version.length > 0 ? `${view.version} · ${view.name}` : view.name)
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.text_primary'))
+                .layoutWeight(1)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+              Text(`${view.totalCount} 抽`)
+                .fontSize(12)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .width('100%')
+
+            if (view.orangeUps.length > 0) {
+              Flex({
+                wrap: FlexWrap.Wrap,
+                justifyContent: FlexAlign.Start,
+                space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) }
+              }) {
+                ForEach(view.orangeUps, (up: HistoryUpItem) => {
+                  this.wishUpCell(up)
+                }, (up: HistoryUpItem) => `o_${view.from}_${up.itemId}_${up.count}`)
+              }
+              .width('100%')
+            }
+            if (view.purpleUps.length > 0) {
+              Flex({
+                wrap: FlexWrap.Wrap,
+                justifyContent: FlexAlign.Start,
+                space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) }
+              }) {
+                ForEach(view.purpleUps, (up: HistoryUpItem) => {
+                  this.wishUpCell(up)
+                }, (up: HistoryUpItem) => `p_${view.from}_${up.itemId}_${up.count}`)
+              }
+              .width('100%')
+            }
+
+            if (GachaLogPage.wishSpanText(view).length > 0) {
+              Text(GachaLogPage.wishSpanText(view))
+                .fontSize(10)
+                .opacity(0.6)
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%')
+            }
+          }
+          .width('100%')
+          .padding(12)
+          .borderRadius(12)
+          .backgroundColor($r('app.color.card_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
+          .alignItems(HorizontalAlign.Start)
+        }, (view: HistoryWishView) => `hw_${view.from}_${view.type}_${view.totalCount}`)
+      }
+    }
+    .width('100%')
   }
 
   /** 角色/武器头像网格区（按星级分组） */

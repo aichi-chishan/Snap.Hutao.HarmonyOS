@@ -5,6 +5,7 @@
  * 图标：rawfile/icons（离线）。区块：简介(元素/武器/生日/命座/CV)、养成材料、基础属性曲线(滑条+突破)、天赋技能、命座、料理、语音、故事。
  */
 import { router } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
 import { WikiMetaService, WikiAvatarMeta, MetaSkill, MetaText, MetaMaterial } from '../service/WikiMetaService';
 import { AppBackButton } from '../components/AppBackButton';
 import { MetaIcon } from '../components/MetaIcon';
@@ -35,6 +36,13 @@ export struct WikiAvatarPage {
   @State curAtk: number = 0;
   @State curDef: number = 0;
   @State curBonusText: string = '';
+  /** 名片名称/描述（NameCard.json 懒加载，跟随 current 异步刷新） */
+  @State ncName: string = '';
+  @State ncDesc: string = '';
+
+  toast(msg: string): void {
+    this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1500 });
+  }
 
   aboutToAppear(): void {
     this.load();
@@ -69,6 +77,46 @@ export struct WikiAvatarPage {
     this.curLevel = 1;
     this.curPromoted = false;
     this.calcAvatarBase();
+    this.loadNameCardInfo();
+  }
+
+  /** 名片描述懒加载（NameCard.json 按大图名匹配；与 current 异步对齐，避免切换串台） */
+  async loadNameCardInfo(): Promise<void> {
+    const avatar: WikiAvatarMeta | undefined = this.current;
+    this.ncName = '';
+    this.ncDesc = '';
+    if (avatar === undefined || avatar.nameCardPic.length === 0) {
+      return;
+    }
+    const info = await WikiMetaService.getNameCardByPic(avatar.nameCardPic);
+    // 异步返回时用户可能已切到其他角色，仅在接受者仍是当前角色时应用
+    if (info !== undefined && this.current === avatar) {
+      this.ncName = info.name;
+      this.ncDesc = info.description;
+    }
+  }
+
+  /** 攻略外链：米游社搜索 / B站战争百科直达（对齐 Windows WikiAvatarStrategyComponent） */
+  openStrategy(target: string): void {
+    const avatar: WikiAvatarMeta | undefined = this.current;
+    if (avatar === undefined) {
+      return;
+    }
+    const url: string = target === 'mys'
+      ? `https://www.miyoushe.com/ys/search?keyword=${encodeURIComponent(avatar.name + ' 攻略')}`
+      : `https://wiki.biligame.com/ys/${encodeURIComponent(avatar.name)}/攻略`;
+    try {
+      const host = this.getUIContext().getHostContext();
+      if (host === undefined) {
+        return;
+      }
+      const ui = host as common.UIAbilityContext;
+      ui.openLink(url).catch((e: Error) => {
+        this.toast(`打开失败：${e.message}`);
+      });
+    } catch (e) {
+      this.toast(`打开失败：${(e as Error).message}`);
+    }
   }
 
   /** 依据当前角色+等级+突破重算 生命/攻击/防御/突破属性 */
@@ -342,6 +390,8 @@ export struct WikiAvatarPage {
           }
           this.textsCard('语音', 'fetters')
           this.textsCard('故事', 'stories')
+          this.nameCardBlock()
+          this.strategyBlock()
           Text('数据来源：Snap.Metadata（本地打包）')
             .fontSize(10)
             .fontColor($r('app.color.text_secondary'))
@@ -698,5 +748,110 @@ export struct WikiAvatarPage {
         .backgroundColor($r('app.color.card_background'))
       }
     }
+  }
+
+  /** 名片区块（对齐 Windows WikiAvatarPage NameCard Expander：胶囊横幅 + 大图卡） */
+  @Builder
+  nameCardBlock() {
+    if (this.current !== undefined && this.current.nameCardPic.length > 0) {
+      Column({ space: 8 }) {
+        Text('名片')
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .width('100%')
+        // 胶囊横幅：右侧大图 + 左侧头像圆框（对齐 Windows 90 高圆角 45 布局）
+        Stack({ alignContent: Alignment.Start }) {
+          Image($rawfile(`icons/NameCardPic/${this.current.nameCardPic}.png`))
+            .height(90)
+            .width('100%')
+            .objectFit(ImageFit.Cover)
+          Row() {
+            MetaIcon({ category: 'AvatarIcon', name: this.current.icon, iconSize: 56 })
+          }
+          .margin({ left: 12 })
+        }
+        .width('100%')
+        .height(90)
+        .borderRadius(45)
+        .clip(true)
+        .backgroundColor($r('app.color.page_background'))
+        // 大图卡：全幅名片 + 左下角图标/名称/描述浮层（对齐 Windows AcrylicSecondaryGridCardStyle）
+        Stack({ alignContent: Alignment.BottomStart }) {
+          Image($rawfile(`icons/NameCardPic/${this.current.nameCardPic}.png`))
+            .width('100%')
+            .objectFit(ImageFit.Cover)
+            .borderRadius(12)
+          Row({ space: 12 }) {
+            MetaIcon({ category: 'NameCardIcon', name: this.current.nameCardIcon, iconSize: 52 })
+            Column({ space: 4 }) {
+              Text(this.ncName.length > 0 ? this.ncName : `${this.current.name}的名片`)
+                .fontSize(13)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Color.White)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+              if (this.ncDesc.length > 0) {
+                Text(this.ncDesc)
+                  .fontSize(10)
+                  .fontColor(Color.White)
+                  .opacity(0.85)
+                  .maxLines(3)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+          }
+          .alignItems(VerticalAlign.Bottom)
+          .padding(12)
+        }
+        .width('100%')
+        .borderRadius(12)
+        .clip(true)
+        .backgroundColor($r('app.color.page_background'))
+      }
+      .width('100%')
+      .padding(14)
+      .borderRadius($r('app.float.card_radius'))
+      .backgroundColor($r('app.color.card_background'))
+    }
+  }
+
+  /** 攻略区块（米游社搜索 / B站战争百科直达，openLink 拉起浏览器） */
+  @Builder
+  strategyBlock() {
+    if (this.current !== undefined) {
+      Column({ space: 8 }) {
+        Text('攻略')
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .width('100%')
+        Row({ space: 10 }) {
+          this.strategyChip('米游社攻略', 'mys')
+          this.strategyChip('B站攻略', 'bili')
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .padding(14)
+      .borderRadius($r('app.float.card_radius'))
+      .backgroundColor($r('app.color.card_background'))
+    }
+  }
+
+  @Builder
+  strategyChip(label: string, target: string) {
+    Text(label)
+      .fontSize(13)
+      .fontColor($r('app.color.app_primary'))
+      .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+      .borderRadius(10)
+      .border({ width: 1, color: $r('app.color.app_primary') })
+      .hoverEffect(HoverEffect.Highlight)
+      .onClick(() => {
+        this.openStrategy(target);
+      })
   }
 }
