@@ -67,20 +67,33 @@ export struct GeetestVerifyPage {
       this.statusText = '验证参数缺失，请返回重试';
       return;
     }
-    // 注册 JS 桥后加载内嵌极验页面
+    // 真正的 loadData 放到 Web 的 onControllerAttached 里（见 loadGeetestPage 注释）
+    this.statusText = '正在加载验证组件...';
+  }
+
+  /** 加载极验内嵌页面（与参考项目一致的 gt.0.5.2.js 方案）。
+   *  ⚠ 必须等 Web 组件绑定控制器后调用：此前调用 loadData 会抛 17100001（真机表现为空白页）；
+   *  另外用 5 参 loadData 给出 baseUrl/historyUrl，避免退化成 data: 文档被跨源策略拦截。 */
+  loadGeetestPage(): void {
+    if (this.gt.length === 0 || this.challenge.length === 0) {
+      return;
+    }
     try {
       this.controller.registerJavaScriptProxy(this.proxy, 'hutaoVerifyBridge', ['onValidate']);
     } catch (e) {
       Logger.warn(TAG, `register proxy fail ${(e as BusinessError).message}`);
     }
-    this.loadGeetestPage();
-  }
-
-  /** 加载极验内嵌页面（与参考项目一致的 gt.0.5.2.js 方案） */
-  loadGeetestPage(): void {
     const html: string = this.buildGeetestHtml(this.gt, this.challenge);
-    this.controller.loadData(html, 'text/html', 'UTF-8');
-    this.statusText = '请完成下方人机验证';
+    try {
+      this.controller.loadData(html, 'text/html', 'UTF-8',
+        'https://static.geetest.com/', 'https://static.geetest.com/');
+      this.statusText = '请完成下方人机验证';
+      Logger.info(TAG, 'loadData issued');
+    } catch (e) {
+      const msg: string = (e as BusinessError).message;
+      Logger.error(TAG, `loadData fail ${msg}`);
+      this.statusText = `验证组件加载失败：${msg}`;
+    }
   }
 
   /** 构造极验 HTML（api.geetest.com 为极验官方域） */
@@ -196,10 +209,29 @@ initGeetest({
         Web({ src: 'about:blank', controller: this.controller })
           .javaScriptAccess(true)
           .domStorageAccess(true)
+          // 验证图属在线图片资源，显式放行
+          .imageAccess(true)
+          .onlineImageAccess(true)
+          .mixedMode(MixedMode.All)
           .width('100%')
           .layoutWeight(1)
+          .onControllerAttached(() => {
+            // 控制器绑定完成才可安全调用 loadData（提前调用抛 17100001 → 真机空白）
+            Logger.info(TAG, 'controller attached, start load');
+            this.loadGeetestPage();
+          })
           .onPageEnd(() => {
-            this.statusText = '请完成下方人机验证';
+            if (!this.statusText.includes('失败')) {
+              this.statusText = '请完成下方人机验证';
+            }
+          })
+          .onErrorReceive((event: OnErrorReceiveEvent) => {
+            const url: string = event.request.getRequestUrl();
+            const info: string = event.error.getErrorInfo();
+            Logger.warn(TAG, `resource error ${info} ${url}`);
+            if (event.request.isMainFrame() || url.indexOf('geetest') >= 0) {
+              this.statusText = `验证组件加载失败：${info}`;
+            }
           })
       } else {
         Column({ space: 10 }) {

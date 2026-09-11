@@ -31,6 +31,16 @@ const GACHA_TAG: string = 'GachaLogPage';
 const ORANGE_GUARANTEE: number = 90;
 const PURPLE_GUARANTEE: number = 10;
 
+/** 多池卡片响应式断点（读组件自身宽度，非屏幕宽）：<840 单列 / 840~1199 双列 / >=1200 四列 */
+const POOL_SINGLE_COLUMN_VP: number = 840;
+const POOL_FOUR_COLUMN_VP: number = 1200;
+/** 多池卡片一行最多列数（对齐 Windows 四池同排） */
+const MAX_POOL_COLUMNS: number = 4;
+/** 同行卡片间距 / 相邻两行间距 */
+const POOL_CARD_GAP: number = 10;
+/** 行高未知哨兵（实测行高恒 > 0；0 表示尚未测得，按内容自适应） */
+const POOL_ROW_HEIGHT_UNKNOWN: number = 0;
+
 /** 池卡内单个五星头像（圆形占位 + 抽数标签） */
 class FiveStarPull {
   name: string = '';
@@ -64,6 +74,40 @@ class PoolCardData {
   isCurrent: boolean = false;
   fivePulls: FiveStarPull[] = [];
   lastFiveName: string = '';
+  /** 卡片内容标识（ForEach key + 折叠态查表 + 自然高度测量失效判定） */
+  key: string = '';
+}
+
+/** 多池卡片多列布局的行内单元（单参 @Builder 传参用，避免多参 Builder 不刷新） */
+class PoolCellData {
+  /** 该单元对应卡片的内容标识 */
+  key: string = '';
+  /** 所属行的标识（测量回调用，免去渲染期查表） */
+  rowKey: string = '';
+  /** 卡片快照 */
+  card: PoolCardData = new PoolCardData();
+  /** 该单元统一高度（vp）；0 = 尚未测得，按内容自适应 */
+  height: number = POOL_ROW_HEIGHT_UNKNOWN;
+}
+
+/** 多池卡片多列布局的一行（同行卡片等高：height 取该行内容最高者） */
+class PoolRowData {
+  /** 行内容标识（含本行全部卡片 key；列数变化/数据变化时整体失效重测） */
+  key: string = '';
+  /** 本行渲染单元（等宽 + 等高） */
+  cells: PoolCellData[] = [];
+  /** 本行统一高度（vp）；0 = 尚未测得 */
+  height: number = POOL_ROW_HEIGHT_UNKNOWN;
+}
+
+/** 池卡内容高度回调包装（ArkTS 禁未类型化对象字面量：以类承载 state/键/行标识） */
+class PoolHeightHandler {
+  /** 所属组件实例（@State 数组整体替换才触发刷新） */
+  state: GachaLogPage | undefined = undefined;
+  /** 被测量卡片的内容标识 */
+  cardKey: string = '';
+  /** 所属行标识 */
+  rowKey: string = '';
 }
 
 /** 角色/武器分池计数项 */
@@ -86,6 +130,14 @@ export struct GachaLogPage {
   @State poolCards: PoolCardData[] = [];
   /** 宽屏断点（>=840vp 两列，窄屏单列） */
   @State isWide: boolean = false;
+  /** 组件自身宽度（vp，onAreaChange 读取；多池列数用它判定，不用屏幕宽） */
+  @State areaWidth: number = 0;
+  /** 多池卡片多列行快照（整体替换驱动刷新；每行等高） */
+  @State poolRows: PoolRowData[] = [];
+  /** 当前列数（1 / 2 / 4，最多 4；池数不足时降列） */
+  @State poolColumnCount: number = 1;
+  /** 已折叠统计详情的池（对齐 Windows Expander 收起；不在表内 = 初始展开） */
+  @State poolCollapsed: number[] = [];
   /** 刷新进度快照 */
   @State progressText: string = '';
   @State progressCount: number = 0;
@@ -291,13 +343,200 @@ export struct GachaLogPage {
         pull.itemType = src.itemType;
         card.fivePulls.push(pull);
       }
+      card.key = GachaLogPage.cardKey(card);
       cards.push(card);
       Logger.info(GACHA_TAG, `card ${pool.typeName}: total=${card.totalCount} ` +
         `5star=${card.fiveCount} 4star=${card.fourCount} since=${card.sinceLastFive} ` +
         `avg=${card.avgOrange} min=${card.minOrange} max=${card.maxOrange} current=${card.isCurrent}`);
     }
     this.poolCards = cards;
+    this.rebuildPoolRows();
     Logger.info(GACHA_TAG, `syncPoolCards current=${this.vm.currentPoolType} cards=${cards.length}`);
+  }
+
+  /** 卡片内容标识（字段即渲染内容：任一变化都需重建测量缓存） */
+  private static cardKey(card: PoolCardData): string {
+    return `${card.gachaType}_${card.typeName}_${card.totalCount}_${card.fiveCount}_${card.fourCount}_` +
+      `${card.sinceLastFive}_${card.sinceLastFour}_${card.startDate}_${card.endDate}_${card.avgOrange}_` +
+      `${card.avgUpOrange}_${card.maxOrange}_${card.minOrange}_${card.fivePulls.length}`;
+  }
+
+  /** 按当前组件宽度与池数决定列数：<840 单列 / 840~1199 双列 / >=1200 最多四列（池少则降列） */
+  private poolColumnsFor(widthVp: number): number {
+    if (widthVp < POOL_SINGLE_COLUMN_VP) {
+      return 1;
+    }
+    const byWidth: number = widthVp >= POOL_FOUR_COLUMN_VP ? MAX_POOL_COLUMNS : 2;
+    const byPoolCount: number = Math.max(1, this.poolCards.length);
+    return Math.min(byWidth, byPoolCount);
+  }
+
+  /**
+   * 依据 poolCards + 当前列数重建多列行快照。
+   * 每行整体替换（新对象），并在列数或行内容变化时清空测量高度，触发重测 → 同行卡片等高。
+   */
+  rebuildPoolRows(): void {
+    // 旧行的测量回调随旧组件销毁，清掉缓存防无界增长（已挂载回调持有对象引用，不受影响）
+    this.poolHeightHandlers.clear();
+    const columns: number = this.poolColumnsFor(this.areaWidth);
+    const rows: PoolRowData[] = [];
+    for (let i = 0; i < this.poolCards.length; i += columns) {
+      const row: PoolRowData = new PoolRowData();
+      const end: number = Math.min(i + columns, this.poolCards.length);
+      let key: string = `c${columns}`;
+      for (let j = i; j < end; j++) {
+        const card: PoolCardData = this.poolCards[j];
+        const cell: PoolCellData = new PoolCellData();
+        cell.key = card.key;
+        cell.card = card;
+        cell.height = POOL_ROW_HEIGHT_UNKNOWN;
+        row.cells.push(cell);
+        key += `|${card.key}`;
+      }
+      row.key = key;
+      for (let j = 0; j < row.cells.length; j++) {
+        row.cells[j].rowKey = key;
+      }
+      // 内容标识未变的行沿用已测高度，并把该高度下发到各单元（避免重复测量导致的闪动）
+      row.height = GachaLogPage.findRowHeight(this.poolRows, key);
+      for (let j = 0; j < row.cells.length; j++) {
+        row.cells[j].height = row.height;
+      }
+      rows.push(row);
+    }
+    this.poolColumnCount = columns;
+    this.poolRows = rows;
+  }
+
+  private static findRowHeight(rows: PoolRowData[], key: string): number {
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].key === key) {
+        return rows[i].height;
+      }
+    }
+    return POOL_ROW_HEIGHT_UNKNOWN;
+  }
+
+  /** 测量缓存：行+卡标识 → 该卡在自然高度下的实测值（防止链式刷新，见 onPoolCellArea） */
+  private poolHeightCache: Map<string, number> = new Map<string, number>();
+
+  private static heightHandlerKey(rowKey: string, cardKey: string): string {
+    return `${rowKey}#${cardKey}`;
+  }
+
+  /** 隐藏测量副本的高度回调（回调包装缓存，避免每次渲染重建闭包导致无谓重测） */
+  private poolHeightHandlers: Map<string, (area: Area) => void> = new Map<string, (area: Area) => void>();
+
+  private heightHandlerFor(cell: PoolCellData): (area: Area) => void {
+    const id: string = GachaLogPage.heightHandlerKey(cell.rowKey, cell.key);
+    const cached: ((area: Area) => void) | undefined = this.poolHeightHandlers.get(id);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const handler: PoolHeightHandler = new PoolHeightHandler();
+    handler.state = this;
+    handler.cardKey = cell.key;
+    handler.rowKey = cell.rowKey;
+    const cb: (area: Area) => void = (area: Area) => {
+      GachaLogPage.onPoolCellArea(handler, area);
+    };
+    this.poolHeightHandlers.set(id, cb);
+    return cb;
+  }
+
+  /**
+   * 隐藏测量副本测得“卡片在自然高度下的高度”后，把行高提升到该行最大值。
+   * 隐藏副本恒为自适应高度，因此可见卡片被拉伸不会反向影响测量值 → 不产生刷新环。
+   */
+  private static onPoolCellArea(handler: PoolHeightHandler, area: Area): void {
+    const state: GachaLogPage | undefined = handler.state;
+    if (state === undefined) {
+      return;
+    }
+    const measured: number = Number(area.height);
+    if (!(measured > 0)) {
+      return;
+    }
+    const cacheId: string = `${handler.rowKey}#${handler.cardKey}`;
+    const known: number | undefined = state.poolHeightCache.get(cacheId);
+    if (known !== undefined && Math.abs(known - measured) < 0.5) {
+      return;
+    }
+    state.poolHeightCache.set(cacheId, measured);
+    const rows: PoolRowData[] = state.poolRows;
+    let hit: number = -1;
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].key === handler.rowKey) {
+        hit = i;
+        break;
+      }
+    }
+    if (hit < 0) {
+      return;
+    }
+    const current: number = rows[hit].height;
+    if (current > 0 && current >= measured - 0.5) {
+      return;
+    }
+    // 整体替换 @State 数组（行与单元都用新对象），驱动同行卡片统一改高
+    const next: PoolRowData[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const copy: PoolRowData = new PoolRowData();
+      copy.key = rows[i].key;
+      copy.height = i === hit ? measured : rows[i].height;
+      const cells: PoolCellData[] = [];
+      for (let j = 0; j < rows[i].cells.length; j++) {
+        const src: PoolCellData = rows[i].cells[j];
+        const cell: PoolCellData = new PoolCellData();
+        cell.key = src.key;
+        cell.rowKey = src.rowKey;
+        cell.card = src.card;
+        cell.height = copy.height;
+        cells.push(cell);
+      }
+      copy.cells = cells;
+      next.push(copy);
+    }
+    state.poolRows = next;
+  }
+
+  /** 该池统计详情是否已折叠（对齐 Windows Expander：默认展开，仅折叠统计详情） */
+  private isPoolCollapsed(card: PoolCardData): boolean {
+    return this.poolCollapsed.indexOf(card.gachaType) >= 0;
+  }
+
+  /** 卡头 Chevron 点击：每卡独立切换（初始展开） */
+  private togglePoolDetail(card: PoolCardData): void {
+    const next: number[] = [];
+    let removed: boolean = false;
+    for (let i = 0; i < this.poolCollapsed.length; i++) {
+      if (this.poolCollapsed[i] === card.gachaType) {
+        removed = true;
+      } else {
+        next.push(this.poolCollapsed[i]);
+      }
+    }
+    if (!removed) {
+      next.push(card.gachaType);
+    }
+    this.poolCollapsed = next;
+    // 折叠会改变卡片自然高度：清测量缓存并重建行，保证折叠后同行仍等高（不裁剪内容）
+    this.poolHeightCache.clear();
+    this.rebuildPoolRows();
+  }
+
+  /** 组件宽度变化：同步宽屏断点与多池列数（列数变化时重测行高） */
+  onPoolAreaChange(widthVp: number): void {
+    this.isWide = widthVp >= POOL_SINGLE_COLUMN_VP;
+    if (Math.abs(this.areaWidth - widthVp) < 0.5) {
+      return;
+    }
+    this.areaWidth = widthVp;
+    const columns: number = this.poolColumnsFor(widthVp);
+    if (columns !== this.poolColumnCount) {
+      this.poolHeightCache.clear();
+      this.rebuildPoolRows();
+    }
   }
 
   toast(msg: string): void {
@@ -405,6 +644,7 @@ export struct GachaLogPage {
             .backgroundColor(this.vm.currentPoolType === type ? $r('app.color.app_primary') : $r('app.color.card_background'))
             .border({ width: 1, color: $r('app.color.divider') })
             .constraintSize({ minWidth: 56 })
+            .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
               this.vm.selectPool(type).then(() => {
                 this.syncAll();
@@ -475,7 +715,7 @@ export struct GachaLogPage {
       .backgroundColor(bg)
   }
 
-  /** 五星头像网格：星级色圆形占位 + 右下角抽数标签 */
+  /** 五星头像网格：星级色圆形占位 + 右下角抽数标签（完整展示，不做截断） */
   @Builder
   avatarGrid(pulls: FiveStarPull[]) {
     if (pulls.length === 0) {
@@ -484,8 +724,10 @@ export struct GachaLogPage {
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
     } else {
+      // 对齐 Windows StatisticsCard：OrangeGrid 完整绑定 GridView，不 Take、不加“+N 更多”
+      // Windows 侧仅 ToolTip（悬停显示时间），无点击弹窗，故此处不加 onClick/hover
       Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
-        ForEach(pulls.length > 10 ? pulls.slice(0, 10) : pulls, (pull: FiveStarPull) => {
+        ForEach(pulls, (pull: FiveStarPull, index: number) => {
           Stack({ alignContent: Alignment.BottomEnd }) {
             if (this.iconOfPull(pull).length > 0) {
               MetaIcon({ category: this.pullCategory(pull), name: this.iconOfPull(pull), iconSize: 40 })
@@ -512,33 +754,24 @@ export struct GachaLogPage {
           }
           .width(40)
           .height(42)
-        }, (pull: FiveStarPull) => `${pull.name}_${pull.time}_${pull.lastPull}`)
-        if (pulls.length > 10) {
-          Column({ space: 2 }) {
-            Text(`+${pulls.length - 10}`)
-              .fontSize(13)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.text_secondary'))
-            Text('更多')
-              .fontSize(9)
-              .fontColor($r('app.color.text_secondary'))
-          }
-          .width(40)
-          .height(42)
           .borderRadius(10)
-          .backgroundColor($r('app.color.page_background'))
-          .alignItems(HorizontalAlign.Center)
-          .justifyContent(FlexAlign.Center)
-        }
+        }, (pull: FiveStarPull, index: number) => `${pull.name}_${pull.time}_${pull.lastPull}_${index}`)
       }
       .width('100%')
     }
   }
 
-  /** 单张池卡片：对齐电脑版（大标题池名+大数字抽数+星级徽章+日期范围+保底进度条+六项统计+头像网格） */
+  /**
+   * 单张池卡片：对齐电脑版 Windows StatisticsCard.xaml
+   *   外框 Grid（AcrylicGridCardStyle）
+   *   ├─ Expander「卡头 + 统计详情」：卡头常显（池名 + 抽数 + Chevron），详情可折叠
+   *   └─ SwitchPresenter「五星列表/网格」：位于 Expander 之外 → 始终完整显示
+   * Chevron 折叠状态每卡独立（对齐 WinUI Expander 内建开合），初始展开。
+   */
   @Builder
   poolCard(card: PoolCardData) {
     Column({ space: 8 }) {
+      // 卡头：池名 + 五星徽章 + 抽数摘要（折叠时可见）+ Chevron 开合
       Row({ space: 6 }) {
         Text(card.typeName)
           .fontSize(16)
@@ -555,102 +788,126 @@ export struct GachaLogPage {
           .textAlign(TextAlign.Center)
           .borderRadius(6)
           .backgroundColor($r('app.color.five_star'))
+        // 仅在折叠时于头部显示总抽数（对齐 Windows：Expander 收起后头部保留 FormattedTotalCount），
+        // 展开态由详情区大数字承担，避免同一数值重复出现
+        if (this.isPoolCollapsed(card)) {
+          Text(`${card.totalCount} 抽`)
+            .fontSize(12)
+            .fontColor($r('app.color.text_secondary'))
+            .maxLines(1)
+        }
+        Text('›')
+          .fontSize(20)
+          .fontColor($r('app.color.text_secondary'))
+          .width(24)
+          .height(24)
+          .textAlign(TextAlign.Center)
+          .borderRadius(12)
+          .rotate({ angle: this.isPoolCollapsed(card) ? 0 : 90 })
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
+      .borderRadius(8)
+      .hoverEffect(HoverEffect.Highlight)
+      .onClick(() => {
+        this.togglePoolDetail(card);
+      })
 
-      // 大数字抽数（同电脑版 2008 抽）
-      Row() {
-        Text(`${card.totalCount}`)
-          .fontSize(38)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-        Text('抽')
-          .fontSize(12)
-          .fontColor($r('app.color.text_secondary'))
-          .margin({ left: 4, bottom: 6 })
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Bottom)
-
-      // 距上个五星/四星 徽章
-      Row({ space: 8 }) {
-        this.pillBadge(`距上个五星 ${card.sinceLastFive}`, $r('app.color.danger'))
-        this.pillBadge(`距上个四星 ${card.sinceLastFour}`, $r('app.color.four_star'))
-      }
-      .width('100%')
-
-      // 日期范围
-      if (card.startDate.length > 0) {
-        Text(`${card.startDate} - ${card.endDate}`)
-          .fontSize(11)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%')
-      }
-
-      // 橙/紫保底进度条（对齐 Windows StatisticsCard CardProgressBar）
-      Column({ space: 2 }) {
-        Text(`累计五星 ${card.fiveCount} 个 · 距保底 ${Math.max(0, ORANGE_GUARANTEE - card.sinceLastFive)} 抽`)
-          .fontSize(11)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%')
-        Progress({
-          value: Math.min(card.sinceLastFive, ORANGE_GUARANTEE),
-          total: ORANGE_GUARANTEE,
-          type: ProgressType.Linear,
-        })
-          .width('100%')
-          .color($r('app.color.five_star'))
-          .style({ strokeWidth: 6 })
-        Text(`累计四星 ${card.fourCount} 个 · 距保底 ${Math.max(0, PURPLE_GUARANTEE - card.sinceLastFour)} 抽`)
-          .fontSize(11)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%')
-          .margin({ top: 4 })
-        Progress({
-          value: Math.min(card.sinceLastFour, PURPLE_GUARANTEE),
-          total: PURPLE_GUARANTEE,
-          type: ProgressType.Linear,
-        })
-          .width('100%')
-          .color($r('app.color.four_star'))
-          .style({ strokeWidth: 6 })
-      }
-      .width('100%')
-
-      // Windows StatisticsCard：统计/比例 双模式（切换 chip）
-      Row({ space: 8 }) {
-        this.statModeChip('统计', false)
-        this.statModeChip('比例', true)
-      }
-      .width('100%')
-      .padding({ top: 2, bottom: 4 })
-
-      if (!this.showRatioMode) {
-        // 统计模式：五星平均/UP 平均/最非/最欧（对齐 Windows）
-        Row({ space: 12 }) {
-          this.statCell('五星平均', `${card.avgOrange} 抽`, $r('app.color.app_primary'))
-          this.statCell('UP 平均', `${card.avgUpOrange} 抽`, $r('app.color.app_primary'))
-          this.statCell('最非', `${card.maxOrange} 抽`, $r('app.color.danger'))
-          this.statCell('最欧', `${card.minOrange} 抽`, $r('app.color.success'))
+      // Expander 主体：统计详情（折叠时仅隐藏此段，五星区不受影响）
+      if (!this.isPoolCollapsed(card)) {
+        // 大数字抽数（同电脑版 2008 抽）
+        Row() {
+          Text(`${card.totalCount}`)
+            .fontSize(38)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary'))
+          Text('抽')
+            .fontSize(12)
+            .fontColor($r('app.color.text_secondary'))
+            .margin({ left: 4, bottom: 6 })
         }
         .width('100%')
-      } else {
-        // 比例模式：橙/紫/蓝占比（对齐 Windows TotalOrangePercent 等）
-        Row({ space: 12 }) {
-          this.statCell('五星', `${card.orangePercent.toFixed(2)}%`, $r('app.color.five_star'))
-          this.statCell('四星', `${card.purplePercent.toFixed(2)}%`, $r('app.color.four_star'))
-          this.statCell('三星', `${card.bluePercent.toFixed(2)}%`, $r('app.color.text_secondary'))
-          this.statCell('合计', `${card.totalCount}`, $r('app.color.app_primary'))
+        .alignItems(VerticalAlign.Bottom)
+
+        // 距上个五星/四星 徽章
+        Row({ space: 8 }) {
+          this.pillBadge(`距上个五星 ${card.sinceLastFive}`, $r('app.color.danger'))
+          this.pillBadge(`距上个四星 ${card.sinceLastFour}`, $r('app.color.four_star'))
         }
         .width('100%')
+
+        // 日期范围
+        if (card.startDate.length > 0) {
+          Text(`${card.startDate} - ${card.endDate}`)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+        }
+
+        // 橙/紫保底进度条（对齐 Windows StatisticsCard CardProgressBar）
+        Column({ space: 2 }) {
+          Text(`累计五星 ${card.fiveCount} 个 · 距保底 ${Math.max(0, ORANGE_GUARANTEE - card.sinceLastFive)} 抽`)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+          Progress({
+            value: Math.min(card.sinceLastFive, ORANGE_GUARANTEE),
+            total: ORANGE_GUARANTEE,
+            type: ProgressType.Linear,
+          })
+            .width('100%')
+            .color($r('app.color.five_star'))
+            .style({ strokeWidth: 6 })
+          Text(`累计四星 ${card.fourCount} 个 · 距保底 ${Math.max(0, PURPLE_GUARANTEE - card.sinceLastFour)} 抽`)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+            .margin({ top: 4 })
+          Progress({
+            value: Math.min(card.sinceLastFour, PURPLE_GUARANTEE),
+            total: PURPLE_GUARANTEE,
+            type: ProgressType.Linear,
+          })
+            .width('100%')
+            .color($r('app.color.four_star'))
+            .style({ strokeWidth: 6 })
+        }
+        .width('100%')
+
+        // Windows StatisticsCard：统计/比例 双模式（切换 chip）
+        Row({ space: 8 }) {
+          this.statModeChip('统计', false)
+          this.statModeChip('比例', true)
+        }
+        .width('100%')
+        .padding({ top: 2, bottom: 4 })
+
+        if (!this.showRatioMode) {
+          // 统计模式：五星平均/UP 平均/最非/最欧（对齐 Windows）
+          Row({ space: 12 }) {
+            this.statCell('五星平均', `${card.avgOrange} 抽`, $r('app.color.app_primary'))
+            this.statCell('UP 平均', `${card.avgUpOrange} 抽`, $r('app.color.app_primary'))
+            this.statCell('最非', `${card.maxOrange} 抽`, $r('app.color.danger'))
+            this.statCell('最欧', `${card.minOrange} 抽`, $r('app.color.success'))
+          }
+          .width('100%')
+        } else {
+          // 比例模式：橙/紫/蓝占比（对齐 Windows TotalOrangePercent 等）
+          Row({ space: 12 }) {
+            this.statCell('五星', `${card.orangePercent.toFixed(2)}%`, $r('app.color.five_star'))
+            this.statCell('四星', `${card.purplePercent.toFixed(2)}%`, $r('app.color.four_star'))
+            this.statCell('三星', `${card.bluePercent.toFixed(2)}%`, $r('app.color.text_secondary'))
+            this.statCell('合计', `${card.totalCount}`, $r('app.color.app_primary'))
+          }
+          .width('100%')
+        }
       }
 
       Divider()
         .width('100%')
         .color($r('app.color.divider'))
 
-      // 五星头像网格（每个头像带抽数标签）
+      // 五星头像网格：Expander 之外，始终完整显示（每个头像带抽数标签）
       this.avatarGrid(card.fivePulls)
     }
     .width('100%')
@@ -673,12 +930,13 @@ export struct GachaLogPage {
       .borderRadius(10)
       .backgroundColor(this.showRatioMode === isRatio ? $r('app.color.app_primary') : $r('app.color.card_background'))
       .border({ width: 1, color: $r('app.color.divider') })
+      .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
         this.showRatioMode = isRatio;
       })
   }
 
-  /** 多池卡片区：宽屏（>=840vp）两列、窄屏单列 */
+  /** 多池卡片区：按组件自身宽度分列（<840 单列 / 840~1199 双列 / >=1200 最多四列），同行等高 */
   @Builder
   poolCardsArea() {
     if (this.poolCards.length === 0) {
@@ -688,28 +946,81 @@ export struct GachaLogPage {
         .width('100%')
         .padding({ top: 24, bottom: 24 })
         .textAlign(TextAlign.Center)
-    } else if (this.isWide) {
-      // 宽屏：四池等宽铺满整列（对齐 Windows 四列），自适应宽度、无横向滚动
-      Grid() {
-        ForEach(this.poolCards, (card: PoolCardData) => {
-          GridItem() {
-            this.poolCard(card)
-          }
-        }, (card: PoolCardData) =>
-          `${card.gachaType}_${card.totalCount}_${card.fiveCount}_${card.sinceLastFive}_${card.startDate}`)
-      }
-      .columnsTemplate(this.poolCards.length >= 4 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr')
-      .columnsGap(10)
-      .width('100%')
     } else {
-      Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start, space: { main: LengthMetrics.vp(10), cross: LengthMetrics.vp(10) } }) {
-        ForEach(this.poolCards, (card: PoolCardData) => {
-          this.poolCard(card)
-        }, (card: PoolCardData) =>
-          `${card.gachaType}_${card.totalCount}_${card.fiveCount}_${card.sinceLastFive}_${card.startDate}`)
+      Column({ space: POOL_CARD_GAP }) {
+        ForEach(this.poolRows, (row: PoolRowData) => {
+          this.poolCardRow(row);
+        }, (row: PoolRowData) => row.key)
       }
       .width('100%')
     }
+  }
+
+  /** 一行池卡：外层 Row 高度 = 本行内容最高者，卡片按该高度拉伸，禁止固定/裁剪 */
+  @Builder
+  poolCardRow(row: PoolRowData) {
+    Row({ space: POOL_CARD_GAP }) {
+      ForEach(row.cells, (cell: PoolCellData) => {
+        this.poolRowCell(cell);
+      }, (cell: PoolCellData) => cell.key)
+      // 末行不足列数时补齐占位，保证同行卡片宽度一致（与 Windows 等宽卡片一致）
+      ForEach(GachaLogPage.gapSlots(row.cells.length, this.poolColumnCount), (slotIndex: number) => {
+        this.poolRowGap();
+      }, (slotIndex: number) => `gap_${row.key}_${slotIndex}`)
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Top)
+    .height(row.height > 0 ? row.height : 'auto')
+  }
+
+  /** 占位槽位（ForEach 数据源：只用索引，卡片内容不参与刷新）。补位上限=当前列数，
+   *  而非固定四列：否则双列/按池数降列时，末行卡片会被占位挤成 1/4 宽，与上方整行不对齐。 */
+  private static gapSlots(cardCount: number, columns: number): number[] {
+    const slots: number[] = [];
+    for (let i = cardCount; i < columns; i++) {
+      slots.push(i);
+    }
+    return slots;
+  }
+
+  @Builder
+  poolRowGap() {
+    Column()
+      .layoutWeight(1)
+      .height(1)
+  }
+
+  /**
+   * 行内单个单元（单参 @Builder，保证动态刷新）：可见卡片按精确行高拉伸；
+   * 行高未知时叠加一份不可交互、恒定自适应高度的测量副本上报本行统一高度。
+   * 高度用明确数值（cell.height）而非百分比，避免 auto 父级 + 百分比子级的循环依赖；
+   * 行高 0 时按内容自适应（首帧），测得后即用数值。
+   * 测量副本必须参与布局（故用 opacity(0) 而非 Visibility.None）才能触发 onAreaChange；
+   * 它恒为自然高度，因此可见卡片被拉伸不会反向改变测量值 → 不产生刷新环；
+   * 行高已知后不再渲染副本，避免五星头像节点翻倍（数据/列数变化会重新测量）。
+   */
+  @Builder
+  poolRowCell(cell: PoolCellData) {
+    Stack({ alignContent: Alignment.TopStart }) {
+      Column() {
+        this.poolCard(cell.card)
+      }
+      .width('100%')
+      .height(cell.height > 0 ? cell.height : 'auto')
+
+      if (cell.height <= 0) {
+        Column() {
+          this.poolCard(cell.card)
+        }
+        .width('100%')
+        .opacity(0)
+        .hitTestBehavior(HitTestMode.None)
+        .accessibilityLevel('no')
+        .onAreaChange(this.heightHandlerFor(cell))
+      }
+    }
+    .width('100%')
+    .layoutWeight(1)
   }
 
   @Builder
@@ -1178,7 +1489,7 @@ export struct GachaLogPage {
     .height('100%')
     .backgroundColor(Color.Transparent)
     .onAreaChange((oldValue: Area, newValue: Area) => {
-      this.isWide = newValue.width >= 840;
+      this.onPoolAreaChange(Number(newValue.width));
     })
   }
 
@@ -1193,6 +1504,7 @@ export struct GachaLogPage {
       .borderRadius(16)
       .backgroundColor(this.pivotIndex === index ? $r('app.color.app_primary') : $r('app.color.card_background'))
       .border({ width: 1, color: this.pivotIndex === index ? $r('app.color.app_primary') : $r('app.color.divider') })
+      .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
         this.pivotIndex = index;
         this.syncAll();
