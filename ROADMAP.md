@@ -40,12 +40,12 @@
 
 | 项 | 说明 | 规模 |
 |---|---|---|
-| 祈愿「历史记录列表」页签 | Windows 有完整逐条列表（当前用户选择保留总览精简形态）。可做成设置开关「详细历史」，默认关 | M |
-| 角色立绘浏览 | 素材缺口：rawfile 目前无 `GachaSplashIcon` 类目。需 `fetch-assets.py` 扩展类目 + Wiki 角色页加 FlipView 立绘浏览器（对齐 Windows 角色详情立绘切换） | L |
-| 名片展示页 | `NameCardIcon`/`NameCardPic` 已全部内置，纯 UI 工作：名片网格 + 点开大图（对齐 Windows 名片图鉴） | M |
-| 攻略外链 | 角色武器详情页跳米游社攻略 / B站搜索（`router` 外链系统浏览器，对齐 Windows 攻略跳转） | S |
-| 应用版本检查 | 现有「检查更新」仅覆盖**元数据热更**（GameDataUpdater）。新增 GitHub Releases API 查询最新 Release tag 与当前 versionName 比对 + About 页展示版本/构建信息 | M |
-| 全量本地备份/还原 | 导出账号+祈愿+成就+养成+设置 为单一备份文件、导入还原。UIGF/UIAF 已覆盖祈愿/成就，此项解决换机迁移（Windows 有云备份，鸿蒙做本地等价物） | M |
+| ~~祈愿「历史记录列表」页签~~ ✅ | 已完成（e27abe7）：历史页签顶部期次汇总卡（GachaEvent 期次元数据归桶：版本/池名/UP 五星四星获取数/时间跨度，对齐 HistoryWishBuilder+PivotHistory）；同轮修复五页签在 7994665 被误删的回归 | M |
+| 角色立绘浏览 | 素材缺口：rawfile 目前无 `GachaSplashIcon` 类目。需 `fetch-assets.py` 扩展类目 + Wiki 角色页加 FlipView 立绘浏览器（对齐 Windows 角色详情立绘切换）。**待决策**：打包（+包体）或走 CDN 按需拉取 | L |
+| ~~名片展示~~ ✅ | 已完成（e27abe7）：角色资料页名片区块（胶囊横幅 + 全幅大图 + 名称/描述浮层，描述来自 NameCard.json 入 rawfile） | M |
+| ~~攻略外链~~ ✅ | 已完成（e27abe7）：角色资料页攻略区块（米游社搜索 + B站战争百科直达，对齐 WikiAvatarStrategyComponent）；我的角色详情页此前已有 | S |
+| ~~应用版本检查~~ ✅ | 已完成（e27abe7）：设置→关于显示版本号 + 「检查应用更新」（GitHub Releases latest 对比 versionName，发现新版跳发布页） | M |
+| ~~全量本地备份/还原~~ ✅ | 已完成（e27abe7）：设置→备份与还原（账号凭证+祈愿+成就+偏好 → 单 JSON；覆盖式还原带二次确认；设备指纹类键不备份） | M |
 | 日历/签到细节打磨 | 日历事件详情（跳公告）、签到补签状态反馈统一 | S |
 | 深渊数据完整性核对 | 波次/渊月祝福/历史期 chips 已实现；对照 Windows 核对敌人等级、祝福词缀多语言取值细节 | S |
 

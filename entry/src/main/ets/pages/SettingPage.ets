@@ -6,6 +6,7 @@ import { router, ShowDialogSuccessResponse } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { ConfigurationConstant } from '@kit.AbilityKit';
 import { bundleManager } from '@kit.AbilityKit';
+import { util } from '@kit.ArkTS';
 import { window } from '@kit.ArkUI';
 import { fileIo, picker } from '@kit.CoreFileKit';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
@@ -20,6 +21,7 @@ import { GameDataService } from '../service/GameDataService';
 import { GameDataUpdater } from '../data/remote/GameDataUpdater';
 import { RiskVerifyService } from '../service/RiskVerifyService';
 import { ApiClient } from '../data/network/ApiClient';
+import { BackupService } from '../service/BackupService';
 
 const TAG: string = 'SettingPage';
 
@@ -165,6 +167,77 @@ export struct SettingPage {
   private getHostContext(): common.UIAbilityContext | undefined {
     const ctx = this.getUIContext().getHostContext();
     return ctx !== undefined ? ctx as common.UIAbilityContext : undefined;
+  }
+
+  /** 导出全量备份 JSON（用户自选保存位置） */
+  async exportBackup(): Promise<void> {
+    try {
+      const json: string = await BackupService.getInstance().buildBackupJson();
+      const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker();
+      const opts: picker.DocumentSaveOptions = new picker.DocumentSaveOptions();
+      opts.newFileNames = [`hutao_backup_${Date.now()}.json`];
+      const uris: string[] = await docPicker.save(opts);
+      if (uris.length === 0) {
+        return;
+      }
+      const file: fileIo.File = fileIo.openSync(uris[0], fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
+      try {
+        fileIo.writeSync(file.fd, json);
+      } finally {
+        fileIo.closeSync(file);
+      }
+      this.toast('备份导出成功（含账号凭证，请妥善保管）');
+    } catch (e) {
+      this.toast(`导出失败：${(e as Error).message}`);
+    }
+  }
+
+  /** 还原前二次确认（覆盖式，不可撤销） */
+  private confirmRestoreBackup(): void {
+    this.getUIContext().showAlertDialog({
+      title: '从备份还原',
+      message: '将清空并覆盖现有的全部账号、祈愿、成就与偏好设置，操作不可撤销。确定继续？',
+      primaryButton: {
+        value: '取消',
+        action: () => {
+        }
+      },
+      secondaryButton: {
+        value: '选择文件并还原',
+        fontColor: $r('app.color.danger'),
+        action: () => {
+          this.restoreBackup();
+        }
+      },
+      cancel: () => {
+      }
+    });
+  }
+
+  /** 选择备份文件并还原 */
+  async restoreBackup(): Promise<void> {
+    try {
+      const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker();
+      const opts: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
+      opts.fileSuffixFilters = ['.json'];
+      const uris: string[] = await docPicker.select(opts);
+      if (uris.length === 0) {
+        return;
+      }
+      const file: fileIo.File = fileIo.openSync(uris[0], fileIo.OpenMode.READ_ONLY);
+      let text: string;
+      try {
+        const buf = new ArrayBuffer(fileIo.statSync(file.fd).size);
+        fileIo.readSync(file.fd, buf);
+        text = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
+      } finally {
+        fileIo.closeSync(file);
+      }
+      const result = await BackupService.getInstance().restoreFromText(text);
+      this.toast(result.message);
+    } catch (e) {
+      this.toast(`还原失败：${(e as Error).message}`);
+    }
   }
 
   /** 保存极验自定义组合接口（留空禁用） */
@@ -776,6 +849,62 @@ export struct SettingPage {
               });
             })
           }
+
+          this.sectionTitle('备份与还原')
+          Row() {
+            Column({ space: 2 }) {
+              Text('导出全量备份')
+                .fontSize(15)
+                .fontColor($r('app.color.text_primary'))
+              Text('账号凭证 + 祈愿 + 成就 + 偏好 → 单个 JSON 文件（含登录凭证，妥善保管）')
+                .fontSize(11)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text('导出')
+              .fontSize(12)
+              .fontColor($r('app.color.app_primary'))
+              .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+              .borderRadius(10)
+              .border({ width: 1, color: $r('app.color.app_primary') })
+          }
+          .width('100%')
+          .padding(14)
+          .borderRadius(12)
+          .backgroundColor($r('app.color.card_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.exportBackup();
+          })
+          Row() {
+            Column({ space: 2 }) {
+              Text('从备份还原')
+                .fontSize(15)
+                .fontColor($r('app.color.danger'))
+              Text('选择备份文件，覆盖现有全部账号/祈愿/成就/偏好')
+                .fontSize(11)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text('还原')
+              .fontSize(12)
+              .fontColor($r('app.color.danger'))
+              .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+              .borderRadius(10)
+              .border({ width: 1, color: $r('app.color.danger') })
+          }
+          .width('100%')
+          .padding(14)
+          .borderRadius(12)
+          .backgroundColor($r('app.color.card_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.confirmRestoreBackup();
+          })
 
           this.sectionTitle('关于')
           this.rowItem(`胡桃工具箱（鸿蒙版）${this.appVersion.length > 0 ? ` v${this.appVersion}` : ''}`,
