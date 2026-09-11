@@ -7,10 +7,81 @@
 import { router } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { WikiMetaService, WikiAvatarMeta, MetaSkill, MetaText, MetaMaterial } from '../service/WikiMetaService';
+import { StandardIconService } from '../data/remote/StandardIconService';
 import { AppBackButton } from '../components/AppBackButton';
 import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 import { BaseValueService, AvatarGrowInfo, AvatarBaseValues } from '../service/BaseValueService';
+import { Logger } from '../common/Logger';
+
+const AVATAR_PAGE_TAG: string = 'WikiAvatarPage';
+/** 立绘 CDN 类目（Snap.Hutao 静态 CDN：raw/GachaAvatarIcon/UI_Gacha_AvatarIcon_{后缀}.png） */
+const SPLASH_CATEGORY: string = 'GachaAvatarIcon';
+
+/**
+ * 单张角色立绘（按需拉取 + 沙盒缓存，零包体）：
+ * 命名规则 UI_Gacha_AvatarIcon_{icon 去掉 UI_AvatarIcon_ 前缀}；旅行者等无立绘时显示占位。
+ */
+@Component
+export struct SplashArtView {
+  @Prop icon: string = '';
+  @State src: string = '';
+  private resolveToken: number = 0;
+
+  aboutToAppear(): void {
+    this.resolve();
+  }
+
+  onIconChanged(): void {
+    this.resolve();
+  }
+
+  private async resolve(): Promise<void> {
+    const token: number = ++this.resolveToken;
+    const suffix: string = this.icon.replace('UI_AvatarIcon_', '');
+    if (suffix.length === 0 || suffix === this.icon) {
+      this.src = '';
+      return;
+    }
+    try {
+      const path: string = await StandardIconService.ensure(SPLASH_CATEGORY, `UI_Gacha_AvatarIcon_${suffix}`);
+      if (token !== this.resolveToken) {
+        return;
+      }
+      this.src = path.length > 0 ? `file://${path}` : '';
+      Logger.info(AVATAR_PAGE_TAG, `splash ${suffix} -> ${path.length > 0 ? 'ok' : 'miss'}`);
+    } catch (e) {
+      if (token === this.resolveToken) {
+        this.src = '';
+      }
+    }
+  }
+
+  build() {
+    Stack() {
+      if (this.src.length > 0) {
+        Image(this.src)
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Contain)
+          .draggable(false)
+      } else {
+        Column() {
+          Text('暂无立绘')
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .opacity(0.5)
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor($r('app.color.page_background'))
+  }
+}
 
 @Entry
 @Component
@@ -29,6 +100,8 @@ export struct WikiAvatarPage {
   @State isWide: boolean = false;
   /** 角色列表懒加载数据源（140+ 项全量渲染开销大，LazyForEach 只画可视区） */
   private listSource: SimpleDataSource<WikiAvatarMeta> = new SimpleDataSource([]);
+  /** 立绘 Swiper 独立数据源（与列表同数据；LazyForEach+cachedCount(1) 按需创建立绘页，避免全量下载） */
+  private splashSource: SimpleDataSource<WikiAvatarMeta> = new SimpleDataSource([]);
   /** 基础属性滑条状态（对齐 Windows BaseValueSlider） */
   @State curLevel: number = 1;
   @State curPromoted: boolean = false;
@@ -39,6 +112,8 @@ export struct WikiAvatarPage {
   /** 名片名称/描述（NameCard.json 懒加载，跟随 current 异步刷新） */
   @State ncName: string = '';
   @State ncDesc: string = '';
+  /** 当前角色在列表中的位置（立绘 Swiper 翻页联动） */
+  @State curIdx: number = 0;
 
   toast(msg: string): void {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1500 });
@@ -56,12 +131,14 @@ export struct WikiAvatarPage {
     if (this.isWide && this.avatars.length > 0) {
       this.selectedId = this.avatars[0].id;
       this.current = this.avatars[0];
+      this.syncCurIdx();
       this.onAvatarSelected();
     } else {
       this.selectedId = 0;
       this.current = undefined;
     }
     this.listSource.notifyDataReload(this.avatars.slice());
+    this.splashSource.notifyDataReload(this.avatars.slice());
     this.loading = false;
   }
 
@@ -69,7 +146,19 @@ export struct WikiAvatarPage {
   select(a: WikiAvatarMeta): void {
     this.selectedId = a.id;
     this.current = a;
+    this.syncCurIdx();
     this.onAvatarSelected();
+  }
+
+  /** 同步当前角色在列表中的下标（立绘 Swiper 用） */
+  private syncCurIdx(): void {
+    for (let i = 0; i < this.avatars.length; i++) {
+      if (this.avatars[i].id === this.selectedId) {
+        this.curIdx = i;
+        return;
+      }
+    }
+    this.curIdx = 0;
   }
 
   /** 重置滑条并重算基础属性（切换角色时） */
@@ -382,6 +471,7 @@ export struct WikiAvatarPage {
       Scroll() {
         Column({ space: 12 }) {
           this.profileCard()
+          this.splashCard()
           this.baseValueCard()
           this.skillsCard()
           this.talentsCard()
@@ -405,6 +495,58 @@ export struct WikiAvatarPage {
       .width('100%')
       .layoutWeight(1)
       .scrollBar(BarState.Auto)
+    }
+  }
+
+  /** 立绘卡（FlipView 式翻页：Swiper 左右滑动切换相邻角色立绘，仅渲染当前±1 页控制内存） */
+  @Builder
+  splashCard() {
+    if (this.current !== undefined) {
+      Column({ space: 8 }) {
+        Row({ space: 6 }) {
+          Text('立绘')
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+          Text('左右滑动查看其他角色')
+            .fontSize(10)
+            .fontColor($r('app.color.text_secondary'))
+          Blank()
+          Text(`${this.curIdx + 1}/${this.avatars.length}`)
+            .fontSize(10)
+            .fontColor($r('app.color.text_secondary'))
+        }
+        .width('100%')
+
+        Swiper() {
+          LazyForEach(this.splashSource, (a: WikiAvatarMeta) => {
+            Column() {
+              SplashArtView({ icon: a.icon })
+            }
+            .width('100%')
+            .height('100%')
+          }, (a: WikiAvatarMeta) => `sp_${a.id}`)
+        }
+        .index(this.curIdx)
+        .loop(false)
+        .indicator(false)
+        .duration(240)
+        .cachedCount(1)
+        .onChange((idx: number) => {
+          const target: WikiAvatarMeta | undefined = this.avatars[idx];
+          if (target !== undefined && target.id !== this.selectedId) {
+            this.select(target);
+          }
+        })
+        .width('100%')
+        .height(this.isWide ? 360 : 260)
+        .borderRadius($r('app.float.card_radius'))
+        .clip(true)
+      }
+      .width('100%')
+      .padding(14)
+      .borderRadius($r('app.float.card_radius'))
+      .backgroundColor($r('app.color.card_background'))
     }
   }
 

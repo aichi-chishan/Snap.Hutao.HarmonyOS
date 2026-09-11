@@ -41,7 +41,7 @@
 | 项 | 说明 | 规模 |
 |---|---|---|
 | ~~祈愿「历史记录列表」页签~~ ✅ | 已完成（e27abe7）：历史页签顶部期次汇总卡（GachaEvent 期次元数据归桶：版本/池名/UP 五星四星获取数/时间跨度，对齐 HistoryWishBuilder+PivotHistory）；同轮修复五页签在 7994665 被误删的回归 | M |
-| 角色立绘浏览 | 素材缺口：rawfile 目前无 `GachaSplashIcon` 类目。需 `fetch-assets.py` 扩展类目 + Wiki 角色页加 FlipView 立绘浏览器（对齐 Windows 角色详情立绘切换）。**待决策**：打包（+包体）或走 CDN 按需拉取 | L |
+| ~~角色立绘浏览~~ ✅ | 已完成：WikiAvatarPage 立绘卡（Swiper 翻页切换相邻角色，LazyForEach+cachedCount(1) 按需创建页）。采用 **CDN 按需拉取 + 沙盒缓存**（复用 StandardIconService，`GachaAvatarIcon/UI_Gacha_AvatarIcon_{icon后缀}.png`，118/119 角色可用，旅行者占位），零包体；`fetch-assets.py --bundle-splash` 可选本地打包 | L |
 | ~~名片展示~~ ✅ | 已完成（e27abe7）：角色资料页名片区块（胶囊横幅 + 全幅大图 + 名称/描述浮层，描述来自 NameCard.json 入 rawfile） | M |
 | ~~攻略外链~~ ✅ | 已完成（e27abe7）：角色资料页攻略区块（米游社搜索 + B站战争百科直达，对齐 WikiAvatarStrategyComponent）；我的角色详情页此前已有 | S |
 | ~~应用版本检查~~ ✅ | 已完成（e27abe7）：设置→关于显示版本号 + 「检查应用更新」（GitHub Releases latest 对比 versionName，发现新版跳发布页） | M |
@@ -106,6 +106,6 @@
 
 ## 里程碑建议
 
-- **v1.1**：P0 全清 + P1 的 攻略外链 / 版本检查 / 名片展示（体感提升最直接）
-- **v1.2**：P1 剩余（历史列表开关、立绘浏览、本地备份）+ CI/Release 工作流
+- ~~**v1.1**：P0 还债 + P1 主体（期次历史 / 名片 / 攻略外链 / 版本检查 / 立绘浏览 / 备份还原）~~ ✅ 已随 e27abe7 / 0a61a6b / 后续立绘提交落地
+- **v1.2**：P2 工程化（GitHub Actions CI / Release 工作流 / 单测）+ P0 lint 还债
 - **v1.3+**：P2 体验与性能按反馈排期，P3 按平台条件逐个解锁
