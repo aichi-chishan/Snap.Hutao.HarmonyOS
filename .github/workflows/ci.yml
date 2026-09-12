@@ -11,6 +11,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  meta:
+    name: Repo invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check invariants
+        run: |
+          test -f ci/build-profile.ci.json5
+          test -f docs/TESTING.md
+          test -f entry/src/test/LogicUnitTest.test.ets
+          grep -q "logicUnitTest()" entry/src/test/List.test.ets
+          grep -q "logicUnitTest" entry/src/test/List.test.ets
+          # 隐私回归门禁：文档不得含本机用户名/QQ 邮箱（历史曾泄露，已清洗）
+          if grep -rn -E "27415|2741559686@qq\.com" --include="*.md" .; then
+            echo "::error::Privacy regression: personal info in markdown"
+            exit 1
+          fi
+          echo "invariants ok"
+
   lint:
     name: Lint (0 errors gate)
     runs-on: ubuntu-latest
