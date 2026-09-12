@@ -10,6 +10,8 @@ HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），�
 ![API](https://img.shields.io/badge/API--24-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+[![CI](https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS/actions/workflows/ci.yml/badge.svg)](https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS/actions/workflows/ci.yml)
+
 > 🗺️ 后续完善计划（功能补全 / 体验优化 / 工程化 / 性能）见 [ROADMAP.md](ROADMAP.md)
 
 > ⚠️ **免责声明**：本项目与米哈游 / HoYoverse 无任何关联，仅供学习交流使用。
@@ -21,9 +23,9 @@ HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），�
 
 ### 主页（Windows 仪表板布局）
 - **卡池横幅**（左上合框）：角色 UP / 武器 UP 横幅，UP 阵容头像 + 剩余时间 + 起止日期
-- **活动与挑战**（右上合框）：渊月螺旋 / 幻想真境剧诗 / 铸境研炼等剩余时间与状态
-- **仪表板四卡**：启动游戏（拉起本机游戏）| 祈愿统计（保底进度）| 成就统计 | 实时便笺
-- **日历 + 每日签到**：本月奖励网格、签到 / 补签
+- **活动与挑战**（右上合框）：渊月螺旋 / 幻想真境剧诗 / 铸境研炼等剩余时间与状态（可在设置隐藏）
+- **仪表板卡组**（UniformPanel 响应式）：启动游戏 | 祈愿统计（保底进度）| 成就统计 | 实时便笺 | 旅行者札记 | 日历 | 每日签到——列数随窗口宽度自动变化，行内等高
+- **胡桃每日一图**：Snap.Hutao 公开壁纸接口，当日缓存；按图片亮度自适应透明度（全量复刻 Windows 合成），亚克力卡片材质（浅/深双主题）
 - **游戏公告**：官方封面图 + 标题，点击查看详情；**前瞻直播兑换码**一键查询复制
 
 ### 工具

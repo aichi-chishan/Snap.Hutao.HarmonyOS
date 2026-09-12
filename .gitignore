@@ -49,4 +49,6 @@ layout*.json
 *.bak
 *.orig
 /.agents/
-/.claude/ci_lint_log.txt
+/.claude/
+ci_lint_log.txt
+*.log

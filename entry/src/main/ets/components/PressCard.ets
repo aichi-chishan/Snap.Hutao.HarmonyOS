@@ -31,6 +31,8 @@ export struct PressCard {
   @Prop lightSoft: boolean = false;
   /** 是否启用柔和投影（对齐 Windows Acrylic 卡片层次；默认开启） */
   @Prop shadowEnabled: boolean = true;
+  /** 是否撑满父容器高度（Grid 显式行高下行内等高用） */
+  @Prop fillHeight: boolean = false;
 
   /** 按压光源状态 */
   @State pressed: boolean = false;
@@ -58,8 +60,9 @@ export struct PressCard {
       this.content()
     }
     .width('100%')
-    // 高度自适应内容（对齐 Windows UniformPanel.ArrangeOverride：每卡保持自然高度，
-    // 行高互不影响）；百分比高度在 Scroll>Grid 场景会被解析为视口高导致卡片巨长
+    // 高度：fillHeight=true 时撑满 Grid 单元格（配合 Grid 显式行高实现行内等高）；
+    // 默认自适应内容。百分比高度在 Scroll>Grid 无显式行高场景会被解析为视口高（巨长卡）
+    .height(this.fillHeight ? '100%' : undefined)
     .borderRadius(this.radius)
     .backgroundColor(this.cardBg)
     // 亚克力卡片（对齐 Windows AcrylicBorderCardStyle / SystemControlAcrylicElementBrush）：

@@ -33,8 +33,12 @@ export struct HomeTravelersDiaryCard {
     return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
 
+    /** 是否撑满 Grid 单元格高度（行内等高） */
+    @Prop fillHeight: boolean = false;
+
   build() {
     PressCard({
+      fillHeight: this.fillHeight,
       onTap: () => {
         this.onTap()
       },
