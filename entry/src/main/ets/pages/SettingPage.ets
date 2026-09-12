@@ -22,6 +22,7 @@ import { GameDataUpdater } from '../data/remote/GameDataUpdater';
 import { RiskVerifyService } from '../service/RiskVerifyService';
 import { ApiClient } from '../data/network/ApiClient';
 import { BackupService } from '../service/BackupService';
+import { HutaoDailyImageService } from '../service/HutaoDailyImageService';
 
 const TAG: string = 'SettingPage';
 
@@ -63,6 +64,8 @@ export struct SettingPage {
   /** 应用版本与更新检查（GitHub Releases） */
   @State appVersion: string = '';
   @State updating: boolean = false;
+  /** 每日一图加载状态（选中该背景时展示） */
+  @State hutaoDailyStatus: string = '首次使用将自动下载今日一图';
   @StorageProp('isLoggedIn') isLoggedIn: boolean = false;
   /** 祈愿归档（数据管理） */
   @State gachaRows: GachaArchiveRow[] = [];
@@ -83,8 +86,25 @@ export struct SettingPage {
     this.dailyBgEnabled = PreferencesStore.getDailyBgEnabled();
     this.dataUrl = GameDataUpdater.manifestUrl();
     this.geetestInput = RiskVerifyService.getCustomCompositeUrl();
+    if (this.bgType === 'hutao') {
+      this.loadHutaoDaily();
+    }
     this.loadAppVersion();
     this.loadGachaRows();
+  }
+
+  /** 胡桃每日一图：预取并展示状态/署名 */
+  loadHutaoDaily(): void {
+    this.hutaoDailyStatus = '正在获取今日一图...';
+    HutaoDailyImageService.getInstance().getToday().then((img) => {
+      if (img !== undefined) {
+        this.hutaoDailyStatus = img.fromCache
+          ? `今日一图已就绪（当日缓存${img.author.length > 0 ? ` · 作者 ${img.author}` : ''}）`
+          : `今日一图已下载${img.author.length > 0 ? ` · 作者 ${img.author}` : ''}`;
+      } else {
+        this.hutaoDailyStatus = '获取失败（网络不可用），显示主题纯色底';
+      }
+    });
   }
 
   /** 当前应用版本号（bundleManager versionName） */
@@ -430,6 +450,9 @@ export struct SettingPage {
         PreferencesStore.setBackgroundImageType(value);
         AppStorage.setOrCreate<string>('bgType', value);
         this.toast(`背景图片：${label}`);
+        if (value === 'hutao') {
+          this.loadHutaoDaily();
+        }
       })
   }
 
@@ -598,8 +621,16 @@ export struct SettingPage {
             Row({ space: 8 }) {
               this.bgTypeChip('none', '无背景图片')
               this.bgTypeChip('local', '本地随机图片')
+              this.bgTypeChip('hutao', '胡桃每日一图')
             }
             .width('100%')
+
+            if (this.bgType === 'hutao') {
+              Text(this.hutaoDailyStatus)
+                .fontSize(11)
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%')
+            }
 
             if (this.bgType === 'local') {
               Row() {
@@ -629,7 +660,7 @@ export struct SettingPage {
               .padding({ top: 4, bottom: 4 })
             }
 
-            Text('本地目录递归扫描图片，5 分钟轮换；未选目录或目录无图片时显示主题纯色底（与无背景图片一致）')
+            Text('本地目录：递归扫描图片 5 分钟轮换；每日一图：Snap.Hutao 公开壁纸接口（当日缓存，图片版权归 miHoYo 及原作者）')
               .fontSize(10)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')

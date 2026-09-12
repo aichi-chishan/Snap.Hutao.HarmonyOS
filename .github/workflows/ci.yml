@@ -43,7 +43,10 @@ jobs:
         run: npm install -g @deveco/deveco-cli
       - name: Install Command Line Tools
         run: |
-          curl -L --fail --retry 3 -o clt.zip "$DEVECO_CLT_URL"
+          # CLT zip 超 GitHub 单文件 2GiB 限制，拆为 part-00/part-01 两段发布，下载后拼接
+          curl -L --fail --retry 3 -o clt-part-00 "$DEVECO_CLT_URL"
+          curl -L --fail --retry 3 -o clt-part-01 "${DEVECO_CLT_URL%00}01"
+          cat clt-part-00 clt-part-01 > clt.zip
           unzip -q clt.zip -d clt
           clt_dir=$(find clt -maxdepth 2 -type d -name 'command-line-tools' | head -1)
           if [ -z "$clt_dir" ]; then clt_dir=$(find clt -maxdepth 2 -mindepth 1 -type d | head -1); fi
@@ -74,7 +77,10 @@ jobs:
         run: npm install -g @deveco/deveco-cli
       - name: Install Command Line Tools
         run: |
-          curl -L --fail --retry 3 -o clt.zip "$DEVECO_CLT_URL"
+          # CLT zip 超 GitHub 单文件 2GiB 限制，拆为 part-00/part-01 两段发布，下载后拼接
+          curl -L --fail --retry 3 -o clt-part-00 "$DEVECO_CLT_URL"
+          curl -L --fail --retry 3 -o clt-part-01 "${DEVECO_CLT_URL%00}01"
+          cat clt-part-00 clt-part-01 > clt.zip
           unzip -q clt.zip -d clt
           clt_dir=$(find clt -maxdepth 2 -type d -name 'command-line-tools' | head -1)
           if [ -z "$clt_dir" ]; then clt_dir=$(find clt -maxdepth 2 -mindepth 1 -type d | head -1); fi

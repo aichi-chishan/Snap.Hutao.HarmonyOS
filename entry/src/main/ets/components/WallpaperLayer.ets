@@ -4,11 +4,12 @@
  * - none：无背景图片，主题纯色底（与窗口底色同色系）
  * - local：本地随机图片（用户目录递归扫描 8 种格式随机取 1，5 分钟轮换；
  *   未选目录或目录无图片时与 none 相同显示主题纯色底，保证两种模式观感一致）
+ * - hutao：胡桃每日一图（Snap.Hutao 公开壁纸接口，当日缓存复用；失败与 none 观感一致）
  * 图片上层保留主题化遮罩（深色压暗/浅色提亮），ImageFit.Cover。
  */
 import { fileIo, fileUri } from '@kit.CoreFileKit';
-import { http } from '@kit.NetworkKit';
 import { AppContextProvider } from '../common/AppContext';
+import { HutaoDailyImageService } from '../service/HutaoDailyImageService';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'WallpaperLayer';
@@ -69,6 +70,19 @@ export struct WallpaperLayer {
   }
 
   private loadImage(): void {
+    if (this.bgType === 'hutao') {
+      // 胡桃每日一图：当日缓存复用，失败回退主题纯色底（与 none 一致）
+      this.hasImage = false;
+      this.imgSrc = '';
+      HutaoDailyImageService.getInstance().getToday().then((img) => {
+        if (img !== undefined && this.bgType === 'hutao') {
+          this.imgSrc = `file://${img.path}`;
+          this.hasImage = true;
+          Logger.info(TAG, `hutao daily image ready (${img.author}${img.fromCache ? ', cached' : ''})`);
+        }
+      });
+      return;
+    }
     if (this.bgType !== 'local' || this.folderPath.length === 0) {
       // none / local 未选目录：主题纯色底（观感一致）
       this.hasImage = false;
