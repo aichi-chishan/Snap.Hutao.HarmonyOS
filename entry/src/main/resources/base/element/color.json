@@ -107,6 +107,14 @@
     {
       "name": "icon_dark_chip",
       "value": "#E62E2E2E"
+    },
+    {
+      "name": "card_acrylic_tint",
+      "value": "#D9F3F3F3"
+    },
+    {
+      "name": "card_inner_tint",
+      "value": "#0A000000"
     }
   ]
 }

@@ -200,7 +200,7 @@ export struct HomeCalendarCard {
         .width('100%')
         .padding(4)
         .borderRadius(10)
-        .backgroundColor($r('app.color.page_background'))
+        .backgroundColor($r('app.color.card_inner_tint'))
 
         // 本月日期格（7 列，有事件的日期显示事件标记点）
         Grid() {
