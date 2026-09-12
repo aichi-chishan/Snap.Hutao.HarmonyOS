@@ -1016,6 +1016,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         Grid() {
           GridItem() {
             HomeLaunchCard({
+              fillHeight: true,
               onLaunched: (ok: boolean, message: string) => {
                 this.getUIContext().getPromptAction().showToast({ message: message, duration: 2200 });
               },
@@ -1023,6 +1024,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           }
           GridItem() {
             HomeGachaCard({
+              fillHeight: true,
               uid: this.homeVm.currentUid,
               pools: this.homeVm.gachaPools,
               total: this.homeVm.gachaTotal,
@@ -1034,6 +1036,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           }
           GridItem() {
             HomeAchievementCard({
+              fillHeight: true,
               onTap: () => {
                 this.switchTo(2);
               },
@@ -1041,6 +1044,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           }
           GridItem() {
             HomeDailyNoteCard({
+              fillHeight: true,
               uid: this.homeVm.currentUid,
               note: this.homeVm.note,
               refreshTime: this.homeVm.noteRefreshTime,
@@ -1052,6 +1056,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           }
           GridItem() {
             HomeTravelersDiaryCard({
+              fillHeight: true,
               onTap: () => {
                 this.switchTo(15);
               },
@@ -1059,6 +1064,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           }
           GridItem() {
             HomeCalendarCard({
+              fillHeight: true,
               eventDays: this.calendarEventDays(),
               todayActs: this.todayActNames(),
               onTap: () => {
@@ -1068,6 +1074,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           }
           GridItem() {
             HomeSignInCard({
+              fillHeight: true,
               uid: this.homeVm.currentUid,
               info: this.homeVm.signInfo,
               loaded: this.homeVm.signLoaded,
@@ -1089,7 +1096,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .columnsGap(12)
         .rowsGap(12)
         .width('100%')
-
+        // 显式行高（行数=ceil(7/列数)，行高 262）→ 单元格有界，卡片行内等高且不溢出
+        .height(Math.ceil(7 / this.homeCols(300, 12)) * 262)
         // Row5：游戏公告（全宽）
         HomeAnnouncementCard({
           items: this.homeVm.announcements,

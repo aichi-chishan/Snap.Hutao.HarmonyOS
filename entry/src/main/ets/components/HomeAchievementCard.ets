@@ -39,8 +39,12 @@ export struct HomeAchievementCard {
     }
   }
 
+    /** 是否撑满 Grid 单元格高度（行内等高） */
+    @Prop fillHeight: boolean = false;
+
   build() {
     PressCard({
+      fillHeight: this.fillHeight,
       onTap: () => {
         this.onTap();
       },
