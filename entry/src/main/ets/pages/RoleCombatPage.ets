@@ -13,7 +13,8 @@ import { MetaIcon } from '../components/MetaIcon';
 import { NavIcon } from '../components/NavIcon';
 import { AssetIcon } from '../components/AssetIcon';
 import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
-import { WikiMetaService } from '../service/WikiMetaService';
+import { WikiMetaService, RoleCombatScheduleMeta } from '../service/WikiMetaService';
+import { Logger } from '../common/Logger';
 
 @Entry
 @Component
@@ -26,6 +27,8 @@ export struct RoleCombatPage {
   @State vm: RoleCombatViewModel = new RoleCombatViewModel();
   /** 风控验证弹窗开关（needRiskVerify 时自动弹出，对齐 Windows 验证小窗） */
   @State showVerify: boolean = false;
+  /** 本期期次元数据（限定元素/特邀/初始可选角色，本地 RoleCombatSchedule.json 按 scheduleId 匹配） */
+  @State scheduleMeta: RoleCombatScheduleMeta | undefined = undefined;
 
   aboutToAppear(): void {
     this.loadData();
@@ -45,11 +48,34 @@ export struct RoleCombatPage {
   loadData(): void {
     if (this.isLoggedIn && this.currentUid.length > 0) {
       this.vm.load(this.currentUid).then(() => {
+        this.syncScheduleMeta();
       });
     } else {
       this.vm.loaded = true;
       this.vm.message = '请先登录';
     }
+  }
+
+  /** 数据到位后按当前期 scheduleId 匹配本地期次元数据（限定元素/特邀/初始可选） */
+  private syncScheduleMeta(): void {
+    const current: RoleCombatDataItem | undefined = this.vm.current();
+    if (current === undefined || current.schedule.scheduleId <= 0) {
+      this.scheduleMeta = undefined;
+      return;
+    }
+    WikiMetaService.getRoleCombatSchedules().then((all: RoleCombatScheduleMeta[]) => {
+      let hit: RoleCombatScheduleMeta | undefined = undefined;
+      for (const m of all) {
+        if (m.id === current.schedule.scheduleId) {
+          hit = m;
+          break;
+        }
+      }
+      this.scheduleMeta = hit;
+      if (hit === undefined) {
+        Logger.warn('RoleCombatPage', `schedule meta miss id=${current.schedule.scheduleId}`);
+      }
+    });
   }
 
   toast(msg: string): void {
@@ -144,6 +170,39 @@ export struct RoleCombatPage {
       }
       .width('100%')
 
+      // 期次元数据（限定元素/特邀/初始可选角色，来自 RoleCombatSchedule.json；匹配不到则不显示）
+      if (this.scheduleMeta !== undefined) {
+        Divider()
+          .width('100%')
+          .color($r('app.color.divider'))
+        if (this.scheduleMeta!.elements.length > 0) {
+          Row({ space: 8 }) {
+            Text('限定元素')
+              .fontSize(12)
+              .fontColor($r('app.color.text_secondary'))
+            ForEach(this.scheduleMeta!.elements, (e: number) => {
+              Row({ space: 4 }) {
+                MetaIcon({ category: 'IconElement', name: WikiMetaService.elementIconById(e), iconSize: 16 })
+                Text(WikiMetaService.elementNameById(e))
+                  .fontSize(12)
+                  .fontColor($r('app.color.text_primary'))
+              }
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+              .borderRadius(8)
+              .backgroundColor($r('app.color.page_background'))
+            }, (e: number) => `rc_el_${e}`)
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+        }
+        if (this.scheduleMeta!.specialAvatars.length > 0) {
+          this.metaAvatarRow('特邀角色', this.scheduleMeta!.specialAvatars)
+        }
+        if (this.scheduleMeta!.initialAvatars.length > 0) {
+          this.metaAvatarRow('初始可选', this.scheduleMeta!.initialAvatars)
+        }
+      }
+
       Divider()
         .width('100%')
         .color($r('app.color.divider'))
@@ -178,6 +237,37 @@ export struct RoleCombatPage {
       .padding({ left: 8, right: 8, top: 4, bottom: 4 })
       .borderRadius(10)
       .backgroundColor(isMedal ? $r('app.color.app_primary') : $r('app.color.app_primary_bg'))
+  }
+
+  /** 期次元数据头像行（特邀/初始可选角色：头像 + 名字，横向滚动） */
+  @Builder
+  metaAvatarRow(label: string, ids: number[]) {
+    Row({ space: 8 }) {
+      Text(label)
+        .fontSize(12)
+        .fontColor($r('app.color.text_secondary'))
+      Scroll() {
+        Row({ space: 10 }) {
+          ForEach(ids, (id: number) => {
+            Column({ space: 2 }) {
+              MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(id), iconSize: 36 })
+              Text(WikiMetaService.nameOfAvatarId(id))
+                .fontSize(9)
+                .fontColor($r('app.color.text_secondary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+            }
+            .width(44)
+            .alignItems(HorizontalAlign.Center)
+          }, (id: number) => `rc_meta_av_${id}`)
+        }
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .scrollBar(BarState.Off)
+      .layoutWeight(1)
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Center)
   }
 
   @Builder

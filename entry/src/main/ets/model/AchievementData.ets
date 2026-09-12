@@ -1,7 +1,8 @@
 /**
  * AchievementData.ets
  * 成就系统数据模型（对齐 Windows 版成就页 + UIAF v1.1 互通格式）。
- * 元数据来自本地 rawfile（paimon-moe 社区开源数据集成就分册·中文，无胡桃云依赖）。
+ * 元数据：官方 Snap.Metadata（metadata/Achievement.json + AchievementGoal.json，1844 条）；
+ * paimon-moe 社区数据集（achievement_zh.json）仅作缺失兜底。
  */
 
 /** 单条成就元数据 */
@@ -17,6 +18,14 @@ export class AchievementEntry {
   groupKey: string = '';
   /** 组内阶段序号（0 起） */
   stageIndex: number = 0;
+  /** 官方元数据：前一阶段 id（0=组首，用于 PreviousId 链聚合） */
+  previousId: number = 0;
+  /** 官方元数据：所属分类 Goal */
+  goalId: number = 0;
+  /** 官方元数据：条目顺序 */
+  order: number = 0;
+  /** 组首条目顺序（组间排序用） */
+  groupOrder: number = 0;
 }
 
 /** 成就分类 */

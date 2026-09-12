@@ -84,12 +84,27 @@ export class AchievementService {
     return archives;
   }
 
-  /** 元数据分类列表（远端更新优先，回退 rawfile；进程内缓存一次） */
+  /** 元数据分类列表（官方包优先 → 远端 paimon 遗留 → rawfile paimon 兜底；进程内缓存一次） */
   static async getCategories(): Promise<AchievementCategory[]> {
     if (AchievementService.categories !== undefined) {
       return AchievementService.categories;
     }
-    // 1) 远端更新版（GitHub 数据源，设置页触发更替）
+    // 1) 官方元数据（rawfile/metadata，对齐 Snap.Metadata：1844 条 > paimon-moe 社区集 1548 条）
+    try {
+      const rm = AppContextProvider.getResourceManager();
+      const achRaw: Uint8Array = await rm.getRawFileContent('metadata/Achievement.json');
+      const goalRaw: Uint8Array = await rm.getRawFileContent('metadata/AchievementGoal.json');
+      AchievementService.parseOfficialMetadata(
+        util.TextDecoder.create('utf-8').decodeToString(achRaw),
+        util.TextDecoder.create('utf-8').decodeToString(goalRaw));
+      if ((AchievementService.idIndex?.size ?? 0) > 0) {
+        return AchievementService.categories ?? [];
+      }
+      AchievementService.categories = undefined;
+    } catch (e) {
+      Logger.warn(TAG, `official achievement meta fail: ${JSON.stringify(e)}`);
+    }
+    // 2) 远端更新版（GitHub 数据源，paimon 遗留格式；官方包缺失时兜底）
     try {
       const remoteText: string = await GameDataService.getInstance().readText(GameDataDomain.Achievement);
       if (remoteText.length > 0) {
@@ -99,7 +114,7 @@ export class AchievementService {
     } catch (e) {
       Logger.warn(TAG, `remote achievement meta fail: ${JSON.stringify(e)}`);
     }
-    // 2) rawfile 内置版
+    // 3) rawfile 内置 paimon 版（最后兜底）
     try {
       const rm = AppContextProvider.getResourceManager();
       const raw: Uint8Array = await rm.getRawFileContent('achievement_zh.json');
@@ -110,6 +125,83 @@ export class AchievementService {
       AchievementService.categories = [];
     }
     return AchievementService.categories ?? [];
+  }
+
+  /**
+   * 解析官方元数据（对齐 Snap.Metadata Achievement.json + AchievementGoal.json）：
+   * 分类=Goal（含官方图标名），条目按 Goal 归类、PreviousId 链聚合多阶段组（如"动物园大亨"三阶段）。
+   */
+  private static parseOfficialMetadata(achText: string, goalText: string): void {
+    const goals: Record<string, Object>[] = JSON.parse(goalText) as Record<string, Object>[];
+    const achs: Record<string, Object>[] = JSON.parse(achText) as Record<string, Object>[];
+    // 分类（按 Order 排序）
+    const catById: Map<number, AchievementCategory> = new Map<number, AchievementCategory>();
+    const sortedGoals: Record<string, Object>[] = goals.slice().sort((a: Record<string, Object>, b: Record<string, Object>) => {
+      return Number(a['Order'] ?? 0) - Number(b['Order'] ?? 0);
+    });
+    for (const g of sortedGoals) {
+      const cat: AchievementCategory = new AchievementCategory();
+      cat.id = Number(g['Id'] ?? 0);
+      cat.name = (g['Name'] as string) ?? '';
+      cat.icon = (g['Icon'] as string) ?? '';
+      catById.set(cat.id, cat);
+    }
+    // 条目：Goal 归类 + PreviousId 链聚合（0=组首）
+    const entryById: Map<number, AchievementEntry> = new Map<number, AchievementEntry>();
+    for (const a of achs) {
+      const entry: AchievementEntry = new AchievementEntry();
+      entry.id = Number(a['Id'] ?? 0);
+      entry.name = (a['Title'] as string) ?? '';
+      entry.desc = (a['Description'] as string) ?? '';
+      entry.reward = Number(a['Reward'] ?? 0);
+      entry.ver = (a['Version'] as string) ?? '';
+      entry.previousId = Number(a['PreviousId'] ?? 0);
+      entry.goalId = Number(a['Goal'] ?? 0);
+      entry.order = Number(a['Order'] ?? 0);
+      entryById.set(entry.id, entry);
+    }
+    for (const entry of entryById.values()) {
+      const cat: AchievementCategory | undefined = catById.get(entry.goalId);
+      if (cat === undefined) {
+        continue;
+      }
+      const prev: AchievementEntry | undefined = entry.previousId > 0
+        ? entryById.get(entry.previousId)
+        : undefined;
+      if (prev !== undefined) {
+        entry.groupKey = prev.groupKey;
+        entry.stageIndex = prev.stageIndex + 1;
+        entry.groupOrder = prev.groupOrder;
+      } else {
+        entry.groupKey = `${entry.goalId}_${entry.id}`;
+        entry.stageIndex = 0;
+        entry.groupOrder = entry.order;
+      }
+      cat.entries.push(entry);
+    }
+    const list: AchievementCategory[] = [];
+    const index: Map<number, AchievementEntry> = new Map<number, AchievementEntry>();
+    catById.forEach((cat: AchievementCategory) => {
+      // 组间按组首 Order，组内按阶段序
+      cat.entries.sort((a: AchievementEntry, b: AchievementEntry) => {
+        if (a.groupOrder !== b.groupOrder) {
+          return a.groupOrder - b.groupOrder;
+        }
+        if (a.groupKey !== b.groupKey) {
+          return a.order - b.order;
+        }
+        return a.stageIndex - b.stageIndex;
+      });
+      list.push(cat);
+      for (const e of cat.entries) {
+        if (e.id > 0) {
+          index.set(e.id, e);
+        }
+      }
+    });
+    AchievementService.categories = list;
+    AchievementService.idIndex = index;
+    Logger.info(TAG, `official metadata loaded: ${list.length} categories, ${index.size} entries`);
   }
 
   /** 解析元数据 JSON：{ "<分类id>": { name, achievements: [ 单对象 | 对象数组(多阶段) ] } } */

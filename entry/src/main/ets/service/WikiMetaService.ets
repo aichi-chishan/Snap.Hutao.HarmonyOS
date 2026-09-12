@@ -125,6 +125,19 @@ export class GachaEventMeta {
   upPurple: number[] = [];
 }
 
+/** 幻想真境剧诗期次元数据（对齐 Snap.Metadata RoleCombatSchedule，时间已转 epoch ms） */
+export class RoleCombatScheduleMeta {
+  id: number = 0;
+  begin: number = 0;
+  end: number = 0;
+  /** 本期限定元素（ElementType 数字，见 elementNameById） */
+  elements: number[] = [];
+  /** 特邀角色 */
+  specialAvatars: number[] = [];
+  /** 初始可选角色 */
+  initialAvatars: number[] = [];
+}
+
 export class WikiMetaService {
   private static avatars: WikiAvatarMeta[] | undefined = undefined;
   private static weapons: WikiWeaponMeta[] | undefined = undefined;
@@ -133,6 +146,7 @@ export class WikiMetaService {
   private static nameCards: NameCardMeta[] | undefined = undefined;
   private static nameCardByPic: Map<string, NameCardMeta> = new Map();
   private static gachaEvents: GachaEventMeta[] | undefined = undefined;
+  private static roleCombatSchedules: RoleCombatScheduleMeta[] | undefined = undefined;
 
   private static async readRawJson(name: string): Promise<Record<string, Object> | Object[]> {
     const rm = AppContextProvider.getResourceManager();
@@ -441,6 +455,19 @@ export class WikiMetaService {
     return n !== undefined ? n : '';
   }
 
+  /** 角色 id → 名称（未命中返回空；剧期限定角色行用） */
+  static nameOfAvatarId(id: number): string {
+    const avatars = WikiMetaService.avatars;
+    if (avatars !== undefined) {
+      for (const a of avatars) {
+        if (a.id === id) {
+          return a.name;
+        }
+      }
+    }
+    return '';
+  }
+
   /** 武器 item_id → 图标名（未命中返回空） */
   static iconOfWeapon(id: number): string {
     const n: string | undefined = WikiMetaService.weaponIconMap.get(id);
@@ -626,6 +653,71 @@ export class WikiMetaService {
       case 'Cryo': return '冰';
       case 'Geo': return '岩';
       default: return e;
+    }
+  }
+
+  /** 幻想真境剧诗期次元数据（懒加载 metadata/RoleCombatSchedule.json，按 Id 匹配 API scheduleId） */
+  static async getRoleCombatSchedules(): Promise<RoleCombatScheduleMeta[]> {
+    if (WikiMetaService.roleCombatSchedules !== undefined) {
+      return WikiMetaService.roleCombatSchedules;
+    }
+    try {
+      const arr = await WikiMetaService.readRawJson('RoleCombatSchedule.json') as Object[];
+      const list: RoleCombatScheduleMeta[] = [];
+      for (const raw of arr) {
+        const o: Record<string, Object> = raw as Record<string, Object>;
+        const m: RoleCombatScheduleMeta = new RoleCombatScheduleMeta();
+        m.id = Number(o['Id'] ?? 0);
+        m.begin = Date.parse(String(o['Begin'] ?? ''));
+        m.end = Date.parse(String(o['End'] ?? ''));
+        const els = (o['Elements'] as Object[]) ?? [];
+        for (const e of els) {
+          m.elements.push(Number(e));
+        }
+        const sp = (o['SpecialAvatars'] as Object[]) ?? [];
+        for (const e of sp) {
+          m.specialAvatars.push(Number(e));
+        }
+        const ini = (o['InitialAvatars'] as Object[]) ?? [];
+        for (const e of ini) {
+          m.initialAvatars.push(Number(e));
+        }
+        list.push(m);
+      }
+      WikiMetaService.roleCombatSchedules = list;
+      Logger.info(TAG, `role combat schedules loaded: ${list.length}`);
+    } catch (e) {
+      Logger.warn(TAG, `load role combat schedules fail: ${(e as Error).message}`);
+      WikiMetaService.roleCombatSchedules = [];
+    }
+    return WikiMetaService.roleCombatSchedules;
+  }
+
+  /** 剧期限定元素数字 → 元素中文名（对齐 Windows ElementType 枚举） */
+  static elementNameById(n: number): string {
+    switch (n) {
+      case 1: return '火';
+      case 2: return '水';
+      case 3: return '草';
+      case 4: return '雷';
+      case 5: return '冰';
+      case 7: return '风';
+      case 8: return '岩';
+      default: return `${n}`;
+    }
+  }
+
+  /** 剧期限定元素数字 → IconElement 图标名（rawfile/icons/IconElement） */
+  static elementIconById(n: number): string {
+    switch (n) {
+      case 1: return 'UI_Icon_Element_Pyro';
+      case 2: return 'UI_Icon_Element_Hydro';
+      case 3: return 'UI_Icon_Element_Dendro';
+      case 4: return 'UI_Icon_Element_Electro';
+      case 5: return 'UI_Icon_Element_Cryo';
+      case 7: return 'UI_Icon_Element_Anemo';
+      case 8: return 'UI_Icon_Element_Geo';
+      default: return '';
     }
   }
 }
