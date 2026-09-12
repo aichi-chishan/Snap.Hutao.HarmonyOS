@@ -8,6 +8,8 @@ import { router } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { WikiMetaService, WikiAvatarMeta, MetaSkill, MetaText, MetaMaterial } from '../service/WikiMetaService';
 import { StandardIconService } from '../data/remote/StandardIconService';
+import { fileIo } from '@kit.CoreFileKit';
+import { AppContextProvider } from '../common/AppContext';
 import { AppBackButton } from '../components/AppBackButton';
 import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
@@ -43,16 +45,73 @@ export struct SplashArtView {
       this.src = '';
       return;
     }
+    const name: string = `UI_Gacha_AvatarIcon_${suffix}`;
+    const dir: string = `${AppContextProvider.getCacheDir()}/rawicons/${SPLASH_CATEGORY}`;
+    const dest: string = `${dir}/${name}.png`;
+    // 1) 沙盒缓存命中（含已从 rawfile 落盘过的）
     try {
-      const path: string = await StandardIconService.ensure(SPLASH_CATEGORY, `UI_Gacha_AvatarIcon_${suffix}`);
+      if (fileIo.accessSync(dest)) {
+        if (token === this.resolveToken) {
+          this.src = `file://${dest}`;
+        }
+        return;
+      }
+    } catch (e) {
+      // 未缓存，继续
+    }
+    // 2) rawfile 预打包立绘（离线可用）→ 落盘缓存
+    try {
+      const raw: Uint8Array = await AppContextProvider.getResourceManager()
+        .getRawFileContent(`icons/${SPLASH_CATEGORY}/${name}.png`);
+      await SplashArtView.ensureDir(dir);
+      const file = fileIo.openSync(dest, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
+      try {
+        fileIo.writeSync(file.fd, raw.buffer as ArrayBuffer);
+      } finally {
+        fileIo.closeSync(file);
+      }
+      if (token === this.resolveToken) {
+        this.src = `file://${dest}`;
+      }
+      Logger.info(AVATAR_PAGE_TAG, `splash ${suffix} -> rawfile`);
+      return;
+    } catch (e) {
+      // 包内无该立绘（旅行者等），继续走 CDN
+    }
+    // 3) 静态 CDN 按需拉取（包内缺失时的兜底）
+    try {
+      const path: string = await StandardIconService.ensure(SPLASH_CATEGORY, name);
       if (token !== this.resolveToken) {
         return;
       }
       this.src = path.length > 0 ? `file://${path}` : '';
-      Logger.info(AVATAR_PAGE_TAG, `splash ${suffix} -> ${path.length > 0 ? 'ok' : 'miss'}`);
+      Logger.info(AVATAR_PAGE_TAG, `splash ${suffix} -> ${path.length > 0 ? 'cdn' : 'miss'}`);
     } catch (e) {
       if (token === this.resolveToken) {
         this.src = '';
+      }
+    }
+  }
+
+  /** 逐级创建目录（fileIo.mkdirSync 非递归） */
+  private static async ensureDir(full: string): Promise<void> {
+    try {
+      fileIo.mkdirSync(full);
+      return;
+    } catch (e) {
+      // 已存在或父目录缺失：逐级创建
+    }
+    const segs: string[] = full.split('/');
+    let cur: string = '';
+    for (const seg of segs) {
+      if (seg.length === 0) {
+        continue;
+      }
+      cur += cur.length > 0 ? `/${seg}` : seg;
+      try {
+        fileIo.mkdirSync(cur);
+      } catch (e) {
+        // 已存在
       }
     }
   }
@@ -114,6 +173,10 @@ export struct WikiAvatarPage {
   @State ncDesc: string = '';
   /** 当前角色在列表中的位置（立绘 Swiper 翻页联动） */
   @State curIdx: number = 0;
+  /** 基础属性计算请求序号（拖动滑条连发时丢弃过期异步结果） */
+  private calcSeq: number = 0;
+  /** 该角色无基础属性元数据（旅行者等，官方数据不含其成长曲线） */
+  @State baseDataMissing: boolean = false;
 
   toast(msg: string): void {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1500 });
@@ -212,12 +275,15 @@ export struct WikiAvatarPage {
   calcAvatarBase(): void {
     const cur: WikiAvatarMeta | undefined = this.current;
     if (cur === undefined || cur.growCurves.length === 0) {
+      this.baseDataMissing = true;
+      Logger.warn(AVATAR_PAGE_TAG, `calc skip: cur=${cur?.name ?? 'undefined'} growCurves=${cur?.growCurves.length ?? -1}`);
       this.curHp = 0;
       this.curAtk = 0;
       this.curDef = 0;
       this.curBonusText = '';
       return;
     }
+    this.baseDataMissing = false;
     const maxLv: number = BaseValueService.avatarMaxLevel(cur.quality);
     if (this.curLevel > maxLv) {
       this.curLevel = maxLv;
@@ -228,9 +294,17 @@ export struct WikiAvatarPage {
     info.defenseBase = cur.defenseBase;
     info.promoteId = cur.promoteId;
     info.growCurves = cur.growCurves;
-    BaseValueService.avatarBaseValues(info, this.curLevel, this.curPromoted).then((v: AvatarBaseValues) => {
-      // 异步返回时角色可能已切换，校验后再落地
+    const seq: number = ++this.calcSeq;
+    const reqLevel: number = this.curLevel;
+    const reqPromoted: boolean = this.curPromoted;
+    BaseValueService.avatarBaseValues(info, reqLevel, reqPromoted).then((v: AvatarBaseValues) => {
+      // 异步返回时角色/等级/突破任一变化即为过期结果，丢弃（防拖动滑条连发时旧值覆盖新值）
+      if (seq !== this.calcSeq || this.curLevel !== reqLevel || this.curPromoted !== reqPromoted) {
+        return;
+      }
       if (this.current !== undefined && this.current.id === cur.id) {
+        Logger.info(AVATAR_PAGE_TAG, `calc applied lv=${reqLevel} pro=${reqPromoted} hp=${v.hp} atk=${v.atk} def=${v.def}`);
+        this.baseDataMissing = false;
         this.curHp = v.hp;
         this.curAtk = v.atk;
         this.curDef = v.def;
@@ -595,6 +669,13 @@ export struct WikiAvatarPage {
         this.propCell('防御力', this.curDef)
       }
       .width('100%')
+
+      if (this.baseDataMissing) {
+        Text(`${this.current?.name ?? '该角色'}的基础属性与元素相关，本地元数据未收录（与 Windows 版数据源一致）`)
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+      }
 
       Row() {
         Text('是否突破')

@@ -20,9 +20,9 @@ export class BaseValueService {
   private static avatarPromotes: Promotes | undefined = undefined;
   private static monsterCurves: Curves | undefined = undefined;
 
-  /** 角色品质 → 最大等级（4/5 星 90；对齐 Windows GetMaxLevelByQuality） */
+  /** 角色品质 → 最大等级（4/5 星 100；对齐 Windows Avatar.GetMaxLevel，6.x 起上限 100） */
   static avatarMaxLevel(quality: number): number {
-    return quality >= 4 ? 90 : 70;
+    return quality >= 4 ? 100 : 70;
   }
 
   /** 战斗属性中文名（1 生命/4 攻击/7 防御 + 突破属性） */
@@ -354,7 +354,7 @@ export class AvatarBaseValues {
   /** 突破加成属性 id（非生命/攻击/防御；0=无） */
   bonusType: number = 0;
   bonusValue: number = 0;
-  maxLevel: number = 90;
+  maxLevel: number = 100;
 }
 
 /** 单条曲线 */
