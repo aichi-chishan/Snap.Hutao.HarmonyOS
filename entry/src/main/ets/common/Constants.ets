@@ -6,7 +6,7 @@
 
 export class AppConstants {
   /** 上报给米哈游的客户端版本号（x-rpc-app_version，对齐 Windows CNVersion；过旧易风控） */
-  static readonly APP_VERSION: string = '2.95.1';
+  static readonly APP_VERSION: string = '1.21.0';
   /** 战绩类接口（便笺/角色/深渊/日历/签到）客户端类型：5 = 桌面（对齐 Windows XRpc） */
   static readonly GAMERECORD_CLIENT_TYPE: string = '5';
   /** 客户端类型：2 = android（仅 passport/登录链路用） */

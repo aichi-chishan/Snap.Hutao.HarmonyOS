@@ -98,6 +98,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     @State isUltra: boolean = false;
     /** 系统三键区（最小化/全屏/关闭）占位宽度 vp（PC 自定义窗口装饰；0=无系统三键） */
     @StorageProp('titleBtnWidthVp') titleBtnWidthVp: number = 0;
+    @StorageProp('appVersion') appVersion: string = '';
     /** 是否正在通过自绘 TitleBar 拖拽窗口（避免重复触发 startMoving） */
     private windowDragging: boolean = false;
     private controller: HdsTabsController = new HdsTabsController();
@@ -402,8 +403,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         });
       })
 
-      // 版本号（胡桃 1.20.0）
-      Text('胡桃 1.20.0')
+      // 版本号（胡桃 x.y.z，来自 bundleManager versionName）
+      Text(`胡桃 ${this.appVersion}`)
         .fontSize(14)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
@@ -417,13 +418,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .height('100%')
     }
     .width('100%')
-    // 标题栏实时磨砂（Acrylic 观感；对齐 Windows 标题栏材质）
-    .backgroundEffect({
-      radius: 40,
-      color: this.isDark ? '#80141418' : '#80F2F0EC',
-      saturation: 1.2,
-      brightness: this.isDark ? 0.9 : 1.1,
-    })
+    // 沉浸式标题栏：完全透明，壁纸直接透出（对齐 Windows 版标题栏材质）
     .height(40)
     .padding({ left: 6, right: 0 })
     .alignItems(VerticalAlign.Center)

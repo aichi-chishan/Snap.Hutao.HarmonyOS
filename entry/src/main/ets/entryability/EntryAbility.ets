@@ -1,4 +1,5 @@
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
+import { bundleManager } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { ComponentContent, UIContext, display, window } from '@kit.ArkUI';
 import { RelationalStoreHelper } from '../data/db/RelationalStoreHelper';
@@ -88,6 +89,13 @@ export default class EntryAbility extends UIAbility {
         hilog.warn(DOMAIN, TAG, 'setWindowDecorVisible unsupported');
       }
       AppStorage.setOrCreate<boolean>('sysDecorButtons', decorButtons);
+      // 应用版本号（顶栏展示与更新检查共用）
+      try {
+        const info = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
+        AppStorage.setOrCreate<string>('appVersion', info.versionName);
+      } catch (e) {
+        hilog.warn(DOMAIN, TAG, 'versionName read fail');
+      }
       EntryAbility.publishTitleButtonRect(mainWindow, decorButtons);
       try {
         mainWindow.on('windowTitleButtonRectChange', (rect: window.TitleButtonRect) => {

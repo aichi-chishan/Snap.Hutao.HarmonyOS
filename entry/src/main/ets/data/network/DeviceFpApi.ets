@@ -7,6 +7,7 @@
 import { ApiClient } from './ApiClient';
 import { ApiResponse } from '../../model/ApiResponse';
 import { Logger } from '../../common/Logger';
+import { AppConstants } from '../../common/Constants';
 
 const TAG: string = 'DeviceFpApi';
 
@@ -139,7 +140,7 @@ export class DeviceFpApi {
     const bodyJson: string = JSON.stringify(req);
     try {
       const resp: ApiResponse = await ApiClient.getInstance().postJson(
-        DeviceFpApi.URL, bodyJson, { 'User-Agent': 'Snap Hutao/1.20.0' });
+        DeviceFpApi.URL, bodyJson, { 'User-Agent': `Snap Hutao/${AppConstants.APP_VERSION}` });
       if (!resp.success || resp.data === undefined) {
         Logger.warn(TAG, `getFp fail retcode=${resp.retcode} msg=${resp.message}`);
         return '';

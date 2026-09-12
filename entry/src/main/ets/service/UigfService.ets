@@ -7,6 +7,7 @@ import { GachaRepo } from '../data/repo/GachaRepo';
 import { GachaItem } from '../model/GachaItem';
 import { GachaType } from '../model/GachaType';
 import { Logger } from '../common/Logger';
+import { AppConstants } from '../common/Constants';
 
 const TAG: string = 'UigfService';
 const UIGF_VERSION: string = 'v4.2';
@@ -86,7 +87,7 @@ export class UigfService {
     const root: UigfRoot = new UigfRoot();
     root.info.export_timestamp = Math.floor(Date.now() / 1000);
     root.info.export_app = 'Snap.Hutao.HarmonyOS';
-    root.info.export_app_version = '1.20.0';
+    root.info.export_app_version = AppConstants.APP_VERSION;
     root.info.version = UIGF_VERSION;
     const archives = await GachaRepo.getAllArchives();
     for (const archive of archives) {
