@@ -14,7 +14,9 @@ python .zcode/skills/hmos-local-test/scripts/run_local_test.py --project-path <�
 CI（`.github/workflows/ci.yml`）：
 - `lint` job：`devecocli check lint`，**Errors ≥ 1 即失败**（warning 不阻断）
 - `build` job：复制 `ci/build-profile.ci.json5`（无签名）→ 构建 unsigned debug HAP → 传 artifact
-- 注意：build job 依赖 `@deveco/deveco-cli` 在 CI 环境自管理工具链；首次运行如因环境差异失败，按日志调整
+- **启用条件**：仓库 Variables 配置 `DEVECO_CLT_URL`（华为 Command Line Tools zip 直链，开发者站登录下载）；
+  未配置时两个 job 自动跳过（CLT 无公开直链，见 ci.yml 顶部注释）
+- `@deveco/deveco-cli` 来自公开 npm（Node ≥ 22），无需 DevEco Studio，仅需 CLT
 
 ## 实机回归清单（发版前）
 

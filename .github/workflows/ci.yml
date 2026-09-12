@@ -1,5 +1,9 @@
 name: CI
 
+# HarmonyOS lint/build 依赖华为 Command Line Tools（华为开发者站需登录下载，无公开直链）。
+# 在仓库 Settings → Secrets and variables → Actions → Variables 配置
+#   DEVECO_CLT_URL = CLT zip 直链（如 DevEco-Command-Line-Tools-linux-x64.zip 的下载地址）
+# 后本工作流自动启用；未配置时两个 job 跳过（不阻塞 PR）。
 on:
   push:
     branches: [main]
@@ -10,6 +14,7 @@ jobs:
   lint:
     name: Lint (0 errors gate)
     runs-on: ubuntu-latest
+    if: ${{ vars.DEVECO_CLT_URL != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,6 +22,15 @@ jobs:
           node-version: '22'
       - name: Install DevEco CLI
         run: npm install -g @deveco/deveco-cli
+      - name: Install Command Line Tools
+        run: |
+          curl -L --fail --retry 3 -o clt.zip "$DEVECO_CLT_URL"
+          unzip -q clt.zip -d clt
+          clt_dir=$(find clt -maxdepth 2 -type d -name 'command-line-tools' | head -1)
+          if [ -z "$clt_dir" ]; then clt_dir=$(find clt -maxdepth 2 -mindepth 1 -type d | head -1); fi
+          echo "DEVECO_CLI_CLT_PATH=$(pwd)/$clt_dir" >> "$GITHUB_ENV"
+        env:
+          DEVECO_CLT_URL: ${{ vars.DEVECO_CLT_URL }}
       - name: Prepare CI build profile
         run: cp ci/build-profile.ci.json5 build-profile.json5
       - name: Lint
@@ -31,6 +45,7 @@ jobs:
   build:
     name: Build unsigned debug HAP
     runs-on: ubuntu-latest
+    if: ${{ vars.DEVECO_CLT_URL != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,6 +53,15 @@ jobs:
           node-version: '22'
       - name: Install DevEco CLI
         run: npm install -g @deveco/deveco-cli
+      - name: Install Command Line Tools
+        run: |
+          curl -L --fail --retry 3 -o clt.zip "$DEVECO_CLT_URL"
+          unzip -q clt.zip -d clt
+          clt_dir=$(find clt -maxdepth 2 -type d -name 'command-line-tools' | head -1)
+          if [ -z "$clt_dir" ]; then clt_dir=$(find clt -maxdepth 2 -mindepth 1 -type d | head -1); fi
+          echo "DEVECO_CLI_CLT_PATH=$(pwd)/$clt_dir" >> "$GITHUB_ENV"
+        env:
+          DEVECO_CLT_URL: ${{ vars.DEVECO_CLT_URL }}
       - name: Prepare CI build profile
         run: cp ci/build-profile.ci.json5 build-profile.json5
       - name: Build
