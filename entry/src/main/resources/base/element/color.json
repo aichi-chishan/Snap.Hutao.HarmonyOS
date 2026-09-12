@@ -103,6 +103,10 @@
     {
       "name": "wallpaper_mask",
       "value": "#99FFFFFF"
+    },
+    {
+      "name": "icon_dark_chip",
+      "value": "#E62E2E2E"
     }
   ]
 }

@@ -723,7 +723,7 @@ export struct WikiAvatarPage {
           .width('100%')
         }
         .width('100%')
-        .padding(8)
+        .padding(12)
         .borderRadius(10)
         .backgroundColor($r('app.color.page_background'))
       }
@@ -746,7 +746,15 @@ export struct WikiAvatarPage {
         .width('100%')
       ForEach(this.current?.skills ?? [], (s: MetaSkill, idx: number) => {
         Row({ space: 10 }) {
-          MetaIcon({ category: s.i.startsWith('UI_Talent_') ? 'Talent' : 'Skill', name: s.i, iconSize: 38 })
+          Row() {
+            MetaIcon({ category: s.i.startsWith('UI_Talent_') ? 'Talent' : 'Skill', name: s.i, iconSize: 38 })
+          }
+          .width(46)
+          .height(46)
+          .borderRadius(10)
+          .backgroundColor($r('app.color.icon_dark_chip'))
+          .alignItems(VerticalAlign.Center)
+          .justifyContent(FlexAlign.Center)
           Column({ space: 3 }) {
             Row({ space: 6 }) {
               Text(s.n)
@@ -770,7 +778,9 @@ export struct WikiAvatarPage {
           .layoutWeight(1)
         }
         .width('100%')
-        .padding({ top: 6, bottom: 6 })
+        .padding({ top: 8, bottom: 8, left: 12, right: 12 })
+        .borderRadius(10)
+        .backgroundColor($r('app.color.page_background'))
         .alignItems(VerticalAlign.Top)
       }, (s: MetaSkill, idx: number) => `sk_${s.n}`)
     }
@@ -797,7 +807,15 @@ export struct WikiAvatarPage {
             .fontColor($r('app.color.app_primary'))
             .width(20)
             .textAlign(TextAlign.Center)
-          MetaIcon({ category: 'Talent', name: s.i, iconSize: 34 })
+          Row() {
+            MetaIcon({ category: 'Talent', name: s.i, iconSize: 34 })
+          }
+          .width(44)
+          .height(44)
+          .borderRadius(10)
+          .backgroundColor($r('app.color.icon_dark_chip'))
+          .alignItems(VerticalAlign.Center)
+          .justifyContent(FlexAlign.Center)
           Column({ space: 3 }) {
             Text(s.n)
               .fontSize(13)
@@ -813,7 +831,9 @@ export struct WikiAvatarPage {
           .layoutWeight(1)
         }
         .width('100%')
-        .padding({ top: 6, bottom: 6 })
+        .padding({ top: 8, bottom: 8, left: 12, right: 12 })
+        .borderRadius(10)
+        .backgroundColor($r('app.color.page_background'))
         .alignItems(VerticalAlign.Top)
       }, (s: MetaSkill, idx: number) => `tl_${s.n}`)
     }
@@ -879,7 +899,7 @@ export struct WikiAvatarPage {
                 .width('100%')
             }
             .width('100%')
-            .padding({ top: 6, bottom: 6, left: 8, right: 8 })
+            .padding({ top: 8, bottom: 8, left: 12, right: 12 })
             .borderRadius(8)
             .backgroundColor($r('app.color.page_background'))
           }, (t: MetaText, idx: number) => `tx_${title}_${idx}_${t.t}`)
