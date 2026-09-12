@@ -134,7 +134,7 @@ export struct HomeGachaCard {
     .width(160)
     .padding(10)
     .borderRadius(10)
-    .backgroundColor($r('app.color.page_background'))
+    .backgroundColor($r('app.color.card_inner_tint'))
     .border({ width: 1, color: $r('app.color.divider') })
     .alignItems(HorizontalAlign.Start)
   }

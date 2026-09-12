@@ -53,7 +53,7 @@ export struct HomeAnnouncementCard {
           .height(50)
           .borderRadius(8)
           .objectFit(ImageFit.Cover)
-          .backgroundColor($r('app.color.page_background'))
+          .backgroundColor($r('app.color.card_inner_tint'))
       } else {
         Text(item.typeName)
           .fontSize(9)

@@ -136,7 +136,7 @@ export struct HomeChallengeCard {
     }
     .padding(8)
     .borderRadius(8)
-    .backgroundColor($r('app.color.page_background'))
+    .backgroundColor($r('app.color.card_inner_tint'))
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Start)
     .onClick(() => {

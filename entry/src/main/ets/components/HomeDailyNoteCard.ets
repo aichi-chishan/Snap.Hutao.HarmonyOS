@@ -191,7 +191,7 @@ export struct HomeDailyNoteCard {
     .height(wide ? 64 : 28)
     .padding({ left: 8, right: 8, top: wide ? 0 : 4, bottom: wide ? 0 : 4 })
     .borderRadius(8)
-    .backgroundColor($r('app.color.page_background'))
+    .backgroundColor($r('app.color.card_inner_tint'))
   }
 
   build() {
@@ -260,7 +260,7 @@ export struct HomeDailyNoteCard {
                   .fontColor(exp.isFinished() ? $r('app.color.success') : $r('app.color.notice_on'))
                   .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                   .borderRadius(6)
-                  .backgroundColor($r('app.color.page_background'))
+                  .backgroundColor($r('app.color.card_inner_tint'))
                   .maxLines(1)
               }, (exp: Expedition, idx: number) => `exp_${idx}_${exp.status}`)
               Blank()

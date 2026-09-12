@@ -99,6 +99,11 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     /** 系统三键区（最小化/全屏/关闭）占位宽度 vp（PC 自定义窗口装饰；0=无系统三键） */
     @StorageProp('titleBtnWidthVp') titleBtnWidthVp: number = 0;
     @StorageProp('appVersion') appVersion: string = '';
+    /** 主页内容区宽度（UniformPanel 式响应列数：列数 = floor((W+gap)/(minItem+gap))） */
+    @State homeW: number = 0;
+    /** 主页游戏活动区域设置（对齐 Windows：日历显示默认开 / 未在进行中活动默认关） */
+    @StorageProp('homeActCalendarShown') homeActCalendarShown: boolean = true;
+    @StorageProp('homeActPreview') homeActPreview: boolean = false;
     /** 是否正在通过自绘 TitleBar 拖拽窗口（避免重复触发 startMoving） */
     private windowDragging: boolean = false;
     private controller: HdsTabsController = new HdsTabsController();
@@ -114,6 +119,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         this.materialLevelIdx = 2;
       }
       AppStorage.setOrCreate<string>('bgType', PreferencesStore.getBackgroundImageType());
+    AppStorage.setOrCreate<boolean>('homeActCalendarShown', PreferencesStore.getHomeActCalendar());
+    AppStorage.setOrCreate<boolean>('homeActPreview', PreferencesStore.getHomeActPreview());
       AppStorage.setOrCreate<string>('bgFolderPath', PreferencesStore.getBackgroundFolderPath());
       // 立即检测宽屏（PC/平板>普通手机）：屏幕宽度 vp 判断，避免等待 onAreaChange 首帧
       this.isWide = Index.detectWideScreen();
@@ -896,7 +903,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           subtitle: '胡桃工具箱 · 祈愿记录 / 实时便笺 / 签到日历',
         })
 
-        // Row2：左 = 三个祈愿卡池（同框竖排） | 右 = 三个挑战/活动（同框竖排）
+        // Row2：左 = 三个祈愿卡池（同框竖排） | 右 = 挑战/活动（同框竖排；受主页活动区域设置控制）
         Row({ space: 12 }) {
           Column() {
             if (this.poolBanners().length > 0) {
@@ -951,12 +958,18 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           .padding(14)
           .borderRadius(12)
           .backgroundColor($r('app.color.card_background'))
+          .backgroundEffect({
+            radius: 40,
+            color: $r('app.color.card_acrylic_tint'),
+            saturation: 1.15,
+          })
           .border({ width: 1, color: $r('app.color.divider') })
           .alignItems(HorizontalAlign.Start)
 
+          if (this.homeActCalendarShown) {
           Column() {
-            if (this.actBanners().length > 0) {
-              ForEach(this.actBanners(), (act: ActCalendarEntry, idx: number) => {
+            if (this.actBannersFiltered().length > 0) {
+              ForEach(this.actBannersFiltered(), (act: ActCalendarEntry, idx: number) => {
                 Column() {
                   HomeActBannerCard({
                     entry: act,
@@ -985,62 +998,65 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           .padding(14)
           .borderRadius(12)
           .backgroundColor($r('app.color.card_background'))
+          .backgroundEffect({
+            radius: 40,
+            color: $r('app.color.card_acrylic_tint'),
+            saturation: 1.15,
+          })
           .border({ width: 1, color: $r('app.color.divider') })
           .alignItems(HorizontalAlign.Start)
+          }
         }
         .width('100%')
         .height(360)
         .alignItems(VerticalAlign.Top)
 
-        // Row3：等高 4 列卡（对齐 Windows：启动游戏 | 保底计数 | 成就统计 | 实时便笺）
-        Row({ space: 10 }) {
-          HomeLaunchCard({
-            onLaunched: (ok: boolean, message: string) => {
-              this.getUIContext().getPromptAction().showToast({ message: message, duration: 2200 });
-            },
-          })
-          .layoutWeight(1)
-          .height('100%')
-
-          HomeGachaCard({
-            uid: this.homeVm.currentUid,
-            pools: this.homeVm.gachaPools,
-            total: this.homeVm.gachaTotal,
-            loaded: this.homeVm.gachaLoaded,
-            onTap: () => {
-              this.switchTo(1);
-            },
-          })
-          .layoutWeight(1)
-          .height('100%')
-
-          HomeAchievementCard({
-            onTap: () => {
-              this.switchTo(2);
-            },
-          })
-          .layoutWeight(1)
-          .height('100%')
-
-          HomeDailyNoteCard({
-            uid: this.homeVm.currentUid,
-            note: this.homeVm.note,
-            refreshTime: this.homeVm.noteRefreshTime,
-            loaded: this.homeVm.noteLoaded,
-            onTap: () => {
-              this.switchTo(3);
-            },
-          })
-          .layoutWeight(1)
-          .height('100%')
-
-        }
-        .width('100%')
-        .height(260)
-        .alignItems(VerticalAlign.Center)
-
-        // Row4：日历 | 每日签到 | 空 | 空（四列，与 Row3 列宽一致）
+        // 仪表板卡组（对齐 Windows UniformPanel MinItemWidth=300 gap=12：
+        // 列数随内容宽度推导，等分拉伸，行高按内容自适应；顺序=Windows InitializeDashboard）
         Grid() {
+          GridItem() {
+            HomeLaunchCard({
+              onLaunched: (ok: boolean, message: string) => {
+                this.getUIContext().getPromptAction().showToast({ message: message, duration: 2200 });
+              },
+            })
+          }
+          GridItem() {
+            HomeGachaCard({
+              uid: this.homeVm.currentUid,
+              pools: this.homeVm.gachaPools,
+              total: this.homeVm.gachaTotal,
+              loaded: this.homeVm.gachaLoaded,
+              onTap: () => {
+                this.switchTo(1);
+              },
+            })
+          }
+          GridItem() {
+            HomeAchievementCard({
+              onTap: () => {
+                this.switchTo(2);
+              },
+            })
+          }
+          GridItem() {
+            HomeDailyNoteCard({
+              uid: this.homeVm.currentUid,
+              note: this.homeVm.note,
+              refreshTime: this.homeVm.noteRefreshTime,
+              loaded: this.homeVm.noteLoaded,
+              onTap: () => {
+                this.switchTo(3);
+              },
+            })
+          }
+          GridItem() {
+            HomeTravelersDiaryCard({
+              onTap: () => {
+                this.switchTo(15);
+              },
+            })
+          }
           GridItem() {
             HomeCalendarCard({
               eventDays: this.calendarEventDays(),
@@ -1068,21 +1084,11 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
-          GridItem() {
-            HomeTravelersDiaryCard({
-              onTap: () => {
-                this.switchTo(15);
-              },
-            })
-          }
-          GridItem() {
-            Column()
-          }
         }
-        .columnsTemplate('1fr 1fr 1fr 1fr')
-        .columnsGap(10)
+        .columnsTemplate(Array(this.homeCols(300, 12)).fill('1fr').join(' '))
+        .columnsGap(12)
+        .rowsGap(12)
         .width('100%')
-        .height(240)
 
         // Row5：游戏公告（全宽）
         HomeAnnouncementCard({
@@ -1103,10 +1109,37 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       }
       .width('100%')
       .padding({ left: 16, right: 16, bottom: 16 })
+      .onAreaChange((oldValue: Area, newValue: Area) => {
+        // UniformPanel 语义：列数按内容区实际宽度推导（不含侧栏）
+        this.homeW = Number(newValue.width);
+      })
     }
     .width('100%')
     .height('100%')
     .align(Alignment.Top)
+  }
+
+  /** UniformPanel 列数（对齐 Windows UniformPanel.MeasureOverride）：floor((W+gap)/(minItem+gap))，至少 1 */
+  homeCols(minItem: number, gap: number): number {
+    if (this.homeW <= 0) {
+      return 4;
+    }
+    return Math.max(1, Math.floor((this.homeW + gap) / (minItem + gap)));
+  }
+
+  /** 未在进行中（无有效起止时间）的活动过滤（对齐 Windows ActPreview 开关） */
+  private actBannersFiltered(): ActCalendarEntry[] {
+    const all: ActCalendarEntry[] = this.actBanners();
+    if (this.homeActPreview) {
+      return all;
+    }
+    const out: ActCalendarEntry[] = [];
+    for (const a of all) {
+      if (a.startTime > 0 && a.endTime > 0) {
+        out.push(a);
+      }
+    }
+    return out;
   }
 
   /** 时后活动小标题 */

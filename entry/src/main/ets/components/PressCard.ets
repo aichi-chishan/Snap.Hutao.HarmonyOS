@@ -58,10 +58,17 @@ export struct PressCard {
       this.content()
     }
     .width('100%')
-    // 固定高父容器（仪表板行）下撑满实现多卡等高；自适应父容器中百分比回落为内容高，无副作用
-    .height('100%')
+    // 高度自适应内容（对齐 Windows UniformPanel.ArrangeOverride：每卡保持自然高度，
+    // 行高互不影响）；百分比高度在 Scroll>Grid 场景会被解析为视口高导致卡片巨长
     .borderRadius(this.radius)
     .backgroundColor(this.cardBg)
+    // 亚克力卡片（对齐 Windows AcrylicBorderCardStyle / SystemControlAcrylicElementBrush）：
+    // 背景模糊 + 主题染色，壁纸透过卡片呈现"一丢丢透明度"的观感
+    .backgroundEffect({
+      radius: 40,
+      color: $r('app.color.card_acrylic_tint'),
+      saturation: 1.15,
+    })
     .shadow(this.shadowEnabled ? {
       radius: 14,
       color: '#18000000',

@@ -66,6 +66,9 @@ export struct SettingPage {
   @State updating: boolean = false;
   /** 每日一图加载状态（选中该背景时展示） */
   @State hutaoDailyStatus: string = '首次使用将自动下载今日一图';
+  /** 主页游戏活动区域设置（对齐 Windows：日历显示默认开 / 未在进行中活动默认关） */
+  @State homeActCalendarShown: boolean = true;
+  @State homeActPreview: boolean = false;
   @StorageProp('isLoggedIn') isLoggedIn: boolean = false;
   /** 祈愿归档（数据管理） */
   @State gachaRows: GachaArchiveRow[] = [];
@@ -89,6 +92,8 @@ export struct SettingPage {
     if (this.bgType === 'hutao') {
       this.loadHutaoDaily();
     }
+    this.homeActCalendarShown = PreferencesStore.getHomeActCalendar();
+    this.homeActPreview = PreferencesStore.getHomeActPreview();
     this.loadAppVersion();
     this.loadGachaRows();
   }
@@ -880,6 +885,62 @@ export struct SettingPage {
               });
             })
           }
+
+          this.sectionTitle('主页游戏活动区域设置')
+          Row() {
+            Column({ space: 2 }) {
+              Text('是否开启游戏活动日历显示')
+                .fontSize(15)
+                .fontColor($r('app.color.text_primary'))
+              Text('立即生效，关闭后将不再显示')
+                .fontSize(11)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text(this.homeActCalendarShown ? '显示' : '隐藏')
+              .fontSize(12)
+              .fontColor($r('app.color.text_secondary'))
+            Toggle({ type: ToggleType.Switch, isOn: this.homeActCalendarShown })
+              .margin({ left: 10 })
+              .onChange((isOn: boolean) => {
+                this.homeActCalendarShown = isOn;
+                PreferencesStore.setHomeActCalendar(isOn);
+                AppStorage.setOrCreate<boolean>('homeActCalendarShown', isOn);
+              })
+          }
+          .width('100%')
+          .padding(14)
+          .backgroundColor($r('app.color.card_background'))
+          .borderRadius(12)
+          .border({ width: 1, color: $r('app.color.divider') })
+          Row() {
+            Column({ space: 2 }) {
+              Text('是否显示未在进行中的游戏内版本活动事件')
+                .fontSize(15)
+                .fontColor($r('app.color.text_primary'))
+              Text('默认关闭，不在进行中的事件日期等部分内容将不会正确显示')
+                .fontSize(11)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text(this.homeActPreview ? '显示' : '隐藏')
+              .fontSize(12)
+              .fontColor($r('app.color.text_secondary'))
+            Toggle({ type: ToggleType.Switch, isOn: this.homeActPreview })
+              .margin({ left: 10 })
+              .onChange((isOn: boolean) => {
+                this.homeActPreview = isOn;
+                PreferencesStore.setHomeActPreview(isOn);
+                AppStorage.setOrCreate<boolean>('homeActPreview', isOn);
+              })
+          }
+          .width('100%')
+          .padding(14)
+          .backgroundColor($r('app.color.card_background'))
+          .borderRadius(12)
+          .border({ width: 1, color: $r('app.color.divider') })
 
           this.sectionTitle('备份与还原')
           Row() {

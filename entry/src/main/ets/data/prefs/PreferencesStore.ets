@@ -27,6 +27,10 @@ export class PreferencesStore {
   static readonly KEY_DEVICE_FP_TIME: string = 'app.device_fp_time';
   /** 极验自定义组合接口（{0}=gt {1}=challenge），留空禁用（对齐 Windows GeetestCustomCompositeUrl） */
   static readonly KEY_GEETEST_CUSTOM_URL: string = 'risk.geetest_custom_composite_url';
+  /** 主页游戏活动日历显示（对齐 Windows IsHomeAnnouncementActivityCalendarPresented，默认开） */
+  static readonly KEY_HOME_ACT_CALENDAR: string = 'home.act_calendar_presented';
+  /** 主页显示未在进行中的版本活动事件（对齐 Windows HomeAnnouncementActPreviewEnabled，默认关） */
+  static readonly KEY_HOME_ACT_PREVIEW: string = 'home.act_preview_enabled';
 
   // ---- defaults ----
   static readonly DEFAULT_REFRESH_INTERVAL: number = 30;
@@ -203,6 +207,22 @@ export class PreferencesStore {
 
   static getDeviceFp(): string {
     return PreferencesStore.getString(PreferencesStore.KEY_DEVICE_FP, '');
+  }
+
+  static getHomeActCalendar(): boolean {
+    return PreferencesStore.getBool(PreferencesStore.KEY_HOME_ACT_CALENDAR, true);
+  }
+
+  static setHomeActCalendar(v: boolean): void {
+    PreferencesStore.setBool(PreferencesStore.KEY_HOME_ACT_CALENDAR, v);
+  }
+
+  static getHomeActPreview(): boolean {
+    return PreferencesStore.getBool(PreferencesStore.KEY_HOME_ACT_PREVIEW, false);
+  }
+
+  static setHomeActPreview(v: boolean): void {
+    PreferencesStore.setBool(PreferencesStore.KEY_HOME_ACT_PREVIEW, v);
   }
 
   static setDeviceFp(fp: string): void {
