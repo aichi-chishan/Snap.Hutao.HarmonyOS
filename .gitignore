@@ -45,7 +45,7 @@ shot_*.png
 layout*.json
 
 # ===== 临时文件 / 备份 / 其他本地工具 =====
-.tmp_*/
+.tmp_*
 *.bak
 *.orig
 /.agents/
