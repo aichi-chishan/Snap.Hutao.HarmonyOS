@@ -133,7 +133,8 @@ export class TowerMetadataService {
   private static async loadAll(): Promise<void> {
     const rm = AppContextProvider.getResourceManager();
     const read = async (file: string): Promise<string> => {
-      const bytes = await rm.getRawFileContent(`metadata/${file}`);
+      // Promise.resolve 包一层：兼容 SDK 中该 API 的同步/异步重载（CI lint await-thenable）
+      const bytes = await Promise.resolve(rm.getRawFileContent(`metadata/${file}`));
       const decoder = util.TextDecoder.create('utf-8');
       return decoder.decodeToString(bytes);
     };
