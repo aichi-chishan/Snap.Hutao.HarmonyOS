@@ -332,7 +332,7 @@ export struct WikiWeaponPage {
                     .width('100%')
                 }
                 .width('100%')
-                .padding({ top: 6, bottom: 6, left: 8, right: 8 })
+                .padding({ top: 8, bottom: 8, left: 12, right: 12 })
                 .borderRadius(8)
                 .backgroundColor($r('app.color.page_background'))
               }, (d: string, idx: number) => `af_${idx}_${d.length}`)

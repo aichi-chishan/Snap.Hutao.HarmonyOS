@@ -247,7 +247,15 @@ export struct CharacterPage {
               Column({ space: 3 }) {
                 Row({ space: 8 }) {
                   if (sk.i.length > 0) {
-                    MetaIcon({ category: 'Skill', name: sk.i, iconSize: 28 })
+                    Row() {
+                      MetaIcon({ category: 'Skill', name: sk.i, iconSize: 28 })
+                    }
+                    .width(38)
+                    .height(38)
+                    .borderRadius(10)
+                    .backgroundColor($r('app.color.icon_dark_chip'))
+                    .alignItems(VerticalAlign.Center)
+                    .justifyContent(FlexAlign.Center)
                   }
                   Column({ space: 2 }) {
                     Text(sk.n)
@@ -270,7 +278,7 @@ export struct CharacterPage {
                   .width('100%')
               }
               .width('100%')
-              .padding({ top: 6, bottom: 6 })
+              .padding({ top: 8, bottom: 8, left: 12, right: 12 })
               .borderRadius(10)
               .backgroundColor($r('app.color.page_background'))
             }, (sk: MetaSkill) => `sk_${sk.n}`)
@@ -402,7 +410,7 @@ export struct CharacterPage {
                 }
               }
               .width('100%')
-              .padding({ top: 8, bottom: 8 })
+              .padding({ top: 8, bottom: 8, left: 12, right: 12 })
               .borderRadius(10)
               .backgroundColor($r('app.color.page_background'))
             }, (r: Reliquary) => `${r.id}_${r.pos}_${r.level}_${r.subProperties.length}`)
