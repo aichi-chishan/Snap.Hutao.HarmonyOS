@@ -17,6 +17,7 @@ import {
 } from '../model/AchievementData';
 import { Logger } from '../common/Logger';
 import { GameDataService, GameDataDomain } from './GameDataService';
+import { AppConstants } from '../common/Constants';
 
 const TAG: string = 'AchievementService';
 const UIAF_VERSION: string = 'v1.1';
@@ -313,7 +314,7 @@ export class AchievementService {
     }
     const info: UiafInfo = new UiafInfo();
     info.export_app = 'Snap.Hutao.HarmonyOS';
-    info.export_app_version = '1.20.0';
+    info.export_app_version = AppConstants.APP_VERSION;
     info.export_timestamp = Math.floor(Date.now() / 1000);
     info.uiaf_version = UIAF_VERSION;
     const root: UiafRoot = new UiafRoot();

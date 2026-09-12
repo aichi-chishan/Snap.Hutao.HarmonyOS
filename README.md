@@ -116,6 +116,7 @@ entry/src/main/ets/
 - [DGP-Studio/Snap.Hutao](https://github.com/DGP-Studio/Snap.Hutao) — Windows 版原项目（MIT）
 - [Snap.Metadata](https://github.com/DGP-Studio/Snap.Metadata) — 元数据
 - [UIGF 组织](https://uigf.org/) — 统一祈愿/成就交换标准
+- [ZCode Weekend Build](https://github.com/zai-org) — AI 结对开发（ZCode）
 
 ## 📄 许可证
 

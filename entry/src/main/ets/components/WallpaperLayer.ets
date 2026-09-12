@@ -8,6 +8,7 @@
  * 图片上层保留主题化遮罩（深色压暗/浅色提亮），ImageFit.Cover。
  */
 import { fileIo, fileUri } from '@kit.CoreFileKit';
+import { image } from '@kit.ImageKit';
 import { AppContextProvider } from '../common/AppContext';
 import { HutaoDailyImageService } from '../service/HutaoDailyImageService';
 import { Logger } from '../common/Logger';
@@ -27,6 +28,8 @@ export struct WallpaperLayer {
   /** 当前图片源（file:// 路径或内置 Resource） */
   @State imgSrc: string | Resource = '';
   @State hasImage: boolean = false;
+  /** 图片不透明度：按图片亮度动态计算（Windows Luminance 规则），渐变过渡 */
+  @State imgOpacity: number = 0;
   /** 本地图片池 */
   private localPool: string[] = [];
   /** 轮换计时器 */
@@ -76,8 +79,7 @@ export struct WallpaperLayer {
       this.imgSrc = '';
       HutaoDailyImageService.getInstance().getToday().then((img) => {
         if (img !== undefined && this.bgType === 'hutao') {
-          this.imgSrc = `file://${img.path}`;
-          this.hasImage = true;
+          this.applyImage(img.path);
           Logger.info(TAG, `hutao daily image ready (${img.author}${img.fromCache ? ', cached' : ''})`);
         }
       });
@@ -101,8 +103,59 @@ export struct WallpaperLayer {
       return;
     }
     const idx: number = Math.floor(Math.random() * this.localPool.length);
-    this.imgSrc = `file://${this.localPool[idx]}`;
+    this.applyImage(this.localPool[idx]);
+  }
+
+  /** 应用背景图：亮度→不透明度（Windows：深色 1-L / 浅色 L），1s Quartic 渐变 */
+  private applyImage(path: string): void {
+    this.imgSrc = `file://${path}`;
     this.hasImage = true;
+    WallpaperLayer.luminance(path).then((l: number) => {
+      const target: number = this.isDark ? 1 - l : l;
+      this.getUIContext().animateTo({ duration: 1000, curve: Curve.EaseInOut }, () => {
+        this.imgOpacity = Math.min(1, Math.max(0, target));
+      });
+    });
+  }
+
+  /**
+   * 图片平均亮度 L（对齐 Windows GetRgba32AccentColor 均值色 + Rgba32.Luminance）：
+   * 全图 RGB 均值后按 Rec.709 加权（0.2126R+0.7152G+0.0722B）/255。
+   * 解码降采样到 160x90 再求均值（均值与大图全量均值差异可忽略，避免大位图遍历开销）。
+   */
+  private static async luminance(path: string): Promise<number> {
+    try {
+      const src: image.ImageSource = image.createImageSource(path);
+      const size: image.Size = { width: 160, height: 90 };
+      const opts: image.DecodingOptions = {
+        desiredSize: size,
+      };
+      const pm: image.PixelMap = await src.createPixelMap(opts);
+      const info: image.ImageInfo = await pm.getImageInfo();
+      const buf: ArrayBuffer = new ArrayBuffer(info.size.width * info.size.height * 4);
+      await pm.readPixelsToBuffer(buf);
+      const bytes: Uint8Array = new Uint8Array(buf);
+      let r = 0; let g = 0; let b = 0;
+      const px: number = Math.floor(bytes.length / 4);
+      for (let i = 0; i < px; i++) {
+        r += bytes[i * 4];
+        g += bytes[i * 4 + 1];
+        b += bytes[i * 4 + 2];
+      }
+      pm.release();
+      src.release();
+      const lum: number = (0.2126 * (r / px) + 0.7152 * (g / px) + 0.0722 * (b / px)) / 255;
+      Logger.info(TAG, `luminance ${path.substring(path.lastIndexOf('/') + 1)} -> ${lum.toFixed(3)}`);
+      return lum;
+    } catch (e) {
+      Logger.warn(TAG, `luminance fail: ${(e as Error).message}`);
+      return WallpaperLayer.isDarkFallback();
+    }
+  }
+
+  private static isDarkFallback(): number {
+    // 解码失败：中性值 0.5（两种主题下均为中等透明度）
+    return 0.5;
   }
 
   /** 递归扫描目录图片（对齐 Windows Directory.EnumerateFiles AllDirectories；支持 file:// URI 归一化） */
@@ -144,24 +197,15 @@ export struct WallpaperLayer {
         .height('100%')
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .backgroundColor($r('app.color.wallpaper_base'))
-      // 背景图片（ImageFit.Cover = UniformToFill；未选目录/目录无图时不渲染）
+      // 背景图片（全量复刻 Windows：UniformToFill + 按图片亮度动态透明度，无模糊无遮罩。
+      // 亮度低→浅色模式更不透明/深色模式更透明，自动保证前景对比度）
       if (this.hasImage) {
         Image(this.imgSrc)
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
-          .opacity(this.isDark ? 0.38 : 0.5)
+          .opacity(this.imgOpacity)
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-          .backgroundBlurStyle(BlurStyle.Regular)
-        // 主题化遮罩：浅色提亮 / 深色压暗，保证前景文字对比度。
-        // ⚠ 8 位色值顺序是 #AARRGGBB（不是 CSS 的 #RRGGBBAA）：
-        //   历史 bug —— 曾写 '#FFFFFF99' 想表达"60% 白"，实际被解析为不透明 #FFFF99，
-        //   浅色模式下整窗发黄（曾被误判为 linearGradient 问题）。
-        Column()
-          .width('100%')
-          .height('100%')
-          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-          .backgroundColor($r('app.color.wallpaper_mask'))
       }
     }
     .width('100%')
