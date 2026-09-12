@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint (0 errors gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install DevEco CLI
+        run: npm install -g @deveco/deveco-cli
+      - name: Prepare CI build profile
+        run: cp ci/build-profile.ci.json5 build-profile.json5
+      - name: Lint
+        run: |
+          set -o pipefail
+          devecocli check lint | tee lint_report.txt
+          if grep -E "Errors:[[:space:]]*[1-9]" lint_report.txt; then
+            echo "::error::Lint finished with errors (see report above)"
+            exit 1
+          fi
+
+  build:
+    name: Build unsigned debug HAP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install DevEco CLI
+        run: npm install -g @deveco/deveco-cli
+      - name: Prepare CI build profile
+        run: cp ci/build-profile.ci.json5 build-profile.json5
+      - name: Build
+        run: devecocli build --product default --modules entry@default --build-mode debug
+      - name: Upload unsigned HAP
+        uses: actions/upload-artifact@v4
+        with:
+          name: entry-unsigned-hap
+          path: entry/build/default/outputs/default/*.hap
+          if-no-files-found: warn
+          retention-days: 7

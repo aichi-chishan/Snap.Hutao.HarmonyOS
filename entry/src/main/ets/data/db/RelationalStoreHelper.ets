@@ -166,34 +166,57 @@ export class RelationalStoreHelper {
     for (let i = 0; i < statements.length; i++) {
       await store.executeSql(statements[i]);
     }
-    // 迁移：gacha_items 增加 schedule_id（千星奇域 + UIGF v4.2 导出需要；已存在时忽略报错）
-    try {
-      await store.executeSql('ALTER TABLE gacha_items ADD COLUMN schedule_id INTEGER DEFAULT 0');
-    } catch (e) {
-      // 列已存在
-    }
-    // 历史数据清理：删除空 uid 祈愿归档（曾因未登录时装载误建，覆盖默认 UID 逻辑）
-    try {
-      await store.executeSql(
-        `DELETE FROM gacha_items WHERE archive_id IN (SELECT id FROM gacha_archives WHERE uid = '')`);
-      await store.executeSql(`DELETE FROM gacha_archives WHERE uid = ''`);
-    } catch (e) {
-      Logger.warn(TAG, 'cleanup empty gacha archives skip');
-    }
-    // 版本升级预留：空实现挂载点，后续结构变更在此按版本迁移。
-    await RelationalStoreHelper.upgradeIfNeeded(store);
+    // 有序版本迁移（新增结构/数据修复：DB_VERSION+1，并在 MIGRATIONS 末尾追加迁移）
+    await RelationalStoreHelper.migrate(store);
     Logger.info(TAG, 'tables ready');
   }
 
-  /** 版本升级预留：当前为 1，无迁移逻辑 */
-  private static async upgradeIfNeeded(store: relationalStore.RdbStore): Promise<void> {
+  /** 当前数据库结构版本（每次结构变更 +1，并在 MIGRATIONS 末尾追加对应迁移） */
+  private static readonly DB_VERSION: number = 3;
+
+  /**
+   * 有序迁移列表：MIGRATIONS[i] 把版本 i+1 升到 i+2。
+   * 语句幂等容错（重复加列/重复清理直接放行）；已应用版本记入 user_version，只执行未应用部分。
+   */
+  private static readonly MIGRATIONS: string[][] = [
+    [
+      // v1 → v2：gacha_items 增加 schedule_id（千星奇域 + UIGF v4.2 导出需要）
+      'ALTER TABLE gacha_items ADD COLUMN schedule_id INTEGER DEFAULT 0',
+    ],
+    [
+      // v2 → v3：历史数据清理——删除空 uid 祈愿归档（曾因未登录时装载误建，覆盖默认 UID 逻辑）
+      `DELETE FROM gacha_items WHERE archive_id IN (SELECT id FROM gacha_archives WHERE uid = '')`,
+      `DELETE FROM gacha_archives WHERE uid = ''`,
+    ],
+  ];
+
+  /** 版本驱动的迁移执行器 */
+  private static async migrate(store: relationalStore.RdbStore): Promise<void> {
+    let v: number = 1;
     try {
-      const v: number = store.version;
-      if (v < 1) {
-        store.version = 1;
-      }
+      v = store.version;
     } catch (e) {
-      Logger.warn(TAG, 'skip version check');
+      Logger.warn(TAG, 'read db version fail, assume 1');
+    }
+    if (v < 1) {
+      v = 1;
+    }
+    while (v < RelationalStoreHelper.DB_VERSION) {
+      const steps: string[] = RelationalStoreHelper.MIGRATIONS[v - 1] ?? [];
+      for (let i = 0; i < steps.length; i++) {
+        try {
+          await store.executeSql(steps[i]);
+        } catch (e) {
+          // 幂等容错：重复加列/已清理过等场景放行
+          Logger.info(TAG, `migration v${v} stmt${i} skip: ${(e as Error).message}`);
+        }
+      }
+      v += 1;
+      try {
+        store.version = v;
+      } catch (e) {
+        Logger.warn(TAG, 'write db version fail');
+      }
     }
   }
 

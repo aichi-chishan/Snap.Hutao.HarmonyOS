@@ -28,8 +28,8 @@
 | `@Entry` + `@Prop embedMode` 编译 WARN 消除 | 目前所有内嵌页带 WARN（非阻断）。方案：内嵌页改纯 `@Component`，路由入口包一层薄 `@Entry` 壳转发参数 | M |
 | HdsSideBar 回归评估 | 真机崩溃根因：V1→V2 组件传 `@Builder` 引用丢失 `this`（编译为 `.bind(this)` 报 undefined）。待 UIDesignKit 修复后重试，或自写 `@ComponentV2` 桥接层。**回退代码保留在 cb3df76**，勿重复踩坑 | S（评估）/ M（重做） |
 | 死代码清理 | `ResourcePackService` / `StandardIconService` 已从设置页退役（素材全内置后无用武之地）；`MetaIcon.remoteFallback` 云端兜底链是否保留需决策。删除前确认无隐藏引用 | S |
-| DB 迁移框架化 | 目前 `try { ALTER ... } catch(已存在)` 散落在 `RelationalStoreHelper`。改为 user_version 驱动的有序迁移列表，新迁移只追加不改旧 | S |
-| 真机回归清单 | 把每轮发版前的手工验证步骤固化成文档：登录/风控/刷新/导入导出/深浅色/三断点（720/840/1200）矩阵，放 `docs/` 或本文件附录 | S |
+| ~~DB 迁移框架化~~ ✅ | 已完成：`RelationalStoreHelper` 版本驱动有序迁移（DB_VERSION=3 + MIGRATIONS 列表，user_version 记录，语句幂等容错）；新迁移只追加不改旧 | S |
+| ~~真机回归清单~~ ✅ | 已完成：`docs/TESTING.md`（自动化测试说明 + 9 大区实机打勾矩阵） | S |
 | @Builder 多参传递全量审计 | 官方规则：@Builder 传两个及以上参数时内部 UI 不随状态刷新。本轮已修便笺链路的 4 处，仍需排查：`SpiralAbyssPage.overviewCell`/`rankRow`、`RoleCombatPage.statCell`/`statValueCell`、`WikiAvatarPage.propCell`、`WikiMonsterPage.monStat`、`GachaLogPage.avatarSection`/`rankGroup`（判据：参数里是否含会变的字段 / ForEach 键值是否含变动字段） | M |
 | WallpaperLayer 观感复核 | 修正色值顺序后，浅色遮罩（60% 白）与图片 opacity 0.5 的实际观感需真机确认是否需要下调遮罩强度；`local` 模式未选目录时与 `none` 观感是否一致 | S |
 | 风控兜底页复检 | `GeetestVerifyPage` / `RiskVerifyDialog` 仅作兜底保留（AGENTS.md 约定），确认统一浮层主链路覆盖后评估是否可退场 | S |
@@ -67,9 +67,9 @@
 
 | 项 | 说明 | 规模 |
 |---|---|---|
-| GitHub Actions CI | push/PR 触发：`hvigorw assembleHap`（不签名，仅验证编译）+ `devecocli check lint` 0 error 门禁 | M |
+| ~~GitHub Actions CI~~ ✅ | 已完成：`.github/workflows/ci.yml`——lint（Errors≥1 失败门禁）+ 无签名 debug HAP 构建（`ci/build-profile.ci.json5` 模板落位，产物传 artifact）。build job 依赖 `@deveco/deveco-cli`（公开 npm）在 CI 环境自管理工具链，首次运行按日志调优 | M |
 | Release 工作流 | 打 tag → CI 构建 → 自动建 GitHub Release 附变更说明（未签名包 + 自签说明） | M |
-| 单元测试 | 现有 test 目录是模板空壳。优先覆盖：`UigfService` 解析/导出（v4.2/v4.0/v3.x）、`DsSigner` 参数拼装、`GachaType` 映射、日期工具 | M |
+| ~~单元测试~~ ✅ | 已完成：`entry/src/test/LogicUnitTest.test.ets`（hypium Local Test，**18/18 通过**）覆盖圣遗物评分（双爆强制/心海特例/充能特判）、祈愿类型映射、富文本清洗、日期工具；CI 可集成 | M |
 | README 截图 | 补主页/祈愿/图鉴截图（**脱敏**：用测试账号截，不带真实 UID/昵称）+ CI badge | S |
 | 依赖审计 | `oh-package.json5` 依赖最小化复核、lock 跟随提交 | S |
 
