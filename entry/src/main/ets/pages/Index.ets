@@ -1096,8 +1096,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .columnsGap(12)
         .rowsGap(12)
         .width('100%')
-        // 显式行高（行数=ceil(7/列数)，行高 262）→ 单元格有界，卡片行内等高且不溢出
-        .height(Math.ceil(7 / this.homeCols(300, 12)) * 262)
+        // 显式行高（行数=ceil(7/列数)，行高 200）→ 单元格有界，卡片行内等高且不溢出
+        .height(Math.ceil(7 / this.homeCols(300, 12)) * 200)
         // Row5：游戏公告（全宽）
         HomeAnnouncementCard({
           items: this.homeVm.announcements,

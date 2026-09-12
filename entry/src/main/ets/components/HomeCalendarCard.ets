@@ -206,31 +206,6 @@ export struct HomeCalendarCard {
         .borderRadius(10)
         .backgroundColor($r('app.color.card_inner_tint'))
 
-        // 本月日期格（7 列，有事件的日期显示事件标记点）
-        Grid() {
-          ForEach(this.monthDays(), (cell: WeekDayCell) => {
-            GridItem() {
-              Column({ space: 3 }) {
-                Text(cell.label)
-                  .fontSize(12)
-                  .fontColor(cell.isToday ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
-                Circle()
-                  .width(5)
-                  .height(5)
-                  .backgroundColor(this.hasEvent(cell) ? $r('app.color.app_primary') : Color.Transparent)
-                  .opacity(cell.isToday ? 1 : 0.55)
-              }
-              .width('100%')
-              .padding({ top: 5, bottom: 5 })
-              .borderRadius(8)
-              .backgroundColor(cell.isToday ? $r('app.color.app_primary_bg') : Color.Transparent)
-            }
-          }, (cell: WeekDayCell) => `md_${cell.index}_${cell.isToday}_${this.hasEvent(cell)}`)
-        }
-        .columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr 1fr')
-        .columnsGap(4)
-        .rowsGap(4)
-        .width('100%')
 
         // 今日材料（按星期轮换：天赋书/武器矿，图标取自本地元数据）
         if (this.todayMaterials().length > 0) {

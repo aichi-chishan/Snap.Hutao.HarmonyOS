@@ -96,15 +96,15 @@ export struct HomeSignInCard {
       Stack({ alignContent: Alignment.Center }) {
         if (reward.icon.startsWith('http')) {
           Image(reward.icon)
-            .width(26)
-            .height(26)
+            .width(22)
+            .height(22)
             .objectFit(ImageFit.Contain)
             .borderRadius(7)
             .backgroundColor($r('app.color.app_primary_bg'))
             .opacity(this.isDaySigned(reward.day) ? 0.35 : 1)
         } else {
           // 图标为物品 ID/名：尝试 rawfile ItemIcon 材料映射，未命中显示礼包图标
-          MetaIcon({ category: 'ItemIcon', name: HomeSignInCard.itemIconOf(reward.name), iconSize: 26, remoteFallback: true })
+          MetaIcon({ category: 'ItemIcon', name: HomeSignInCard.itemIconOf(reward.name), iconSize: 22, remoteFallback: true })
             .opacity(this.isDaySigned(reward.day) ? 0.35 : 1)
         }
         if (this.isDaySigned(reward.day)) {
@@ -121,8 +121,8 @@ export struct HomeSignInCard {
         .width(24)
         .height(24)
       }
-      .width(26)
-      .height(26)
+      .width(22)
+      .height(22)
       Text(`${reward.day}日`)
         .fontSize(9)
         .fontColor(this.isDaySigned(reward.day) ? $r('app.color.text_secondary') : $r('app.color.text_primary'))
@@ -133,10 +133,10 @@ export struct HomeSignInCard {
     .backgroundColor(this.isDaySigned(reward.day) ? $r('app.color.card_background') : Color.Transparent)
   }
 
-  /** 奖励网格高度：按行数动态（7 列，每行 30vp；整体控制在仪表板行 240vp 内） */
+  /** 奖励网格高度：按行数动态（7 列，每行 24vp；整体控制在仪表板行 200vp 内） */
   static gridHeight(count: number): number {
     const rows: number = Math.ceil(count / 7);
-    return rows * 30;
+    return rows * 24;
   }
 
   /** 奖励名（原神通用材料名）→ rawfile ItemIcon 文件名（去 UI_ 前缀映射失败则用通用）

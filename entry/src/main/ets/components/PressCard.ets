@@ -64,6 +64,7 @@ export struct PressCard {
     // 默认自适应内容。百分比高度在 Scroll>Grid 无显式行高场景会被解析为视口高（巨长卡）
     .height(this.fillHeight ? '100%' : undefined)
     .borderRadius(this.radius)
+    .clip(true)
     .backgroundColor(this.cardBg)
     // 亚克力卡片（对齐 Windows AcrylicBorderCardStyle / SystemControlAcrylicElementBrush）：
     // 背景模糊 + 主题染色，壁纸透过卡片呈现"一丢丢透明度"的观感
