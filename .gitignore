@@ -49,4 +49,4 @@ layout*.json
 *.bak
 *.orig
 /.agents/
-/.claude/
+/.claude/ci_lint_log.txt
