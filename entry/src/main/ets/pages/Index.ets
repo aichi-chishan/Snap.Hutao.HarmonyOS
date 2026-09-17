@@ -94,8 +94,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     @State homeRefreshing: boolean = false;
     /** 主页数据在途加载标记（reloadHome 防抖） */
     private homeReloading: boolean = false;
-    /** 超宽（>=1200vp PC 全屏/平板横屏）：首页网格扩展列数 */
-    @State isUltra: boolean = false;
     /** 系统三键区（最小化/全屏/关闭）占位宽度 vp（PC 自定义窗口装饰；0=无系统三键） */
     @StorageProp('titleBtnWidthVp') titleBtnWidthVp: number = 0;
     @StorageProp('appVersion') appVersion: string = '';
@@ -124,7 +122,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       AppStorage.setOrCreate<string>('bgFolderPath', PreferencesStore.getBackgroundFolderPath());
       // 立即检测宽屏（PC/平板>普通手机）：屏幕宽度 vp 判断，避免等待 onAreaChange 首帧
       this.isWide = Index.detectWideScreen();
-      this.isUltra = Index.detectWidthVp() >= 1200;
       this.reloadHome();
     }
 
@@ -312,7 +309,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     .onAreaChange((oldValue: Area, newValue: Area) => {
       const w: number = newValue.width as number;
       this.isWide = w >= Index.WIDE_VP;
-      this.isUltra = w >= 1200;
       // 窗口不足平板宽（<840）时自动折叠侧栏（图标态）给内容让位；用户此后可手动展开，
       // 仅在宽度变化跨越时触发，不与手动操作打架
       if (w > 0 && w < 840) {
@@ -358,7 +354,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       // 与 phoneShell 同阈值：窗口缩到 <720vp 时切回窄屏（2in1 旋转/缩放）
       const w: number = newValue.width as number;
       this.isWide = w >= Index.WIDE_VP;
-      this.isUltra = w >= 1200;
       // 窗口不足平板宽（<840）时自动折叠侧栏（图标态）给内容让位；用户此后可手动展开，
       // 仅在宽度变化跨越时触发，不与手动操作打架
       if (w > 0 && w < 840) {
@@ -775,7 +770,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
                 }
               }, (act: ActCalendarEntry) => `home_act_${act.type}_${act.name}_${act.endTime}`)
             }
-            .columnsTemplate(this.isUltra ? '1fr 1fr 1fr 1fr' : '1fr 1fr')
+            .columnsTemplate('1fr 1fr')
             .columnsGap(10)
             .rowsGap(10)
             .width('100%')
@@ -866,7 +861,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               })
             }
           }
-          .columnsTemplate(this.isUltra ? '1fr 1fr 1fr 1fr' : '1fr 1fr')
+          .columnsTemplate('1fr 1fr')
           .columnsGap(10)
           .rowsGap(10)
           .width('100%')
@@ -1146,8 +1141,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     return Math.max(1, Math.floor((this.homeW + gap) / (minItem + gap)));
   }
 
-  /** 活动区行高（Windows 池行 104 契约需容纳 44vp UP 图标行 → 取 112） */
-  static readonly ACT_ROW_H: number = 112;
+  /** 活动区行高：池行内容 18+8+44(UP 图标)+8+17+上下 padding 20 ≈ 115，取 116 留 1vp 余量 */
+  static readonly ACT_ROW_H: number = 116;
   /** 行间分割线占位（Divider 1 + margin 4+4） */
   private static readonly ACT_DIVIDER_H: number = 9;
 
@@ -1177,25 +1172,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       }
     }
     return out;
-  }
-
-  /** 时后活动小标题 */
-  @Builder
-  actListTitle() {
-    Row() {
-      Text('近期活动 / 卡池')
-        .fontSize(14)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'))
-        .layoutWeight(1)
-      Text('查看日历 ›')
-        .fontSize(12)
-        .fontColor($r('app.color.app_primary'))
-        .onClick(() => {
-          router.pushUrl({ url: 'pages/CalendarPage' });
-        })
-    }
-    .width('100%')
   }
 
   /** 祈愿横幅池数（网络卡池优先；无网络数据用本地统计，离线可用） */
@@ -1236,21 +1212,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       }
     }
     return out;
-  }
-
-  /** 活动卡 2x2 网格项（空数据时仅显示一句提示，其余格隐藏避免黑色占位块） */
-  @Builder
-  actBannerGridItem(idx: number) {
-    if (idx < this.actBanners().length) {
-      HomeActBannerCard({
-        entry: this.actBanners()[idx],
-        onTap: () => {
-          router.pushUrl({ url: 'pages/CalendarPage' });
-        },
-      })
-    } else if (idx === 0) {
-      this.emptyWideCard('暂无活动安排', '登录后同步活动/卡池/签到日历', 184)
-    }
   }
 
   /** 宽屏空态占位卡（Row2 无数据时替代黑块） */
