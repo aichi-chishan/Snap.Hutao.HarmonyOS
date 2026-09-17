@@ -82,8 +82,8 @@ git clone https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS.git
 
 - 元数据（角色 / 武器 / 怪物 / 成就 / 曲线）与常用图标（2100+ 张）**全部内置安装包**，离线可用
 - 素材来源：[Snap.Metadata](https://github.com/DGP-Studio/Snap.Metadata)（精简提取）+ 胡桃静态 CDN
-- 更新管线：`python github-data/fetch-assets.py`（增量拉取新素材 + 回填映射，详见 AGENTS.md「素材管理」）
-- 云端热更（可选）：`github-data/` 目录同步到自己的 GitHub 仓库后，在设置页改数据源地址即可
+- 更新管线：独立数据仓库 `E:/project/snap-hutao-data`（aichi-chishan/snap-hutao-data）：`python fetch-assets.py` 增量拉素材 → `gen-manifest.ps1` 重出清单（改 channelVersion）→ push；APP 设置→游戏数据更新即热更，无需整包更新
+- 云端热更：默认清单已指向 aichi-chishan/snap-hutao-data，设置页可改数据源地址
 
 ---
 

@@ -82,9 +82,9 @@
 
 ## 素材管理（游戏版本更新时的同步流程）
 - **已内置 rawfile 的图标类目**（`entry/src/main/resources/rawfile/icons/`）：AvatarIcon / EquipIcon / MonsterIcon / Skill / Talent / ItemIcon / NameCardIcon / NameCardPic / RelicIcon —— 全部打包进安装包，**无二次下载**（ResourcePackService 已从设置页退役，仅保留代码）。
-- **角色立绘（GachaAvatarIcon）刻意不打包**（均幅 ~500KB/张，会显著膨胀包体）：运行时经 `StandardIconService`（静态 CDN `raw/GachaAvatarIcon/UI_Gacha_AvatarIcon_{icon后缀}.png`）按需拉取 + cacheDir 沙盒缓存；命名=角色 icon 去掉 `UI_AvatarIcon_` 前缀换 `UI_Gacha_AvatarIcon_` 前缀；旅行者无立绘（CDN 404 → 占位）。需要离线包时跑 `python github-data/fetch-assets.py --bundle-splash`。
-- **新增/更新素材**：运行 `python github-data/fetch-assets.py`（源：Snap.Metadata 本地检出目录下的 `Genshin/CHS`，CDN：api.snaphutaorp.org/static/raw/{Category}/{Name}.png，8 并发、增量跳过）。脚本同时回填 avatar_meta.json 的 nameCardIcon/nameCardPic 字段。
-- **元数据更新**：同一脚本思路；重提 monster/weapon/avatar meta 后同步 github-data（aichi-chishan/snap-hutao-data 仓库）供 GameDataUpdater 热更。
+- **角色立绘（GachaAvatarIcon）刻意不打包**（均幅 ~500KB/张，会显著膨胀包体）：运行时经 `StandardIconService`（静态 CDN `raw/GachaAvatarIcon/UI_Gacha_AvatarIcon_{icon后缀}.png`）按需拉取 + cacheDir 沙盒缓存；命名=角色 icon 去掉 `UI_AvatarIcon_` 前缀换 `UI_Gacha_AvatarIcon_` 前缀；旅行者无立绘（CDN 404 → 占位）。需要离线包时在数据仓库跑 `python fetch-assets.py --bundle-splash`。
+- **新增/更新素材**：在 `E:/project/snap-hutao-data` 独立数据仓库运行 `python fetch-assets.py`（源：该仓库 `.local/upstream/Snap.Metadata/Genshin/CHS`，CDN：api.snaphutaorp.org/static/raw/{Category}/{Name}.png，8 并发、增量跳过）。脚本只写数据仓库的 metadata/ 与 icons/，不再写 APP 工程；同时回填 avatar_meta.json 的 nameCardIcon/nameCardPic 字段。
+- **元数据更新**：同一脚本思路；重提 monster/weapon/avatar meta 后在数据仓库跑 `powershell -File gen-manifest.ps1` 重新生成清单（记得改 channelVersion），推送 aichi-chishan/snap-hutao-data 仓库；APP 设置→游戏数据更新→立即更新即可热更（元数据远端优先、rawfile 兜底，图标 MetaIcon 自动优先远端）。
 - MetaIcon 引用约定：`category` = icons 下目录名，`name` = 文件名（去 .png）。名片大图背景直接 `Image($rawfile('icons/NameCardPic/{name}.png'))`（全幅场景不走 MetaIcon）。
 
 ## 变更敏感区
