@@ -25,6 +25,8 @@ export struct HomeGachaBannerCard {
   @Prop summary: HomePoolSummary | undefined = undefined;
   /** plain：无独立卡片壳（嵌入合框时用，由外层容器统一画卡面） */
   @Prop plain: boolean = false;
+  /** plain 模式固定行高（0=按内容自适应），由合框按行数统一计算 */
+  @Prop rowHeight: number = 0;
   onTap: () => void = () => {
   };
 
@@ -61,6 +63,9 @@ export struct HomeGachaBannerCard {
         this.bannerBody()
       }
       .width('100%')
+      // 固定行高（对齐 Windows 池行 104 契约的等比放大：容纳 44vp UP 图标行）
+      .height(this.rowHeight > 0 ? this.rowHeight : undefined)
+      .justifyContent(FlexAlign.Center)
       .padding({ top: 10, bottom: 10 })
     } else {
       PressCard({

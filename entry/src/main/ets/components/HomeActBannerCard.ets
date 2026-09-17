@@ -12,6 +12,8 @@ export struct HomeActBannerCard {
   @Prop entry: ActCalendarEntry = new ActCalendarEntry();
   /** plain：无独立卡片壳（嵌入合框时用） */
   @Prop plain: boolean = false;
+  /** plain 模式固定行高（0=按内容自适应），与左列池行等高 */
+  @Prop rowHeight: number = 0;
   onTap: () => void = () => {
   };
 
@@ -37,6 +39,9 @@ export struct HomeActBannerCard {
         this.bannerBody()
       }
       .width('100%')
+      // 固定行高：与左列池行等高（面板两列恒等高）
+      .height(this.rowHeight > 0 ? this.rowHeight : undefined)
+      .justifyContent(FlexAlign.Center)
       .padding({ top: 10, bottom: 10 })
     } else {
       PressCard({

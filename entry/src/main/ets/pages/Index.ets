@@ -779,6 +779,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             .columnsGap(10)
             .rowsGap(10)
             .width('100%')
+            // 行高由内容决定（窄屏卡高自适应），Grid 默认 clip=true 会裁掉首末行卡片的阴影与受光
+            .clip(false)
           } else if (this.homeVm.actsLoaded) {
             Text('暂无活动安排')
               .fontSize(12)
@@ -912,6 +914,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
                   HomeGachaBannerCard({
                     pool: pool,
                     plain: true,
+                    rowHeight: Index.ACT_ROW_H,
                     onTap: () => {
                       this.switchTo(1);
                     },
@@ -934,6 +937,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
                     pool: new ActCalendarEntry(),
                     summary: p,
                     plain: true,
+                    rowHeight: Index.ACT_ROW_H,
                     onTap: () => {
                       this.switchTo(1);
                     },
@@ -954,7 +958,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             }
           }
           .layoutWeight(1)
-          .height('100%')
+          .height(this.activityPanelH())
           .padding(14)
           .borderRadius(12)
           .backgroundColor($r('app.color.card_background'))
@@ -974,11 +978,12 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
                   HomeActBannerCard({
                     entry: act,
                     plain: true,
+                    rowHeight: Index.ACT_ROW_H,
                     onTap: () => {
                       router.pushUrl({ url: 'pages/CalendarPage' });
                     },
                   })
-                  if (idx < this.actBanners().length - 1) {
+                  if (idx < this.actBannersFiltered().length - 1) {
                     Divider()
                       .color($r('app.color.divider'))
                       .margin({ top: 4, bottom: 4 })
@@ -994,7 +999,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             }
           }
           .layoutWeight(1)
-          .height('100%')
+          .height(this.activityPanelH())
           .padding(14)
           .borderRadius(12)
           .backgroundColor($r('app.color.card_background'))
@@ -1008,7 +1013,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           }
         }
         .width('100%')
-        .height(360)
         .alignItems(VerticalAlign.Top)
 
         // Windows UniformPanel：最小列宽 300、间距 12，HomeAdaptiveCardHeight 为 204。
@@ -1140,6 +1144,24 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       return 4;
     }
     return Math.max(1, Math.floor((this.homeW + gap) / (minItem + gap)));
+  }
+
+  /** 活动区行高（Windows 池行 104 契约需容纳 44vp UP 图标行 → 取 112） */
+  static readonly ACT_ROW_H: number = 112;
+  /** 行间分割线占位（Divider 1 + margin 4+4） */
+  private static readonly ACT_DIVIDER_H: number = 9;
+
+  /** 活动区面板高度：按实际行数算出，两列取较大者等高（替代写死的 360） */
+  activityPanelH(): number {
+    const pools: number = this.poolBanners().length > 0
+      ? this.poolBanners().length : this.localPoolSummaries().length;
+    const acts: number = this.homeActCalendarShown ? this.actBannersFiltered().length : 0;
+    const rows: number = Math.max(pools, acts);
+    if (rows <= 0) {
+      return 148;
+    }
+    // 上下 padding 14*2 + 行高*行数 + 分割线*（行数-1）
+    return 28 + Index.ACT_ROW_H * rows + Index.ACT_DIVIDER_H * (rows - 1);
   }
 
   /** 未在进行中（无有效起止时间）的活动过滤（对齐 Windows ActPreview 开关） */
