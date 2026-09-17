@@ -3,8 +3,7 @@
  * 本地图鉴元数据（rawfile/metadata/*.json，提取自 Snap.Metadata 公开仓库，无运行时云依赖）：
  * 角色 118（技能/命座/养成材料/语音/故事/CV）、武器 246（精炼/材料）、怪物 560、被引用材料 498、曲线表。
  */
-import { util } from '@kit.ArkTS';
-import { AppContextProvider } from '../common/AppContext';
+import { GameDataService } from './GameDataService';
 import { Logger } from '../common/Logger';
 import { Curve3 } from './BaseValueService';
 
@@ -149,9 +148,7 @@ export class WikiMetaService {
   private static roleCombatSchedules: RoleCombatScheduleMeta[] | undefined = undefined;
 
   private static async readRawJson(name: string): Promise<Record<string, Object> | Object[]> {
-    const rm = AppContextProvider.getResourceManager();
-    const raw: Uint8Array = await rm.getRawFileContent(`metadata/${name}`);
-    return JSON.parse(util.TextDecoder.create('utf-8').decodeToString(raw)) as Record<string, Object> | Object[];
+    return JSON.parse(await GameDataService.readMetadataFile(name)) as Record<string, Object> | Object[];
   }
 
   /** 角色列表（按 Sort 降序，新角色在前） */

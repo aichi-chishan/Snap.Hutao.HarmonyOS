@@ -7,8 +7,7 @@
  *   - 怪物 describeId → name/icon（monster_meta，含 Windows MonsterDescribe.Normalize 归一表）
  * 数据：rawfile/metadata/{TowerSchedule,TowerFloor,TowerLevel,monster_meta}.json（本地打包）
  */
-import { util } from '@kit.ArkTS';
-import { AppContextProvider } from '../common/AppContext';
+import { GameDataService } from './GameDataService';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'TowerMetadata';
@@ -131,12 +130,8 @@ export class TowerMetadataService {
   }
 
   private static async loadAll(): Promise<void> {
-    const rm = AppContextProvider.getResourceManager();
     const read = async (file: string): Promise<string> => {
-      // Promise.resolve 包一层：兼容 SDK 中该 API 的同步/异步重载（CI lint await-thenable）
-      const bytes = await Promise.resolve(rm.getRawFileContent(`metadata/${file}`));
-      const decoder = util.TextDecoder.create('utf-8');
-      return decoder.decodeToString(bytes);
+      return GameDataService.readMetadataFile(file);
     };
     const schedules: TowerScheduleRow[] = JSON.parse(await read('TowerSchedule.json')) as TowerScheduleRow[];
     const floors: TowerFloorRow[] = JSON.parse(await read('TowerFloor.json')) as TowerFloorRow[];

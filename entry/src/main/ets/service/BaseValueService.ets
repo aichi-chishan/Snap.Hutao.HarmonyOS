@@ -4,8 +4,7 @@
  *   值(level, promoted) = InitValue × GrowCurveMap[level][growCurveType] + PromoteMap[promoteLevel].AddProperties[fightProperty]
  * 数据：rawfile/metadata/{WeaponCurve,WeaponPromote,AvatarCurve,AvatarPromote,MonsterCurve}.json
  */
-import { util } from '@kit.ArkTS';
-import { AppContextProvider } from '../common/AppContext';
+import { GameDataService } from './GameDataService';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'BaseValueService';
@@ -127,8 +126,7 @@ export class BaseValueService {
     if (BaseValueService.monsterCurves !== undefined) {
       return BaseValueService.monsterCurves;
     }
-    const raw = JSON.parse(util.TextDecoder.create('utf-8').decodeToString(
-      await AppContextProvider.getResourceManager().getRawFileContent('metadata/MonsterCurve.json'))) as Object[];
+    const raw = JSON.parse(await GameDataService.readMetadataFile('MonsterCurve.json')) as Object[];
     const map: Curves = new Map();
     for (const levelRow of raw) {
       const ro = levelRow as Record<string, Object>;
@@ -150,8 +148,7 @@ export class BaseValueService {
     if (BaseValueService.avatarCurves !== undefined) {
       return BaseValueService.avatarCurves;
     }
-    const raw = JSON.parse(util.TextDecoder.create('utf-8').decodeToString(
-      await AppContextProvider.getResourceManager().getRawFileContent('metadata/AvatarCurve.json'))) as Object[];
+    const raw = JSON.parse(await GameDataService.readMetadataFile('AvatarCurve.json')) as Object[];
     const map: Curves = new Map();
     for (const levelRow of raw) {
       const ro = levelRow as Record<string, Object>;
@@ -173,8 +170,7 @@ export class BaseValueService {
     if (BaseValueService.avatarPromotes !== undefined) {
       return BaseValueService.avatarPromotes;
     }
-    const raw = JSON.parse(util.TextDecoder.create('utf-8').decodeToString(
-      await AppContextProvider.getResourceManager().getRawFileContent('metadata/AvatarPromote.json'))) as Object[];
+    const raw = JSON.parse(await GameDataService.readMetadataFile('AvatarPromote.json')) as Object[];
     const map: Promotes = new Map();
     for (const row of raw) {
       const ro = row as Record<string, Object>;
@@ -249,8 +245,7 @@ export class BaseValueService {
   }
 
   private static async weaponOf(id: number): Promise<GrowCurveItem | undefined> {
-    const meta = JSON.parse(util.TextDecoder.create('utf-8').decodeToString(
-      await AppContextProvider.getResourceManager().getRawFileContent('metadata/weapon_meta.json'))) as Object[];
+    const meta = JSON.parse(await GameDataService.readMetadataFile('weapon_meta.json')) as Object[];
     for (const raw of meta) {
       const o = raw as Record<string, Object>;
       if (Number(o['id']) === id) {
@@ -274,8 +269,7 @@ export class BaseValueService {
     if (BaseValueService.weaponCurves !== undefined) {
       return BaseValueService.weaponCurves;
     }
-    const raw = JSON.parse(util.TextDecoder.create('utf-8').decodeToString(
-      await AppContextProvider.getResourceManager().getRawFileContent('metadata/WeaponCurve.json'))) as Object[];
+    const raw = JSON.parse(await GameDataService.readMetadataFile('WeaponCurve.json')) as Object[];
     const map: Curves = new Map();
     for (const levelRow of raw) {
       const ro = levelRow as Record<string, Object>;
@@ -297,8 +291,7 @@ export class BaseValueService {
     if (BaseValueService.weaponPromotes !== undefined) {
       return BaseValueService.weaponPromotes;
     }
-    const raw = JSON.parse(util.TextDecoder.create('utf-8').decodeToString(
-      await AppContextProvider.getResourceManager().getRawFileContent('metadata/WeaponPromote.json'))) as Object[];
+    const raw = JSON.parse(await GameDataService.readMetadataFile('WeaponPromote.json')) as Object[];
     const map: Promotes = new Map();
     for (const row of raw) {
       const ro = row as Record<string, Object>;

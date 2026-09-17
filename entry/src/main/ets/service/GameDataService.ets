@@ -113,6 +113,21 @@ export class GameDataService {
     return this.readIcon(category, name).length > 0;
   }
 
+  /** 发布清单的 path 保留 metadata/ 前缀；与下载器 itemPath 的落盘规则一致。 */
+  static async readMetadataFile(name: string): Promise<string> {
+    const remote: string = GameDataUpdater.readMetadata(`metadata/${name}`);
+    if (remote.length > 0) {
+      try {
+        JSON.parse(remote);
+        return remote;
+      } catch (e) {
+        Logger.warn(TAG, `invalid remote metadata ${name}, using bundled data`);
+      }
+    }
+    const raw: Uint8Array = await AppContextProvider.getResourceManager().getRawFileContent(`metadata/${name}`);
+    return util.TextDecoder.create('utf-8').decodeToString(raw);
+  }
+
   /** 当前远端版本号（无则 ''） */
   remoteVersion(): string {
     return GameDataUpdater.localVersion();

@@ -92,12 +92,9 @@ export class AchievementService {
     }
     // 1) 官方元数据（rawfile/metadata，对齐 Snap.Metadata：1844 条 > paimon-moe 社区集 1548 条）
     try {
-      const rm = AppContextProvider.getResourceManager();
-      const achRaw: Uint8Array = await rm.getRawFileContent('metadata/Achievement.json');
-      const goalRaw: Uint8Array = await rm.getRawFileContent('metadata/AchievementGoal.json');
-      AchievementService.parseOfficialMetadata(
-        util.TextDecoder.create('utf-8').decodeToString(achRaw),
-        util.TextDecoder.create('utf-8').decodeToString(goalRaw));
+      const achText: string = await GameDataService.readMetadataFile('Achievement.json');
+      const goalText: string = await GameDataService.readMetadataFile('AchievementGoal.json');
+      AchievementService.parseOfficialMetadata(achText, goalText);
       if ((AchievementService.idIndex?.size ?? 0) > 0) {
         return AchievementService.categories ?? [];
       }

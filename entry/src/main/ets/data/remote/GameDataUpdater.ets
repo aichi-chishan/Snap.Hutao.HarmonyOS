@@ -241,6 +241,7 @@ export class GameDataUpdater {
       return manifest;
     }
     let done = 0;
+    let failed: number = 0;
     for (const item of manifest.items) {
       try {
         await GameDataUpdater.downloadItem(item);
@@ -252,12 +253,15 @@ export class GameDataUpdater {
           onProgress(p);
         }
       } catch (e) {
-        // 单条失败不阻断整体（后续可再次 update 补齐）
+        failed += 1;
         Logger.warn(TAG, `update item fail ${item.path}: ${(e as Error).message}`);
       }
       done += 1;
     }
-    // 全部项（含失败）处理完后才更新版本戳：失败项下次 update 会重试
+    GameDataUpdater.metaCache.clear();
+    if (failed > 0) {
+      throw new Error(`数据更新未完成：${failed} 个文件下载失败，请重试`);
+    }
     PreferencesStore.setString(GameDataUpdater.versionKey(), manifest.channelVersion);
     Logger.info(TAG, `update done items=${manifest.items.length} version=${manifest.channelVersion}`);
     return manifest;
