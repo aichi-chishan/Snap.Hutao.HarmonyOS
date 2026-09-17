@@ -77,16 +77,16 @@ Windows 主页纵向流（AnnouncementPage.xaml）：
 
 ## 四、背景图选项（SettingPage 外观区 + WallpaperLayer 重构）
 
-Windows 五选项及可移植性：
+Windows 五选项及可移植性（**下表为 2026-09 实际落地状态**）：
 | 选项 | Windows 实现 | 结论 |
 |---|---|---|
-| 无背景图片 | 主题纯色底 | ✅ 移植（渐变/纯色） |
-| 本地随机图片 | 用户目录递归扫描 8 种格式，随机取 1（短期不重复），5 分钟轮换 | ✅ 移植（DocumentViewPicker 选目录 + fs.listFile 递归 + Random） |
-| 必应每日一图 | **胡桃云中转** api.snaphutaorp.org/wallpaper/bing | ⚠️ 云依赖；**等效替代**：直连 `https://cn.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1` 取 images[0].url（前缀 https://cn.bing.com），SHA1 文件名落盘缓存（对齐 Windows ImageCache 策略） |
-| 胡桃每日一图 | 胡桃云 /wallpaper/today | ❌ 不移植 |
+| 无背景图片 | 主题纯色底 | ✅ 已实现（none：主题纯色/渐变） |
+| 本地随机图片 | 用户目录递归扫描 8 种格式，随机取 1（短期不重复），5 分钟轮换 | ✅ 已实现（DocumentViewPicker 选目录 + fs.listFile 递归 + Random） |
+| 必应每日一图 | **胡桃云中转** api.snaphutaorp.org/wallpaper/bing | ❌ **已下线**（直连 cn.bing.com 图源不稳定）。旧偏好值 `bing` 在 `PreferencesStore.getBackgroundImageType()` 中迁移为 `none` |
+| 胡桃每日一图 | 胡桃云 /wallpaper/today | ✅ **已实现**（`service/HutaoDailyImageService.ets`，原计划标"不移植"，后因 Bing 下线而启用） |
 | 官方启动器壁纸 | 胡桃云 /wallpaper/hoyoplay（服务端选图） | ❌ 不移植（客户端无列表逻辑可复用） |
 
-鸿蒙动作：PreferencesStore 新增 backgroundImageType('none'|'local'|'bing') + backgroundImagePath；WallpaperLayer 改造为：none=主题渐变 / local=file:// 随机图 / bing=必应图（http 拉取+cacheDir 缓存，当日同 URL 不重下）；设置页外观区加"背景图片"选择器+文件夹选择+版权信息（bing 返回 copyright 字段）。拉伸 ImageFit.Cover（=UniformToFill）；暗色模式按图片亮度调透明度（可选，先简化为固定遮罩）。
+鸿蒙实现：`PreferencesStore` 存 `backgroundImageType('none'|'local'|'hutao')` + `backgroundImagePath`；`WallpaperLayer` 三态：none=主题底 / local=file:// 随机图 / hutao=每日一图（cacheDir 缓存）；设置页外观区提供三选项选择器 + 文件夹选择。拉伸 ImageFit.Cover（=UniformToFill）；遮罩用资源色 `wallpaper_mask`（浅 `#99FFFFFF` / 深 `#33000000`，注意 8 位 hex 为 `#AARRGGBB`）。
 
 ## 五、图片资源：替换 emoji 占位
 
@@ -121,7 +121,7 @@ Windows 结构：CommandBar(列表/网格切换+多条件搜索+加入养成计�
 
 | 功能 | 状态 |
 |---|---|
-| 主页（活动/卡池/仪表板/日历/签到/公告/入口） | ✅（Row3=启动游戏/保底/成就/便笺，Row4=日历/签到） |
+| 主页（活动/卡池/仪表板/日历/签到/公告/入口） | ✅（宽屏：欢迎横幅 → 活动区[左池/右活动同框] → 仪表板 7 卡等高 204vp[启动游戏/祈愿/成就/便笺/旅行者札记/日历/签到] → 游戏公告；手机：单列堆叠 + 底部 HdsTabs） |
 | 启动游戏（拉起本机 APP，不注入） | ✅ |
 | 祈愿记录（总览统计 + SToken 重签刷新 + 头像流进度 + UIGF 导入导出） | ✅ |
 | 成就管理（UIAF 互通） | ✅ |

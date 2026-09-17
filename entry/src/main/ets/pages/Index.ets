@@ -24,7 +24,6 @@ import { HomeAnnouncementCard } from '../components/HomeAnnouncementCard';
 import { HomeGachaBannerCard } from '../components/HomeGachaBannerCard';
 import { HomeActBannerCard } from '../components/HomeActBannerCard';
 import { HomeCalendarCard } from '../components/HomeCalendarCard';
-import { HomeChallengeCard } from '../components/HomeChallengeCard';
 import { GachaLogPage } from './GachaLogPage';
 import { DailyNotePage } from './DailyNotePage';
 import { CharacterPage } from './CharacterPage';
@@ -820,7 +819,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             GridItem() {
               this.entryTile('AvatarProperty', '我的角色', '角色列表 / 详情', () => {
                 if (this.isWide) {
-                  this.switchTo(3);
+                  this.switchTo(4);
                 } else {
                   router.pushUrl({ url: 'pages/CharacterPage' });
                 }
@@ -829,7 +828,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
             GridItem() {
               this.entryTile('SpiralAbyss', '深境螺旋', '当期 / 上期战绩', () => {
                 if (this.isWide) {
-                  this.switchTo(4);
+                  this.switchTo(6);
                 } else {
                   router.pushUrl({ url: 'pages/SpiralAbyssPage' });
                 }
@@ -1010,7 +1009,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .width('100%')
         .alignItems(VerticalAlign.Top)
 
-        // Windows UniformPanel：最小列宽 300、间距 12，HomeAdaptiveCardHeight 为 204。
+        // Windows UniformPanel：最小列宽 300、间距 DASH_GAP，HomeAdaptiveCardHeight 为 DASH_CARD_H。
         Grid() {
           GridItem() {
             HomeLaunchCard({
@@ -1020,7 +1019,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
-          .height(204)
+          .height(Index.DASH_CARD_H)
           GridItem() {
             HomeGachaCard({
               fillHeight: true,
@@ -1033,7 +1032,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
-          .height(204)
+          .height(Index.DASH_CARD_H)
           GridItem() {
             HomeAchievementCard({
               fillHeight: true,
@@ -1042,7 +1041,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
-          .height(204)
+          .height(Index.DASH_CARD_H)
           GridItem() {
             HomeDailyNoteCard({
               fillHeight: true,
@@ -1055,7 +1054,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
-          .height(204)
+          .height(Index.DASH_CARD_H)
           GridItem() {
             HomeTravelersDiaryCard({
               fillHeight: true,
@@ -1064,7 +1063,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
-          .height(204)
+          .height(Index.DASH_CARD_H)
           GridItem() {
             HomeCalendarCard({
               fillHeight: true,
@@ -1075,7 +1074,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
-          .height(204)
+          .height(Index.DASH_CARD_H)
           GridItem() {
             HomeSignInCard({
               fillHeight: true,
@@ -1095,14 +1094,15 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
-          .height(204)
+          .height(Index.DASH_CARD_H)
         }
-        .columnsTemplate(Array(this.homeCols(300, 12)).fill('1fr').join(' '))
-        .rowsTemplate(Array(Math.ceil(7 / this.homeCols(300, 12))).fill('1fr').join(' '))
-        .columnsGap(12)
-        .rowsGap(12)
+        // 300 = Windows UniformPanel.MinItemWidth（最小列宽），与 DASH_GAP 一起决定响应列数
+        .columnsTemplate(Array(this.homeCols(300, Index.DASH_GAP)).fill('1fr').join(' '))
+        .rowsTemplate(Array(Math.ceil(Index.DASH_CARD_COUNT / this.homeCols(300, Index.DASH_GAP))).fill('1fr').join(' '))
+        .columnsGap(Index.DASH_GAP)
+        .rowsGap(Index.DASH_GAP)
         .width('100%')
-        .height(Math.ceil(7 / this.homeCols(300, 12)) * 216 - 12)
+        .height(Math.ceil(Index.DASH_CARD_COUNT / this.homeCols(300, Index.DASH_GAP)) * (Index.DASH_CARD_H + Index.DASH_GAP) - Index.DASH_GAP)
         // 页面 Scroll 负责视口裁剪；卡组不裁掉首末行的阴影和受光。
         .clip(false)
         .onAreaChange((oldValue: Area, newValue: Area) => {
@@ -1145,6 +1145,13 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
   static readonly ACT_ROW_H: number = 116;
   /** 行间分割线占位（Divider 1 + margin 4+4） */
   private static readonly ACT_DIVIDER_H: number = 9;
+
+  /** 仪表板卡片高度（对齐 Windows HomeAdaptiveCardHeight=204，ThemeResource 单一事实来源） */
+  static readonly DASH_CARD_H: number = 204;
+  /** 仪表板网格列/行间距 vp（对齐 Windows UniformPanel 间距 12） */
+  private static readonly DASH_GAP: number = 12;
+  /** 仪表板卡片数量（启动游戏/祈愿/成就/便笺/旅行者札记/日历/签到） */
+  private static readonly DASH_CARD_COUNT: number = 7;
 
   /** 活动区面板高度：按实际行数算出，两列取较大者等高（替代写死的 360） */
   activityPanelH(): number {

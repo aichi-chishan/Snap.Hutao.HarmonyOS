@@ -26,6 +26,10 @@ struct AnnouncementDetailPage {
   @State showWeb: boolean = false;
   @State webUrl: string = '';
   private annId: number = 0;
+  /** 正文滚动区视口高度（vp，onAreaChange 读取；Web 兜底模式按它自适应，替代写死的 600） */
+  @State bodyAreaH: number = 0;
+  /** 正文滚动区底部内边距（与下方 Column.padding bottom 一致，Web 高度需扣除） */
+  private static readonly BODY_BOTTOM_PAD: number = 24;
 
   aboutToAppear(): void {
     const params = router.getParams() as AnnouncementDetailParams;
@@ -87,6 +91,17 @@ struct AnnouncementDetailPage {
     }
   }
 
+  /** Web 兜底高度：正文区视口高扣除底部 padding 与 Column 间距。
+   *  未测量（首帧）前退回 600（原写死值，保证不闪）；下限 240 防止极窄横屏下压没内容。
+   *  高度跟随窗口/分屏变化实时更新；Web 组件内部自带滚动，故给足高度不破坏查看完整原文。 */
+  webHeight(): number {
+    if (this.bodyAreaH <= 0) {
+      return 600;
+    }
+    const h: number = this.bodyAreaH - AnnouncementDetailPage.BODY_BOTTOM_PAD - 10;
+    return h > 240 ? h : 240;
+  }
+
   build() {
     Column() {
       Row() {
@@ -137,7 +152,9 @@ struct AnnouncementDetailPage {
               .javaScriptAccess(true)
               .domStorageAccess(true)
               .width('100%')
-              .height(600)
+              // 按正文区视口高度自适应（手机约 700-800vp 视口减去 header，写死 600 会超出；
+              // 平板偏矮）。Web 组件自带内部滚动，给足高度后仍能查看完整原文。
+              .height(this.webHeight())
           } else {
             Text(this.bodyText)
               .fontSize(15)
@@ -152,6 +169,10 @@ struct AnnouncementDetailPage {
       .width('100%')
       .layoutWeight(1)
       .align(Alignment.Top)
+      // 读正文滚动区自身高度（视口高，由 layoutWeight 决定，与内容无关，不会形成布局回环）
+      .onAreaChange((oldValue: Area, newValue: Area) => {
+        this.bodyAreaH = Number(newValue.height);
+      })
     }
     .width('100%')
     .height('100%')

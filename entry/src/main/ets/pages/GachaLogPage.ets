@@ -1179,6 +1179,9 @@ export struct GachaLogPage {
       .height(420)
       .cachedCount(5)
       .scrollBar(BarState.Off)
+      // 内层 List 与外层页面 Scroll 同轴嵌套：SELF_FIRST 让列表先滚，到边界后把剩余手势交给外层页面
+      // （否则手指落在抽卡历史列表上时页面完全滑不动）
+      .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
     }
     .width('100%')
     .padding(14)

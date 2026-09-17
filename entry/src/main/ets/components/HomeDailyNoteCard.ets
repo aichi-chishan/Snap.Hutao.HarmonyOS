@@ -128,7 +128,10 @@ export struct HomeDailyNoteCard {
         .fontColor($r('app.color.text_secondary'))
     }
     .width('100%')
-    .height(120)
+    // fillHeight（宽屏 204 单元格）时占满头部之外的剩余空间并垂直居中，避免底部空洞；
+    // 手机自适应高度时保持原 120 视觉。
+    .height(this.fillHeight ? undefined : 120)
+    .layoutWeight(this.fillHeight ? 1 : 0)
     .justifyContent(FlexAlign.Center)
   }
 
@@ -144,7 +147,8 @@ export struct HomeDailyNoteCard {
         .fontColor($r('app.color.text_secondary'))
     }
     .width('100%')
-    .height(140)
+    .height(this.fillHeight ? undefined : 140)
+    .layoutWeight(this.fillHeight ? 1 : 0)
     .justifyContent(FlexAlign.Center)
   }
 

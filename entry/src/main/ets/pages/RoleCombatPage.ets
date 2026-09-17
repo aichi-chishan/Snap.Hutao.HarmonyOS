@@ -29,6 +29,11 @@ export struct RoleCombatPage {
   @State showVerify: boolean = false;
   /** 本期期次元数据（限定元素/特邀/初始可选角色，本地 RoleCombatSchedule.json 按 scheduleId 匹配） */
   @State scheduleMeta: RoleCombatScheduleMeta | undefined = undefined;
+  /** 月谕统计 Grid 自身宽度（vp，onAreaChange 读取；列数按它推导，不用屏幕宽） */
+  @State moonGridW: number = 0;
+  /** 月谕统计网格：最小列宽 / 列间距（对齐 Windows UniformPanel，MinItemWidth 按手机可读性下调） */
+  private static readonly MOON_MIN_ITEM: number = 260;
+  private static readonly MOON_COL_GAP: number = 8;
 
   aboutToAppear(): void {
     this.loadData();
@@ -687,10 +692,13 @@ export struct RoleCombatPage {
             }
           }
         }
-        .columnsTemplate('1fr 1fr')
+        .columnsTemplate(Array(this.moonCols()).fill('1fr').join(' '))
         .columnsGap(8)
         .rowsGap(8)
         .width('100%')
+        .onAreaChange((oldValue: Area, newValue: Area) => {
+          this.moonGridW = Number(newValue.width);
+        })
       }
       .width('100%')
       .padding(14)
@@ -698,6 +706,19 @@ export struct RoleCombatPage {
       .backgroundColor($r('app.color.card_background'))
       .border({ width: 1, color: $r('app.color.divider') })
     }
+  }
+
+  /** 月谕统计列数（对齐 Windows UniformPanel.MeasureOverride：floor((W+gap)/(minItem+gap))）。
+   *  W 取 Grid 自身宽度（onAreaChange），不读屏幕宽；首帧未测量前退回 2 列（原视觉）。
+   *  下限 2 保持手机窄屏观感（原为固定 2 列），上限 4 防止超宽屏格子过窄；
+   *  列模板用 '1fr'，任何列数都按可用宽均分，不会横向溢出。 */
+  moonCols(): number {
+    if (this.moonGridW <= 0) {
+      return 2;
+    }
+    const computed: number = Math.floor((this.moonGridW + RoleCombatPage.MOON_COL_GAP)
+      / (RoleCombatPage.MOON_MIN_ITEM + RoleCombatPage.MOON_COL_GAP));
+    return Math.max(2, Math.min(4, computed));
   }
 
   /** avatar_icon 全名（如 UI_AvatarIcon_Ayaka）→ MetaIcon name（UI_AvatarIcon_Ayaka）直接可用 */
