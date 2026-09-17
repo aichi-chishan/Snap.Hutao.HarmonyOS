@@ -45,6 +45,7 @@ export struct HomeTravelersDiaryCard {
       cardBg: $r('app.color.card_background'),
       radius: 12,
     }) {
+      // 统一 12vp 内边距；fillHeight 时撑满父级 204vp 行高，正文区纵向均衡
       Column({ space: 8 }) {
         Row({ space: 8 }) {
           NavIcon({ name: 'TravelersDiary', iconSize: 20 })
@@ -60,6 +61,8 @@ export struct HomeTravelersDiaryCard {
             .fontColor($r('app.color.text_secondary'))
         }
         .width('100%')
+        .height(24)
+        .flexShrink(0)
 
         if (this.loaded && this.ledger !== undefined) {
           Row({ space: 8 }) {
@@ -88,19 +91,31 @@ export struct HomeTravelersDiaryCard {
             .layoutWeight(1)
           }
           .width('100%')
+          .alignSelf(ItemAlign.Stretch)
+          .layoutWeight(this.fillHeight ? 1 : 0)
+          .alignItems(this.fillHeight ? VerticalAlign.Center : VerticalAlign.Top)
         } else if (this.loaded) {
           Text('暂无札记数据')
             .fontSize(12)
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
+            .layoutWeight(this.fillHeight ? 1 : 0)
+            .textAlign(this.fillHeight ? TextAlign.Center : TextAlign.Start)
         } else {
-          LoadingProgress()
-            .width(18)
-            .height(18)
-            .color($r('app.color.app_primary'))
+          Row() {
+            LoadingProgress()
+              .width(18)
+              .height(18)
+              .color($r('app.color.app_primary'))
+          }
+          .width('100%')
+          .layoutWeight(this.fillHeight ? 1 : 0)
+          .justifyContent(FlexAlign.Center)
         }
       }
       .width('100%')
+      .height(this.fillHeight ? '100%' : undefined)
+      .padding(12)
     }
   }
 }

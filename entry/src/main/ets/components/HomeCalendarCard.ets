@@ -169,7 +169,7 @@ export struct HomeCalendarCard {
       cardBg: $r('app.color.card_background'),
       radius: 12,
     }) {
-      Column({ space: 10 }) {
+      Column({ space: 8 }) {
         Row({ space: 8 }) {
           NavIcon({ name: 'Database', iconSize: 20 })
           Text('日历')
@@ -182,6 +182,8 @@ export struct HomeCalendarCard {
             .fontColor($r('app.color.app_primary'))
         }
         .width('100%')
+        .height(24)
+        .flexShrink(0)
 
         // 周历 Segmented（7 格，选中今天）
         Row({ space: 4 }) {
@@ -196,68 +198,100 @@ export struct HomeCalendarCard {
                 .fontColor(cell.isToday ? $r('app.color.app_primary') : $r('app.color.text_primary'))
             }
             .layoutWeight(1)
-            .padding({ top: 6, bottom: 6 })
+            .padding({ top: 3, bottom: 3 })
             .borderRadius(8)
             .backgroundColor(cell.isToday ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
           }, (cell: WeekDayCell) => `wk_${cell.index}_${cell.isToday}`)
         }
         .width('100%')
+        .height(48)
         .padding(4)
         .borderRadius(10)
         .backgroundColor($r('app.color.card_inner_tint'))
 
 
-        // 今日材料（按星期轮换：天赋书/武器矿，图标取自本地元数据）
-        if (this.todayMaterials().length > 0) {
-          Row({ space: 6 }) {
-            Text('今日获取')
-              .fontSize(12)
-              .fontColor($r('app.color.text_secondary'))
-            ForEach(this.todayMaterials(), (m: DailyMaterial, idx: number) => {
-              Column({ space: 2 }) {
-                MetaIcon({ category: 'ItemIcon', name: m.icon, iconSize: 22, remoteFallback: true })
-                Text(HomeCalendarCard.shorten(m.name))
-                  .fontSize(8)
+        // 正文独立纵向视口兜底；每行横滚保留完整名称，不截掉材料、生日或活动。
+        Scroll() {
+          Column({ space: 4 }) {
+            if (this.todayMaterials().length > 0) {
+              Row({ space: 6 }) {
+                Text('今日获取')
+                  .fontSize(12)
                   .fontColor($r('app.color.text_secondary'))
+                Scroll() {
+                  Row({ space: 10 }) {
+                    ForEach(this.todayMaterials(), (m: DailyMaterial) => {
+                      Row({ space: 3 }) {
+                        MetaIcon({ category: 'ItemIcon', name: m.icon, iconSize: 22, remoteFallback: true })
+                        Text(m.name)
+                          .fontSize(12)
+                          .fontColor($r('app.color.text_secondary'))
+                          .maxLines(1)
+                      }
+                    }, (m: DailyMaterial) => `dm_${m.id}_${m.name}_${m.icon}`)
+                  }
+                }
+                .scrollable(ScrollDirection.Horizontal)
+                .scrollBar(BarState.Off)
+                .layoutWeight(1)
+                .height(24)
+                .align(Alignment.Start)
+              }
+              .width('100%')
+              .height(24)
+            }
+            if (this.todayBirthdays().length > 0) {
+              Row({ space: 6 }) {
+                Text('今日生日')
+                  .fontSize(12)
+                  .fontColor($r('app.color.text_secondary'))
+                Scroll() {
+                  Row({ space: 10 }) {
+                    ForEach(this.todayBirthdays(), (b: BirthdayCell) => {
+                      Row({ space: 3 }) {
+                        MetaIcon({ category: 'AvatarIcon', name: b.icon, iconSize: 22, circular: true })
+                        Text(b.name)
+                          .fontSize(12)
+                          .fontColor($r('app.color.text_primary'))
+                          .maxLines(1)
+                      }
+                    }, (b: BirthdayCell) => `bd_${b.name}_${b.icon}`)
+                  }
+                }
+                .scrollable(ScrollDirection.Horizontal)
+                .scrollBar(BarState.Off)
+                .layoutWeight(1)
+                .height(24)
+                .align(Alignment.Start)
+              }
+              .width('100%')
+              .height(24)
+            }
+            if (this.todayActs.length > 0) {
+              Scroll() {
+                Text(`今日活动：${this.todayActs.join(' / ')}`)
+                  .fontSize(12)
+                  .fontColor($r('app.color.app_primary'))
                   .maxLines(1)
               }
-            }, (m: DailyMaterial) => `dm_${m.id}`)
-            Blank()
+              .scrollable(ScrollDirection.Horizontal)
+              .scrollBar(BarState.Off)
+              .width('100%')
+              .height(24)
+              .align(Alignment.Start)
+            }
           }
           .width('100%')
         }
-
-        // 今日角色生日（头像 + 名字）
-        if (this.todayBirthdays().length > 0) {
-          Row({ space: 6 }) {
-            Text('今日生日')
-              .fontSize(12)
-              .fontColor($r('app.color.text_secondary'))
-            ForEach(this.todayBirthdays(), (b: BirthdayCell, idx: number) => {
-              Column({ space: 2 }) {
-                MetaIcon({ category: 'AvatarIcon', name: b.icon, iconSize: 22, circular: true })
-                Text(b.name.length > 4 ? `${b.name.substring(0, 4)}…` : b.name)
-                  .fontSize(8)
-                  .fontColor($r('app.color.text_primary'))
-                  .maxLines(1)
-              }
-            }, (b: BirthdayCell) => `bd_${b.name}`)
-            Blank()
-          }
-          .width('100%')
-        }
-
-        // 今日活动名称
-        if (this.todayActs.length > 0) {
-          Text(`今日活动：${this.todayActs.slice(0, 2).join(' / ')}`)
-            .fontSize(12)
-            .fontColor($r('app.color.app_primary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .width('100%')
-        }
+        .scrollable(ScrollDirection.Vertical)
+        .scrollBar(BarState.Auto)
+        .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+        .width('100%')
+        .height(this.fillHeight ? 92 : undefined)
+        .align(Alignment.TopStart)
       }
       .width('100%')
+      .height(this.fillHeight ? '100%' : undefined)
       .padding(12)
     }
   }

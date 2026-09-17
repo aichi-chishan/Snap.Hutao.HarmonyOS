@@ -63,6 +63,7 @@ export struct HomeLaunchCard {
       cardBg: $r('app.color.card_background'),
       radius: 12,
     }) {
+      // 统一 12vp 内边距；fillHeight 时撑满父级 204vp 行高：头部/副文/按钮纵向均衡分布
       Column({ space: 8 }) {
         Row({ space: 8 }) {
           NavIcon({ name: 'LaunchGame', iconSize: 18 })
@@ -72,6 +73,8 @@ export struct HomeLaunchCard {
             .fontColor($r('app.color.text_primary'))
         }
         .width('100%')
+        .height(24)
+        .flexShrink(0)
 
         Column({ space: 2 }) {
           Text(this.detected ? this.game.displayName : '未检测到游戏')
@@ -86,6 +89,8 @@ export struct HomeLaunchCard {
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
+        .height(this.fillHeight ? 96 : undefined)
+        .justifyContent(FlexAlign.Center)
 
         Row() {
           Text(this.launching ? '启动中...' : '启动游戏')
@@ -95,13 +100,18 @@ export struct HomeLaunchCard {
         }
         .width('100%')
         .height(44)
+        .flexShrink(0)
+        .hoverEffect(HoverEffect.Highlight)
         .borderRadius(10)
         .backgroundColor($r('app.color.app_primary'))
         .alignItems(VerticalAlign.Center)
         .justifyContent(FlexAlign.Center)
       }
       .width('100%')
+      .height(this.fillHeight ? '100%' : undefined)
+      .padding(12)
       .alignItems(HorizontalAlign.Start)
+      .justifyContent(this.fillHeight ? FlexAlign.SpaceBetween : FlexAlign.Start)
     }
   }
 }

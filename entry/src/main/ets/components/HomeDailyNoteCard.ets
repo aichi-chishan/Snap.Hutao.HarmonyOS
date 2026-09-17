@@ -148,50 +148,50 @@ export struct HomeDailyNoteCard {
     .justifyContent(FlexAlign.Center)
   }
 
-  /** 圆点提示（阈值达成显示主题色圆点） */
-  @Builder
-  dot(visible: boolean) {
-    Circle()
-      .width(7)
-      .height(7)
-      .fill($r('app.color.app_primary'))
-      .margin({ top: 2 })
-      .opacity(visible ? 1 : 0)
-  }
-
   /** 游戏素材图标块（对齐 Windows DailyNoteCard：UI_ItemIcon_106/UI_MarkQuest_* 等）。
    *  slot 为常量槽位；文案/红点在渲染期读组件状态，保证便笺刷新后同步。 */
   @Builder
   block(slot: number, wide: boolean) {
-    Row({ space: 8 }) {
-      MetaIcon({ category: this.blockCategory(slot), name: this.blockIcon(slot), iconSize: wide ? 22 : 18, remoteFallback: true })
-      Column({ space: 1 }) {
-        Text(this.blockText(slot))
-          .fontSize(16)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
+    Column({ space: 3 }) {
+      if (wide) {
+        MetaIcon({ category: this.blockCategory(slot), name: this.blockIcon(slot), iconSize: 26, remoteFallback: true })
+      }
+      Text(this.blockText(slot))
+        .fontSize(wide ? 17 : 13)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.text_primary'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+      Row({ space: 3 }) {
         Text(this.blockSub(slot))
           .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
+        Row()
+          .width(6)
+          .height(6)
+          .borderRadius(4)
+          .backgroundColor($r('app.color.app_primary'))
+          .opacity(this.blockDot(slot) ? 1 : 0)
       }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-      Circle()
-        .width(7)
-        .height(7)
-        .fill($r('app.color.app_primary'))
-        .margin({ top: 2 })
-        .opacity(this.blockDot(slot) ? 1 : 0)
+      .width('100%')
     }
     .width('100%')
-    .height(wide ? 64 : 28)
-    .padding({ left: 8, right: 8, top: wide ? 0 : 4, bottom: wide ? 0 : 4 })
+    .height(wide ? 104 : 50)
+    .padding({ left: 6, right: 6, top: 4, bottom: 4 })
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Start)
     .borderRadius(8)
     .backgroundColor($r('app.color.card_inner_tint'))
+  }
+
+  private expeditionSummary(): string {
+    const n: DailyNote = this.cur();
+    const finished: number = n.expeditions.filter((exp: Expedition) => exp.isFinished()).length;
+    return `派遣 ${n.currentExpeditionNum}/${n.maxExpeditionNum} · 已完成 ${finished}`;
   }
 
     /** 是否撑满 Grid 单元格高度（行内等高） */
@@ -221,19 +221,20 @@ export struct HomeDailyNoteCard {
           }
         }
         .width('100%')
+        .height(24)
+        .flexShrink(0)
 
         if (!this.loaded) {
           this.loadingView()
         } else if (this.note === undefined) {
           this.emptyView()
         } else {
-          Row({ space: 8 }) {
-            // 列1：树脂（大块）
-            this.block(HomeDailyNoteCard.SLOT_RESIN, true)
-          }
-          .width('100%')
-
-          Row({ space: 8 }) {
+          Row({ space: 6 }) {
+            // 三列：树脂跨两块高度，其余两列各两个双行块。
+            Column() {
+              this.block(HomeDailyNoteCard.SLOT_RESIN, true)
+            }
+            .layoutWeight(1)
             // 列2：宝钱 / 委托
             Column({ space: 4 }) {
               this.block(HomeDailyNoteCard.SLOT_HOME_COIN, false)
@@ -252,29 +253,26 @@ export struct HomeDailyNoteCard {
           }
           .width('100%')
 
-          if (this.note.expeditions.length > 0) {
-            Row({ space: 6 }) {
-              NavIcon({ name: 'DailyNote', iconSize: 14 })
-              Text(`派遣 ${this.note.currentExpeditionNum}/${this.note.maxExpeditionNum}`)
-                .fontSize(12)
-                .fontColor($r('app.color.text_primary'))
-              ForEach(this.note.expeditions, (exp: Expedition, idx: number) => {
-                Text(exp.isFinished() ? '已归' : '进行中')
-                  .fontSize(12)
-                  .fontColor(exp.isFinished() ? $r('app.color.success') : $r('app.color.notice_on'))
-                  .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                  .borderRadius(6)
-                  .backgroundColor($r('app.color.card_inner_tint'))
-                  .maxLines(1)
-              }, (exp: Expedition, idx: number) => `exp_${idx}_${exp.status}`)
-              Blank()
-            }
-            .width('100%')
+          Row({ space: 6 }) {
+            Text(this.expeditionSummary())
+              .fontSize(12)
+              .fontColor($r('app.color.text_secondary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .layoutWeight(1)
+            Text('查看详情 ›')
+              .fontSize(12)
+              .fontColor($r('app.color.app_primary'))
+              .hoverEffect(HoverEffect.Highlight)
+              .onClick(() => this.onTap())
           }
+          .width('100%')
+          .height(24)
         }
       }
       .width('100%')
-      .padding(14)
+      .height(this.fillHeight ? '100%' : undefined)
+      .padding(12)
     }
   }
 }

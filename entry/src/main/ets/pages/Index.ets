@@ -1011,8 +1011,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .height(360)
         .alignItems(VerticalAlign.Top)
 
-        // 仪表板卡组（对齐 Windows UniformPanel MinItemWidth=300 gap=12：
-        // 列数随内容宽度推导，等分拉伸，行高按内容自适应；顺序=Windows InitializeDashboard）
+        // Windows UniformPanel：最小列宽 300、间距 12，HomeAdaptiveCardHeight 为 204。
         Grid() {
           GridItem() {
             HomeLaunchCard({
@@ -1022,6 +1021,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
+          .height(204)
           GridItem() {
             HomeGachaCard({
               fillHeight: true,
@@ -1034,6 +1034,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
+          .height(204)
           GridItem() {
             HomeAchievementCard({
               fillHeight: true,
@@ -1042,6 +1043,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
+          .height(204)
           GridItem() {
             HomeDailyNoteCard({
               fillHeight: true,
@@ -1054,6 +1056,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
+          .height(204)
           GridItem() {
             HomeTravelersDiaryCard({
               fillHeight: true,
@@ -1062,6 +1065,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
+          .height(204)
           GridItem() {
             HomeCalendarCard({
               fillHeight: true,
@@ -1072,6 +1076,7 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
+          .height(204)
           GridItem() {
             HomeSignInCard({
               fillHeight: true,
@@ -1091,13 +1096,19 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
               },
             })
           }
+          .height(204)
         }
         .columnsTemplate(Array(this.homeCols(300, 12)).fill('1fr').join(' '))
+        .rowsTemplate(Array(Math.ceil(7 / this.homeCols(300, 12))).fill('1fr').join(' '))
         .columnsGap(12)
         .rowsGap(12)
         .width('100%')
-        // 显式行高（行数=ceil(7/列数)，行高 200）→ 单元格有界，卡片行内等高且不溢出
-        .height(Math.ceil(7 / this.homeCols(300, 12)) * 200)
+        .height(Math.ceil(7 / this.homeCols(300, 12)) * 216 - 12)
+        // 页面 Scroll 负责视口裁剪；卡组不裁掉首末行的阴影和受光。
+        .clip(false)
+        .onAreaChange((oldValue: Area, newValue: Area) => {
+          this.homeW = Number(newValue.width);
+        })
         // Row5：游戏公告（全宽）
         HomeAnnouncementCard({
           items: this.homeVm.announcements,
@@ -1117,10 +1128,6 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       }
       .width('100%')
       .padding({ left: 16, right: 16, bottom: 16 })
-      .onAreaChange((oldValue: Area, newValue: Area) => {
-        // UniformPanel 语义：列数按内容区实际宽度推导（不含侧栏）
-        this.homeW = Number(newValue.width);
-      })
     }
     .width('100%')
     .height('100%')

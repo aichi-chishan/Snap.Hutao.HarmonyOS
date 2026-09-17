@@ -51,6 +51,7 @@ export struct HomeAchievementCard {
       cardBg: $r('app.color.card_background'),
       radius: 12,
     }) {
+      // 统一 12vp 内边距；fillHeight 时撑满父级 204vp 行高，正文占剩余空间居中
       Column({ space: 10 }) {
         // 头部
         Row({ space: 8 }) {
@@ -66,6 +67,8 @@ export struct HomeAchievementCard {
             .fontColor($r('app.color.app_primary'))
         }
         .width('100%')
+        .height(24)
+        .flexShrink(0)
 
         if (!this.loaded) {
           Row({ space: 10 }) {
@@ -78,7 +81,8 @@ export struct HomeAchievementCard {
               .fontColor($r('app.color.text_secondary'))
           }
           .width('100%')
-          .height(84)
+          .layoutWeight(this.fillHeight ? 1 : 0)
+          .height(this.fillHeight ? undefined : 84)
           .justifyContent(FlexAlign.Center)
         } else {
           Row({ space: 14 }) {
@@ -124,10 +128,13 @@ export struct HomeAchievementCard {
             .layoutWeight(1)
           }
           .width('100%')
+          .layoutWeight(this.fillHeight ? 1 : 0)
+          .alignItems(this.fillHeight ? VerticalAlign.Center : VerticalAlign.Top)
         }
       }
       .width('100%')
-      .padding(14)
+      .height(this.fillHeight ? '100%' : undefined)
+      .padding(12)
     }
   }
 }

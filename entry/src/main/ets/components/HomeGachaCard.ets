@@ -33,7 +33,7 @@ export struct HomeGachaCard {
         .fontColor($r('app.color.text_secondary'))
     }
     .width('100%')
-    .height(120)
+    .height(96)
     .justifyContent(FlexAlign.Center)
   }
 
@@ -49,13 +49,14 @@ export struct HomeGachaCard {
         .fontColor($r('app.color.text_secondary'))
     }
     .width('100%')
-    .height(140)
+    .height(112)
     .justifyContent(FlexAlign.Center)
   }
 
+  /** 紧凑单池面板：标题 + 总抽数 + 两行保底进度（单行式，面板自然高度 <=150） */
   @Builder
   poolPanel(summary: HomePoolSummary) {
-    Column({ space: 6 }) {
+    Column({ space: 5 }) {
       Text(summary.typeName)
         .fontSize(13)
         .fontWeight(FontWeight.Medium)
@@ -66,73 +67,55 @@ export struct HomeGachaCard {
 
       Row({ space: 4 }) {
         Text(`${summary.totalCount}`)
-          .fontSize(26)
+          .fontSize(22)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
         Text('抽')
-          .fontSize(12)
+          .fontSize(11)
           .fontColor($r('app.color.text_secondary'))
-          .margin({ top: 12 })
+          .margin({ top: 8 })
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
 
-      // 橙色（五星）保底进度
+      // 橙色（五星）保底进度（单行：进度条 + 距保底计数）
       Row({ space: 6 }) {
         Progress({
           value: Math.min(summary.sinceLastFive, ORANGE_GUARANTEE),
           total: ORANGE_GUARANTEE,
           type: ProgressType.Linear,
         })
-          .width(28)
+          .width('100%')
+          .layoutWeight(1)
           .color($r('app.color.five_star'))
           .style({ strokeWidth: 4 })
-        Column({ space: 0 }) {
-          Text(`${summary.sinceLastFive}`)
-            .fontSize(13)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.five_star'))
-          Text('距五星')
-            .fontSize(9)
-            .fontColor($r('app.color.text_secondary'))
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Text(`${Math.max(0, ORANGE_GUARANTEE - summary.sinceLastFive)}抽保底`)
-          .fontSize(9)
-          .fontColor($r('app.color.text_secondary'))
+        Text(`五星 ${summary.sinceLastFive}/90 · 余${Math.max(0, ORANGE_GUARANTEE - summary.sinceLastFive)}抽`)
+          .fontSize(12)
+          .fontColor($r('app.color.five_star'))
       }
       .width('100%')
 
-      // 紫色（四星）保底进度
+      // 紫色（四星）保底进度（单行：进度条 + 距保底计数）
       Row({ space: 6 }) {
         Progress({
           value: Math.min(summary.sinceLastFour, PURPLE_GUARANTEE),
           total: PURPLE_GUARANTEE,
           type: ProgressType.Linear,
         })
-          .width(28)
+          .width('100%')
+          .layoutWeight(1)
           .color($r('app.color.four_star'))
           .style({ strokeWidth: 4 })
-        Column({ space: 0 }) {
-          Text(`${summary.sinceLastFour}`)
-            .fontSize(13)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.four_star'))
-          Text('距四星')
-            .fontSize(9)
-            .fontColor($r('app.color.text_secondary'))
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Text(`${Math.max(0, PURPLE_GUARANTEE - summary.sinceLastFour)}抽保底`)
-          .fontSize(9)
-          .fontColor($r('app.color.text_secondary'))
+        Text(`四星 ${summary.sinceLastFour}/10 · 余${Math.max(0, PURPLE_GUARANTEE - summary.sinceLastFour)}抽`)
+          .fontSize(12)
+          .fontColor($r('app.color.four_star'))
       }
       .width('100%')
     }
-    .width(160)
-    .padding(10)
+    .width(224)
+    .height(142)
+    .justifyContent(FlexAlign.SpaceBetween)
+    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
     .borderRadius(10)
     .backgroundColor($r('app.color.card_inner_tint'))
     .border({ width: 1, color: $r('app.color.divider') })
@@ -151,6 +134,7 @@ export struct HomeGachaCard {
       cardBg: $r('app.color.card_background'),
       radius: 12,
     }) {
+      // 统一 12vp 内边距；fillHeight 时撑满父级 204vp 行高，横向滚动池区占剩余空间
       Column({ space: 10 }) {
         // 头部
         Row({ space: 8 }) {
@@ -165,6 +149,8 @@ export struct HomeGachaCard {
             .fontColor($r('app.color.app_primary'))
         }
         .width('100%')
+        .height(24)
+        .flexShrink(0)
 
         if (this.loaded && this.pools.length === 0) {
           this.emptyView()
@@ -175,17 +161,21 @@ export struct HomeGachaCard {
             Row({ space: 8 }) {
               ForEach(this.pools, (pool: HomePoolSummary) => {
                 this.poolPanel(pool)
-              }, (pool: HomePoolSummary) => `${pool.gachaType}_${pool.totalCount}_${pool.sinceLastFive}`)
+              }, (pool: HomePoolSummary) => `${pool.gachaType}_${pool.typeName}_${pool.totalCount}_${pool.sinceLastFive}_${pool.sinceLastFour}`)
             }
           }
           .scrollable(ScrollDirection.Horizontal)
           .scrollBar(BarState.Off)
           .edgeEffect(EdgeEffect.Spring)
           .width('100%')
+          .alignSelf(ItemAlign.Stretch)
+          .layoutWeight(this.fillHeight ? 1 : 0)
+          .align(Alignment.TopStart)
         }
       }
       .width('100%')
-      .padding(14)
+      .height(this.fillHeight ? '100%' : undefined)
+      .padding(12)
     }
   }
 }

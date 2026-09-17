@@ -79,7 +79,7 @@ export struct HomeSignInCard {
         .fontColor($r('app.color.text_secondary'))
     }
     .width('100%')
-    .height(140)
+    .height(this.fillHeight ? 136 : 140)
     .justifyContent(FlexAlign.Center)
   }
 
@@ -128,15 +128,17 @@ export struct HomeSignInCard {
         .fontColor(this.isDaySigned(reward.day) ? $r('app.color.text_secondary') : $r('app.color.text_primary'))
         .opacity(this.isDaySigned(reward.day) ? 0.6 : 1)
     }
+    .width('100%')
+    .height(40)
     .padding(2)
     .borderRadius(8)
     .backgroundColor(this.isDaySigned(reward.day) ? $r('app.color.card_background') : Color.Transparent)
   }
 
-  /** 奖励网格高度：按行数动态（7 列，每行 24vp；整体控制在仪表板行 200vp 内） */
+  /** 自然模式展示完整月表；40vp 奖励格加 2vp 行间距，不能按视口压缩格子。 */
   static gridHeight(count: number): number {
     const rows: number = Math.ceil(count / 7);
-    return rows * 24;
+    return rows * 40 + Math.max(0, rows - 1) * 2;
   }
 
   /** 奖励名（原神通用材料名）→ rawfile ItemIcon 文件名（去 UI_ 前缀映射失败则用通用）
@@ -181,6 +183,8 @@ export struct HomeSignInCard {
           }
         }
         .width('100%')
+        .height(38)
+        .flexShrink(0)
 
         if (!this.loaded) {
           this.loadingView()
@@ -193,13 +197,19 @@ export struct HomeSignInCard {
               GridItem() {
                 this.awardCell(reward)
               }
-            }, (reward: SignInReward) => `sign_${reward.day}_${reward.count}`)
+              .height(40)
+            }, (reward: SignInReward) => `sign_${reward.day}_${reward.count}_${reward.icon}_${this.info?.signedDays}`)
           }
           .columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr 1fr')
           .columnsGap(2)
           .rowsGap(2)
           .width('100%')
-          .height(this.info !== undefined ? HomeSignInCard.gridHeight(this.info.rewards.length) : 44)
+          // 只设列模板，Grid 保持纵向滚动；每格独立 40vp，按钮位于视口外。
+          .height(this.fillHeight ? 92 : HomeSignInCard.gridHeight(this.info.rewards.length))
+          .scrollBar(this.fillHeight ? BarState.Auto : BarState.Off)
+          .enableScrollInteraction(this.fillHeight)
+          .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+          .flexShrink(0)
 
           Divider()
             .width('100%')
@@ -209,6 +219,7 @@ export struct HomeSignInCard {
             Button(this.info.isTodaySigned(this.todayDay) ? '今日已签' : '签到')
               .fontSize(13)
               .height(30)
+              .hoverEffect(HoverEffect.Highlight)
               .layoutWeight(1)
               .backgroundColor(this.info.isTodaySigned(this.todayDay) ? $r('app.color.card_background') : $r('app.color.app_primary'))
               .fontColor(this.info.isTodaySigned(this.todayDay) ? $r('app.color.text_secondary') : Color.White)
@@ -219,6 +230,7 @@ export struct HomeSignInCard {
             Button('补签')
               .fontSize(13)
               .height(30)
+              .hoverEffect(HoverEffect.Highlight)
               .layoutWeight(1)
               .backgroundColor($r('app.color.app_primary_bg'))
               .fontColor($r('app.color.app_primary'))
@@ -227,10 +239,13 @@ export struct HomeSignInCard {
               })
           }
           .width('100%')
+          .height(30)
+          .flexShrink(0)
         }
       }
       .width('100%')
-      .padding(14)
+      .height(this.fillHeight ? '100%' : undefined)
+      .padding(12)
     }
   }
 }
