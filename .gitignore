@@ -1,54 +1,55 @@
+# ============================================================
+# Snap.Hutao.HarmonyOS — 忽略规则
+# 原则：构建产物 / 本地配置 / 含隐私或密钥的文件一律不入库。
+# 新增忽略项时请归入对应分组，不要散落。
+# ============================================================
+
 # ===== 构建产物 =====
 /node_modules
 /oh_modules
-/local.properties
-/.idea
 **/build
 /.hvigor
-.cxx
-/.clangd
-/.clang-format
-/.clang-tidy
-**/.test
+/.cxx
 /.appanalyzer
-/.deveco
-/.zcode
+**/.test
 /.cache
 
-# ===== 本地工具（DevEco 自带 skills，非项目源码）=====
+# ===== 本地签名配置（含密钥，自行在 DevEco 配置）=====
+/build-profile.json5
+/local.properties
+
+# ===== IDE / 编辑器 =====
+/.idea
+/.deveco
+*.iml
+.DS_Store
+Thumbs.db
+
+# ===== AI 工具与本地开发辅助（非项目源码）=====
+/.zcode
+/.mimocode
+/.mimosa/
+/.agents/
+/.claude/
+/spec/
 /skills
 
 # ===== 独立数据仓库（snap-hutao-data，另行托管）=====
 /github-data
 
-# ===== 本地签名配置（含密钥，自行配置）=====
-/build-profile.json5
-
-# ===== 参考截图（Windows 版界面截图；含账号信息，不随仓库公开）=====
+# ===== 参考截图（Windows 版界面截图；含账号信息，不公开）=====
 /example
 
-# ===== IDE / 本地配置 =====
-*.iml
-.DS_Store
-Thumbs.db
-
-# ===== Mimosa 安全钩子状态 =====
-/.mimosa/
-
-# ===== AI 工具开发文档（本地） =====
-/spec/
-
-# ===== 截图/调试产物 =====
+# ===== 隐私/调试产物：截图与布局转储 =====
 /.debug/
+/.local/
 shot_*.jpeg
 shot_*.png
 layout*.json
 
-# ===== 临时文件 / 备份 / 其他本地工具 =====
+# ===== 临时文件 / 备份 =====
 .tmp_*
 *.bak
 *.orig
-/.agents/
-/.claude/
-ci_lint_log.txt
 *.log
+ci_lint_log.txt

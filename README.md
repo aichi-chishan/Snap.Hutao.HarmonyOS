@@ -21,10 +21,11 @@ HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），�
 
 ## ✨ 功能总览
 
-### 主页（Windows 仪表板布局）
+### 主页（对齐 Windows 仪表板布局）
 - **卡池横幅**（左上合框）：角色 UP / 武器 UP 横幅，UP 阵容头像 + 剩余时间 + 起止日期
 - **活动与挑战**（右上合框）：渊月螺旋 / 幻想真境剧诗 / 铸境研炼等剩余时间与状态（可在设置隐藏）
-- **仪表板卡组**（UniformPanel 响应式）：启动游戏 | 祈愿统计（保底进度）| 成就统计 | 实时便笺 | 旅行者札记 | 日历 | 每日签到——列数随窗口宽度自动变化，行内等高
+- **仪表板卡组**（UniformPanel 语义）：启动游戏 | 祈愿统计（保底进度）| 成就统计 | 实时便笺 | 旅行者札记 | 日历 | 每日签到
+  ——列数按内容区宽度自适应（最小列宽 300vp / 间距 12vp），卡片恒高 **204vp**（对齐 Windows `HomeAdaptiveCardHeight`），行内等高
 - **胡桃每日一图**：Snap.Hutao 公开壁纸接口，当日缓存；按图片亮度自适应透明度（全量复刻 Windows 合成），亚克力卡片材质（浅/深双主题）
 - **游戏公告**：官方封面图 + 标题，点击查看详情；**前瞻直播兑换码**一键查询复制
 
@@ -54,6 +55,20 @@ HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），�
 
 ---
 
+## 🧪 质量与自动化
+
+| 项 | 说明 |
+|---|---|
+| 单元测试 | `entry/src/test`（hypium Local Test，纯逻辑：圣遗物评分 / 祈愿类型 / 富文本清洗 / 日期工具） |
+| CI | `.github/workflows/ci.yml`：仓库不变量 + 隐私门禁 + lint（0 error 门禁）+ 无签名 HAP 构建 |
+| 回归清单 | [docs/TESTING.md](docs/TESTING.md)（实机验证逐项打勾） |
+| 隐私门禁 | CI 自动扫描已跟踪文件中的私人邮箱 / 本机绝对路径，命中即失败 |
+
+CI 的 lint/build job 需要华为 Command Line Tools（无公开直链）：在仓库
+Settings → Secrets and variables → Actions → Variables 配置 `DEVECO_CLT_URL` 后自动启用，未配置则跳过。
+
+---
+
 ## 🔧 构建要求
 
 | 项 | 版本 |
@@ -71,19 +86,23 @@ git clone https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS.git
 
 1. 用 DevEco Studio 打开工程
 2. `build-profile.json5` **不入库**（含本地签名）：首次构建前在 DevEco 中
-   File → Project Structure → Signing Configs 勾选 Automatically generate 并配置 compatibleSdkVersion 为 `6.1.1(24)`
+   File → Project Structure → Signing Configs 勾选 Automatically generate，并把 compatibleSdkVersion 配为 `6.1.1(24)`
 3. 构建：`hvigorw.bat assembleHap --mode module -p module=entry@default -p product=default --no-daemon`
 4. 真机安装：`hdc file send entry/build/default/outputs/default/entry-default-signed.hap /data/local/tmp/entry.hap`
    → `hdc shell bm install -p /data/local/tmp/entry.hap`
+
+> 模拟器注意：仅 HarmonyOS 6.1.1(24) 及以上镜像能安装本包（API 23 镜像装不上 compatibleSdkVersion 24 的包）。
+> Git Bash 下 `hdc file send` 的源路径须为裸文件名，`bm install` 前加 `MSYS_NO_PATHCONV=1`。
 
 ---
 
 ## 📦 素材与元数据
 
-- 元数据（角色 / 武器 / 怪物 / 成就 / 曲线）与常用图标（2100+ 张）**全部内置安装包**，离线可用
+- 元数据（角色 / 武器 / 怪物 / 成就 / 曲线，17 个 JSON）与图标（**3754 张 PNG，约 233MB**）**全部内置安装包**，离线可用
 - 素材来源：[Snap.Metadata](https://github.com/DGP-Studio/Snap.Metadata)（精简提取）+ 胡桃静态 CDN
-- 更新管线：独立数据仓库 `E:/project/snap-hutao-data`（aichi-chishan/snap-hutao-data）：`python fetch-assets.py` 增量拉素材 → `gen-manifest.ps1` 重出清单（改 channelVersion）→ push；APP 设置→游戏数据更新即热更，无需整包更新
-- 云端热更：默认清单已指向 aichi-chishan/snap-hutao-data，设置页可改数据源地址
+- 角色立绘（`GachaAvatarIcon`，58MB / 118 张）虽已内置，但按需场景优先走静态 CDN + 沙盒缓存
+- 更新管线：独立数据仓库 [aichi-chishan/snap-hutao-data](https://github.com/aichi-chishan/snap-hutao-data)：`python fetch-assets.py` 增量拉素材 → `gen-manifest.ps1` 重出清单（改 channelVersion）→ push；APP 设置 → 游戏数据更新即热更，**无需整包更新**
+- 云端热更：默认清单已指向 `aichi-chishan/snap-hutao-data`，设置页可改数据源地址
 
 ---
 
@@ -94,11 +113,22 @@ entry/src/main/ets/
 ├── pages/        页面（@Entry / 内嵌组件，宽屏 embedMode）
 ├── viewmodel/    页面状态容器（@Observed）
 ├── service/      业务逻辑（网络 / 元数据 / 计算）
-├── data/         db(SQLite) / network(Hoyolab 客户端+DS 签名) / prefs / repo
+├── data/         db(SQLite) / network(Hoyolab 客户端+DS 签名) / prefs / repo / remote(数据热更)
 ├── model/        数据模型 + fromJson
 ├── components/   复用组件（MetaIcon / PressCard / Home*Card）
 ├── common/       常量 / 日志 / 动效(Motion) / GitHub 镜像
 └── widgets/      桌面卡片（实时便笺）
+
+entry/src/main/resources/
+├── base|dark/element/color.json   主题色（深浅双定义，代码一律 $r('app.color.x')）
+└── rawfile/
+    ├── metadata/   本地元数据（17 个 JSON，远端可热更、rawfile 兜底）
+    ├── icons/      游戏素材图标 3754 张（按 Category 分目录）
+    └── nav/        导航图标
+
+ci/               CI 专用构建配置（无签名）
+docs/             测试与回归清单
+.github/workflows CI（不变量 + 隐私门禁 + lint + 构建）
 ```
 
 分层规则：`pages → viewmodel → service → data(repo/network) → model`，页面不发网络请求、不拼 SQL。
@@ -110,6 +140,8 @@ entry/src/main/ets/
 - 所有账号数据（Cookie / SToken）仅存储在**设备本地**数据库与偏好文件中，经加密保存
 - 本项目**不包含任何遥测 / 数据上报**；网络请求仅发往米哈游官方 API 与 GitHub 资源源
 - 仓库不含任何签名密钥、账号信息与调试产物（详见 .gitignore）
+- CI 设有**隐私回归门禁**：自动扫描已跟踪文件中的私人邮箱与本机绝对路径，命中即构建失败
+- 提交者身份使用 GitHub noreply 邮箱，不暴露真实邮箱
 
 ---
 

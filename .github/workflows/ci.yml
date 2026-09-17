@@ -23,9 +23,12 @@ jobs:
           test -f entry/src/test/LogicUnitTest.test.ets
           grep -q "logicUnitTest()" entry/src/test/List.test.ets
           grep -q "logicUnitTest" entry/src/test/List.test.ets
-          # 隐私回归门禁：文档不得含本机用户名/QQ 邮箱（历史曾泄露，已清洗）
-          if grep -rn -E "[REDACTED_USER]|[REDACTED_EMAIL]" --include="*.md" .; then
-            echo "::error::Privacy regression: personal info in markdown"
+          # 隐私回归门禁：仓库不得含个人隐私（本机用户名 / 私人邮箱 / 本机绝对路径）
+          # 注意：此处只写通用模式，禁止把真实隐私值写进本文件（那本身就是泄露）
+          # 用 git grep 只扫已跟踪文件（免疫未跟踪的本地目录）
+          if git grep -InE "[A-Za-z0-9._%+-]+@(qq|163|126|gmail|outlook|foxmail)\.com|[A-Za-z]:[\\\\/]Users[\\\\/]|/home/[a-z0-9_-]+/|/Users/[a-z0-9_-]+/" \
+               -- '*.md' '*.ets' '*.json5' '*.yml' '*.ts'; then
+            echo "::error::Privacy regression: personal info detected in tracked files"
             exit 1
           fi
           echo "invariants ok"
