@@ -455,12 +455,12 @@ export struct SpiralAbyssPage {
                   .borderRadius(14)
                   .backgroundColor(!this.vm.fromHistory && this.vm.abyss !== undefined
                     && this.vm.abyss.scheduleId === h.scheduleId
-                    ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+                    ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
                   .border({
                     width: 1,
                     color: !this.vm.fromHistory && this.vm.abyss !== undefined
                       && this.vm.abyss.scheduleId === h.scheduleId
-                      ? $r('app.color.app_primary') : $r('app.color.divider'),
+                      ? $r('app.color.app_primary') : $r('app.color.card_stroke'),
                   })
                   .onClick(() => {
                     this.vm.loadFromHistory(h.scheduleId).then(() => {
@@ -581,8 +581,8 @@ export struct SpiralAbyssPage {
       .fontColor(this.vm.scheduleType === type ? Color.White : $r('app.color.text_primary'))
       .padding({ left: 16, right: 16, top: 6, bottom: 6 })
       .borderRadius(12)
-      .backgroundColor(this.vm.scheduleType === type ? $r('app.color.app_primary') : $r('app.color.card_background'))
-      .border({ width: 1, color: $r('app.color.divider') })
+      .backgroundColor(this.vm.scheduleType === type ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+      .border({ width: 1, color: this.vm.scheduleType === type ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
       .onClick(() => {
         this.vm.switchSchedule(this.currentUid, type).then(() => {
         });

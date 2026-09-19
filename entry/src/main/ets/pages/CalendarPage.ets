@@ -198,10 +198,10 @@ export struct CalendarPage {
           .layoutWeight(1)
           .padding({ top: 8, bottom: 6 })
           .borderRadius(10)
-          .backgroundColor(this.weekSelIdx === idx ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+          .backgroundColor(this.weekSelIdx === idx ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
           .border({
             width: 1,
-            color: this.weekSelIdx === idx ? $r('app.color.app_primary') : $r('app.color.divider')
+            color: this.weekSelIdx === idx ? $r('app.color.app_primary') : $r('app.color.card_stroke')
           })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
@@ -282,7 +282,7 @@ export struct CalendarPage {
     .width(56)
     .padding(4)
     .borderRadius(8)
-    .backgroundColor(mat.highlighted ? $r('app.color.cultivate_highlight') : $r('app.color.page_background'))
+    .backgroundColor(mat.highlighted ? $r('app.color.cultivate_highlight') : $r('app.color.card_inner_tint'))
     .hoverEffect(HoverEffect.Highlight)
     .onClick(() => {
       this.selectedMat = mat;

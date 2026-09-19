@@ -485,8 +485,8 @@ export struct AchievementPage {
               .fontColor(a.id === this.currentArchiveId ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
               .padding({ left: 12, right: 12, top: 6, bottom: 6 })
               .borderRadius(14)
-              .backgroundColor(a.id === this.currentArchiveId ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
-              .border({ width: 1, color: a.id === this.currentArchiveId ? $r('app.color.app_primary') : $r('app.color.divider') })
+              .backgroundColor(a.id === this.currentArchiveId ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
+              .border({ width: 1, color: a.id === this.currentArchiveId ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
               .onClick(() => {
                 this.switchArchive(a.id);
               })
@@ -496,8 +496,8 @@ export struct AchievementPage {
             .fontColor($r('app.color.app_primary'))
             .padding({ left: 12, right: 12, top: 6, bottom: 6 })
             .borderRadius(14)
-            .backgroundColor($r('app.color.card_background'))
-            .border({ width: 1, color: $r('app.color.divider') })
+            .backgroundColor($r('app.color.card_surface'))
+            .border({ width: 1, color: $r('app.color.card_stroke') })
             .onClick(() => {
               this.showCreate = !this.showCreate;
             })
@@ -506,8 +506,8 @@ export struct AchievementPage {
             .fontColor($r('app.color.danger'))
             .padding({ left: 12, right: 12, top: 6, bottom: 6 })
             .borderRadius(14)
-            .backgroundColor($r('app.color.card_background'))
-            .border({ width: 1, color: $r('app.color.divider') })
+            .backgroundColor($r('app.color.card_surface'))
+            .border({ width: 1, color: $r('app.color.card_stroke') })
             .onClick(() => {
               this.deleteCurrentArchive();
             })
@@ -655,7 +655,7 @@ export struct AchievementPage {
           this.sortChip()
         }
         .borderRadius(10)
-        .backgroundColor($r('app.color.card_background'))
+        .backgroundColor($r('app.color.card_surface'))
       }
       .width('100%')
       // 分类筛选（横向滚动 chips）
@@ -666,7 +666,7 @@ export struct AchievementPage {
             .fontColor(this.categoryFilter === -1 ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
             .padding({ left: 10, right: 10, top: 5, bottom: 5 })
             .borderRadius(12)
-            .backgroundColor(this.categoryFilter === -1 ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+            .backgroundColor(this.categoryFilter === -1 ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
             .onClick(() => {
               this.categoryFilter = -1;
               this.rebuildGroups();
@@ -677,7 +677,7 @@ export struct AchievementPage {
               .fontColor(this.categoryFilter === cs.category.id ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
               .borderRadius(12)
-              .backgroundColor(this.categoryFilter === cs.category.id ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+              .backgroundColor(this.categoryFilter === cs.category.id ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
               .onClick(() => {
                 this.categoryFilter = cs.category.id;
                 this.rebuildGroups();

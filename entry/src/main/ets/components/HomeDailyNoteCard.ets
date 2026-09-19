@@ -77,7 +77,7 @@ export struct HomeDailyNoteCard {
       return `${n.finishedTaskNum}/${n.totalTaskNum}`;
     }
     if (slot === HomeDailyNoteCard.SLOT_DISCOUNT) {
-      return `${n.remainResinDiscountNum}/${n.resinDiscountNumLimit}`;
+      return `${n.resinDiscountUsedNum()}/${n.resinDiscountNumLimit}`;
     }
     return n.transformer.text();
   }

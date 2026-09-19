@@ -7,6 +7,10 @@
  *   武器：全池 5 星/4 星/3 星武器头像网格
  *   倒计时：各池距保底剩余抽数卡
  * 池切换高亮、刷新按钮/进度展示、手动 URL 兜底；未登录引导。
+ * 统计小模块对齐：星号列 Grid（1fr + columnsGap）决定宽度 + 数字 maxFontSize/minFontSize 只缩不放
+ *   （对齐 Windows CardProgressBar / HorizontalEqualPanel：等宽等高与数字位数完全解耦）。
+ * 五星记录区：列表/方块双视图切换（对齐 Windows StatisticsCard LayoutSwitch + SwitchPresenter，
+ *   每池独立记忆，持久化键复刻 Control.PanelSelector.StatisticsCard.SummaryList{池类型}）。
  * 快照模式：每次装载/刷新/切池后 syncPoolCards() 整体重建 @State poolCards 数组，
  * 池卡片所有展示字段取自同一 PoolCardData 对象，杜绝“部分统计为 0/切池不刷新”。
  */
@@ -29,6 +33,7 @@ import { MetaIcon } from '../components/MetaIcon';
 import { NavIcon } from '../components/NavIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { Logger } from '../common/Logger';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 
 const GACHA_TAG: string = 'GachaLogPage';
 
@@ -53,6 +58,8 @@ class FiveStarPull {
   isUp: boolean = false;
   /** 角色/武器（决定图标分类 AvatarIcon/EquipIcon） */
   itemType: string = '';
+  /** 大保底命中（时间上更早的一金非 UP → 本次必 UP；自 fiveDetails 推导，精度受简化 UP 判定限制） */
+  isGuarantee: boolean = false;
 }
 
 /** 池卡片快照（每次同步整体重建，非 @Observed 嵌套追踪） */
@@ -76,6 +83,8 @@ class PoolCardData {
   startDate: string = '';
   endDate: string = '';
   isCurrent: boolean = false;
+  /** 池内是否已有 UP 标记（"歪=红块"等 UP 语义仅在确有 UP 数据时启用，规避常驻/武器池全红误判） */
+  hasUpMark: boolean = false;
   fivePulls: FiveStarPull[] = [];
   lastFiveName: string = '';
   /** 卡片内容标识（ForEach key + 折叠态查表 + 自然高度测量失效判定） */
@@ -148,6 +157,8 @@ export struct GachaLogPage {
   @State poolColumnCount: number = 1;
   /** 已折叠统计详情的池（对齐 Windows Expander 收起；不在表内 = 初始展开） */
   @State poolCollapsed: number[] = [];
+  /** 列表视图开启的池（对齐 Windows Control.PanelSelector.StatisticsCard.SummaryList{池}；不在表内 = 方块视图） */
+  @State poolViewList: number[] = [];
   /** 期次汇总（对齐 Windows PivotHistory，懒构建：首次切到历史页签时构建） */
   @State historyWishes: HistoryWishView[] = [];
   /** 深色模式（横幅遮罩用；浅色不叠遮罩，对齐 Windows DarkOnlyOverlayMask） */
@@ -174,6 +185,8 @@ export struct GachaLogPage {
   historySource: SimpleDataSource<GachaItem> = new SimpleDataSource<GachaItem>([]);
 
   aboutToAppear(): void {
+    // 装载各池记录视图记忆（列表/方块，每池独立）
+    this.loadPoolViewModes();
     this.vm.onProgressChanged = () => {
       this.syncProgress();
     };
@@ -354,6 +367,15 @@ export struct GachaLogPage {
         }
       }
       card.avgUpOrange = upCount > 0 ? Math.round(upSum / upCount * 100) / 100 : card.avgOrange;
+      // UP 标记存在性：池内任一五星被标记 UP 才启用"歪=红块"等 UP 语义（常驻/颂愿常驻无 UP 概念）
+      let upMarked: boolean = false;
+      for (let j = 0; j < pool.fiveDetails.length; j++) {
+        if (pool.fiveDetails[j].isUp) {
+          upMarked = true;
+          break;
+        }
+      }
+      card.hasUpMark = upMarked;
       for (let j = 0; j < pool.fiveDetails.length; j++) {
         const src: FiveStarDetail = pool.fiveDetails[j];
         const pull: FiveStarPull = new FiveStarPull();
@@ -362,6 +384,8 @@ export struct GachaLogPage {
         pull.lastPull = src.lastPull;
         pull.isUp = src.isUp;
         pull.itemType = src.itemType;
+        // 大保底推导：时间上更早的一金（fiveDetails 倒序，故为 j+1）非 UP → 本次必为 UP
+        pull.isGuarantee = j + 1 < pool.fiveDetails.length && !pool.fiveDetails[j + 1].isUp;
         card.fivePulls.push(pull);
       }
       card.key = GachaLogPage.cardKey(card);
@@ -408,7 +432,8 @@ export struct GachaLogPage {
       for (let j = i; j < end; j++) {
         const card: PoolCardData = this.poolCards[j];
         const cell: PoolCellData = new PoolCellData();
-        cell.key = card.key;
+        // 键含视图模式：列表/方块切换改变卡片自然高度，换键触发整行重测（防行高陈旧导致裁剪/留白）
+        cell.key = `${card.key}_${this.isPoolListView(card) ? 'list' : 'grid'}`;
         cell.card = card;
         cell.height = POOL_ROW_HEIGHT_UNKNOWN;
         row.cells.push(cell);
@@ -544,6 +569,83 @@ export struct GachaLogPage {
     // 折叠会改变卡片自然高度：清测量缓存并重建行，保证折叠后同行仍等高（不裁剪内容）
     this.poolHeightCache.clear();
     this.rebuildPoolRows();
+  }
+
+  /** 池记录视图持久化键（复刻 Windows：Control.PanelSelector.StatisticsCard.SummaryList{池类型}） */
+  private static listViewKey(gachaType: number): string {
+    return `Control.PanelSelector.StatisticsCard.SummaryList${gachaType}`;
+  }
+
+  /** 启动时装载各池视图记忆（缺省 = 方块视图，对齐 Windows 默认 OrangeGrid） */
+  private loadPoolViewModes(): void {
+    const list: number[] = [];
+    if (PreferencesStore.isReady()) {
+      const types: number[] = GachaType.QUERY_ORDER.concat(GachaType.BEYOND_ORDER);
+      for (const t of types) {
+        if (PreferencesStore.getBool(GachaLogPage.listViewKey(t), false)) {
+          list.push(t);
+        }
+      }
+    }
+    this.poolViewList = list;
+  }
+
+  /** 该池是否列表视图 */
+  private isPoolListView(card: PoolCardData): boolean {
+    return this.poolViewList.indexOf(card.gachaType) >= 0;
+  }
+
+  /** 切换池记录视图并持久化记忆（切换改变卡片自然高度：清测量缓存并重建行重测） */
+  private setPoolListView(gachaType: number, isList: boolean): void {
+    const next: number[] = [];
+    for (const t of this.poolViewList) {
+      if (t !== gachaType) {
+        next.push(t);
+      }
+    }
+    if (isList) {
+      next.push(gachaType);
+    }
+    this.poolViewList = next;
+    if (PreferencesStore.isReady()) {
+      PreferencesStore.setBool(GachaLogPage.listViewKey(gachaType), isList);
+    }
+    this.poolHeightCache.clear();
+    this.rebuildPoolRows();
+  }
+
+  /** 是否带 UP 语义的池（结构判定：UP 平均列显隐用；歪块红底另受 hasUpMark 数据门控） */
+  private static poolHasUp(gachaType: number): boolean {
+    return gachaType === GachaType.AVATAR_EVENT || gachaType === GachaType.WEAPON_EVENT ||
+      gachaType === GachaType.UGC_AVATAR_EVENT;
+  }
+
+  /** 取颜色数值的 R/G/B 分量（shift: 16=R 8=G 0=B） */
+  private static colorChan(c: number, shift: number): number {
+    return (c >> shift) & 0xFF;
+  }
+
+  /**
+   * 列表行水位条颜色：距金抽数 0→90 在 success→danger 资源色间线性插值
+   * （等价 Windows #48FF7A→#FF4949 渐变，端点取现有资源色，深浅色各自生效；20% 透明度由 .opacity 统一叠加）
+   */
+  private listBarColor(lastPull: number): ResourceColor {
+    const t: number = Math.max(0, Math.min(1, lastPull / ORANGE_GUARANTEE));
+    try {
+      // getColorSync 数字 id 重载（Resource 重载已弃用）
+      const from: number = getContext(this).resourceManager.getColorSync($r('app.color.success').id);
+      const to: number = getContext(this).resourceManager.getColorSync($r('app.color.danger').id);
+      const r: number = Math.round(GachaLogPage.colorChan(from, 16)
+        + (GachaLogPage.colorChan(to, 16) - GachaLogPage.colorChan(from, 16)) * t);
+      const g: number = Math.round(GachaLogPage.colorChan(from, 8)
+        + (GachaLogPage.colorChan(to, 8) - GachaLogPage.colorChan(from, 8)) * t);
+      const b: number = Math.round(GachaLogPage.colorChan(from, 0)
+        + (GachaLogPage.colorChan(to, 0) - GachaLogPage.colorChan(from, 0)) * t);
+      return 255 << 24 | r << 16 | g << 8 | b;
+    } catch (e) {
+      // 资源解析失败兜底：走品质金色
+      return $r('app.color.five_star');
+    }
   }
 
   /** 组件宽度变化：同步宽屏断点与多池列数（列数变化时重测行高） */
@@ -710,31 +812,52 @@ export struct GachaLogPage {
     });
   }
 
-  /** 保底进度条单元（对齐 Windows CardProgressBar：头部行 + 进度条 + 描述行，等宽双列之一） */
+  /**
+   * 保底进度条单元（对齐 Windows CardProgressBar：底层通栏 Progress + 上层文字块，MinHeight 32）。
+   * 对齐关键：数值文本 layoutWeight(1) + 居中，占满剩余宽度——位数不影响布局；
+   * maxFontSize/minFontSize 等价 Viewbox DownOnly（数字只缩不放）。
+   * 由 Grid '1fr 1fr' + columnsGap 4 装载，本 Builder 自身占满格位。
+   */
   @Builder
   guaranteeBar(label: string, cur: number, guarantee: number, desc: string, color: Resource) {
     Column({ space: 3 }) {
-      Row() {
-        Text(label)
-          .fontSize(11)
-          .fontColor($r('app.color.text_secondary'))
-          .layoutWeight(1)
-          .maxLines(1)
-        Text(`${cur}/${guarantee}`)
-          .fontSize(12)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(color)
+      Stack({ alignContent: Alignment.Center }) {
+        // 底层通栏进度条：透明背景、前景 20% 透明度、圆角 4、高 32（Stack clip 裁出圆角）
+        Progress({
+          value: Math.min(cur, guarantee),
+          total: guarantee,
+          type: ProgressType.Linear,
+        })
+          .width('100%')
+          .height(32)
+          .color(color)
+          .opacity(0.2)
+          .borderRadius(4)
+          .style({ strokeWidth: 32 })
+        // 上层文字：Header（auto 列）+ 数值（* 列居中，layoutWeight 是对齐关键）
+        Row({ space: 6 }) {
+          Text(label)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .maxLines(1)
+          Text(`${cur}/${guarantee}`)
+            .fontSize(12)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(color)
+            .maxFontSize(12)
+            .minFontSize(9)
+            .maxLines(1)
+            .textAlign(TextAlign.Center)
+            .layoutWeight(1)
+        }
+        .width('100%')
+        .padding({ left: 8, right: 8 })
+        .alignItems(VerticalAlign.Center)
       }
       .width('100%')
-      .alignItems(VerticalAlign.Center)
-      Progress({
-        value: Math.min(cur, guarantee),
-        total: guarantee,
-        type: ProgressType.Linear,
-      })
-        .width('100%')
-        .color(color)
-        .style({ strokeWidth: 4 })
+      .height(32)
+      .borderRadius(4)
+      .clip(true)
       Text(desc)
         .fontSize(10)
         .fontColor($r('app.color.text_secondary'))
@@ -742,10 +865,14 @@ export struct GachaLogPage {
         .maxLines(1)
     }
     .alignItems(HorizontalAlign.Start)
-    .layoutWeight(1)
+    .width('100%')
   }
 
-  /** 统计格（对齐 Windows BorderShimmer 盒状格子：说明 + 大数值，固定高度保证跨卡对齐） */
+  /**
+   * 统计格（对齐 Windows BorderShimmer 盒状格子：说明 + 大数值，固定高度保证跨卡对齐）。
+   * 由 Grid '1fr 1fr 1fr'/'1fr 1fr' + columnsGap 4 装载（星号列定宽）；数值只缩不放
+   * （maxFontSize/minFontSize 等价 Viewbox DownOnly），位数不影响格宽。
+   */
   @Builder
   statCellBox(caption: string, value: string, valueColor: Resource, captionColor: Resource) {
     Column({ space: 3 }) {
@@ -753,7 +880,10 @@ export struct GachaLogPage {
         .fontSize(17)
         .fontWeight(FontWeight.Bold)
         .fontColor(valueColor)
+        .maxFontSize(17)
+        .minFontSize(10)
         .maxLines(1)
+        .textAlign(TextAlign.Center)
       Text(caption)
         .fontSize(11)
         .fontColor(captionColor)
@@ -761,20 +891,22 @@ export struct GachaLogPage {
     }
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
-    .layoutWeight(1)
+    .width('100%')
     .height(72)
     .borderRadius(4)
     .backgroundColor($r('app.color.card_inner_tint'))
     .border({ width: 1, color: $r('app.color.divider') })
   }
 
-  /** 上下叠放半高统计格（对齐 Windows Case 0 右列：最大/最小两行各占一半） */
+  /** 上下叠放半高统计格（对齐 Windows Case 0 右列：最大/最小两行各占一半）；数字只缩不放 */
   @Builder
   statMiniBox(text: string, color: Resource) {
     Text(text)
       .fontSize(13)
       .fontWeight(FontWeight.Bold)
       .fontColor(color)
+      .maxFontSize(13)
+      .minFontSize(9)
       .maxLines(1)
       .textAlign(TextAlign.Center)
       .width('100%')
@@ -802,23 +934,105 @@ export struct GachaLogPage {
       })
   }
 
-  /** 五星头像网格：星级色圆形占位 + 右下角抽数标签（完整展示，不做截断） */
+  /**
+   * 五星记录区（对齐 Windows StatisticsCard SwitchPresenter）：列表/方块双视图，
+   * 视图由 poolViewList 每池记忆（见 setPoolListView）。Windows 侧仅 ToolTip（悬停显示时间），
+   * 无点击弹窗，故条目不加 onClick。
+   */
   @Builder
-  avatarGrid(pulls: FiveStarPull[]) {
-    if (pulls.length === 0) {
+  fiveStarArea(card: PoolCardData) {
+    if (card.fivePulls.length === 0) {
       Text('暂无五星出金记录')
         .fontSize(12)
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
+    } else if (this.isPoolListView(card)) {
+      this.summaryListView(card)
     } else {
-      // 对齐 Windows StatisticsCard：OrangeGrid 完整绑定 GridView，不 Take、不加“+N 更多”
-      // Windows 侧仅 ToolTip（悬停显示时间），无点击弹窗，故此处不加 onClick/hover
-      Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
-        ForEach(pulls, (pull: FiveStarPull, index: number) => {
-          Stack({ alignContent: Alignment.BottomEnd }) {
+      this.orangeGridView(card)
+    }
+  }
+
+  /**
+   * 列表视图（对齐 Windows SummaryListTemplate）：全宽行三层叠放——
+   * ① 底层通栏 Progress（Max=90 保底阈值，Value=距金抽数，前景按抽数绿→红渐变、20% 透明度）；
+   * ② 左 40×40 圆角图标 + 品质色名称；③ 右「保底」角标 →「UP」角标 → 计数（minWidth 24 居中防跳动）。
+   */
+  @Builder
+  summaryListView(card: PoolCardData) {
+    Column({ space: 4 }) {
+      ForEach(card.fivePulls, (pull: FiveStarPull) => {
+        Stack({ alignContent: Alignment.Start }) {
+          Progress({
+            value: Math.min(pull.lastPull, ORANGE_GUARANTEE),
+            total: ORANGE_GUARANTEE,
+            type: ProgressType.Linear,
+          })
+            .width('100%')
+            .height(40)
+            .color(this.listBarColor(pull.lastPull))
+            .opacity(0.2)
+            .borderRadius(4)
+            .style({ strokeWidth: 40 })
+          Row({ space: 6 }) {
+            this.pullIcon(pull)
+            Text(pull.name)
+              .fontSize(13)
+              .fontColor($r('app.color.five_star'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .layoutWeight(1)
+            if (pull.isGuarantee) {
+              this.pullBadge('保底', $r('app.color.app_primary_bg'), $r('app.color.app_primary'))
+            }
+            if (pull.isUp) {
+              this.pullBadge('UP', $r('app.color.five_star'), Color.White)
+            }
+            Text(`${pull.lastPull}`)
+              .fontSize(12)
+              .fontColor($r('app.color.text_primary'))
+              .constraintSize({ minWidth: 24 })
+              .textAlign(TextAlign.Center)
+          }
+          .width('100%')
+          .height(40)
+          .padding({ left: 4, right: 8 })
+          .alignItems(VerticalAlign.Center)
+        }
+        .width('100%')
+        .height(40)
+        .borderRadius(4)
+        .clip(true)
+        .backgroundColor($r('app.color.card_inner_tint'))
+      }, (pull: FiveStarPull) => `${pull.name}_${pull.time}_${pull.lastPull}_list`)
+    }
+    .width('100%')
+  }
+
+  /**
+   * 方块视图（对齐 Windows OrangeGridTemplate）：小方块卡（内衬底 + 1px 描边 + 圆角 4），
+   * 上部 40×40 图标（品质金底衬）、底部距金抽数（品质色）；歪了的块整体换红底（仅确有 UP 数据的池）。
+   * 网格随卡宽自动换行平铺，块间距右 2 下 4。
+   */
+  @Builder
+  orangeGridView(card: PoolCardData) {
+    Flex({
+      wrap: FlexWrap.Wrap,
+      justifyContent: FlexAlign.Start,
+      space: { main: LengthMetrics.vp(2), cross: LengthMetrics.vp(4) }
+    }) {
+      ForEach(card.fivePulls, (pull: FiveStarPull) => {
+        Column({ space: 3 }) {
+          Stack() {
+            Column()
+              .width(40)
+              .height(40)
+              .borderRadius(6)
+              .backgroundColor($r('app.color.five_star'))
+              .opacity(0.18)
             if (this.iconOfPull(pull).length > 0) {
               MetaIcon({ category: this.pullCategory(pull), name: this.iconOfPull(pull), iconSize: 40 })
-                .borderRadius(20)
+                .borderRadius(6)
                 .clip(true)
             } else {
               Text(this.avatarInitial(pull))
@@ -828,24 +1042,80 @@ export struct GachaLogPage {
                 .width(40)
                 .height(40)
                 .textAlign(TextAlign.Center)
-                .borderRadius(20)
-                .backgroundColor($r('app.color.five_star'))
+                .borderRadius(6)
             }
-            Text(`${pull.lastPull}`)
-              .fontSize(8)
-              .fontColor(Color.White)
-              .padding({ left: 4, right: 4 })
-              .borderRadius(6)
-              .backgroundColor($r('app.color.overlay_scrim'))
-              .margin({ right: 1, bottom: 1 })
           }
           .width(40)
-          .height(42)
-          .borderRadius(10)
-        }, (pull: FiveStarPull, index: number) => `${pull.name}_${pull.time}_${pull.lastPull}_${index}`)
-      }
-      .width('100%')
+          .height(40)
+          Text(`${pull.lastPull}`)
+            .fontSize(12)
+            .fontColor($r('app.color.five_star'))
+            .maxLines(1)
+            .textAlign(TextAlign.Center)
+            .width('100%')
+        }
+        .width(48)
+        .padding({ top: 4, bottom: 4 })
+        .borderRadius(4)
+        .backgroundColor(!pull.isUp && card.hasUpMark ? $r('app.color.danger_bg') : $r('app.color.card_inner_tint'))
+        .border({ width: 1, color: $r('app.color.card_stroke') })
+        .alignItems(HorizontalAlign.Center)
+      }, (pull: FiveStarPull) => `${pull.name}_${pull.time}_${pull.lastPull}_grid`)
     }
+    .width('100%')
+  }
+
+  /** 列表行 40×40 圆角图标（元数据映射未命中时星级首字占位） */
+  @Builder
+  pullIcon(pull: FiveStarPull) {
+    if (this.iconOfPull(pull).length > 0) {
+      MetaIcon({ category: this.pullCategory(pull), name: this.iconOfPull(pull), iconSize: 40 })
+        .borderRadius(8)
+        .clip(true)
+    } else {
+      Text(this.avatarInitial(pull))
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .width(40)
+        .height(40)
+        .textAlign(TextAlign.Center)
+        .borderRadius(8)
+        .backgroundColor($r('app.color.five_star'))
+    }
+  }
+
+  /** 列表行角标（保底/UP） */
+  @Builder
+  pullBadge(label: string, bg: ResourceColor, fg: ResourceColor) {
+    Text(label)
+      .fontSize(9)
+      .fontColor(fg)
+      .padding({ left: 5, right: 5, top: 1, bottom: 1 })
+      .borderRadius(6)
+      .backgroundColor(bg)
+  }
+
+  /** 卡头记录视图切换按钮（对齐 Windows LayoutSwitch 两档：≡ 列表 / ▦ 方块） */
+  @Builder
+  poolViewBtn(card: PoolCardData, isListMode: boolean) {
+    Text(isListMode ? '≡' : '▦')
+      .fontSize(13)
+      .fontWeight(FontWeight.Medium)
+      .fontColor(this.isPoolListView(card) === isListMode
+        ? $r('app.color.app_primary')
+        : $r('app.color.text_secondary'))
+      .width(24)
+      .height(24)
+      .textAlign(TextAlign.Center)
+      .borderRadius(6)
+      .backgroundColor(this.isPoolListView(card) === isListMode
+        ? $r('app.color.app_primary_bg')
+        : Color.Transparent)
+      .hoverEffect(HoverEffect.Highlight)
+      .onClick(() => {
+        this.setPoolListView(card.gachaType, isListMode);
+      })
   }
 
   /**
@@ -883,6 +1153,9 @@ export struct GachaLogPage {
             .fontColor($r('app.color.text_secondary'))
             .maxLines(1)
         }
+        // 记录视图切换（对齐 Windows LayoutSwitch：≡ 列表 / ▦ 方块，每池独立记忆）
+        this.poolViewBtn(card, true)
+        this.poolViewBtn(card, false)
         Text('›')
           .fontSize(20)
           .fontColor($r('app.color.text_secondary'))
@@ -916,11 +1189,20 @@ export struct GachaLogPage {
         .width('100%')
         .alignItems(VerticalAlign.Bottom)
 
-        // 双列保底进度条（对齐 Windows CardProgressBar 双列 Grid：距上次金/紫各占一半，MinHeight 32）
-        Row({ space: 4 }) {
-          this.guaranteeBar('距上个五星', card.sinceLastFive, ORANGE_GUARANTEE, `累计五星 ${card.fiveCount} 个`, $r('app.color.five_star'))
-          this.guaranteeBar('距上个四星', card.sinceLastFour, PURPLE_GUARANTEE, `累计四星 ${card.fourCount} 个`, $r('app.color.four_star'))
+        // 双列保底进度条（对齐 Windows CardProgressBar 双列 Grid：1* 列 + ColumnSpacing 4，
+        // 星号列定宽——距金抽数位数不影响布局）
+        Grid() {
+          GridItem() {
+            this.guaranteeBar('距上个五星', card.sinceLastFive, ORANGE_GUARANTEE,
+              `累计五星 ${card.fiveCount} 个`, $r('app.color.five_star'))
+          }
+          GridItem() {
+            this.guaranteeBar('距上个四星', card.sinceLastFour, PURPLE_GUARANTEE,
+              `累计四星 ${card.fourCount} 个`, $r('app.color.four_star'))
+          }
         }
+        .columnsTemplate('1fr 1fr')
+        .columnsGap(4)
         .width('100%')
 
         // 时间线分隔条（对齐 Windows：分隔线 ─ 居中时间跨度 ─ 分隔线）
@@ -950,30 +1232,68 @@ export struct GachaLogPage {
         .backgroundColor($r('app.color.page_background'))
         .border({ width: 1, color: $r('app.color.divider') })
 
-        // 固定高度统计格（对齐 Windows SwitchPresenter Height=96 + BorderShimmer 盒状格子：
-        // 卡片并排时该区域高度一致，是各池小模块横向对齐的关键）
+        // 统计格（对齐 Windows HorizontalEqualPanel：列 1*,4,1*,4,1* → Grid '1fr 1fr 1fr' + columnsGap 4；
+        // UP 列仅在带 UP 语义的池显示，隐藏时其余自动重排为两等分 '1fr 1fr'；
+        // 固定高度 72 + 星号列定宽 = 任意卡池、任意数字下所有模块格等宽等高）
         if (!this.countStatMode) {
-          // 概况：五星平均 | UP 平均 | 最非/最欧 上下叠放（对齐 Windows Case 0 三列等宽）
-          Row({ space: 4 }) {
-            this.statCellBox('五星平均', `${card.avgOrange} 抽`, $r('app.color.text_primary'), $r('app.color.text_secondary'))
-            this.statCellBox('UP 平均', card.avgUpOrange > 0 ? `${card.avgUpOrange} 抽` : 'N/A',
-              $r('app.color.text_primary'), $r('app.color.text_secondary'))
-            Column({ space: 4 }) {
-              this.statMiniBox(`最非 ${card.maxOrange}`, $r('app.color.danger'))
-              this.statMiniBox(`最欧 ${card.minOrange}`, $r('app.color.success'))
+          // 概况：五星平均 | UP 平均（UP 池）| 最非/最欧 上下叠放
+          if (GachaLogPage.poolHasUp(card.gachaType)) {
+            Grid() {
+              GridItem() {
+                this.statCellBox('五星平均', `${card.avgOrange} 抽`,
+                  $r('app.color.text_primary'), $r('app.color.text_secondary'))
+              }
+              GridItem() {
+                this.statCellBox('UP 平均', card.avgUpOrange > 0 ? `${card.avgUpOrange} 抽` : 'N/A',
+                  $r('app.color.text_primary'), $r('app.color.text_secondary'))
+              }
+              GridItem() {
+                Column({ space: 4 }) {
+                  this.statMiniBox(`最非 ${card.maxOrange}`, $r('app.color.danger'))
+                  this.statMiniBox(`最欧 ${card.minOrange}`, $r('app.color.success'))
+                }
+                .width('100%')
+                .height(72)
+              }
             }
-            .layoutWeight(1)
-            .height(72)
+            .columnsTemplate('1fr 1fr 1fr')
+            .columnsGap(4)
+            .width('100%')
+          } else {
+            Grid() {
+              GridItem() {
+                this.statCellBox('五星平均', `${card.avgOrange} 抽`,
+                  $r('app.color.text_primary'), $r('app.color.text_secondary'))
+              }
+              GridItem() {
+                Column({ space: 4 }) {
+                  this.statMiniBox(`最非 ${card.maxOrange}`, $r('app.color.danger'))
+                  this.statMiniBox(`最欧 ${card.minOrange}`, $r('app.color.success'))
+                }
+                .width('100%')
+                .height(72)
+              }
+            }
+            .columnsTemplate('1fr 1fr')
+            .columnsGap(4)
+            .width('100%')
           }
-          .width('100%')
         } else {
-          // 数量：五星/四星/三星 计数（对齐 Windows Case 1 TotalOrange/Purple/Blue）
-          Row({ space: 4 }) {
-            this.statCellBox('五星', `${card.fiveCount}`, $r('app.color.five_star'), $r('app.color.five_star'))
-            this.statCellBox('四星', `${card.fourCount}`, $r('app.color.four_star'), $r('app.color.four_star'))
-            this.statCellBox('三星', `${card.totalCount - card.fiveCount - card.fourCount}`,
-              $r('app.color.text_primary'), $r('app.color.text_secondary'))
+          // 数量：五星/四星/三星 计数（对齐 Windows Case 1 三等分 '1fr 1fr 1fr'）
+          Grid() {
+            GridItem() {
+              this.statCellBox('五星', `${card.fiveCount}`, $r('app.color.five_star'), $r('app.color.five_star'))
+            }
+            GridItem() {
+              this.statCellBox('四星', `${card.fourCount}`, $r('app.color.four_star'), $r('app.color.four_star'))
+            }
+            GridItem() {
+              this.statCellBox('三星', `${card.totalCount - card.fiveCount - card.fourCount}`,
+                $r('app.color.text_primary'), $r('app.color.text_secondary'))
+            }
           }
+          .columnsTemplate('1fr 1fr 1fr')
+          .columnsGap(4)
           .width('100%')
         }
       }
@@ -982,8 +1302,8 @@ export struct GachaLogPage {
         .width('100%')
         .color($r('app.color.divider'))
 
-      // 五星头像网格：Expander 之外，始终完整显示（每个头像带抽数标签）
-      this.avatarGrid(card.fivePulls)
+      // 五星记录区：列表/方块双视图，Expander 之外始终完整显示（视图记忆见 poolViewBtn）
+      this.fiveStarArea(card)
     }
     .width('100%')
     .padding(14)

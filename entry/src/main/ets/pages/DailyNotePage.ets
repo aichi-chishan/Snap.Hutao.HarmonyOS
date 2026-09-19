@@ -1,20 +1,44 @@
 /**
  * DailyNotePage.ets（Index 便笺 Tab 内嵌组件）
- * 实时便笺：树脂环形进度、派遣列表、每日委托、周本折扣、洞天宝钱、参变仪；阈值通知设置；自动刷新。
+ * 实时便笺：对齐 Windows DailyNotePage ——
+ * 顶部 CommandBar 操作卡（立即刷新/验证/添加实时便笺/通知设置）+
+ * 每 UID 一张追踪卡瀑布流（宽屏内容区 >=840 双列 / 窄屏单列，间距 12）。
+ * 卡内 = 卡头（昵称 UID + 移除/通知设置 40×40 透明按钮）+ 6 行 shimmer 行
+ * （高 48、底衬 card_inner_tint + 1px card_stroke 描边 + 圆角 4，进度条铺满行底
+ * app_primary 透明度 0.2，图标 32×32 MetaIcon）+ 派遣网格（MinItemWidth=140 间距 6）+ 卡底刷新时间。
  */
-import { router, display } from '@kit.ArkUI';
+import { router } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
-import { DailyNoteViewModel, TrackedNoteEntry } from '../viewmodel/DailyNoteViewModel';
+import { DailyNoteViewModel, NoteCardEntry } from '../viewmodel/DailyNoteViewModel';
 import { DailyNote, Expedition } from '../model/DailyNote';
 import { NotificationHelper } from '../data/local/NotificationHelper';
 import { NotifyFlags } from '../service/DailyNoteService';
 import { DailyNoteService } from '../service/DailyNoteService';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { GeetestVerifyParams } from './GeetestVerifyPage';
-  import { DateUtil } from '../common/DateUtil';
-  import { NavIcon } from '../components/NavIcon';
-  import { MetaIcon } from '../components/MetaIcon';
-  import { PageBackdrop } from '../components/PageBackdrop';
+import { DateUtil } from '../common/DateUtil';
+import { NavIcon } from '../components/NavIcon';
+import { MetaIcon } from '../components/MetaIcon';
+import { PageBackdrop } from '../components/PageBackdrop';
+
+/** shimmer 行渲染数据（单实例传入 @Builder，保证动态渲染；进度条 Max/Value） */
+class NoteRowData {
+  category: string = 'ItemIcon';
+  icon: string = '';
+  main: string = '';
+  sub: string = '';
+  progress: number = 0;
+  max: number = 1;
+}
+
+/** 派遣条目渲染数据（shimmer 底衬行 + 头像 32 + 'X 时 Y 分'/'已完成'） */
+class ExpRowData {
+  avatar: string = '';
+  text: string = '';
+  done: boolean = false;
+  passed: number = 0;
+  total: number = 1;
+}
 
 @Component
 export struct DailyNotePage {
@@ -23,14 +47,29 @@ export struct DailyNotePage {
   @State vm: DailyNoteViewModel = new DailyNoteViewModel();
   @StorageLink('dailyNoteVersion') @Watch('onNoteVersion') noteVersion: number = 0;
   @State allowNotify: boolean = false;
-  /** 刷新/通知设置半屏弹窗（Windows 风格小窗） */
+  /** 顶栏「通知设置」半窗：自动刷新开关 + 间隔 */
   @State showNoteSettings: boolean = false;
+  /** 每卡「通知设置」半窗：每 UID 开关位 + 树脂/宝钱阈值 */
+  @State showUidSettings: boolean = false;
   @State noteAutoRefresh: boolean = PreferencesStore.getAutoRefreshEnabled();
   @State noteInterval: number = PreferencesStore.getRefreshIntervalMinutes();
   /** 最近一次后台（自动）刷新失败原因：风控拦截/网络异常时给用户可见反馈 */
   @StorageLink('dailyNoteLastError') lastNoteError: string = '';
-  /** 宽屏（平板/PC）：左数据面板 + 右侧立绘背景 */
+  /** 宽屏（内容区宽 >=840）：追踪卡双列瀑布流（对齐 Windows UniformStaggeredPanel MinItemWidth=300） */
   @State isWide: boolean = false;
+  /** 派遣 Grid 自身宽度（onAreaChange 读取；列数按 MinItemWidth=140 推导，不读屏幕宽） */
+  @State expGridW: number = 0;
+
+  /** 顶栏按钮槽位（@Builder 参数只放常量槽位，文案/状态渲染期读 vm） */
+  private static readonly BAR_REFRESH: number = 0;
+  private static readonly BAR_VERIFY: number = 1;
+  private static readonly BAR_ADD: number = 2;
+  private static readonly BAR_NOTIFY: number = 3;
+  /** 派遣网格：对齐 Windows UniformPanel MinItemWidth=140 / Spacing=6 */
+  private static readonly EXP_MIN_ITEM: number = 140;
+  private static readonly EXP_GAP: number = 6;
+  /** 参变仪进度条上限：7 天秒数（对齐 Windows Maximum=604800） */
+  private static readonly TRANSFORMER_MAX: number = 604800;
 
   /** 服务层刷新成功（自动刷新定时器 / 桌面卡片手动刷新）→ 重读本地缓存，界面数值即时同步 */
   onNoteVersion(): void {
@@ -44,7 +83,6 @@ export struct DailyNotePage {
   aboutToAppear(): void {
     this.vm.syncAutoRefresh();
     this.allowNotify = NotificationHelper.isEnabled();
-    this.isWide = DailyNotePage.detectWide();
     this.vm.load(this.currentUid).then(() => {
       // 无缓存且已登录 → 自动拉一次
       if (this.isLoggedIn && this.currentUid.length > 0 && this.vm.note === undefined) {
@@ -57,69 +95,11 @@ export struct DailyNotePage {
     });
   }
 
-  /** 宽屏检测：屏幕宽度 vp >= 720 */
-  private static detectWide(): boolean {
-    try {
-      const d: display.Display = display.getDefaultDisplaySync();
-      const widthVp: number = d.densityPixels > 0 ? d.width / d.densityPixels : d.width;
-      return widthVp >= 720;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /** 便笺内容区滚动控制器（通知设置按钮跳转用） */
-  private settingRef: Scroller = new Scroller();
-  /** 顶部操作按钮槽位（@Builder 多参数不参与刷新：只传常量槽位，文案/状态在渲染期读 vm） */
-  private static readonly SLOT_REFRESH: number = 0;
-  private static readonly SLOT_NOTIFY_SETTING: number = 1;
-
-  private headerLabel(slot: number): string {
-    if (slot === DailyNotePage.SLOT_REFRESH) {
-      return this.vm.isRefreshing ? '刷新中...' : '立即刷新';
-    }
-    return '通知设置';
-  }
-
-  private onHeaderAction(slot: number): void {
-    if (slot === DailyNotePage.SLOT_REFRESH) {
-      this.vm.refresh(this.currentUid).then((ok: boolean) => {
-        this.toast(ok ? '已刷新' : this.vm.message);
-      });
-      return;
-    }
-    const anim: ScrollAnimationOptions = { duration: 200, curve: Curve.EaseOut };
-    const so: ScrollOptions = { xOffset: 0, yOffset: 0, animation: anim };
-    this.settingRef.scrollTo(so);
-  }
-
-  /** 顶部操作按钮：官方图标+文字小按钮（对齐 Windows 立即刷新/通知设置样式） */
-  @Builder
-  headerIconButton(slot: number) {
-    Row({ space: 4 }) {
-      if (slot === DailyNotePage.SLOT_REFRESH) {
-        NavIcon({ name: 'DailyNote', iconSize: 14 })
-      }
-      Text(this.headerLabel(slot))
-        .fontSize(12)
-        .fontColor(slot === DailyNotePage.SLOT_REFRESH ? Color.White : $r('app.color.text_secondary'))
-    }
-    .justifyContent(FlexAlign.Center)
-    .alignItems(VerticalAlign.Center)
-    .height(28)
-    .padding({ left: 12, right: 12 })
-    .borderRadius(14)
-    .backgroundColor(slot === DailyNotePage.SLOT_REFRESH ? $r('app.color.app_primary') : $r('app.color.card_surface'))
-    .onClick(() => {
-      this.onHeaderAction(slot);
-    })
-  }
-
   toast(msg: string): void {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1800 });
   }
 
-  /** 跳转极验人机验证页，返回后轮询 challenge 并自动重放 */
+  /** 跳转极验人机验证页，返回后轮询 challenge 并自动重放（顶栏「验证」入口） */
   goGeetest(): void {
     const params: GeetestVerifyParams = {
       gt: this.vm.geetestGt,
@@ -167,170 +147,517 @@ export struct DailyNotePage {
     .justifyContent(FlexAlign.Center)
   }
 
-  @Builder
-  resinCard(note: DailyNote) {
-    Row({ space: 16 }) {
-      Progress({ value: note.currentResin, total: note.maxResin, type: ProgressType.Ring })
-        .width(84)
-        .height(84)
-        .color(Color.White)
-        .style({ strokeWidth: 10 })
-      Column({ space: 3 }) {
-        Text(`进行中`)
-          .fontSize(17)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Color.White)
-        Text(`树脂 ${note.currentResin}/${note.maxResin} · ${note.resinRecoveryText()}`)
-          .fontSize(11)
-          .fontColor(Color.White)
-          .opacity(0.85)
-        if (note.resinRecoveryTargetText().length > 0) {
-          Text(note.resinRecoveryTargetText())
-            .fontSize(11)
-            .fontColor(Color.White)
-            .opacity(0.85)
-        }
-        Text(`洞天宝钱 ${note.currentHomeCoin}/${note.maxHomeCoin}${note.homeCoinRecoveryTargetText().length > 0 ? ` · ${note.homeCoinRecoveryTargetText()}` : ''}`)
-          .fontSize(11)
-          .fontColor(Color.White)
-          .opacity(0.85)
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
+  // ==================== 顶部 CommandBar 操作卡 ====================
+
+  private barLabel(slot: number): string {
+    if (slot === DailyNotePage.BAR_REFRESH) {
+      return this.vm.isRefreshing ? '刷新中...' : '立即刷新';
     }
-    .width('100%')
-    .padding(16)
-    .borderRadius(12)
-    .backgroundColor('#2A7A50')
+    if (slot === DailyNotePage.BAR_VERIFY) {
+      return '验证';
+    }
+    if (slot === DailyNotePage.BAR_ADD) {
+      return '添加实时便笺';
+    }
+    return '通知设置';
+  }
+
+  private barGlyph(slot: number): string {
+    if (slot === DailyNotePage.BAR_VERIFY) {
+      return '✓';
+    }
+    if (slot === DailyNotePage.BAR_ADD) {
+      return '＋';
+    }
+    return '⚙';
+  }
+
+  private onBarAction(slot: number): void {
+    if (slot === DailyNotePage.BAR_REFRESH) {
+      this.vm.refresh(this.currentUid).then((ok: boolean) => {
+        this.toast(ok ? '已刷新' : this.vm.message);
+      });
+      return;
+    }
+    if (slot === DailyNotePage.BAR_VERIFY) {
+      this.goGeetest();
+      return;
+    }
+    if (slot === DailyNotePage.BAR_ADD) {
+      this.vm.trackCurrent().then((added: boolean) => {
+        this.toast(added ? '已追踪当前 UID' : '当前 UID 已在追踪列表');
+      });
+      return;
+    }
+    // 通知设置：Windows 顶栏 Flyout（自动刷新开关 + 间隔）
+    this.noteAutoRefresh = PreferencesStore.getAutoRefreshEnabled();
+    this.noteInterval = PreferencesStore.getRefreshIntervalMinutes();
+    this.showNoteSettings = true;
   }
 
   @Builder
-  taskCard(note: DailyNote) {
-    Row({ space: 10 }) {
-      Text(note.dailyTask.isAllFinished() ? '✔' : '◻')
-        .fontSize(18)
-        .fontColor(note.dailyTask.isAllFinished() ? Color.White : Color.White)
-      Column({ space: 2 }) {
-        Text('每日委托')
+  barButton(slot: number) {
+    Row({ space: 6 }) {
+      if (slot === DailyNotePage.BAR_REFRESH) {
+        NavIcon({ name: 'DailyNote', iconSize: 16 })
+      } else {
+        Text(this.barGlyph(slot))
           .fontSize(15)
-          .fontColor(Color.White)
-        Text(`已完成 ${note.dailyTask.finishedTaskNum}/${note.dailyTask.totalTaskNum}${note.isExtraTaskRewardReceived ? ' · 已领额外奖励' : ''}`)
-          .fontSize(11)
-          .fontColor(Color.White)
-          .opacity(0.85)
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-      Text(`周本折扣 ${note.remainResinDiscountNum}/${note.resinDiscountNumLimit}`)
-        .fontSize(11)
-        .fontColor(Color.White)
-        .opacity(0.85)
-    }
-    .width('100%')
-    .padding(14)
-    .borderRadius(12)
-    .backgroundColor('#2A7A50')
-  }
-
-  @Builder
-  expeditionCard(note: DailyNote) {
-    Column({ space: 8 }) {
-      Row() {
-        Text('派遣任务')
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-        Blank()
-        Text(`${note.currentExpeditionNum}/${note.maxExpeditionNum} 进行中`)
-          .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
+      }
+      Text(this.barLabel(slot))
+        .fontSize(13)
+        .fontColor($r('app.color.text_primary'))
+    }
+    .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
+    .height(34)
+    .padding({ left: 10, right: 10 })
+    .borderRadius(17)
+    .hoverEffect(HoverEffect.Highlight)
+    .onClick(() => {
+      this.onBarAction(slot);
+    })
+  }
+
+  /** 顶部整宽操作卡（对齐 Windows CommandBar 卡：margin 16、亚克力半透明、圆角、投影） */
+  @Builder
+  commandBarCard() {
+    Row({ space: 4 }) {
+      this.barButton(DailyNotePage.BAR_REFRESH)
+      this.barButton(DailyNotePage.BAR_VERIFY)
+      this.barButton(DailyNotePage.BAR_ADD)
+      Blank()
+      this.barButton(DailyNotePage.BAR_NOTIFY)
+    }
+    .width('100%')
+    .padding({ left: 8, right: 8, top: 6, bottom: 6 })
+    .borderRadius(12)
+    .backgroundColor($r('app.color.card_acrylic_tint'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
+    .shadow({ radius: 8, offsetY: 4, color: $r('app.color.nav_scrim') })
+    .margin({ left: 16, right: 16 })
+  }
+
+  @Builder
+  errorBanner() {
+    Row({ space: 6 }) {
+      Text('⚠')
+        .fontSize(12)
+        .fontColor($r('app.color.danger'))
+      Text(this.lastNoteError)
+        .fontSize(11)
+        .fontColor($r('app.color.danger'))
+        .layoutWeight(1)
+        .maxLines(2)
+      Text('立即刷新')
+        .fontSize(11)
+        .fontColor($r('app.color.app_primary'))
+        .hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          this.vm.refresh(this.currentUid).then((ok: boolean) => {
+            this.toast(ok ? '已刷新' : this.vm.message);
+          });
+        })
+    }
+    .width('100%')
+    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+    .borderRadius(8)
+    .backgroundColor($r('app.color.danger_bg'))
+    .margin({ left: 16, right: 16, top: 12 })
+  }
+
+  @Builder
+  loadingBlock() {
+    Column({ space: 12 }) {
+      LoadingProgress()
+        .width(36)
+        .height(36)
+        .color($r('app.color.app_primary'))
+      Text(this.vm.message.length > 0 ? this.vm.message : '加载中...')
+        .fontSize(13)
+        .fontColor(this.vm.message.length > 0 ? $r('app.color.danger') : $r('app.color.text_secondary'))
+        .textAlign(TextAlign.Center)
+      if (this.vm.needGeetest) {
+        Button('去完成人机验证')
+          .fontSize(14)
+          .height(40)
+          .backgroundColor($r('app.color.app_primary'))
+          .fontColor(Color.White)
+          .onClick(() => {
+            this.goGeetest();
+          })
+        Text('验证完成后返回本页会自动重试拉取')
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+      }
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 32, bottom: 24 })
+  }
+
+  // ==================== 每 UID 追踪卡 ====================
+
+  private makeRow(category: string, icon: string, main: string, sub: string,
+    progress: number, max: number): NoteRowData {
+    const row: NoteRowData = new NoteRowData();
+    row.category = category;
+    row.icon = icon;
+    row.main = main;
+    row.sub = sub;
+    row.max = max > 0 ? max : 1;
+    row.progress = Math.max(0, Math.min(progress, row.max));
+    return row;
+  }
+
+  /** 6 行 shimmer 行数据（对齐 Windows DailyNoteEntryTemplate：魔神任务/树脂/宝钱/每日委托/周本折扣/参变仪） */
+  private cardRows(entry: NoteCardEntry): NoteRowData[] {
+    const rows: NoteRowData[] = [];
+    const n: DailyNote | undefined = entry.note;
+    if (n === undefined) {
+      rows.push(this.makeRow('ItemIcon', '', '尚未刷新', '点顶栏「立即刷新」拉取数据', 0, 1));
+      return rows;
+    }
+    // 1 魔神任务（rawfile icons/Mark 无 Main_Start/Proce → MetaIcon 占位/云端兜底）
+    rows.push(this.makeRow('Mark',
+      n.archonQuestFinished() ? 'UI_MarkQuest_Main_Proce' : 'UI_MarkQuest_Main_Start',
+      n.archonQuestMainText(), n.archonQuestSubText(),
+      n.archonQuestFinishedCount(), n.archonQuestTotal()));
+    // 2 树脂
+    rows.push(this.makeRow('ItemIcon', 'UI_ItemIcon_106',
+      n.formattedResin(), n.resinRecoveryTargetText(), n.currentResin, n.maxResin));
+    // 3 洞天宝钱
+    rows.push(this.makeRow('ItemIcon', 'UI_ItemIcon_204',
+      n.formattedHomeCoin(), n.homeCoinRecoveryTargetText(), n.currentHomeCoin, n.maxHomeCoin));
+    // 4 每日委托
+    rows.push(this.makeRow('Mark',
+      n.isExtraTaskRewardReceived ? 'UI_MarkQuest_Events_Proce' : 'UI_MarkQuest_Events_Start',
+      n.formattedTask(), n.extraTaskRewardDescription(), n.finishedTaskNum, n.totalTaskNum));
+    // 5 周本折扣（方向对齐 Windows：已消耗/上限）
+    rows.push(this.makeRow('Mark', 'UI_MarkTower',
+      n.formattedResinDiscount(), '本周已消耗减半次数', n.resinDiscountUsedNum(), n.resinDiscountNumLimit));
+    // 6 参量质变仪
+    rows.push(this.makeRow('ItemIcon', 'UI_ItemIcon_220021',
+      n.transformerMainText(), n.transformerSubText(), n.transformerElapsedSecond(),
+      DailyNotePage.TRANSFORMER_MAX));
+    return rows;
+  }
+
+  /** shimmer 行：高 48、底衬 tint + 1px 描边 + 圆角 4，进度条铺满行底（透明度 0.2），图标 32×32 */
+  @Builder
+  noteRow(row: NoteRowData) {
+    Stack({ alignContent: Alignment.Center }) {
+      Progress({ value: row.progress, total: row.max, type: ProgressType.Linear })
+        .width('100%')
+        .height(48)
+        .style({ strokeWidth: 48 })
+        .color($r('app.color.app_primary'))
+        .backgroundColor(Color.Transparent)
+        .opacity(0.2)
+      Row({ space: 8 }) {
+        MetaIcon({ category: row.category, name: row.icon, iconSize: 32, remoteFallback: true })
+        Column({ space: 2 }) {
+          Text(row.main)
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(row.sub)
+            .fontSize(12)
+            .opacity(0.6)
+            .fontColor($r('app.color.text_primary'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
       }
       .width('100%')
-      if (note.expeditions.length === 0) {
-        Text('暂无派遣数据')
-          .fontSize(13)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%')
-      }
-      ForEach(note.expeditions, (exp: Expedition, idx: number) => {
-        Row({ space: 10 }) {
-          if (exp.avatarSideIcon.length > 0) {
-            // UI_AvatarIcon_Side_Xxx → UI_AvatarIcon_Xxx（与其他页面同一 rawfile 图标源）
-            MetaIcon({
-              category: 'AvatarIcon',
-              name: exp.avatarSideIcon.replace('UI_AvatarIcon_Side_', 'UI_AvatarIcon_'),
-              iconSize: 34,
-            })
-          } else {
-            Text(exp.isFinished() ? '✔' : '…')
-              .fontSize(16)
-              .fontColor(Color.White)
-              .width(34)
-              .height(34)
-              .textAlign(TextAlign.Center)
-              .borderRadius(17)
-              .backgroundColor(exp.isFinished() ? $r('app.color.success') : $r('app.color.notice_on'))
-          }
-          Text(exp.isFinished() ? '完成' : '进行中')
-            .fontSize(14)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1)
-          Text(exp.finishText())
-            .fontSize(13)
-            .fontColor(exp.isFinished() ? $r('app.color.success') : $r('app.color.app_primary'))
-        }
+      .padding({ left: 12, right: 12 })
+      .alignItems(VerticalAlign.Center)
+    }
+    .width('100%')
+    .height(48)
+    .borderRadius(4)
+    .clip(true)
+    .backgroundColor($r('app.color.card_inner_tint'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
+  }
+
+  private makeExpRow(exp: Expedition): ExpRowData {
+    const item: ExpRowData = new ExpRowData();
+    item.avatar = exp.iconName();
+    item.done = exp.isFinished();
+    item.text = exp.finishText();
+    item.total = exp.totalSecond();
+    item.passed = exp.passedSecond();
+    return item;
+  }
+
+  /** 派遣列数（对齐 Windows UniformPanel.MeasureOverride：floor((W+gap)/(minItem+gap))） */
+  private expTemplate(): string {
+    const cols: number = Math.max(1, Math.floor((this.expGridW + DailyNotePage.EXP_GAP)
+      / (DailyNotePage.EXP_MIN_ITEM + DailyNotePage.EXP_GAP)));
+    return Array(cols).fill('1fr').join(' ');
+  }
+
+  /** 派遣条目：shimmer 底衬行（进度 Max=TotalTime / Value=PassedTime 20% 透明度）+ 头像 32 + 剩余文本 */
+  @Builder
+  expRow(item: ExpRowData) {
+    Stack({ alignContent: Alignment.Center }) {
+      Progress({ value: item.passed, total: item.total, type: ProgressType.Linear })
         .width('100%')
-        .padding({ top: 6, bottom: 6 })
-      }, (exp: Expedition, idx: number) => `${idx}_${exp.status}`)
-    }
-    .width('100%')
-    .padding(14)
-    .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
-  }
-
-  @Builder
-  transformerCard(note: DailyNote) {
-    Row({ space: 10 }) {
-      MetaIcon({ category: 'ItemIcon', name: 'UI_ItemIcon_220021', iconSize: 24, remoteFallback: true })
-        .opacity(note.transformer.isReady() ? 1 : 0.55)
-      Column({ space: 2 }) {
-        Text('参量质变仪')
-          .fontSize(15)
-          .fontColor($r('app.color.text_primary'))
-        Text(!note.transformer.isReady() ? `剩余 ${note.transformer.text()}` : '已就绪，可使用')
-          .fontSize(12)
-          .fontColor(note.transformer.isReady() ? $r('app.color.success') : $r('app.color.text_secondary'))
+        .height(40)
+        .style({ strokeWidth: 40 })
+        .color($r('app.color.app_primary'))
+        .backgroundColor(Color.Transparent)
+        .opacity(0.2)
+      Row({ space: 12 }) {
+        if (item.avatar.length > 0) {
+          MetaIcon({ category: 'AvatarIcon', name: item.avatar, iconSize: 32, remoteFallback: true })
+        } else {
+          Text('✈')
+            .fontSize(14)
+            .fontColor($r('app.color.text_secondary'))
+            .width(32)
+            .height(32)
+            .textAlign(TextAlign.Center)
+        }
+        Text(item.text)
+          .fontSize(14)
+          .fontColor(item.done ? $r('app.color.success') : $r('app.color.text_primary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
+      .width('100%')
+      .padding({ left: 8, right: 8 })
+      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .padding(14)
-    .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .height(40)
+    .borderRadius(4)
+    .clip(true)
+    .backgroundColor($r('app.color.card_inner_tint'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
+  /** 派遣探索区：无头行/无「全部领取」（对齐 Windows），Grid 双列/窄卡单列 */
   @Builder
-  notifySettingCard() {
-    Column({ space: 10 }) {
+  expSection(entry: NoteCardEntry) {
+    if (entry.note !== undefined && entry.note.expeditions.length > 0) {
+      Grid() {
+        ForEach(entry.note.expeditions, (exp: Expedition) => {
+          GridItem() {
+            this.expRow(this.makeExpRow(exp))
+          }
+        }, (exp: Expedition, idx: number) => `exp_${idx}_${exp.status}_${exp.remainedTime}`)
+      }
+      .columnsTemplate(this.expTemplate())
+      .columnsGap(DailyNotePage.EXP_GAP)
+      .rowsGap(DailyNotePage.EXP_GAP)
+      .width('100%')
+      .onAreaChange((oldValue: Area, newValue: Area) => {
+        this.expGridW = Number(newValue.width);
+      })
+    }
+  }
+
+  private cardHeadText(entry: NoteCardEntry): string {
+    if (entry.isCurrent && entry.nickname.length > 0) {
+      return `${entry.nickname}（UID ${entry.uid}）`;
+    }
+    return `UID ${entry.uid}`;
+  }
+
+  /** 卡底刷新时间（对齐 Windows RefreshTimeFormatted：'刷新于 MM.dd HH:mm:ss' / '尚未刷新'） */
+  private refreshTimeText(entry: NoteCardEntry): string {
+    if (entry.note === undefined || entry.note.refreshTime <= 0) {
+      return '尚未刷新';
+    }
+    const d: Date = new Date(entry.note.refreshTime);
+    const t: string = `${DateUtil.pad2(d.getMonth() + 1)}.${DateUtil.pad2(d.getDate())} ` +
+      `${DateUtil.pad2(d.getHours())}:${DateUtil.pad2(d.getMinutes())}:${DateUtil.pad2(d.getSeconds())}`;
+    return `刷新于 ${t}`;
+  }
+
+  private onCardRemove(entry: NoteCardEntry): void {
+    this.vm.untrack(entry.uid).then(() => {
+      this.toast('已移除追踪');
+    });
+  }
+
+  private onCardNotify(entry: NoteCardEntry): void {
+    this.vm.openUidSettings(entry.uid).then(() => {
+      this.showUidSettings = true;
+    });
+  }
+
+  /** 每 UID 追踪卡（对齐 Windows DailyNoteEntryTemplate：卡体 padding 8、区块间距 8、行间距 6） */
+  @Builder
+  noteCard(entry: NoteCardEntry) {
+    Column({ space: 8 }) {
+      // 卡头行 MinHeight 40：左 = 昵称+UID（14fp）；右 = 40×40 透明按钮
+      // （Windows 的「启动游戏」属注入/进程链功能，未移植，按规格省略）
       Row() {
-        Text('阈值通知')
-          .fontSize(15)
+        Text(this.cardHeadText(entry))
+          .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
-        Blank()
-        Button('刷新与通知 ⚙')
-          .fontSize(12)
-          .height(26)
-          .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary'))
-          .margin({ right: 8 })
+          .layoutWeight(1)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text('✕')
+          .fontSize(16)
+          .fontColor($r('app.color.text_secondary'))
+          .width(40)
+          .height(40)
+          .textAlign(TextAlign.Center)
+          .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
-            this.noteAutoRefresh = PreferencesStore.getAutoRefreshEnabled();
-            this.noteInterval = PreferencesStore.getRefreshIntervalMinutes();
-            this.showNoteSettings = true;
+            this.onCardRemove(entry);
           })
+        Text('⚙')
+          .fontSize(16)
+          .fontColor($r('app.color.text_secondary'))
+          .width(40)
+          .height(40)
+          .textAlign(TextAlign.Center)
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.onCardNotify(entry);
+          })
+      }
+      .width('100%')
+      .height(40)
+      .alignItems(VerticalAlign.Center)
+
+      // 6 行 shimmer 行（键值含变化字段，刷新后整卡重建）
+      Column({ space: 6 }) {
+        ForEach(this.cardRows(entry), (row: NoteRowData) => {
+          this.noteRow(row)
+        }, (row: NoteRowData, idx: number) => `row_${idx}_${row.main}_${row.sub}`)
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+
+      this.expSection(entry)
+
+      Text(this.refreshTimeText(entry))
+        .fontSize(12)
+        .opacity(0.7)
+        .fontColor($r('app.color.text_primary'))
+    }
+    .width('100%')
+    .padding(8)
+    .borderRadius($r('app.float.card_radius'))
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
+    .shadow({ radius: 8, offsetY: 4, color: $r('app.color.nav_scrim') })
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  private currentEntries(): NoteCardEntry[] {
+    return this.vm.buildCardEntries();
+  }
+
+  private cardKey(entry: NoteCardEntry): string {
+    const rt: number = entry.note !== undefined ? entry.note.refreshTime : 0;
+    return `card_${entry.uid}_${entry.isCurrent ? 1 : 0}_${rt}`;
+  }
+
+  @Builder
+  cardsColumn(entries: NoteCardEntry[]) {
+    ForEach(entries, (entry: NoteCardEntry) => {
+      this.noteCard(entry)
+    }, (entry: NoteCardEntry) => this.cardKey(entry))
+  }
+
+  /** 瀑布流：宽屏双列各自独立 Scroll（近似 Windows UniformStaggeredPanel），窄屏单列 */
+  @Builder
+  noteWaterfall() {
+    if (this.isWide) {
+      Row({ space: 12 }) {
+        Scroll() {
+          Column({ space: 12 }) {
+            this.cardsColumn(this.currentEntries()
+              .filter((_: NoteCardEntry, i: number): boolean => i % 2 === 0))
+          }
+          .width('100%')
+        }
+        .layoutWeight(1)
+        .align(Alignment.Top)
+        .scrollBar(BarState.Auto)
+
+        Scroll() {
+          Column({ space: 12 }) {
+            this.cardsColumn(this.currentEntries()
+              .filter((_: NoteCardEntry, i: number): boolean => i % 2 === 1))
+          }
+          .width('100%')
+        }
+        .layoutWeight(1)
+        .align(Alignment.Top)
+        .scrollBar(BarState.Auto)
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .alignItems(VerticalAlign.Top)
+    } else {
+      Scroll() {
+        Column({ space: 12 }) {
+          this.cardsColumn(this.currentEntries())
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .align(Alignment.Top)
+      .scrollBar(BarState.Auto)
+    }
+  }
+
+  // ==================== 半窗设置 ====================
+
+  @Builder
+  flagToggle(label: string, flag: number) {
+    Row({ space: 8 }) {
+      Text(this.vm.settingsNotifyFlags & flag ? '☑' : '☐')
+        .fontSize(16)
+        .fontColor(this.vm.settingsNotifyFlags & flag ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+      Text(label)
+        .fontSize(14)
+        .fontColor($r('app.color.text_primary'))
+        .hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          this.vm.toggleUidFlag(flag).then(() => {
+          });
+        })
+    }
+  }
+
+  /** 每卡「通知设置」半窗：每 UID 通知开关位 + 树脂/宝钱阈值（沿用原每 UID 设置 UI） */
+  @Builder
+  uidSettingsSheet() {
+    Column({ space: 12 }) {
+      Row() {
+        Text('通知对象')
+          .fontSize(13)
+          .fontColor($r('app.color.text_secondary'))
+        Blank()
+        Text(`UID ${this.vm.settingsUid}`)
+          .fontSize(13)
+          .fontColor($r('app.color.text_primary'))
+      }
+      .width('100%')
+
+      Row() {
+        Text('系统通知')
+          .fontSize(15)
+          .fontColor($r('app.color.text_primary'))
+        Blank()
         if (!this.allowNotify) {
           Button('授权通知')
             .fontSize(12)
@@ -355,7 +682,6 @@ export struct DailyNotePage {
       }
       .width('100%')
 
-      // 通知开关
       Row({ space: 10 }) {
         Column({ space: 6 }) {
           this.flagToggle('树脂', NotifyFlags.RESIN)
@@ -382,15 +708,17 @@ export struct DailyNotePage {
         ForEach([80, 120, 160] as number[], (th: number) => {
           Text(`${th}`)
             .fontSize(13)
-            .fontColor(this.vm.resinThreshold === th ? Color.White : $r('app.color.text_primary'))
+            .fontColor(this.vm.settingsResinThreshold === th ? Color.White : $r('app.color.text_primary'))
             .padding({ left: 12, right: 12, top: 5, bottom: 5 })
             .borderRadius(12)
-            .backgroundColor(this.vm.resinThreshold === th ? $r('app.color.app_primary') : $r('app.color.app_primary_bg'))
+            .backgroundColor(this.vm.settingsResinThreshold === th
+              ? $r('app.color.app_primary') : $r('app.color.app_primary_bg'))
+            .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
-              this.vm.setResinThreshold(th).then(() => {
+              this.vm.setUidResinThreshold(th).then(() => {
               });
             })
-        }, (th: number) => `r_${th}`)
+        }, (th: number) => `usr_${th}`)
       }
       .width('100%')
 
@@ -401,300 +729,30 @@ export struct DailyNotePage {
         ForEach([1200, 1800, 2400] as number[], (th: number) => {
           Text(`${th}`)
             .fontSize(13)
-            .fontColor(this.vm.homeThreshold === th ? Color.White : $r('app.color.text_primary'))
+            .fontColor(this.vm.settingsHomeThreshold === th ? Color.White : $r('app.color.text_primary'))
             .padding({ left: 12, right: 12, top: 5, bottom: 5 })
             .borderRadius(12)
-            .backgroundColor(this.vm.homeThreshold === th ? $r('app.color.app_primary') : $r('app.color.app_primary_bg'))
+            .backgroundColor(this.vm.settingsHomeThreshold === th
+              ? $r('app.color.app_primary') : $r('app.color.app_primary_bg'))
+            .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
-              this.vm.setHomeThreshold(th).then(() => {
+              this.vm.setUidHomeThreshold(th).then(() => {
               });
             })
-        }, (th: number) => `h_${th}`)
+        }, (th: number) => `uhm_${th}`)
       }
       .width('100%')
-    }
-    .width('100%')
-    .padding(14)
-    .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
-  }
 
-  @Builder
-  flagToggle(label: string, flag: number) {
-    Row({ space: 8 }) {
-      Text(this.vm.notifyFlags & flag ? '☑' : '☐')
-        .fontSize(16)
-        .fontColor(this.vm.notifyFlags & flag ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
-      Text(label)
-        .fontSize(14)
-        .fontColor($r('app.color.text_primary'))
-        .onClick(() => {
-          this.vm.toggleFlag(flag).then(() => {
-          });
-        })
-    }
-  }
-
-  @Builder
-  autoRefreshBar() {
-    Row({ space: 8 }) {
-      Text(this.vm.isAutoRunning ? '自动刷新已开启' : '自动刷新已关闭')
-        .fontSize(13)
-        .fontColor($r('app.color.text_secondary'))
-      Blank()
-      Text(`上次刷新：${this.vm.lastRefreshAt > 0 ? DateUtil.formatTimestamp(this.vm.lastRefreshAt) : '--'}`)
+      Text('树脂/宝钱达到阈值或派遣/每日委托完成时发送系统通知（随自动刷新检测，需先授权通知）。')
         .fontSize(11)
         .fontColor($r('app.color.text_secondary'))
-    }
-    .width('100%')
-  }
-
-  build() {
-    Stack() {
-      // 壁纸衬底：本页恒为 Index 壳层内嵌（壳层已铺壁纸），PageBackdrop 渲染为空仅透传
-      PageBackdrop({ embedMode: true })
-      Column() {
-      if (!this.isLoggedIn) {
-        this.loginGuide()
-      } else if (this.currentUid.length === 0) {
-        Column({ space: 14 }) {
-          NavIcon({ name: 'Passport', iconSize: 60 })
-          Text('请先选择默认 UID')
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-          Button('去「账号与数据」选择')
-            .backgroundColor($r('app.color.app_primary'))
-            .fontColor(Color.White)
-            .onClick(() => {
-              router.pushUrl({ url: 'pages/UserPage' });
-            })
-        }
         .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Center)
-      } else {
-        // 顶部操作行：对齐 Windows（立即刷新 / 通知设置 图标+文字小按钮，一行右对齐）
-        Row({ space: 6 }) {
-          Text('实时便笺')
-            .fontSize($r('app.float.page_title_font_size'))
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-          Blank()
-          this.headerIconButton(DailyNotePage.SLOT_REFRESH)
-          this.headerIconButton(DailyNotePage.SLOT_NOTIFY_SETTING)
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16, top: 10, bottom: 8 })
-        .alignItems(VerticalAlign.Center)
-
-        // 宽屏：右侧立绘渐变背景 + 左侧数据面板限宽；窄屏：单列
-        Stack({ alignContent: Alignment.Center }) {
-          Scroll(this.settingRef) {
-            Column({ space: 10 }) {
-              this.autoRefreshBar()
-              if (this.lastNoteError.length > 0) {
-                Row({ space: 6 }) {
-                  Text('⚠')
-                    .fontSize(12)
-                    .fontColor($r('app.color.danger'))
-                  Text(this.lastNoteError)
-                    .fontSize(11)
-                    .fontColor($r('app.color.danger'))
-                    .layoutWeight(1)
-                  Text('立即刷新')
-                    .fontSize(11)
-                    .fontColor($r('app.color.app_primary'))
-                    .onClick(() => {
-                      this.vm.refresh(this.currentUid).then((ok: boolean) => {
-                        this.toast(ok ? '已刷新' : this.vm.message);
-                      });
-                    })
-                }
-                .width('100%')
-                .padding({ left: 10, right: 10, top: 8, bottom: 8 })
-                .borderRadius(8)
-                .backgroundColor($r('app.color.danger_bg'))
-              }
-              if (this.vm.note === undefined) {
-                Column({ space: 12 }) {
-                  LoadingProgress()
-                    .width(40)
-                    .height(40)
-                    .color($r('app.color.app_primary'))
-                  Text('加载中...')
-                    .fontSize(13)
-                    .fontColor($r('app.color.text_secondary'))
-                  if (this.vm.message.length > 0) {
-                    Text(this.vm.message)
-                      .fontSize(13)
-                      .fontColor($r('app.color.danger'))
-                      .textAlign(TextAlign.Center)
-                  }
-                  if (this.vm.needGeetest) {
-                    Button('去完成人机验证')
-                      .fontSize(14)
-                      .height(40)
-                      .backgroundColor($r('app.color.app_primary'))
-                      .fontColor(Color.White)
-                      .onClick(() => {
-                        this.goGeetest();
-                      })
-                    Text('验证完成后返回本页会自动重试拉取')
-                      .fontSize(11)
-                      .fontColor($r('app.color.text_secondary'))
-                  }
-                }
-                .width('100%')
-                .padding({ top: 60, bottom: 60 })
-              } else {
-                this.resinCard(this.vm.note)
-                this.taskCard(this.vm.note)
-                this.expeditionCard(this.vm.note)
-                this.transformerCard(this.vm.note)
-              }
-              // 追踪列表（对齐 Windows 多 UID 追踪：逐卡片展示各 UID 本地快照）
-              this.trackedSection()
-              this.notifySettingCard()
-              Text('提示：在「设置 → 实时便笺」可调整自动刷新间隔')
-                .fontSize(11)
-                .fontColor($r('app.color.text_secondary'))
-                .width('100%')
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, bottom: 16 })
-            .alignItems(HorizontalAlign.Center)
-            .constraintSize({ maxWidth: this.isWide ? 440 : 9999 })
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .align(Alignment.Top)
-          .backgroundColor(Color.Transparent)
-        }
-        .width('100%')
-        .layoutWeight(1)
-      }
     }
     .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
-    // Windows 风格：刷新/通知设置以半屏小窗呈现（不覆盖全屏）
-    .bindSheet($$this.showNoteSettings, this.noteSettingsSheet(), {
-      title: { title: '刷新与通知' },
-      showClose: true,
-      dragBar: true,
-      detents: [SheetSize.MEDIUM, SheetSize.LARGE],
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: $r('app.color.sheet_material_tint'),
-    })
-    }
-    .width('100%')
-    .height('100%')
+    .padding({ left: 16, right: 16, top: 8, bottom: 16 })
   }
 
-  /**
-   * 追踪列表区（对齐 Windows DailyNotePage 追踪列表）：追踪当前 UID / 全部刷新 /
-   * 各 UID 摘要卡（树脂/每日委托/派遣，本地缓存）+ 移除。
-   */
-  @Builder
-  trackedSection() {
-    Column({ space: 8 }) {
-      Row({ space: 8 }) {
-        Text('追踪列表')
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1)
-        Button(this.vm.trackedBusy ? '刷新中...' : '全部刷新')
-          .fontSize(11)
-          .height(26)
-          .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary'))
-          .onClick(() => {
-            this.vm.refreshTracked().then((n: number) => {
-              this.toast(n > 0 ? `已刷新 ${n} 个追踪 UID` : '追踪列表已是最新（或拉取失败）');
-            });
-          })
-        Button(this.vm.trackedEntries.some((e: TrackedNoteEntry): boolean => e.uid === this.vm.currentUid)
-          ? '已追踪当前' : '追踪当前 UID')
-          .fontSize(11)
-          .height(26)
-          .backgroundColor($r('app.color.app_primary'))
-          .fontColor(Color.White)
-          .onClick(() => {
-            this.vm.trackCurrent().then((added: boolean) => {
-              this.toast(added ? '已追踪当前 UID' : '当前 UID 已在追踪列表');
-            });
-          })
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-
-      if (this.vm.trackedEntries.length === 0) {
-        Text('尚未追踪任何 UID：点「追踪当前 UID」把账号加入列表，将随自动刷新一并轮询')
-          .fontSize(11)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%')
-      } else {
-        ForEach(this.vm.trackedEntries, (e: TrackedNoteEntry) => {
-          Row({ space: 8 }) {
-            Column({ space: 2 }) {
-              Text(`UID ${e.uid}${e.uid === this.vm.currentUid ? '（当前）' : ''}`)
-                .fontSize(12)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary'))
-              Text(this.trackedSummary(e))
-                .fontSize(10)
-                .fontColor($r('app.color.text_secondary'))
-                .maxLines(1)
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1)
-            Text('移除')
-              .fontSize(11)
-              .fontColor($r('app.color.danger'))
-              .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-              .borderRadius(8)
-              .backgroundColor($r('app.color.page_background'))
-              .hoverEffect(HoverEffect.Highlight)
-              .onClick(() => {
-                this.vm.untrack(e.uid).then(() => {
-                  this.toast('已移除追踪');
-                });
-              })
-          }
-          .width('100%')
-          .padding(10)
-          .borderRadius(10)
-          .backgroundColor($r('app.color.page_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
-        }, (e: TrackedNoteEntry) => `trk_${e.uid}_${e.note !== undefined ? e.note.currentResin : -1}`)
-      }
-    }
-    .width('100%')
-    .padding(12)
-    .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
-    .border({ width: 1, color: $r('app.color.card_stroke') })
-  }
-
-  /** 追踪条目摘要（本地缓存快照） */
-  private trackedSummary(e: TrackedNoteEntry): string {
-    if (e.note === undefined) {
-      return '暂无缓存数据（点「全部刷新」拉取）';
-    }
-    const n: DailyNote = e.note;
-    const parts: string[] = [`树脂 ${n.currentResin}/${n.maxResin}`];
-    if (n.totalTaskNum > 0) {
-      parts.push(`每日 ${n.finishedTaskNum}/${n.totalTaskNum}`);
-    }
-    if (n.maxExpeditionNum > 0) {
-      parts.push(`派遣 ${n.currentExpeditionNum}/${n.maxExpeditionNum}`);
-    }
-    return parts.join(' · ');
-  }
-
-  /** 半屏设置面板：自动刷新开关 + 刷新间隔（对齐 Windows 便笺设置弹窗） */
+  /** 顶栏「通知设置」半窗：自动刷新开关 + 间隔（沿用现有间隔枚举，见汇报） */
   @Builder
   noteSettingsSheet() {
     Column({ space: 12 }) {
@@ -736,6 +794,7 @@ export struct DailyNotePage {
           .padding({ left: 6, right: 6, top: 9, bottom: 9 })
           .borderRadius(10)
           .backgroundColor(this.noteInterval === min ? $r('app.color.app_primary_bg') : $r('app.color.page_background'))
+          .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
             this.noteInterval = min;
             PreferencesStore.setRefreshIntervalMinutes(min);
@@ -754,5 +813,94 @@ export struct DailyNotePage {
     }
     .width('100%')
     .padding({ left: 16, right: 16, top: 8, bottom: 16 })
+  }
+
+  build() {
+    Stack() {
+      // 壁纸衬底：本页恒为 Index 壳层内嵌（壳层已铺壁纸），PageBackdrop 渲染为空仅透传
+      PageBackdrop({ embedMode: true })
+      Column() {
+        if (!this.isLoggedIn) {
+          this.loginGuide()
+        } else if (this.currentUid.length === 0) {
+          Column({ space: 14 }) {
+            NavIcon({ name: 'Passport', iconSize: 60 })
+            Text('请先选择默认 UID')
+              .fontSize(17)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.text_primary'))
+            Button('去「账号与数据」选择')
+              .backgroundColor($r('app.color.app_primary'))
+              .fontColor(Color.White)
+              .onClick(() => {
+                router.pushUrl({ url: 'pages/UserPage' });
+              })
+          }
+          .width('100%')
+          .height('100%')
+          .justifyContent(FlexAlign.Center)
+        } else {
+          // 标题行
+          Row() {
+            Text('实时便笺')
+              .fontSize($r('app.float.page_title_font_size'))
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.text_primary'))
+          }
+          .width('100%')
+          .padding({ left: 16, right: 16, top: 10, bottom: 8 })
+
+          // 顶部 CommandBar 操作卡（立即刷新/验证/添加实时便笺/通知设置）
+          this.commandBarCard()
+
+          // 内容区：错误横幅 + 加载态 + 追踪卡瀑布流（宽屏断点读内容区自身宽度 >=840）
+          Column() {
+            if (this.lastNoteError.length > 0) {
+              this.errorBanner()
+            }
+            if (this.vm.note === undefined) {
+              this.loadingBlock()
+            }
+            if (this.currentEntries().length > 0) {
+              this.noteWaterfall()
+            } else if (this.vm.note !== undefined) {
+              Text('点顶部「添加实时便笺」把当前 UID 加入追踪')
+                .fontSize(12)
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%')
+                .textAlign(TextAlign.Center)
+                .padding({ top: 32 })
+            }
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .onAreaChange((oldValue: Area, newValue: Area) => {
+            this.isWide = (newValue.width as number) >= 840;
+          })
+        }
+      }
+      .width('100%')
+      .height('100%')
+      .backgroundColor(Color.Transparent)
+    }
+    .width('100%')
+    .height('100%')
+    // Windows 风格：设置均以半屏小窗呈现（不覆盖全屏）
+    .bindSheet($$this.showNoteSettings, this.noteSettingsSheet(), {
+      title: { title: '刷新与通知' },
+      showClose: true,
+      dragBar: true,
+      detents: [SheetSize.MEDIUM, SheetSize.LARGE],
+      blurStyle: BlurStyle.Regular,
+      backgroundColor: $r('app.color.sheet_material_tint'),
+    })
+    .bindSheet($$this.showUidSettings, this.uidSettingsSheet(), {
+      title: { title: '通知设置' },
+      showClose: true,
+      dragBar: true,
+      detents: [SheetSize.MEDIUM, SheetSize.LARGE],
+      blurStyle: BlurStyle.Regular,
+      backgroundColor: $r('app.color.sheet_material_tint'),
+    })
   }
 }

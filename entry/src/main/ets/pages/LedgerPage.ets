@@ -172,7 +172,7 @@ export struct LedgerPage {
                       .fontColor(this.month === m ? Color.White : $r('app.color.text_primary'))
                       .padding({ left: 14, right: 14, top: 6, bottom: 6 })
                       .borderRadius(14)
-                      .backgroundColor(this.month === m ? $r('app.color.app_primary') : $r('app.color.card_background'))
+                      .backgroundColor(this.month === m ? $r('app.color.app_primary') : $r('app.color.card_inner_tint'))
                       .border({ width: 1, color: this.month === m ? $r('app.color.app_primary') : $r('app.color.divider') })
                       .onClick(() => {
                         this.month = m;

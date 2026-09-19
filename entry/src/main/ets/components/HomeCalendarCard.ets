@@ -200,7 +200,7 @@ export struct HomeCalendarCard {
             .layoutWeight(1)
             .padding({ top: 3, bottom: 3 })
             .borderRadius(8)
-            .backgroundColor(cell.isToday ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+            .backgroundColor(cell.isToday ? $r('app.color.app_primary_bg') : $r('app.color.card_inner_tint'))
           }, (cell: WeekDayCell) => `wk_${cell.index}_${cell.isToday}`)
         }
         .width('100%')

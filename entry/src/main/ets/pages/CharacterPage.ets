@@ -403,7 +403,7 @@ export struct CharacterPage {
               .width('100%')
               .padding({ top: 8, bottom: 8, left: 12, right: 12 })
               .borderRadius(10)
-              .backgroundColor($r('app.color.page_background'))
+              .backgroundColor($r('app.color.card_inner_tint'))
             }, (sk: MetaSkill, idx: number) => `sk_${sk.n}_${this.skillLevelAt(this.currentDetail!.name, idx)}`)
           }
           .width('100%')
@@ -526,7 +526,7 @@ export struct CharacterPage {
                         .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                         .margin({ right: 4, bottom: 4 })
                         .borderRadius(7)
-                        .backgroundColor($r('app.color.page_background'))
+                        .backgroundColor($r('app.color.card_inner_tint'))
                     }, (sp: RelicProperty) => `${r.id}_${sp.propertyType}_${sp.value}_${sp.times}`)
                   }
                   .width('100%')
@@ -535,7 +535,7 @@ export struct CharacterPage {
               .width('100%')
               .padding({ top: 8, bottom: 8, left: 12, right: 12 })
               .borderRadius(10)
-              .backgroundColor($r('app.color.page_background'))
+              .backgroundColor($r('app.color.card_inner_tint'))
             }, (r: Reliquary) => `${r.id}_${r.pos}_${r.level}_${r.subProperties.length}`)
           }
           .width('100%')
@@ -568,7 +568,7 @@ export struct CharacterPage {
                     .textAlign(TextAlign.Center)
                     .padding({ top: 3, bottom: 3 })
                     .borderRadius(7)
-                    .backgroundColor(c.isActived ? $r('app.color.app_primary_bg') : $r('app.color.page_background'))
+                    .backgroundColor(c.isActived ? $r('app.color.app_primary_bg') : $r('app.color.card_inner_tint'))
                   Text(c.name.length > 8 ? `${c.name.substring(0, 8)}…` : c.name)
                     .fontSize(10)
                     .fontColor($r('app.color.text_secondary'))
@@ -707,7 +707,7 @@ export struct CharacterPage {
             .width('100%')
             .padding(12)
             .borderRadius(10)
-            .backgroundColor($r('app.color.page_background'))
+            .backgroundColor($r('app.color.card_inner_tint'))
             .border({ width: 1, color: $r('app.color.divider') })
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {

@@ -132,7 +132,7 @@ export struct HomeSignInCard {
     .height(40)
     .padding(2)
     .borderRadius(8)
-    .backgroundColor(this.isDaySigned(reward.day) ? $r('app.color.card_background') : Color.Transparent)
+    .backgroundColor(this.isDaySigned(reward.day) ? $r('app.color.card_inner_tint') : Color.Transparent)
   }
 
   /** 自然模式展示完整月表；40vp 奖励格加 2vp 行间距，不能按视口压缩格子。 */
@@ -221,7 +221,7 @@ export struct HomeSignInCard {
               .height(30)
               .hoverEffect(HoverEffect.Highlight)
               .layoutWeight(1)
-              .backgroundColor(this.info.isTodaySigned(this.todayDay) ? $r('app.color.card_background') : $r('app.color.app_primary'))
+              .backgroundColor(this.info.isTodaySigned(this.todayDay) ? $r('app.color.card_inner_tint') : $r('app.color.app_primary'))
               .fontColor(this.info.isTodaySigned(this.todayDay) ? $r('app.color.text_secondary') : Color.White)
               .enabled(!this.info.isTodaySigned(this.todayDay) && !this.signing)
               .onClick(() => {

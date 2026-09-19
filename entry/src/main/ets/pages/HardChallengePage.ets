@@ -285,7 +285,7 @@ export struct HardChallengePage {
                     .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                     .borderRadius(6)
                     .border({ width: 1, color: $r('app.color.divider') })
-                    .backgroundColor($r('app.color.page_background'))
+                    .backgroundColor($r('app.color.card_inner_tint'))
                 }, (tag: HardChallengeMonsterTag) => `hc_tag_${tag.type}_${tag.desc}`)
               }
               .width('100%')
@@ -308,7 +308,7 @@ export struct HardChallengePage {
     .width('100%')
     .padding(12)
     .borderRadius(10)
-    .backgroundColor($r('app.color.page_background'))
+    .backgroundColor($r('app.color.card_inner_tint'))
     .border({ width: 1, color: $r('app.color.divider') })
     .alignItems(HorizontalAlign.Start)
   }
@@ -398,11 +398,11 @@ export struct HardChallengePage {
                       .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                       .borderRadius(14)
                       .backgroundColor(this.isHistSelected(h)
-                        ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+                        ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
                       .border({
                         width: 1,
                         color: this.isHistSelected(h)
-                          ? $r('app.color.app_primary') : $r('app.color.divider'),
+                          ? $r('app.color.app_primary') : $r('app.color.card_stroke'),
                       })
                       .hoverEffect(HoverEffect.Highlight)
                       .onClick(() => {
@@ -463,8 +463,8 @@ export struct HardChallengePage {
                   .fontColor(this.modeIndex === 0 ? Color.White : $r('app.color.text_primary'))
                   .padding({ left: 14, right: 14, top: 7, bottom: 7 })
                   .borderRadius(16)
-                  .backgroundColor(this.modeIndex === 0 ? $r('app.color.app_primary') : $r('app.color.card_background'))
-                  .border({ width: 1, color: $r('app.color.divider') })
+                  .backgroundColor(this.modeIndex === 0 ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+                  .border({ width: 1, color: this.modeIndex === 0 ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
                   .onClick(() => {
                     this.switchMode(0);
                   })
@@ -474,8 +474,8 @@ export struct HardChallengePage {
                   .fontColor(this.modeIndex === 1 ? Color.White : $r('app.color.text_primary'))
                   .padding({ left: 14, right: 14, top: 7, bottom: 7 })
                   .borderRadius(16)
-                  .backgroundColor(this.modeIndex === 1 ? $r('app.color.app_primary') : $r('app.color.card_background'))
-                  .border({ width: 1, color: $r('app.color.divider') })
+                  .backgroundColor(this.modeIndex === 1 ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+                  .border({ width: 1, color: this.modeIndex === 1 ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
                   .onClick(() => {
                     this.switchMode(1);
                   })

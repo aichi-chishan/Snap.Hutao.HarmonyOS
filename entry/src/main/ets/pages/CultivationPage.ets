@@ -197,7 +197,7 @@ export struct CultivationPage {
     .width('100%')
     .padding(10)
     .borderRadius(10)
-    .backgroundColor(target.selected ? $r('app.color.app_primary_bg') : $r('app.color.page_background'))
+    .backgroundColor(target.selected ? $r('app.color.app_primary_bg') : $r('app.color.card_inner_tint'))
     .border({ width: 1, color: target.selected ? $r('app.color.app_primary') : $r('app.color.divider') })
     .onClick(() => {
       this.vm.toggle(idx);
@@ -220,9 +220,11 @@ export struct CultivationPage {
           .backgroundColor($r('app.color.app_primary_bg'))
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
+            // 走 setTargetLevel（整体重赋值 targets）触发 @State 刷新；就地改 targets[i].targetLevel
+            // 是深层变更不驱动 UI，且不会持久化
             for (let i = 0; i < this.vm.targets.length; i++) {
               if (this.vm.targets[i].selected) {
-                this.vm.targets[i].targetLevel = lv;
+                this.vm.setTargetLevel(i, lv);
               }
             }
           })
@@ -290,7 +292,7 @@ export struct CultivationPage {
               .padding({ left: 12, right: 12, top: 6, bottom: 6 })
               .borderRadius(14)
               .backgroundColor(this.vm.currentProjectId === p.id
-                ? $r('app.color.app_primary') : $r('app.color.page_background'))
+                ? $r('app.color.app_primary') : $r('app.color.card_inner_tint'))
               .border({ width: 1, color: this.vm.currentProjectId === p.id
                 ? $r('app.color.app_primary') : $r('app.color.divider') })
               .constraintSize({ minWidth: 48 })
@@ -327,7 +329,7 @@ export struct CultivationPage {
           .height(30)
           .textAlign(TextAlign.Center)
           .borderRadius(15)
-          .backgroundColor($r('app.color.page_background'))
+          .backgroundColor($r('app.color.card_inner_tint'))
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
             this.confirmDeleteProject();
@@ -451,7 +453,7 @@ export struct CultivationPage {
           .fontColor($r('app.color.danger'))
           .padding({ left: 10, right: 10, top: 5, bottom: 5 })
           .borderRadius(9)
-          .backgroundColor($r('app.color.page_background'))
+          .backgroundColor($r('app.color.card_inner_tint'))
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
             this.vm.removeEntry(entry).then(() => {
@@ -565,7 +567,7 @@ export struct CultivationPage {
             .textAlign(TextAlign.Center)
             .borderRadius(10)
             .backgroundColor(this.vm.resinWorldLevel === lv
-              ? $r('app.color.app_primary') : $r('app.color.page_background'))
+              ? $r('app.color.app_primary') : $r('app.color.card_inner_tint'))
             .border({ width: 1, color: this.vm.resinWorldLevel === lv
               ? $r('app.color.app_primary') : $r('app.color.divider') })
             .hoverEffect(HoverEffect.Highlight)
@@ -742,7 +744,9 @@ export struct CultivationPage {
     Column({ space: 8 }) {
       ForEach(this.vm.targets, (target: CultivateTarget, idx: number) => {
         this.targetRow(target, idx)
-      }, (target: CultivateTarget, idx: number) => `cult_${target.avatarId}`)
+        // 键必须包含会变的字段（AGENTS @Builder 规则）：仅 avatarId 时 toggle 重赋值 targets 后
+        // 键不变 → ForEach 复用旧组件、targetRow 不重建，选中态（圆点/勾选/高亮）永不刷新
+      }, (target: CultivateTarget) => `cult_${target.avatarId}_${target.selected ? 1 : 0}_${target.targetLevel}`)
     }
     .width('100%')
   }

@@ -200,7 +200,7 @@ export struct WikiWeaponPage {
             .width('100%')
             .padding(12)
             .borderRadius(10)
-            .backgroundColor($r('app.color.page_background'))
+            .backgroundColor($r('app.color.card_inner_tint'))
             .border({ width: 1, color: $r('app.color.divider') })
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
@@ -489,7 +489,7 @@ export struct WikiWeaponPage {
                 .width('100%')
                 .padding({ top: 8, bottom: 8, left: 12, right: 12 })
                 .borderRadius(8)
-                .backgroundColor($r('app.color.page_background'))
+                .backgroundColor($r('app.color.card_inner_tint'))
               }, (d: string, idx: number) => `af_${idx}_${d.length}`)
             }
             .width('100%')

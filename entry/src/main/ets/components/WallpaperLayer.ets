@@ -5,7 +5,8 @@
  * - local：本地随机图片（用户目录递归扫描 8 种格式随机取 1，5 分钟轮换；
  *   未选目录或目录无图片时与 none 相同显示主题纯色底，保证两种模式观感一致）
  * - hutao：胡桃每日一图（Snap.Hutao 公开壁纸接口，当日缓存复用；失败与 none 观感一致）
- * 图片上层保留主题化遮罩（深色压暗/浅色提亮），ImageFit.Cover。
+ * 图片按亮度自适应透明度，并叠加 Mica 观感处理（blur 模糊 + saturation 降饱和 + 暗色提亮），
+ * ImageFit.Cover。
  */
 import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
@@ -16,6 +17,12 @@ import { Logger } from '../common/Logger';
 const TAG: string = 'WallpaperLayer';
 /** 本地图片扩展名白名单（对齐 Windows BackgroundImageService） */
 const IMAGE_EXTS: string[] = ['.bmp', '.gif', '.ico', '.jpg', '.jpeg', '.png', '.tiff', '.webp'];
+/** 壁纸模糊半径 vp（对齐 Windows Mica 模糊观感：模糊+降饱和的背景，提高前景卡片可读性） */
+const WALLPAPER_BLUR_VP: number = 22;
+/** Mica 降饱和系数（<1 压低壁纸色彩饱和度，贴近 Windows Mica 底材观感） */
+const MICA_SATURATION: number = 0.9;
+/** Mica 暗色提亮系数（暗色下轻微提亮壁纸，让侧栏/页签玻璃层透出明暗而非纯黑） */
+const MICA_DARK_BRIGHTNESS: number = 1.15;
 
 @Component
 export struct WallpaperLayer {
@@ -197,13 +204,18 @@ export struct WallpaperLayer {
         .height('100%')
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .backgroundColor($r('app.color.wallpaper_base'))
-      // 背景图片（全量复刻 Windows：UniformToFill + 按图片亮度动态透明度，无模糊无遮罩。
-      // 亮度低→浅色模式更不透明/深色模式更透明，自动保证前景对比度）
+      // 背景图片（全量复刻 Windows：UniformToFill + 按图片亮度动态透明度；亮度低→浅色模式更不透明/
+      // 深色模式更透明，自动保证前景对比度）。叠加 Mica 观感处理：模糊 + 降饱和（对齐 Windows Mica
+      // "模糊+降饱和的背景"），暗色再轻微提亮让玻璃材质能透出壁纸明暗。仅 hasImage 时生效，
+      // none 纯色底不受影响。
       if (this.hasImage) {
         Image(this.imgSrc)
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
+          .blur(WALLPAPER_BLUR_VP)
+          .saturate(MICA_SATURATION)
+          .brightness(this.isDark ? MICA_DARK_BRIGHTNESS : 1)
           .opacity(this.imgOpacity)
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       }

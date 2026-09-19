@@ -153,7 +153,7 @@ export struct SplashArtView {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.page_background'))
+    .backgroundColor($r('app.color.card_inner_tint'))
   }
 }
 
@@ -402,7 +402,7 @@ export struct WikiAvatarPage {
             .width('100%')
             .padding(12)
             .borderRadius(10)
-            .backgroundColor($r('app.color.page_background'))
+            .backgroundColor($r('app.color.card_inner_tint'))
             .border({ width: 1, color: $r('app.color.divider') })
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
@@ -995,7 +995,7 @@ export struct WikiAvatarPage {
         .width('100%')
         .padding(12)
         .borderRadius(10)
-        .backgroundColor($r('app.color.page_background'))
+        .backgroundColor($r('app.color.card_inner_tint'))
       }
       }
     }
@@ -1050,7 +1050,7 @@ export struct WikiAvatarPage {
         .width('100%')
         .padding({ top: 8, bottom: 8, left: 12, right: 12 })
         .borderRadius(10)
-        .backgroundColor($r('app.color.page_background'))
+        .backgroundColor($r('app.color.card_inner_tint'))
         .alignItems(VerticalAlign.Top)
       }, (s: MetaSkill, idx: number) => `sk_${s.n}`)
     }
@@ -1103,7 +1103,7 @@ export struct WikiAvatarPage {
         .width('100%')
         .padding({ top: 8, bottom: 8, left: 12, right: 12 })
         .borderRadius(10)
-        .backgroundColor($r('app.color.page_background'))
+        .backgroundColor($r('app.color.card_inner_tint'))
         .alignItems(VerticalAlign.Top)
       }, (s: MetaSkill, idx: number) => `tl_${s.n}`)
     }
@@ -1171,7 +1171,7 @@ export struct WikiAvatarPage {
             .width('100%')
             .padding({ top: 8, bottom: 8, left: 12, right: 12 })
             .borderRadius(8)
-            .backgroundColor($r('app.color.page_background'))
+            .backgroundColor($r('app.color.card_inner_tint'))
           }, (t: MetaText, idx: number) => `tx_${title}_${idx}_${t.t}`)
         }
         .width('100%')

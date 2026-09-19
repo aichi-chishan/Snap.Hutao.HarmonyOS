@@ -70,7 +70,7 @@ export struct HomeActBannerCard {
         .width(52)
         .height(52)
         .borderRadius(12)
-        .backgroundColor(this.isOngoing() ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+        .backgroundColor(this.isOngoing() ? $r('app.color.app_primary_bg') : $r('app.color.card_inner_tint'))
 
         Column({ space: 5 }) {
           Row({ space: 6 }) {

@@ -509,7 +509,14 @@ class DashCardSpec {
       .barFloatingStyle({
         barBottomMargin: 20,
         gradientMask: { maskColor: $r('app.color.mask_scrim'), maskHeight: 96 },
-        systemMaterialEffect: this.materialEffect(),
+        // API<26 传 IMMERSIVE 材质参数不生效：只在 API26+ 传入，低版本回退 barBackgroundBlurStyle
+        systemMaterialEffect: this.immersive ? this.materialEffect() : undefined,
+      })
+      // API<26 或光感关闭时悬浮页签无材质底（暗色下近似纯黑/不可辨）：用系统组件材质
+      // COMPONENT_THICK 给半透明玻璃底兜底；API26+ 材质生效路径用 NONE 不叠加
+      .barBackgroundBlurStyle(!this.immersive || this.materialEffect() === undefined
+        ? BlurStyle.COMPONENT_THICK : BlurStyle.NONE, {
+        colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
       })
       .barBackgroundColor('#00FFFFFF')
       .width('100%')
@@ -686,14 +693,17 @@ class DashCardSpec {
     .width(this.sidebarFold ? 52 : 208)
     .height('100%')
     .scrollBar(BarState.Off)
-    // API 26+ 沉浸光感材质；API 23/24 用 backgroundEffect 实时磨砂玻璃（材质观感一致）
+    // API 26+ 沉浸光感材质（不动）；API 23/24 回退系统组件材质 COMPONENT_THICK（深浅色自适应的
+    // 玻璃底）。旧回退链在暗色下"深色 scrim(#66000000) + 深色 backgroundEffect tint(#66101014) +
+    // brightness 0.9"双层压暗，壁纸几乎不可见 → 侧栏接近纯黑。现改为：底色只留一层极淡 tint
+    // （暗色 card_inner_tint 8% 白轻微提亮 / 浅色 nav_scrim），玻璃感交给系统模糊材质；
+    // 材质若渲染失效，半透明底自身依旧通透（壁纸可透出）。
     .systemMaterial(this.panelMaterial)
-    .backgroundColor(this.panelMaterial !== undefined ? Color.Transparent : $r('app.color.nav_scrim'))
-    .backgroundEffect(this.panelMaterial !== undefined ? undefined : {
-      radius: 40,
-      color: this.isDark ? '#66101014' : '#66F2F0EC',
-      saturation: 1.2,
-      brightness: this.isDark ? 0.9 : 1.05,
+    .backgroundColor(this.panelMaterial !== undefined ? Color.Transparent
+      : (this.isDark ? $r('app.color.card_inner_tint') : $r('app.color.nav_scrim')))
+    .backgroundBlurStyle(this.panelMaterial !== undefined ? BlurStyle.NONE : BlurStyle.COMPONENT_THICK, {
+      // 应用内主题三态可脱离系统：colorMode 跟随 isDark（AppStorage），不能依赖 SYSTEM
+      colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
     })
     .border({ width: { right: 1 }, color: $r('app.color.nav_border') })
   }

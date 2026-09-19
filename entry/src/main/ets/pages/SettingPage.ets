@@ -994,7 +994,7 @@ export struct SettingPage {
                 .height(30)
                 .textAlign(TextAlign.Center)
                 .borderRadius(15)
-                .backgroundColor($r('app.color.page_background'))
+                .backgroundColor($r('app.color.card_inner_tint'))
                 .hoverEffect(HoverEffect.Highlight)
                 .onClick(() => {
                   this.moveHomeCard(row, -1);
@@ -1006,7 +1006,7 @@ export struct SettingPage {
                 .height(30)
                 .textAlign(TextAlign.Center)
                 .borderRadius(15)
-                .backgroundColor($r('app.color.page_background'))
+                .backgroundColor($r('app.color.card_inner_tint'))
                 .hoverEffect(HoverEffect.Highlight)
                 .onClick(() => {
                   this.moveHomeCard(row, 1);

@@ -211,7 +211,7 @@ export struct RoleCombatPage {
               }
               .padding({ left: 8, right: 8, top: 3, bottom: 3 })
               .borderRadius(8)
-              .backgroundColor($r('app.color.page_background'))
+              .backgroundColor($r('app.color.card_inner_tint'))
             }, (e: number) => `rc_el_${e}`)
           }
           .width('100%')
@@ -642,11 +642,11 @@ export struct RoleCombatPage {
                       .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                       .borderRadius(14)
                       .backgroundColor(this.isHistSelected(h)
-                        ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+                        ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
                       .border({
                         width: 1,
                         color: this.isHistSelected(h)
-                          ? $r('app.color.app_primary') : $r('app.color.divider'),
+                          ? $r('app.color.app_primary') : $r('app.color.card_stroke'),
                       })
                       .hoverEffect(HoverEffect.Highlight)
                       .onClick(() => {
@@ -681,8 +681,8 @@ export struct RoleCombatPage {
                         .fontColor(this.vm.currentIndex === idx ? Color.White : $r('app.color.text_primary'))
                         .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                         .borderRadius(14)
-                        .backgroundColor(this.vm.currentIndex === idx ? $r('app.color.app_primary') : $r('app.color.card_background'))
-                        .border({ width: 1, color: $r('app.color.divider') })
+                        .backgroundColor(this.vm.currentIndex === idx ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+                        .border({ width: 1, color: this.vm.currentIndex === idx ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
                         .onClick(() => {
                           this.vm.select(idx);
                         })
@@ -770,7 +770,7 @@ export struct RoleCombatPage {
     .width('100%')
     .padding(12)
     .borderRadius(10)
-    .backgroundColor($r('app.color.page_background'))
+    .backgroundColor($r('app.color.card_inner_tint'))
     .border({ width: 1, color: $r('app.color.divider') })
   }
 
@@ -843,7 +843,7 @@ export struct RoleCombatPage {
               .width('100%')
               .padding(12)
               .borderRadius(10)
-              .backgroundColor($r('app.color.page_background'))
+              .backgroundColor($r('app.color.card_inner_tint'))
               .border({ width: 1, color: $r('app.color.divider') })
             }
           }
