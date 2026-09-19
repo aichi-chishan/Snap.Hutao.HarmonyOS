@@ -1,12 +1,14 @@
 /**
  * CultivationPage.ets（@Entry）
- * 养成计划：候选角色（角色列表）→ 勾选 + 目标等级 → 批量计算材料消耗 → 材料清单。
- * 数据源：character/list（角色）+ batch_compute（材料）。
+ * 养成计划：候选角色（角色列表）→ 勾选 + 目标等级 → 批量计算材料消耗 → 材料清单；
+ * 计算结果可保存为持久化培养条目（多项目 + 材料勾选，对齐 Windows CultivationPage）。
+ * 数据源：character/list（角色）+ batch_compute（材料）+ 本地计划库。
  */
-import { router } from '@kit.ArkUI';
+import { router, ShowDialogSuccessResponse } from '@kit.ArkUI';
 import { CultivationViewModel, CultivateTarget } from '../viewmodel/CultivationViewModel';
 import { CalItem } from '../model/Calculate';
 import { elementName } from '../model/CharacterData';
+import { CultivateEntry, CultivateEntryItem, CultivateProject } from '../data/repo/CultivationRepo';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageHeader } from '../components/PageHeader';
 import { NavIcon } from '../components/NavIcon';
@@ -37,6 +39,9 @@ export struct CultivationPage {
       this.vm.loaded = true;
       this.vm.message = '请先登录';
     }
+    // 计划不依赖登录（本地库），进入页面即加载
+    this.vm.loadPlan().then(() => {
+    });
   }
 
   toast(msg: string): void {
@@ -216,6 +221,252 @@ export struct CultivationPage {
     .padding({ top: 5, bottom: 5 })
   }
 
+  /** 结果区附加：保存到养成计划（对齐 Windows 条目持久化） */
+  @Builder
+  savePlanBar() {
+    if (this.vm.result !== undefined && this.vm.result.overallConsume.length > 0) {
+      Button(this.vm.planBusy ? '保存中...' : '保存计算结果到养成计划')
+        .width('100%')
+        .height(40)
+        .fontSize(14)
+        .backgroundColor($r('app.color.app_primary'))
+        .fontColor(Color.White)
+        .borderRadius(10)
+        .onClick(() => {
+          this.vm.saveResultToPlan().then((ok: boolean) => {
+            this.toast(ok ? this.vm.message : (this.vm.message.length > 0 ? this.vm.message : '保存失败'));
+          });
+        })
+    }
+  }
+
+  /** 项目切换条（chips + 新建/删除） */
+  @Builder
+  projectBar() {
+    Row({ space: 6 }) {
+      Scroll() {
+        Row({ space: 6 }) {
+          ForEach(this.vm.projects, (p: CultivateProject) => {
+            Text(p.name)
+              .fontSize(12)
+              .fontColor(this.vm.currentProjectId === p.id ? Color.White : $r('app.color.text_primary'))
+              .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+              .borderRadius(14)
+              .backgroundColor(this.vm.currentProjectId === p.id
+                ? $r('app.color.app_primary') : $r('app.color.page_background'))
+              .border({ width: 1, color: this.vm.currentProjectId === p.id
+                ? $r('app.color.app_primary') : $r('app.color.divider') })
+              .constraintSize({ minWidth: 48 })
+              .hoverEffect(HoverEffect.Highlight)
+              .onClick(() => {
+                this.vm.selectProject(p.id);
+              })
+          }, (p: CultivateProject) => `proj_${p.id}_${p.name}`)
+        }
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .scrollBar(BarState.Off)
+      .layoutWeight(1)
+      Text('＋')
+        .fontSize(16)
+        .fontColor($r('app.color.app_primary'))
+        .width(30)
+        .height(30)
+        .textAlign(TextAlign.Center)
+        .borderRadius(15)
+        .backgroundColor($r('app.color.app_primary_bg'))
+        .hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          const name: string = `计划 ${this.vm.projects.length + 1}`;
+          this.vm.createProject(name).then(() => {
+            this.toast(`已创建「${name}」`);
+          });
+        })
+      if (this.vm.projects.length > 1) {
+        Text('🗑')
+          .fontSize(14)
+          .fontColor($r('app.color.danger'))
+          .width(30)
+          .height(30)
+          .textAlign(TextAlign.Center)
+          .borderRadius(15)
+          .backgroundColor($r('app.color.page_background'))
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.confirmDeleteProject();
+          })
+      }
+    }
+    .width('100%')
+  }
+
+  /** 删除当前项目确认 */
+  confirmDeleteProject(): void {
+    this.getUIContext().getPromptAction().showDialog({
+      title: '删除计划',
+      message: '将删除当前计划及其全部培养目标与勾选进度，是否继续？',
+      buttons: [
+        { text: '取消', color: $r('app.color.text_secondary') },
+        { text: '删除', color: $r('app.color.danger') },
+      ],
+    }).then((dlg: ShowDialogSuccessResponse) => {
+      if (dlg.index !== 1) {
+        return;
+      }
+      this.vm.deleteCurrentProject().then(() => {
+        this.toast('已删除');
+      });
+    });
+  }
+
+  /** 条目内单个材料行（点击切换已备齐；已备齐划线置灰） */
+  @Builder
+  planItemRow(entry: CultivateEntry, item: CultivateEntryItem) {
+    Row({ space: 8 }) {
+      Text(item.finished ? '✓' : '○')
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(item.finished ? $r('app.color.success') : $r('app.color.text_secondary'))
+        .width(24)
+      Text(item.name.length > 0 ? item.name.substring(0, 1) : '◇')
+        .fontSize(13)
+        .width(30)
+        .height(30)
+        .textAlign(TextAlign.Center)
+        .borderRadius(8)
+        .backgroundColor($r('app.color.app_primary_bg'))
+      Text(item.name)
+        .fontSize(12)
+        .fontColor(item.finished ? $r('app.color.text_secondary') : $r('app.color.text_primary'))
+        .decoration({ type: item.finished ? TextDecorationType.LineThrough : TextDecorationType.None })
+        .layoutWeight(1)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      Text(`× ${item.count}`)
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(item.finished ? $r('app.color.text_secondary') : $r('app.color.app_primary'))
+    }
+    .width('100%')
+    .padding({ top: 5, bottom: 5 })
+    .hoverEffect(HoverEffect.Highlight)
+    .onClick(() => {
+      this.vm.togglePlanItem(entry, item.id).then(() => {
+      });
+    })
+  }
+
+  /** 单个培养条目卡（角色 + 等级目标 + 材料勾选清单） */
+  @Builder
+  planEntryCard(entry: CultivateEntry) {
+    Column({ space: 8 }) {
+      Row({ space: 8 }) {
+        Stack({ alignContent: Alignment.Center }) {
+          if (entry.icon.length > 0) {
+            if (entry.icon.startsWith('http')) {
+              Image(entry.icon)
+                .width(40)
+                .height(40)
+                .objectFit(ImageFit.Cover)
+                .borderRadius(20)
+            } else {
+              MetaIcon({ category: 'AvatarIcon', name: entry.icon, iconSize: 40 })
+                .borderRadius(20)
+                .clip(true)
+            }
+          } else if (WikiMetaService.iconOfAvatar(entry.avatarId).length > 0) {
+            MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(entry.avatarId), iconSize: 40 })
+              .borderRadius(20)
+              .clip(true)
+          } else {
+            Text(entry.name.length > 0 ? entry.name.substring(0, 1) : '◇')
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Color.White)
+              .width(40)
+              .height(40)
+              .textAlign(TextAlign.Center)
+              .borderRadius(20)
+              .backgroundColor($r('app.color.app_primary'))
+          }
+        }
+        Column({ space: 2 }) {
+          Text(entry.name)
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+          Text(`Lv.${entry.level} → Lv.${entry.targetLevel} · 已备齐 ${entry.finishedCount()}/${entry.items.length}`)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Text('删除')
+          .fontSize(12)
+          .fontColor($r('app.color.danger'))
+          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+          .borderRadius(9)
+          .backgroundColor($r('app.color.page_background'))
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.vm.removeEntry(entry).then(() => {
+              this.toast('已移除培养目标');
+            });
+          })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      Divider()
+        .color($r('app.color.divider'))
+      ForEach(entry.items, (item: CultivateEntryItem) => {
+        this.planItemRow(entry, item)
+      }, (item: CultivateEntryItem) => `pe_${item.id}_${item.finished}`)
+    }
+    .width('100%')
+    .padding(12)
+    .borderRadius($r('app.float.card_radius'))
+    .backgroundColor($r('app.color.card_background'))
+    .border({ width: 1, color: $r('app.color.divider') })
+  }
+
+  /** 养成计划区（项目条 + 条目清单；置于计算区上方，可持续追踪） */
+  @Builder
+  planSection() {
+    Column({ space: 8 }) {
+      Row({ space: 8 }) {
+        NavIcon({ name: 'Cultivation', iconSize: 20 })
+        Text('养成计划')
+          .fontSize(15)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
+        Text(`${this.vm.planEntries.length} 个目标`)
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+      }
+      .width('100%')
+      this.projectBar()
+      if (this.vm.planEntries.length === 0) {
+        Text('暂无培养目标：勾选角色并计算材料后，点「保存计算结果到养成计划」')
+          .fontSize(12)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+          .padding({ top: 10, bottom: 10 })
+          .textAlign(TextAlign.Center)
+      } else {
+        ForEach(this.vm.planEntries, (entry: CultivateEntry) => {
+          this.planEntryCard(entry)
+        }, (entry: CultivateEntry) => `plan_${entry.id}_${entry.finishedCount()}`)
+      }
+    }
+    .width('100%')
+    .padding(14)
+    .borderRadius($r('app.float.card_radius'))
+    .backgroundColor($r('app.color.card_background'))
+    .border({ width: 1, color: $r('app.color.divider') })
+  }
+
+  /** 计算结果材料汇总 */
   @Builder
   resultSection() {
     if (this.vm.result !== undefined && this.vm.result.overallConsume.length > 0) {
@@ -272,6 +523,9 @@ export struct CultivationPage {
                 .padding({ top: 30, bottom: 30 })
                 .textAlign(TextAlign.Center)
             } else {
+              // 养成计划区（持久化：项目/条目/材料勾选）
+              this.planSection()
+
               // 操作区
               Column({ space: 8 }) {
                 this.quickLevelBar()
@@ -304,6 +558,7 @@ export struct CultivationPage {
 
               // 结果区
               this.resultSection()
+              this.savePlanBar()
 
               // 候选角色网格
               Row() {

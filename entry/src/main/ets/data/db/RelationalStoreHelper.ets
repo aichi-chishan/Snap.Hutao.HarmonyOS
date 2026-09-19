@@ -172,7 +172,7 @@ export class RelationalStoreHelper {
   }
 
   /** 当前数据库结构版本（每次结构变更 +1，并在 MIGRATIONS 末尾追加对应迁移） */
-  private static readonly DB_VERSION: number = 3;
+  private static readonly DB_VERSION: number = 4;
 
   /**
    * 有序迁移列表：MIGRATIONS[i] 把版本 i+1 升到 i+2。
@@ -187,6 +187,33 @@ export class RelationalStoreHelper {
       // v2 → v3：历史数据清理——删除空 uid 祈愿归档（曾因未登录时装载误建，覆盖默认 UID 逻辑）
       `DELETE FROM gacha_items WHERE archive_id IN (SELECT id FROM gacha_archives WHERE uid = '')`,
       `DELETE FROM gacha_archives WHERE uid = ''`,
+    ],
+    [
+      // v3 → v4：养成计划持久化（项目/条目/材料勾选，对齐 Windows CultivateProject/Entry/Item）
+      `CREATE TABLE IF NOT EXISTS cultivate_projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS cultivate_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        avatar_id INTEGER NOT NULL DEFAULT 0,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL DEFAULT '',
+        level INTEGER NOT NULL DEFAULT 0,
+        target_level INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS cultivate_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entry_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL DEFAULT 0,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL DEFAULT '',
+        count INTEGER NOT NULL DEFAULT 0,
+        finished INTEGER NOT NULL DEFAULT 0
+      )`,
     ],
   ];
 

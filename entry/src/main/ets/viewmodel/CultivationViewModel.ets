@@ -1,12 +1,17 @@
 /**
  * CultivationViewModel.ets
- * 养成计划页状态容器：候选角色清单（来自角色接口）、目标等级输入、批量计算、结果展示。
+ * 养成计划页状态容器：候选角色清单（来自角色接口）、目标等级输入、批量计算、结果展示；
+ * 持久化计划（项目/条目/材料勾选，对齐 Windows CultivateProject/Entry/Item）。
  */
 import { CharacterListItem } from '../model/CharacterData';
 import { CharacterService } from '../service/CharacterService';
 import { CalculateService, CalAvatarDelta, CalSkillDelta, CalWeaponDelta } from '../service/CalculateService';
 import { CalBatchResult, CalItem } from '../model/Calculate';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
+import { CultivationRepo, CultivateProject, CultivateEntry } from '../data/repo/CultivationRepo';
+import { Logger } from '../common/Logger';
+
+const TAG: string = 'CultivationViewModel';
 
 /** 养成候选角色 */
 export class CultivateTarget {
@@ -41,6 +46,12 @@ export class CultivationViewModel {
   loaded: boolean = false;
   /** 计算结果 */
   result: CalBatchResult | undefined = undefined;
+  /** 养成计划：项目列表 / 当前项目 / 条目（含材料勾选） */
+  projects: CultivateProject[] = [];
+  currentProjectId: number = 0;
+  planEntries: CultivateEntry[] = [];
+  /** 计划写操作进行中（防连点） */
+  planBusy: boolean = false;
 
   async load(uid: string): Promise<void> {
     if (uid.length === 0) {
@@ -201,6 +212,172 @@ export class CultivationViewModel {
         return 9;
       default:
         return 0;
+    }
+  }
+
+  // ================= 持久化计划 =================
+
+  /** 加载计划：项目列表（无项目时自动建默认项目）+ 当前项目条目 */
+  async loadPlan(): Promise<void> {
+    try {
+      let projects: CultivateProject[] = await CultivationRepo.getProjects();
+      if (projects.length === 0) {
+        await CultivationRepo.createProject('默认计划');
+        projects = await CultivationRepo.getProjects();
+      }
+      this.projects = projects;
+      let current: number = this.currentProjectId;
+      if (current <= 0 || !CultivationViewModel.containsProject(projects, current)) {
+        current = projects[0].id;
+      }
+      this.currentProjectId = current;
+      await this.reloadEntries();
+    } catch (e) {
+      Logger.warn(TAG, `loadPlan fail ${(e as Error).message}`);
+    }
+  }
+
+  private static containsProject(projects: CultivateProject[], id: number): boolean {
+    for (const p of projects) {
+      if (p.id === id) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** 重读当前项目条目 */
+  async reloadEntries(): Promise<void> {
+    if (this.currentProjectId <= 0) {
+      this.planEntries = [];
+      return;
+    }
+    this.planEntries = await CultivationRepo.getEntries(this.currentProjectId);
+  }
+
+  selectProject(id: number): void {
+    if (this.currentProjectId === id) {
+      return;
+    }
+    this.currentProjectId = id;
+    this.reloadEntries().catch(() => {
+    });
+  }
+
+  async createProject(name: string): Promise<void> {
+    if (this.planBusy || name.trim().length === 0) {
+      return;
+    }
+    this.planBusy = true;
+    try {
+      const p: CultivateProject = await CultivationRepo.createProject(name.trim());
+      this.projects = await CultivationRepo.getProjects();
+      this.currentProjectId = p.id;
+      await this.reloadEntries();
+    } finally {
+      this.planBusy = false;
+    }
+  }
+
+  /** 删除当前项目（项目数 >1 时允许；删后切到第一个项目） */
+  async deleteCurrentProject(): Promise<void> {
+    if (this.planBusy || this.projects.length <= 1 || this.currentProjectId <= 0) {
+      return;
+    }
+    this.planBusy = true;
+    try {
+      await CultivationRepo.deleteProject(this.currentProjectId);
+      this.projects = await CultivationRepo.getProjects();
+      this.currentProjectId = this.projects.length > 0 ? this.projects[0].id : 0;
+      await this.reloadEntries();
+    } finally {
+      this.planBusy = false;
+    }
+  }
+
+  /**
+   * 把本次计算结果保存到当前项目（每个已选角色一条目；items[i] 与 deltas 顺序一一对应）。
+   * 结果不存在/未选角色时置 message 提示。
+   */
+  async saveResultToPlan(): Promise<boolean> {
+    if (this.planBusy) {
+      return false;
+    }
+    if (this.result === undefined) {
+      this.message = '请先计算材料';
+      return false;
+    }
+    if (this.currentProjectId <= 0) {
+      this.message = '无可用计划项目';
+      return false;
+    }
+    this.planBusy = true;
+    try {
+      const selected: CultivateTarget[] = [];
+      for (const t of this.targets) {
+        if (t.selected) {
+          selected.push(t);
+        }
+      }
+      if (selected.length === 0) {
+        this.message = '请先勾选要培养的角色';
+        return false;
+      }
+      let saved: number = 0;
+      for (let i = 0; i < selected.length && i < this.result.items.length; i++) {
+        const t: CultivateTarget = selected[i];
+        const c = this.result.items[i];
+        const items: CalItem[] = [];
+        for (const it of c.avatarConsume) {
+          items.push(it);
+        }
+        for (const it of c.avatarSkillConsume) {
+          items.push(it);
+        }
+        for (const it of c.weaponConsume) {
+          items.push(it);
+        }
+        await CultivationRepo.addEntry(this.currentProjectId, t.avatarId, t.name,
+          t.icon, t.level, Math.max(t.level, t.targetLevel), items);
+        saved++;
+      }
+      await this.reloadEntries();
+      this.message = `已保存 ${saved} 条培养目标到计划`;
+      return true;
+    } catch (e) {
+      this.message = `保存失败：${(e as Error).message}`;
+      return false;
+    } finally {
+      this.planBusy = false;
+    }
+  }
+
+  /** 删除单个培养条目 */
+  async removeEntry(entry: CultivateEntry): Promise<void> {
+    if (this.planBusy) {
+      return;
+    }
+    this.planBusy = true;
+    try {
+      await CultivationRepo.removeEntry(entry.id);
+      await this.reloadEntries();
+    } finally {
+      this.planBusy = false;
+    }
+  }
+
+  /** 切换材料勾选状态 */
+  async togglePlanItem(entry: CultivateEntry, itemId: number): Promise<void> {
+    try {
+      for (const it of entry.items) {
+        if (it.id === itemId) {
+          await CultivationRepo.toggleItem(itemId, !it.finished);
+          break;
+        }
+      }
+      await this.reloadEntries();
+    } catch (e) {
+      Logger.warn(TAG, `toggleItem fail ${(e as Error).message}`);
     }
   }
 }
