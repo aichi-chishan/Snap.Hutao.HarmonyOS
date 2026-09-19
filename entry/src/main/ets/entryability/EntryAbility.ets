@@ -200,6 +200,8 @@ export default class EntryAbility extends UIAbility {
     try {
       AppContextProvider.init(ability.context);
       await PreferencesStore.init(ability.context);
+      // 启动次数自增（主页欢迎语文案，对齐 Windows LaunchTimes）
+      PreferencesStore.bumpLaunchTimes();
       await RelationalStoreHelper.init(ability.context);
       await NotificationHelper.init();
       // 恢复登录态（预登录态）：AppStorage currentUser/currentUid/isLoggedIn

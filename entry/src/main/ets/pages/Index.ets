@@ -50,6 +50,12 @@ import { Logger } from '../common/Logger';
 import { SignInService, SignInResult } from '../service/SignInService';
 import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
 
+/** 主页仪表板卡片规格（设置页可隐藏/重排，对齐 Windows SettingHomeCardViewModel） */
+class DashCardSpec {
+  key: string = '';
+  name: string = '';
+}
+
   @Entry
   @Component
   struct Index {
@@ -101,6 +107,12 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
     /** 主页游戏活动区域设置（对齐 Windows：日历显示默认开 / 未在进行中活动默认关） */
     @StorageProp('homeActCalendarShown') homeActCalendarShown: boolean = true;
     @StorageProp('homeActPreview') homeActPreview: boolean = false;
+    /** 主页卡片配置版本戳（设置页变更后 bump，触发卡片重排/显隐） */
+    @StorageProp('homeCardsVersion') @Watch('onCardsVersionChanged') homeCardsVersion: number = 0;
+    /** 主页仪表板卡片（按用户顺序、过滤隐藏；对齐 Windows HomeCards） */
+    @State dashCards: DashCardSpec[] = [];
+    /** 欢迎语文案（对齐 Windows GreetingText：随机彩蛋 / 启动次数） */
+    @State greeting: string = '旅行者，欢迎来到提瓦特大陆！';
     /** 是否正在通过自绘 TitleBar 拖拽窗口（避免重复触发 startMoving） */
     private windowDragging: boolean = false;
     private controller: HdsTabsController = new HdsTabsController();
@@ -121,7 +133,60 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
       AppStorage.setOrCreate<string>('bgFolderPath', PreferencesStore.getBackgroundFolderPath());
       // 立即检测宽屏（PC/平板>普通手机）：屏幕宽度 vp 判断，避免等待 onAreaChange 首帧
       this.isWide = Index.detectWideScreen();
+      this.greeting = Index.pickGreeting();
+      this.loadDashCards();
       this.reloadHome();
+    }
+
+    /**
+     * 欢迎语文案（对齐 Windows AnnouncementViewModel.UpdateGreetingTextCore）：
+     * 0.6% 彩蛋；其余显示启动次数（首启保留欢迎语）
+     */
+    private static pickGreeting(): string {
+      if (Math.random() * 1000 < 6) {
+        return '你说的对，但是《胡桃》是由 DGP Studio 自主研发的一款...';
+      }
+      const times: number = PreferencesStore.getLaunchTimes();
+      return times > 1 ? `你已经启动了胡桃 ${times} 次` : '旅行者，欢迎来到提瓦特大陆！';
+    }
+
+    /** 从设置页返回本页时重读卡片配置（路由返回不走 aboutToAppear） */
+    onPageShow(): void {
+      this.loadDashCards();
+    }
+
+    /** 设置页 bump 版本戳后重读卡片配置 */
+    onCardsVersionChanged(): void {
+      this.loadDashCards();
+    }
+
+    /** 读取主页卡片配置：按用户顺序排序并过滤隐藏（对齐 Windows Dashboard 卡组构建） */
+    loadDashCards(): void {
+      const cards: DashCardSpec[] = [];
+      for (let i = 0; i < PreferencesStore.HOME_CARD_KEYS.length; i++) {
+        const key: string = PreferencesStore.HOME_CARD_KEYS[i];
+        if (!PreferencesStore.getHomeCardPresented(key)) {
+          continue;
+        }
+        const spec: DashCardSpec = new DashCardSpec();
+        spec.key = key;
+        spec.name = PreferencesStore.HOME_CARD_NAMES[i];
+        cards.push(spec);
+      }
+      cards.sort((a: DashCardSpec, b: DashCardSpec) => {
+        return PreferencesStore.getHomeCardOrder(a.key) - PreferencesStore.getHomeCardOrder(b.key);
+      });
+      this.dashCards = cards;
+    }
+
+    /** 卡片是否在当前配置中显示（手机端堆叠卡用） */
+    dashCardVisible(key: string): boolean {
+      for (const c of this.dashCards) {
+        if (c.key === key) {
+          return true;
+        }
+      }
+      return false;
     }
 
     /** 聚合加载主页仪表盘数据（祈愿/便笺/签到/活动/公告） */
@@ -673,72 +738,80 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
 
       Scroll() {
         Column({ space: 12 }) {
-          // 欢迎横幅（对齐电脑版主页顶部）
+          // 欢迎横幅（对齐电脑版主页顶部；文案含随机彩蛋，对齐 Windows GreetingText）
           HomeHeroBanner({
-            title: '旅行者，欢迎来到提瓦特大陆！',
+            title: this.greeting,
             subtitle: '胡桃工具箱 · 祈愿记录 / 实时便笺 / 签到日历',
           })
 
           LoginStatusBar()
 
-          // 祈愿统计卡（真实数据：各池抽数 + 橙/紫保底进度）
-          HomeGachaCard({
-            uid: this.homeVm.currentUid,
-            pools: this.homeVm.gachaPools,
-            total: this.homeVm.gachaTotal,
-            loaded: this.homeVm.gachaLoaded,
-            onTap: () => {
-              if (this.isWide) {
-                this.switchTo(1);
-              } else {
-                this.controller.changeIndex(1);
-              }
-            },
-          })
+          // 祈愿统计卡（真实数据：各池抽数 + 橙/紫保底进度；受设置页主页卡片显隐控制）
+          if (this.dashCardVisible('gacha')) {
+            HomeGachaCard({
+              uid: this.homeVm.currentUid,
+              pools: this.homeVm.gachaPools,
+              total: this.homeVm.gachaTotal,
+              loaded: this.homeVm.gachaLoaded,
+              onTap: () => {
+                if (this.isWide) {
+                  this.switchTo(1);
+                } else {
+                  this.controller.changeIndex(1);
+                }
+              },
+            })
+          }
 
           // 实时便笺卡（真实数据：树脂/宝钱/委托/周本折扣/参变仪/派遣）
-          HomeDailyNoteCard({
-            uid: this.homeVm.currentUid,
-            note: this.homeVm.note,
-            refreshTime: this.homeVm.noteRefreshTime,
-            loaded: this.homeVm.noteLoaded,
-            onTap: () => {
-              if (this.isWide) {
-                this.switchTo(3);
-              } else {
-                this.controller.changeIndex(2);
-              }
-            },
-          })
+          if (this.dashCardVisible('dailynote')) {
+            HomeDailyNoteCard({
+              uid: this.homeVm.currentUid,
+              note: this.homeVm.note,
+              refreshTime: this.homeVm.noteRefreshTime,
+              loaded: this.homeVm.noteLoaded,
+              onTap: () => {
+                if (this.isWide) {
+                  this.switchTo(3);
+                } else {
+                  this.controller.changeIndex(2);
+                }
+              },
+            })
+          }
 
           // 签到卡（真实数据：奖励网格 + 签到/补签按钮）
-          HomeSignInCard({
-            uid: this.homeVm.currentUid,
-            info: this.homeVm.signInfo,
-            loaded: this.homeVm.signLoaded,
-            signing: this.homeSigning,
-            todayDay: this.todayDay,
-            onTap: () => {
-              router.pushUrl({ url: 'pages/SignInPage' });
-            },
-            onSignIn: () => {
-              this.doHomeSignIn();
-            },
-            onResignIn: () => {
-              router.pushUrl({ url: 'pages/SignInPage' });
-            },
-          })
+          if (this.dashCardVisible('signin')) {
+            HomeSignInCard({
+              uid: this.homeVm.currentUid,
+              info: this.homeVm.signInfo,
+              loaded: this.homeVm.signLoaded,
+              signing: this.homeSigning,
+              todayDay: this.todayDay,
+              onTap: () => {
+                router.pushUrl({ url: 'pages/SignInPage' });
+              },
+              onSignIn: () => {
+                this.doHomeSignIn();
+              },
+              onResignIn: () => {
+                router.pushUrl({ url: 'pages/SignInPage' });
+              },
+            })
+          }
 
           // 成就管理卡（完成度统计，点击进成就管理页）
-          HomeAchievementCard({
-            onTap: () => {
-              if (this.isWide) {
-                this.switchTo(2);
-              } else {
-                router.pushUrl({ url: 'pages/AchievementPage' });
-              }
-            },
-          })
+          if (this.dashCardVisible('achievement')) {
+            HomeAchievementCard({
+              onTap: () => {
+                if (this.isWide) {
+                  this.switchTo(2);
+                } else {
+                  router.pushUrl({ url: 'pages/AchievementPage' });
+                }
+              },
+            })
+          }
 
           // 近期活动/卡池（真实数据：进行中 + 即将开始）
           Row() {
@@ -1010,99 +1083,92 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         .alignItems(VerticalAlign.Top)
 
         // Windows UniformPanel：最小列宽 300、间距 DASH_GAP，HomeAdaptiveCardHeight 为 DASH_CARD_H。
+        // 卡组由设置页「主页卡片」配置（显隐 + 顺序），对齐 Windows HomeCards。
         Grid() {
-          GridItem() {
-            HomeLaunchCard({
-              fillHeight: true,
-              onLaunched: (ok: boolean, message: string) => {
-                this.getUIContext().getPromptAction().showToast({ message: message, duration: 2200 });
-              },
-            })
-          }
-          .height(Index.DASH_CARD_H)
-          GridItem() {
-            HomeGachaCard({
-              fillHeight: true,
-              uid: this.homeVm.currentUid,
-              pools: this.homeVm.gachaPools,
-              total: this.homeVm.gachaTotal,
-              loaded: this.homeVm.gachaLoaded,
-              onTap: () => {
-                this.switchTo(1);
-              },
-            })
-          }
-          .height(Index.DASH_CARD_H)
-          GridItem() {
-            HomeAchievementCard({
-              fillHeight: true,
-              onTap: () => {
-                this.switchTo(2);
-              },
-            })
-          }
-          .height(Index.DASH_CARD_H)
-          GridItem() {
-            HomeDailyNoteCard({
-              fillHeight: true,
-              uid: this.homeVm.currentUid,
-              note: this.homeVm.note,
-              refreshTime: this.homeVm.noteRefreshTime,
-              loaded: this.homeVm.noteLoaded,
-              onTap: () => {
-                this.switchTo(3);
-              },
-            })
-          }
-          .height(Index.DASH_CARD_H)
-          GridItem() {
-            HomeTravelersDiaryCard({
-              fillHeight: true,
-              onTap: () => {
-                this.switchTo(15);
-              },
-            })
-          }
-          .height(Index.DASH_CARD_H)
-          GridItem() {
-            HomeCalendarCard({
-              fillHeight: true,
-              eventDays: this.calendarEventDays(),
-              todayActs: this.todayActNames(),
-              onTap: () => {
-                router.pushUrl({ url: 'pages/CalendarPage' });
-              },
-            })
-          }
-          .height(Index.DASH_CARD_H)
-          GridItem() {
-            HomeSignInCard({
-              fillHeight: true,
-              uid: this.homeVm.currentUid,
-              info: this.homeVm.signInfo,
-              loaded: this.homeVm.signLoaded,
-              signing: this.homeSigning,
-              todayDay: this.todayDay,
-              onTap: () => {
-                router.pushUrl({ url: 'pages/SignInPage' });
-              },
-              onSignIn: () => {
-                this.doHomeSignIn();
-              },
-              onResignIn: () => {
-                router.pushUrl({ url: 'pages/SignInPage' });
-              },
-            })
-          }
-          .height(Index.DASH_CARD_H)
+          ForEach(this.dashCards, (spec: DashCardSpec) => {
+            GridItem() {
+              if (spec.key === 'launch') {
+                HomeLaunchCard({
+                  fillHeight: true,
+                  onLaunched: (ok: boolean, message: string) => {
+                    this.getUIContext().getPromptAction().showToast({ message: message, duration: 2200 });
+                  },
+                })
+              } else if (spec.key === 'gacha') {
+                HomeGachaCard({
+                  fillHeight: true,
+                  uid: this.homeVm.currentUid,
+                  pools: this.homeVm.gachaPools,
+                  total: this.homeVm.gachaTotal,
+                  loaded: this.homeVm.gachaLoaded,
+                  onTap: () => {
+                    this.switchTo(1);
+                  },
+                })
+              } else if (spec.key === 'achievement') {
+                HomeAchievementCard({
+                  fillHeight: true,
+                  onTap: () => {
+                    this.switchTo(2);
+                  },
+                })
+              } else if (spec.key === 'dailynote') {
+                HomeDailyNoteCard({
+                  fillHeight: true,
+                  uid: this.homeVm.currentUid,
+                  note: this.homeVm.note,
+                  refreshTime: this.homeVm.noteRefreshTime,
+                  loaded: this.homeVm.noteLoaded,
+                  onTap: () => {
+                    this.switchTo(3);
+                  },
+                })
+              } else if (spec.key === 'ledger') {
+                HomeTravelersDiaryCard({
+                  fillHeight: true,
+                  onTap: () => {
+                    this.switchTo(15);
+                  },
+                })
+              } else if (spec.key === 'calendar') {
+                HomeCalendarCard({
+                  fillHeight: true,
+                  eventDays: this.calendarEventDays(),
+                  todayActs: this.todayActNames(),
+                  onTap: () => {
+                    router.pushUrl({ url: 'pages/CalendarPage' });
+                  },
+                })
+              } else {
+                HomeSignInCard({
+                  fillHeight: true,
+                  uid: this.homeVm.currentUid,
+                  info: this.homeVm.signInfo,
+                  loaded: this.homeVm.signLoaded,
+                  signing: this.homeSigning,
+                  todayDay: this.todayDay,
+                  onTap: () => {
+                    router.pushUrl({ url: 'pages/SignInPage' });
+                  },
+                  onSignIn: () => {
+                    this.doHomeSignIn();
+                  },
+                  onResignIn: () => {
+                    router.pushUrl({ url: 'pages/SignInPage' });
+                  },
+                })
+              }
+            }
+            .height(Index.DASH_CARD_H)
+          }, (spec: DashCardSpec) => spec.key)
         }
         // 300 = Windows UniformPanel.MinItemWidth（最小列宽），与 DASH_GAP 一起决定响应列数
         .columnsTemplate(Array(this.homeCols(300, Index.DASH_GAP)).fill('1fr').join(' '))
-        .rowsTemplate(Array(Math.ceil(Index.DASH_CARD_COUNT / this.homeCols(300, Index.DASH_GAP))).fill('1fr').join(' '))
+        .rowsTemplate(Array(Math.ceil(this.dashCards.length / this.homeCols(300, Index.DASH_GAP))).fill('1fr').join(' '))
         .columnsGap(Index.DASH_GAP)
         .rowsGap(Index.DASH_GAP)
         .width('100%')
-        .height(Math.ceil(Index.DASH_CARD_COUNT / this.homeCols(300, Index.DASH_GAP)) * (Index.DASH_CARD_H + Index.DASH_GAP) - Index.DASH_GAP)
+        .height(Math.ceil(this.dashCards.length / this.homeCols(300, Index.DASH_GAP)) * (Index.DASH_CARD_H + Index.DASH_GAP) - Index.DASH_GAP)
         // 页面 Scroll 负责视口裁剪；卡组不裁掉首末行的阴影和受光。
         .clip(false)
         .onAreaChange((oldValue: Area, newValue: Area) => {
@@ -1150,8 +1216,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
   static readonly DASH_CARD_H: number = 204;
   /** 仪表板网格列/行间距 vp（对齐 Windows UniformPanel 间距 12） */
   private static readonly DASH_GAP: number = 12;
-  /** 仪表板卡片数量（启动游戏/祈愿/成就/便笺/旅行者札记/日历/签到） */
-  private static readonly DASH_CARD_COUNT: number = 7;
+  /** 仪表板默认卡片数量（启动游戏/祈愿/成就/便笺/旅行者札记/日历/签到；实际数量由设置页配置决定） */
+  static readonly DASH_CARD_COUNT: number = PreferencesStore.HOME_CARD_KEYS.length;
 
   /** 活动区面板高度：按实际行数算出，两列取较大者等高（替代写死的 360） */
   activityPanelH(): number {

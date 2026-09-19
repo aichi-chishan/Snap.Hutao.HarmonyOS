@@ -33,6 +33,14 @@ class GachaArchiveRow {
   count: number = 0;
 }
 
+/** 主页卡片配置行（对齐 Windows SettingHomeCardViewModel：IsPresented + Order） */
+class HomeCardRow {
+  key: string = '';
+  name: string = '';
+  presented: boolean = true;
+  order: number = 0;
+}
+
 @Entry
 @Component
 export struct SettingPage {
@@ -66,9 +74,54 @@ export struct SettingPage {
   @State updating: boolean = false;
   /** 每日一图加载状态（选中该背景时展示） */
   @State hutaoDailyStatus: string = '首次使用将自动下载今日一图';
+  /** 读取主页卡片配置行（按用户顺序排序） */
+  private loadHomeCardRows(): void {
+    const rows: HomeCardRow[] = [];
+    for (let i = 0; i < PreferencesStore.HOME_CARD_KEYS.length; i++) {
+      const key: string = PreferencesStore.HOME_CARD_KEYS[i];
+      const r: HomeCardRow = new HomeCardRow();
+      r.key = key;
+      r.name = PreferencesStore.HOME_CARD_NAMES[i];
+      r.presented = PreferencesStore.getHomeCardPresented(key);
+      r.order = PreferencesStore.getHomeCardOrder(key);
+      rows.push(r);
+    }
+    rows.sort((a: HomeCardRow, b: HomeCardRow) => a.order - b.order);
+    this.homeCardRows = rows;
+  }
+
+  /** 卡片显隐切换（立即生效：持久化 + bump 版本戳让主页重排） */
+  private toggleHomeCard(row: HomeCardRow, presented: boolean): void {
+    PreferencesStore.setHomeCardPresented(row.key, presented);
+    this.loadHomeCardRows();
+    this.bumpHomeCardsVersion();
+  }
+
+  /** 卡片上移/下移（delta=-1/+1）：与相邻卡片交换顺序值 */
+  private moveHomeCard(row: HomeCardRow, delta: number): void {
+    const idx: number = this.homeCardRows.indexOf(row);
+    const otherIdx: number = idx + delta;
+    if (idx < 0 || otherIdx < 0 || otherIdx >= this.homeCardRows.length) {
+      return;
+    }
+    const other: HomeCardRow = this.homeCardRows[otherIdx];
+    PreferencesStore.setHomeCardOrder(row.key, other.order);
+    PreferencesStore.setHomeCardOrder(other.key, row.order);
+    this.loadHomeCardRows();
+    this.bumpHomeCardsVersion();
+  }
+
+  /** 主页卡片配置版本戳（Index 订阅重读配置） */
+  private bumpHomeCardsVersion(): void {
+    const v: number = (AppStorage.get<number>('homeCardsVersion') ?? 0) + 1;
+    AppStorage.setOrCreate<number>('homeCardsVersion', v);
+  }
+
   /** 主页游戏活动区域设置（对齐 Windows：日历显示默认开 / 未在进行中活动默认关） */
   @State homeActCalendarShown: boolean = true;
   @State homeActPreview: boolean = false;
+  /** 主页卡片配置行（显隐 + 顺序，对齐 Windows SettingHomeCardViewModel） */
+  @State homeCardRows: HomeCardRow[] = [];
   @StorageProp('isLoggedIn') isLoggedIn: boolean = false;
   /** 祈愿归档（数据管理） */
   @State gachaRows: GachaArchiveRow[] = [];
@@ -93,6 +146,7 @@ export struct SettingPage {
       this.loadHutaoDaily();
     }
     this.homeActCalendarShown = PreferencesStore.getHomeActCalendar();
+    this.loadHomeCardRows();
     this.homeActPreview = PreferencesStore.getHomeActPreview();
     this.loadAppVersion();
     this.loadGachaRows();
@@ -885,6 +939,57 @@ export struct SettingPage {
               });
             })
           }
+
+          this.sectionTitle('主页卡片')
+          Text('控制主页仪表板各卡片的显示与排列顺序（对齐 Windows 主页卡片设置）')
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+            .padding({ bottom: 4 })
+          ForEach(this.homeCardRows, (row: HomeCardRow) => {
+            Row({ space: 8 }) {
+              Text(row.name)
+                .fontSize(15)
+                .fontColor($r('app.color.text_primary'))
+                .layoutWeight(1)
+              Text('↑')
+                .fontSize(18)
+                .fontColor($r('app.color.text_secondary'))
+                .width(30)
+                .height(30)
+                .textAlign(TextAlign.Center)
+                .borderRadius(15)
+                .backgroundColor($r('app.color.page_background'))
+                .hoverEffect(HoverEffect.Highlight)
+                .onClick(() => {
+                  this.moveHomeCard(row, -1);
+                })
+              Text('↓')
+                .fontSize(18)
+                .fontColor($r('app.color.text_secondary'))
+                .width(30)
+                .height(30)
+                .textAlign(TextAlign.Center)
+                .borderRadius(15)
+                .backgroundColor($r('app.color.page_background'))
+                .hoverEffect(HoverEffect.Highlight)
+                .onClick(() => {
+                  this.moveHomeCard(row, 1);
+                })
+              Text(row.presented ? '显示' : '隐藏')
+                .fontSize(12)
+                .fontColor($r('app.color.text_secondary'))
+              Toggle({ type: ToggleType.Switch, isOn: row.presented })
+                .onChange((isOn: boolean) => {
+                  this.toggleHomeCard(row, isOn);
+                })
+            }
+            .width('100%')
+            .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+            .backgroundColor($r('app.color.card_background'))
+            .borderRadius(12)
+            .border({ width: 1, color: $r('app.color.divider') })
+          }, (row: HomeCardRow) => `${row.key}_${row.presented}_${row.order}`)
 
           this.sectionTitle('主页游戏活动区域设置')
           Row() {

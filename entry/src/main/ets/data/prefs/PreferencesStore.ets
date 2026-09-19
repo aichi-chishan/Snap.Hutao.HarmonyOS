@@ -31,6 +31,15 @@ export class PreferencesStore {
   static readonly KEY_HOME_ACT_CALENDAR: string = 'home.act_calendar_presented';
   /** 主页显示未在进行中的版本活动事件（对齐 Windows HomeAnnouncementActPreviewEnabled，默认关） */
   static readonly KEY_HOME_ACT_PREVIEW: string = 'home.act_preview_enabled';
+  /** 应用启动次数（主页欢迎语文案用，对齐 Windows LaunchTimes） */
+  static readonly KEY_LAUNCH_TIMES: string = 'app.launch_times';
+
+  /** 主页仪表板卡片键（数组顺序即默认顺序，对齐 Windows HomeCards 七卡） */
+  static readonly HOME_CARD_KEYS: string[] =
+    ['launch', 'gacha', 'achievement', 'dailynote', 'ledger', 'calendar', 'signin'];
+  /** 卡片显示名（与 HOME_CARD_KEYS 一一对应） */
+  static readonly HOME_CARD_NAMES: string[] =
+    ['启动游戏', '祈愿记录', '成就管理', '实时便笺', '旅行者札记', '活动日历', '每日签到'];
 
   // ---- defaults ----
   static readonly DEFAULT_REFRESH_INTERVAL: number = 30;
@@ -223,6 +232,36 @@ export class PreferencesStore {
 
   static setHomeActPreview(v: boolean): void {
     PreferencesStore.setBool(PreferencesStore.KEY_HOME_ACT_PREVIEW, v);
+  }
+
+  /** 主页卡片是否显示（对齐 Windows SettingHomeCardViewModel.IsPresented，默认开） */
+  static getHomeCardPresented(key: string): boolean {
+    return PreferencesStore.getBool(`home.card_${key}_presented`, true);
+  }
+
+  static setHomeCardPresented(key: string, v: boolean): void {
+    PreferencesStore.setBool(`home.card_${key}_presented`, v);
+  }
+
+  /** 主页卡片顺序（对齐 Windows SettingHomeCardViewModel.Order；未设置时按 HOME_CARD_KEYS 默认序） */
+  static getHomeCardOrder(key: string): number {
+    const def: number = PreferencesStore.HOME_CARD_KEYS.indexOf(key);
+    return PreferencesStore.getNumber(`home.card_${key}_order`, def);
+  }
+
+  static setHomeCardOrder(key: string, order: number): void {
+    PreferencesStore.setNumber(`home.card_${key}_order`, order);
+  }
+
+  /** 启动次数自增（欢迎语文案；EntryAbility onCreate 调用一次） */
+  static bumpLaunchTimes(): number {
+    const n: number = PreferencesStore.getNumber(PreferencesStore.KEY_LAUNCH_TIMES, 0) + 1;
+    PreferencesStore.setNumber(PreferencesStore.KEY_LAUNCH_TIMES, n);
+    return n;
+  }
+
+  static getLaunchTimes(): number {
+    return PreferencesStore.getNumber(PreferencesStore.KEY_LAUNCH_TIMES, 0);
   }
 
   static setDeviceFp(fp: string): void {
