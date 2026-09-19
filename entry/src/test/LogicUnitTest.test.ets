@@ -110,9 +110,25 @@ export default function logicUnitTest() {
       expect(WikiMetaService.cleanText('A{LINK#123}B{/LINK}C') === 'ABC').assertTrue();
       expect(WikiMetaService.cleanText('A(/LINK)B') === 'AB').assertTrue();
     });
-    it('stripTimezoneAndCompress', 0, () => {
-      const out: string = WikiMetaService.cleanText('行一{TIMEZONE}\n\n\n\n行二');
-      expect(out === '行一\n\n行二').assertTrue();
+    it('stripItalicHtml', 0, () => {
+      expect(WikiMetaService.cleanText('A<i>斜体</i>B') === 'A斜体B').assertTrue();
+    });
+    it('genderPronounPair', 0, () => {
+      // 对齐 Windows MaleFemaleRegex：{M#X}{F#Y} → "X/Y"
+      expect(WikiMetaService.cleanText('他会用{M#他}{F#她}代称') === '他会用他/她代称').assertTrue();
+      expect(WikiMetaService.cleanText('{F#她}{M#他}在前') === '她/他在前').assertTrue();
+    });
+    it('specialNames', 0, () => {
+      // 对齐 Windows SH 资源中文值
+      expect(WikiMetaService.cleanText('你好{NICKNAME}！') === '你好旅行者！').assertTrue();
+      expect(WikiMetaService.cleanText('{PLAYERAVATAR#SEXPRO[INFO_MALE_PRONOUN_HE|INFO_FEMALE_PRONOUN_SHE]}在')
+        === '他/她在').assertTrue();
+      expect(WikiMetaService.cleanText('行一{TIMEZONE}\n\n\n\n行二') === '行一服务器时区\n\n行二').assertTrue();
+    });
+    it('truncatedTrailingMarker', 0, () => {
+      // 源数据在标记中间截断的描述：尾部未闭合标记整体剥离
+      expect(WikiMetaService.cleanText('描述文字<color=#FFD780FF') === '描述文字').assertTrue();
+      expect(WikiMetaService.cleanText('伤害提升{LINK#N111') === '伤害提升').assertTrue();
     });
     it('emptyPassthrough', 0, () => {
       expect(WikiMetaService.cleanText('') === '').assertTrue();

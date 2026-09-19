@@ -8,6 +8,7 @@
  * 数据：rawfile/metadata/{TowerSchedule,TowerFloor,TowerLevel,monster_meta}.json（本地打包）
  */
 import { GameDataService } from './GameDataService';
+import { WikiMetaService } from './WikiMetaService';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'TowerMetadata';
@@ -179,7 +180,8 @@ export class TowerMetadataService {
     const sc: TowerScheduleRow | undefined = TowerMetadataService.schedules?.get(scheduleId);
     if (sc !== undefined) {
       out.name = sc.BuffName;
-      out.description = sc.Descriptions.length > 0 ? sc.Descriptions[0] : '';
+      // 渊月祝福描述含 <color=#> 富文本标记，展示前清洗
+      out.description = WikiMetaService.cleanText(sc.Descriptions.length > 0 ? sc.Descriptions[0] : '');
     }
     return out;
   }

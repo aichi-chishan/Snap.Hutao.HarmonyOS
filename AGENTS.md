@@ -11,8 +11,9 @@
 - 仅国服（米哈游 API 用国服端点）。
 
 ## 关键环境与工具（务必利用）
-- **35 个鸿蒙开发 skill** 在 `skills/` 目录：`hmos-arkui-develop-skill`、`hmos-arkts-syntax-checker`、`hmos-multidevice-*`、`hmos-arkui-mvvm-pattern`、`hmos-*crash-analysis` 等。改 UI/ArkTS/多设备适配前先查相关 skill。
+- **41 个鸿蒙开发 skill** 在 `skills/` 目录：`hmos-arkui-develop-skill`、`hmos-arkts-syntax-checker`、`hmos-multidevice-*`、`hmos-arkui-mvvm-pattern`、`hmos-*crash-analysis` 等。改 UI/ArkTS/多设备适配前先查相关 skill。
 - **DevEco CLI**：`devecocli`（npm 全局，`PATH` 含 npm 全局目录）。常用：`devecocli build` / `devecocli check lint` / `devecocli emulator list|start|stop` / `devecocli skills list|add`。
+- **鸿蒙 MCP（已配置在 `.zcode/config.json`）**：`deveco-mcp`（`devecocli serve mcp`，ArkTS/C++ 静态语法检查）+ `codegenie-mcp`（构建/UI 树/hilog/鸿蒙文档检索）。
 - 编译：`hvigorw.bat assembleHap --mode module -p module=entry@default -p product=default --no-daemon`（DevEco Studio 自带，也可 `devecocli build`）。
 - 模拟器：`devecocli emulator start "MateBook Pro 24"`（2in1，HarmonyOS 6.1.1(24)，**唯一能装当前包的镜像**；API 23 镜像装不上 compatibleSdkVersion 24 的包）；hdc 在 SDK 的 `openharmony/toolchains/hdc.exe`。
 - **hdc 注意（Git Bash）**：`file send` 源路径必须是**裸文件名**（cd 到 outputs 目录后 `hdc file send entry-default-signed.hap /data/local/tmp/entry.hap`），相对子路径会被追加成目录树；`bm install -p /data/...` 要加 `MSYS_NO_PATHCONV=1` 防止路径被转换。
@@ -28,7 +29,7 @@
 - `entry/src/main/ets/widgets/pages/`：ArkTS 桌面卡片（@ComponentV2，@Local 变量名与 Form 推送键一致，严禁回退 @Entry(storage) 写法）。
 - `entry/src/main/resources/rawfile/metadata/`：本地元数据（从 Snap.Metadata 提取：avatar/weapon/monster/material + 曲线表）。
 - `entry/src/main/resources/rawfile/icons/{Category}/`：打包图标（AvatarIcon/EquipIcon/MonsterIcon/Skill/Talent/ItemIcon 等，约 108MB）。
-- `skills/`：35 个鸿蒙开发 skill（只读，勿改）。
+- `skills/`：41 个鸿蒙开发 skill（来自 devecocli，只读，勿改）。
 - `example/`：Windows 版界面截图（参考 UI）。
 - `PORTING_PLAN.md`：Windows 版对齐方案（导航/主页/背景图/图标/图鉴）。
 

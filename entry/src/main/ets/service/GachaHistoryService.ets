@@ -34,6 +34,8 @@ export class HistoryWishView {
   /** 起止 epoch ms */
   from: number = 0;
   to: number = 0;
+  /** 卡池横幅图 URL（对齐 Windows HistoryWish.BannerImage） */
+  banner: string = '';
   orangeUps: HistoryUpItem[] = [];
   purpleUps: HistoryUpItem[] = [];
 }
@@ -114,6 +116,7 @@ export class GachaHistoryService {
       view.type = ev.type;
       view.from = ev.from;
       view.to = ev.to;
+      view.banner = ev.banner;
       const upIndex: Map<number, HistoryUpItem> = new Map<number, HistoryUpItem>();
       const upByName: Map<string, HistoryUpItem> = new Map<string, HistoryUpItem>();
       const registerUp = (id: number, list: HistoryUpItem[]): void => {

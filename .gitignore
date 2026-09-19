@@ -31,6 +31,8 @@ Thumbs.db
 /.mimosa/
 /.agents/
 /.claude/
+/.codex/
+/.opencode/
 /spec/
 /skills
 

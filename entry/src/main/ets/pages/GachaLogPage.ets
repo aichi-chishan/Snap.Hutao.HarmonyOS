@@ -23,6 +23,7 @@ import { SimpleDataSource } from '../components/SimpleDataSource';
 import { UigfService } from '../service/UigfService';
 import { WikiMetaService } from '../service/WikiMetaService';
 import { GachaHistoryService, HistoryWishView, HistoryUpItem } from '../service/GachaHistoryService';
+import { CachedImageService } from '../service/CachedImageService';
 import { Loading } from '../components/Loading';
 import { MetaIcon } from '../components/MetaIcon';
 import { NavIcon } from '../components/NavIcon';
@@ -120,6 +121,12 @@ class ItemCountEntry {
   count: number = 0;
 }
 
+/** 期次横幅图缓存命中（url → 沙盒本地路径） */
+class GachaBannerPath {
+  url: string = '';
+  path: string = '';
+}
+
 @Component
 export struct GachaLogPage {
   @StorageLink('isLoggedIn') @Watch('onLoginStateChanged') isLoggedIn: boolean = false;
@@ -142,6 +149,10 @@ export struct GachaLogPage {
   @State poolCollapsed: number[] = [];
   /** 期次汇总（对齐 Windows PivotHistory，懒构建：首次切到历史页签时构建） */
   @State historyWishes: HistoryWishView[] = [];
+  /** 深色模式（横幅遮罩用；浅色不叠遮罩，对齐 Windows DarkOnlyOverlayMask） */
+  @StorageProp('isDarkMode') isDark: boolean = false;
+  /** 期次横幅图缓存命中表（url → 本地路径；整体 push 后需重赋值触发刷新） */
+  @State bannerPaths: GachaBannerPath[] = [];
   private historyLoading: boolean = false;
   private historyLoadedFor: number = -1;
   /** 刷新进度快照 */
@@ -149,8 +160,8 @@ export struct GachaLogPage {
   @State progressCount: number = 0;
   @State recentItems: RecentGachaItem[] = [];
   @State showProgressDetail: boolean = false;
-  /** 统计/比例模式（Windows StatisticsCard 双模式） */
-  @State showRatioMode: boolean = false;
+  /** 池卡分段模式：false=出金概况 / true=数量统计（对齐 Windows StatisticsSegmented） */
+  @State countStatMode: boolean = false;
   /** Pivot 当前页 */
   @State pivotIndex: number = 0;
   /** 颂愿（千星奇域）模式：切换后页签/卡片/历史只显示颂愿池（对齐 Windows IsBeyondMode） */
@@ -698,30 +709,96 @@ export struct GachaLogPage {
     });
   }
 
+  /** 保底进度条单元（对齐 Windows CardProgressBar：头部行 + 进度条 + 描述行，等宽双列之一） */
   @Builder
-  statCell(label: string, value: string, color: Resource) {
-    Column({ space: 2 }) {
-      Text(value)
-        .fontSize(19)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(color)
-      Text(label)
-        .fontSize(11)
+  guaranteeBar(label: string, cur: number, guarantee: number, desc: string, color: Resource) {
+    Column({ space: 3 }) {
+      Row() {
+        Text(label)
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+          .layoutWeight(1)
+          .maxLines(1)
+        Text(`${cur}/${guarantee}`)
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(color)
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      Progress({
+        value: Math.min(cur, guarantee),
+        total: guarantee,
+        type: ProgressType.Linear,
+      })
+        .width('100%')
+        .color(color)
+        .style({ strokeWidth: 4 })
+      Text(desc)
+        .fontSize(10)
         .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+        .maxLines(1)
     }
-    .alignItems(HorizontalAlign.Center)
+    .alignItems(HorizontalAlign.Start)
     .layoutWeight(1)
   }
 
+  /** 统计格（对齐 Windows BorderShimmer 盒状格子：说明 + 大数值，固定高度保证跨卡对齐） */
   @Builder
-  pillBadge(text: string, bg: Resource) {
+  statCellBox(caption: string, value: string, valueColor: Resource, captionColor: Resource) {
+    Column({ space: 3 }) {
+      Text(value)
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(valueColor)
+        .maxLines(1)
+      Text(caption)
+        .fontSize(11)
+        .fontColor(captionColor)
+        .maxLines(1)
+    }
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .layoutWeight(1)
+    .height(72)
+    .borderRadius(4)
+    .backgroundColor($r('app.color.card_inner_tint'))
+    .border({ width: 1, color: $r('app.color.divider') })
+  }
+
+  /** 上下叠放半高统计格（对齐 Windows Case 0 右列：最大/最小两行各占一半） */
+  @Builder
+  statMiniBox(text: string, color: Resource) {
     Text(text)
-      .fontSize(10)
-      .fontWeight(FontWeight.Medium)
-      .fontColor(Color.White)
-      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+      .fontSize(13)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(color)
+      .maxLines(1)
+      .textAlign(TextAlign.Center)
+      .width('100%')
+      .layoutWeight(1)
+      .borderRadius(4)
+      .backgroundColor($r('app.color.card_inner_tint'))
+      .border({ width: 1, color: $r('app.color.divider') })
+  }
+
+  /** 分段器单元（对齐 Windows StatisticsSegmented：全宽二等分） */
+  @Builder
+  statSegmentChip(label: string, isCount: boolean) {
+    Text(label)
+      .fontSize(12)
+      .fontWeight(this.countStatMode === isCount ? FontWeight.Bold : FontWeight.Normal)
+      .fontColor(this.countStatMode === isCount ? Color.White : $r('app.color.text_secondary'))
+      .textAlign(TextAlign.Center)
+      .padding({ top: 5, bottom: 5 })
+      .layoutWeight(1)
       .borderRadius(9)
-      .backgroundColor(bg)
+      .backgroundColor(this.countStatMode === isCount ? $r('app.color.app_primary') : Color.Transparent)
+      .hoverEffect(HoverEffect.Highlight)
+      .onClick(() => {
+        this.countStatMode = isCount;
+      })
   }
 
   /** 五星头像网格：星级色圆形占位 + 右下角抽数标签（完整展示，不做截断） */
@@ -838,75 +915,63 @@ export struct GachaLogPage {
         .width('100%')
         .alignItems(VerticalAlign.Bottom)
 
-        // 距上个五星/四星 徽章
+        // 双列保底进度条（对齐 Windows CardProgressBar 双列 Grid：距上次金/紫各占一半，MinHeight 32）
+        Row({ space: 4 }) {
+          this.guaranteeBar('距上个五星', card.sinceLastFive, ORANGE_GUARANTEE, `累计五星 ${card.fiveCount} 个`, $r('app.color.five_star'))
+          this.guaranteeBar('距上个四星', card.sinceLastFour, PURPLE_GUARANTEE, `累计四星 ${card.fourCount} 个`, $r('app.color.four_star'))
+        }
+        .width('100%')
+
+        // 时间线分隔条（对齐 Windows：分隔线 ─ 居中时间跨度 ─ 分隔线）
         Row({ space: 8 }) {
-          this.pillBadge(`距上个五星 ${card.sinceLastFive}`, $r('app.color.danger'))
-          this.pillBadge(`距上个四星 ${card.sinceLastFour}`, $r('app.color.four_star'))
+          Divider()
+            .layoutWeight(1)
+            .color($r('app.color.divider'))
+          Text(`${card.startDate} ~ ${card.endDate}`)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .opacity(0.6)
+            .maxLines(1)
+          Divider()
+            .layoutWeight(1)
+            .color($r('app.color.divider'))
         }
         .width('100%')
 
-        // 日期范围
-        if (card.startDate.length > 0) {
-          Text(`${card.startDate} - ${card.endDate}`)
-            .fontSize(11)
-            .fontColor($r('app.color.text_secondary'))
-            .width('100%')
-        }
-
-        // 橙/紫保底进度条（对齐 Windows StatisticsCard CardProgressBar）
-        Column({ space: 2 }) {
-          Text(`累计五星 ${card.fiveCount} 个 · 距保底 ${Math.max(0, ORANGE_GUARANTEE - card.sinceLastFive)} 抽`)
-            .fontSize(11)
-            .fontColor($r('app.color.text_secondary'))
-            .width('100%')
-          Progress({
-            value: Math.min(card.sinceLastFive, ORANGE_GUARANTEE),
-            total: ORANGE_GUARANTEE,
-            type: ProgressType.Linear,
-          })
-            .width('100%')
-            .color($r('app.color.five_star'))
-            .style({ strokeWidth: 6 })
-          Text(`累计四星 ${card.fourCount} 个 · 距保底 ${Math.max(0, PURPLE_GUARANTEE - card.sinceLastFour)} 抽`)
-            .fontSize(11)
-            .fontColor($r('app.color.text_secondary'))
-            .width('100%')
-            .margin({ top: 4 })
-          Progress({
-            value: Math.min(card.sinceLastFour, PURPLE_GUARANTEE),
-            total: PURPLE_GUARANTEE,
-            type: ProgressType.Linear,
-          })
-            .width('100%')
-            .color($r('app.color.four_star'))
-            .style({ strokeWidth: 6 })
+        // 全宽分段器（对齐 Windows StatisticsSegmented：出金概况 / 数量统计）
+        Row({ space: 4 }) {
+          this.statSegmentChip('出金概况', false)
+          this.statSegmentChip('数量统计', true)
         }
         .width('100%')
+        .padding(3)
+        .borderRadius(12)
+        .backgroundColor($r('app.color.page_background'))
+        .border({ width: 1, color: $r('app.color.divider') })
 
-        // Windows StatisticsCard：统计/比例 双模式（切换 chip）
-        Row({ space: 8 }) {
-          this.statModeChip('统计', false)
-          this.statModeChip('比例', true)
-        }
-        .width('100%')
-        .padding({ top: 2, bottom: 4 })
-
-        if (!this.showRatioMode) {
-          // 统计模式：五星平均/UP 平均/最非/最欧（对齐 Windows）
-          Row({ space: 12 }) {
-            this.statCell('五星平均', `${card.avgOrange} 抽`, $r('app.color.app_primary'))
-            this.statCell('UP 平均', `${card.avgUpOrange} 抽`, $r('app.color.app_primary'))
-            this.statCell('最非', `${card.maxOrange} 抽`, $r('app.color.danger'))
-            this.statCell('最欧', `${card.minOrange} 抽`, $r('app.color.success'))
+        // 固定高度统计格（对齐 Windows SwitchPresenter Height=96 + BorderShimmer 盒状格子：
+        // 卡片并排时该区域高度一致，是各池小模块横向对齐的关键）
+        if (!this.countStatMode) {
+          // 概况：五星平均 | UP 平均 | 最非/最欧 上下叠放（对齐 Windows Case 0 三列等宽）
+          Row({ space: 4 }) {
+            this.statCellBox('五星平均', `${card.avgOrange} 抽`, $r('app.color.text_primary'), $r('app.color.text_secondary'))
+            this.statCellBox('UP 平均', card.avgUpOrange > 0 ? `${card.avgUpOrange} 抽` : 'N/A',
+              $r('app.color.text_primary'), $r('app.color.text_secondary'))
+            Column({ space: 4 }) {
+              this.statMiniBox(`最非 ${card.maxOrange}`, $r('app.color.danger'))
+              this.statMiniBox(`最欧 ${card.minOrange}`, $r('app.color.success'))
+            }
+            .layoutWeight(1)
+            .height(72)
           }
           .width('100%')
         } else {
-          // 比例模式：橙/紫/蓝占比（对齐 Windows TotalOrangePercent 等）
-          Row({ space: 12 }) {
-            this.statCell('五星', `${card.orangePercent.toFixed(2)}%`, $r('app.color.five_star'))
-            this.statCell('四星', `${card.purplePercent.toFixed(2)}%`, $r('app.color.four_star'))
-            this.statCell('三星', `${card.bluePercent.toFixed(2)}%`, $r('app.color.text_secondary'))
-            this.statCell('合计', `${card.totalCount}`, $r('app.color.app_primary'))
+          // 数量：五星/四星/三星 计数（对齐 Windows Case 1 TotalOrange/Purple/Blue）
+          Row({ space: 4 }) {
+            this.statCellBox('五星', `${card.fiveCount}`, $r('app.color.five_star'), $r('app.color.five_star'))
+            this.statCellBox('四星', `${card.fourCount}`, $r('app.color.four_star'), $r('app.color.four_star'))
+            this.statCellBox('三星', `${card.totalCount - card.fiveCount - card.fourCount}`,
+              $r('app.color.text_primary'), $r('app.color.text_secondary'))
           }
           .width('100%')
         }
@@ -927,22 +992,6 @@ export struct GachaLogPage {
       width: card.isCurrent && !this.isWide ? 2 : 1,
       color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.divider'),
     })
-  }
-
-  /** 统计/比例 模式切换 chip（Windows StatisticsCard 顶部双按钮） */
-  @Builder
-  statModeChip(label: string, isRatio: boolean) {
-    Text(label)
-      .fontSize(11)
-      .fontColor(this.showRatioMode === isRatio ? Color.White : $r('app.color.text_secondary'))
-      .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-      .borderRadius(10)
-      .backgroundColor(this.showRatioMode === isRatio ? $r('app.color.app_primary') : $r('app.color.card_background'))
-      .border({ width: 1, color: $r('app.color.divider') })
-      .hoverEffect(HoverEffect.Highlight)
-      .onClick(() => {
-        this.showRatioMode = isRatio;
-      })
   }
 
   /** 多池卡片区：按组件自身宽度分列（<840 单列 / 840~1199 双列 / >=1200 最多四列），同行等高 */
@@ -1557,11 +1606,63 @@ export struct GachaLogPage {
         .buildHistory(this.vm.currentArchiveId);
       this.historyWishes = views;
       this.historyLoadedFor = this.vm.currentArchiveId;
+      this.preloadHistoryBanners(views);
     } catch (e) {
       Logger.warn(GACHA_TAG, `history wishes fail: ${(e as Error).message}`);
     } finally {
       this.historyLoading = false;
     }
+  }
+
+  /**
+   * 预载期次横幅图到沙盒缓存（对齐 Windows HistoryWish.BannerImage）：
+   * 下载完成整体替换 @State 数组触发卡片补绘横幅；失败留空，卡片不渲染横幅。
+   */
+  private preloadHistoryBanners(views: HistoryWishView[]): void {
+    // 循环外快照已命中的 URL（避免循环内反复读 @State）
+    const known: Set<string> = new Set<string>();
+    for (const k of this.bannerPaths) {
+      known.add(k.url);
+    }
+    const jobs: Promise<void>[] = [];
+    for (const v of views) {
+      if (v.banner.length === 0 || known.has(v.banner)) {
+        continue;
+      }
+      known.add(v.banner);
+      const url: string = v.banner;
+      jobs.push(CachedImageService.fetchToCache(url).then((p: string) => {
+        if (p.length === 0) {
+          return;
+        }
+        const hit: GachaBannerPath = new GachaBannerPath();
+        hit.url = url;
+        hit.path = p;
+        this.bannerPaths.push(hit);
+        // @State 数组 push 不触发深层级刷新，重赋值确保渲染
+        this.bannerPaths = this.bannerPaths.slice();
+      }));
+    }
+    if (jobs.length > 0) {
+      Promise.all(jobs).catch(() => {
+      });
+    }
+  }
+
+  /** 横幅 URL → 本地缓存路径（未命中返回空串） */
+  private bannerPathOf(url: string): string {
+    for (let i = 0; i < this.bannerPaths.length; i++) {
+      if (this.bannerPaths[i].url === url) {
+        return this.bannerPaths[i].path;
+      }
+    }
+    return '';
+  }
+
+  /** 期次横幅高度：按 1080:533 比例随卡宽走（对齐 Windows ConstrainedBox），限幅防超长 */
+  private historyBannerHeight(): number {
+    const byRatio: number = Math.max(0, this.areaWidth - 72) * (533 / 1080);
+    return Math.round(Math.min(260, Math.max(120, byRatio)));
   }
 
   /** 期次卡头时间跨度文案（对齐 FormattedTimeSpan：yyyy/MM/dd - yyyy/MM/dd） */
@@ -1634,6 +1735,24 @@ export struct GachaLogPage {
       } else {
         ForEach(this.historyWishes, (view: HistoryWishView) => {
           Column({ space: 8 }) {
+            // 卡池横幅图（对齐 Windows PivotHistory：1080:533 比例 UniformToFill，深色叠暗遮罩）
+            if (view.banner.length > 0 && this.bannerPathOf(view.banner).length > 0) {
+              Stack() {
+                Image(`file://${this.bannerPathOf(view.banner)}`)
+                  .width('100%')
+                  .height(this.historyBannerHeight())
+                  .objectFit(ImageFit.Cover)
+                  .borderRadius(8)
+                if (this.isDark) {
+                  Column()
+                    .width('100%')
+                    .height(this.historyBannerHeight())
+                    .borderRadius(8)
+                    .backgroundColor($r('app.color.wallpaper_mask'))
+                }
+              }
+              .width('100%')
+            }
             Row({ space: 6 }) {
               Text(view.version.length > 0 ? `${view.version} · ${view.name}` : view.name)
                 .fontSize(14)

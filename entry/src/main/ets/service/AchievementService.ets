@@ -7,6 +7,7 @@
 import { util } from '@kit.ArkTS';
 import { AppContextProvider } from '../common/AppContext';
 import { AchievementRepo } from '../data/repo/AchievementRepo';
+import { WikiMetaService } from './WikiMetaService';
 import {
   AchievementArchive,
   AchievementCategory,
@@ -150,7 +151,7 @@ export class AchievementService {
       const entry: AchievementEntry = new AchievementEntry();
       entry.id = Number(a['Id'] ?? 0);
       entry.name = (a['Title'] as string) ?? '';
-      entry.desc = (a['Description'] as string) ?? '';
+      entry.desc = WikiMetaService.cleanText((a['Description'] as string) ?? '');
       entry.reward = Number(a['Reward'] ?? 0);
       entry.ver = (a['Version'] as string) ?? '';
       entry.previousId = Number(a['PreviousId'] ?? 0);

@@ -120,6 +120,8 @@ export class GachaEventMeta {
   to: number = 0;
   /** 卡池类型（301 角色 / 400 角色二 UP / 302 武器 / 500 集录） */
   type: number = 0;
+  /** 卡池横幅图 URL（对齐 Windows HistoryWish.BannerImage；旧数据无此字段为空串） */
+  banner: string = '';
   upOrange: number[] = [];
   upPurple: number[] = [];
 }
@@ -230,21 +232,61 @@ export class WikiMetaService {
     return list;
   }
 
-  /** 清洗米哈游富文本标记：<color=#>…</color> → 内容；{LINK#id}…{/LINK} 或 (/LINK) → 内容；{TIMEZONE} 剔除 */
+  /**
+   * 清洗米哈游富文本/特殊名标记（对齐 Windows SpecialNameHandling.Handle + MiHoYoSyntaxLexer 语法，
+   * 纯文本渲染无法还原斜体/内联图标/参数注入，一律剥离标记保留内容）：
+   * - <color=#xxx>…</color> → 内容（Windows 按色渲染，浅色模式还会调亮）
+   * - <i>…</i> 及其余 HTML 标签 → 内容
+   * - {LINK#id}…{/LINK} / (/LINK) → 内容（Windows 渲染为可点 Flyout）
+   * - {M#X}{F#Y} / {F#Y}{M#X} → "X/Y"（Windows 渲染为蓝/粉双色的性别代词对）
+   * - {PLAYERAVATAR#SEXPRO[…HE|…SHE]} → "他/她"；{MATEAVATAR#…BOYFIRST} → "我"；{MATEAVATAR#…BOYD} → "王子/公主"
+   * - {NICKNAME} → 旅行者；{REALNAME[ID(1)]} → 流浪者；{TIMEZONE} → 服务器时区（取 Windows SH 资源中文值）
+   * - {LAYOUT_MOBILE#A}{LAYOUT_PC#B}{LAYOUT_PS#C} → B（Windows 取 PC 版）
+   * - {SPRITE_PRESET#}/{PARAM#}/{SPELL#} 及其余 {XXX#…} → 剥离（内联元素图标/参数注入无法纯文本表达）
+   * - 首字符 # 剥离（Windows Handle 对首字符为 # 的元数据描述剥离后再处理）
+   */
   static cleanText(t: string): string {
     if (t.length === 0) {
       return t;
     }
     let s: string = t;
+    // 性别代词对（必须先于通用 {XXX#…} 剥离，否则连内容一起丢）
+    s = s.replace(/\{M#([^}]*)\}\{F#([^}]*)\}/g, '$1/$2');
+    s = s.replace(/\{F#([^}]*)\}\{M#([^}]*)\}/g, '$1/$2');
+    // SEXPRO 性别代词（常见三种按 Windows 中文资源替换，其余变体走兜底剥离）
+    s = s.replace(/\{PLAYERAVATAR#SEXPRO\[INFO_MALE_PRONOUN_HE\|INFO_FEMALE_PRONOUN_SHE\]\}/g, '他/她');
+    s = s.replace(/\{MATEAVATAR#SEXPRO\[INFO_MALE_PRONOUN_BOYFIRST\|INFO_FEMALE_PRONOUN_GIRLFIRST\]\}/g, '我');
+    s = s.replace(/\{MATEAVATAR#SEXPRO\[INFO_MALE_PRONOUN_BOYD\|INFO_FEMALE_PRONOUN_GIRLD\]\}/g, '王子/公主');
+    s = s.replace(/\{(PLAYERAVATAR|MATEAVATAR)#SEXPRO\[[^}]*\]\}/g, '');
+    // 专名替换（Windows SH.MetadataSpecialName* 中文值）
+    s = s.replace(/\{NICKNAME\}/g, '旅行者');
+    s = s.replace(/\{REALNAME\[ID\(1\)(\|HOSTONLY\(true\))?\]\}/g, '流浪者');
+    s = s.replace(/\{TIMEZONE\}/g, '服务器时区');
+    s = s.replace(/\{NON_BREAK_SPACE\}/g, '\u00A0');
+    // 布局选择取 PC 版
+    s = s.replace(/\{LAYOUT_MOBILE#(.+?)\}\{LAYOUT_PC#(.+?)\}\{LAYOUT_PS#(.+?)\}/g, '$2');
     // <color=#XXXXXX> 与 </color> → 剥离标签保留内容
     s = s.replace(/<color[^>]*>/g, '');
     s = s.replace(/<\/color>/g, '');
+    // 斜体与其余 HTML 标签 → 剥离标签保留内容
+    s = s.replace(/<\/?[a-z]+[^>]*>/gi, '');
     // {LINK#xxx} 与 {/LINK}（新数据闭合格式）与 (/LINK) → 剥离标记保留内容
     s = s.replace(/\{LINK#[^}]*\}/g, '');
     s = s.replace(/\{\/LINK\}/g, '');
     s = s.replace(/\(\/LINK\)/g, '');
-    // {TIMEZONE} 等占位 → 剔除
-    s = s.replace(/\{TIMEZONE\}/g, '');
+    // 内联元素图标 / 参数注入 / 残余 {XXX#…} 标记 → 整体剥离
+    s = s.replace(/\{SPRITE_PRESET#[^}]*\}/g, '');
+    s = s.replace(/\{PARAM#[^}]*\}/g, '');
+    s = s.replace(/\{SPELL#[^}]*\}/g, '');
+    s = s.replace(/\{[A-Za-z_]+#[^}]*\}/g, '');
+    s = s.replace(/\{SPACE\}/g, ' ');
+    // 尾部未闭合标记兜底（源数据偶见在标记中间截断的描述）
+    s = s.replace(/<[^>]*$/, '');
+    s = s.replace(/\{[A-Za-z_]+#[^}]*$/, '');
+    // 首字符 # 标记剥离（对齐 Windows Handle）
+    if (s.startsWith('#')) {
+      s = s.substring(1);
+    }
     // 剥离后可能残留连续空行，压缩
     s = s.replace(/\n{3,}/g, '\n\n');
     // 剥离多余空白首尾
@@ -257,8 +299,9 @@ export class WikiMetaService {
     for (const r of arr) {
       const o: Record<string, Object> = r as Record<string, Object>;
       const t: MetaText = new MetaText();
-      t.t = String(o['t'] ?? '');
-      t.c = String(o['c'] ?? '');
+      // 语音/故事含 {M#}{F#} 性别代词、{NICKNAME}、<i> 等标记，一并清洗
+      t.t = WikiMetaService.cleanText(String(o['t'] ?? ''));
+      t.c = WikiMetaService.cleanText(String(o['c'] ?? ''));
       list.push(t);
     }
     return list;
@@ -282,11 +325,11 @@ export class WikiMetaService {
         w.weaponType = Number(o['weaponType'] ?? 0);
         w.rankLevel = Number(o['rankLevel'] ?? 0);
         w.sort = Number(o['sort'] ?? 0);
-        w.description = String(o['description'] ?? '');
+        w.description = WikiMetaService.cleanText(String(o['description'] ?? ''));
         w.affixName = String(o['affixName'] ?? '');
         const affixes = (o['affixDesc'] as Object[]) ?? [];
         for (const ad of affixes) {
-          w.affixDesc.push(String(ad));
+          w.affixDesc.push(WikiMetaService.cleanText(String(ad)));
         }
         const items = (o['cultivationItems'] as Object[]) ?? [];
         for (const it of items) {
@@ -574,6 +617,7 @@ export class WikiMetaService {
         e.from = Date.parse(String(o['From'] ?? ''));
         e.to = Date.parse(String(o['To'] ?? ''));
         e.type = Number(o['Type'] ?? 0);
+        e.banner = String(o['Banner'] ?? '');
         const upsO = (o['UpOrangeList'] as Object[]) ?? [];
         for (const id of upsO) {
           e.upOrange.push(Number(id));
