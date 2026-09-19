@@ -146,6 +146,38 @@ export class HoyolabClient {
     return HoyolabClient.client.get(url, HoyolabClient.merge(HoyolabClient.baseHeaders(), headers));
   }
 
+  /** 补签信息（GET Luna resign_info：漏签天数/配额/米游币余额与本次花费；对齐 Windows SignInRewardReSignInfo） */
+  static async fetchResignInfo(uid: string, region: string, cookie: string): Promise<ApiResponse> {
+    const query: Record<string, string> = {
+      'lang': AppConstants.X_RPC_LANGUAGE,
+      'act_id': AppConstants.SIGN_ACT_ID,
+      'uid': uid,
+      'region': region,
+    };
+    const sorted: string = DsSigner.sortQuery(query);
+    const t: number = DsSigner.nowTimestamp();
+    const r: string = DsSigner.randomNumber();
+    const ds: string = await DsSigner.signGen1(AppConstants.DS_SALT_LK2, t, r);
+    const url: string = `https://api-takumi.mihoyo.com/event/luna/resign_info?${sorted}`;
+    const headers: Record<string, string> = { 'DS': ds, 'Cookie': cookie, 'x-rpc-signgame': 'hk4e' };
+    return HoyolabClient.client.get(url, HoyolabClient.merge(HoyolabClient.baseHeaders(), headers));
+  }
+
+  /** 补签（POST Luna resign：服务端自动补最近漏签日；body/DS 同 sign，对齐 Windows SignInClient.ReSignAsync）。
+   *  @param extraHeaders 可选重放头（风控极验通过后的 x-rpc-challenge/validate/seccode） */
+  static async resignSign(uid: string, region: string, cookie: string,
+    extraHeaders?: Record<string, string>): Promise<ApiResponse> {
+    const body: Record<string, string> = { 'act_id': AppConstants.SIGN_ACT_ID, 'region': region, 'uid': uid };
+    const bodyJson: string = JSON.stringify(body);
+    const t: number = DsSigner.nowTimestamp();
+    const r: string = DsSigner.randomNumber();
+    const ds: string = await DsSigner.signGen1(AppConstants.DS_SALT_LK2, t, r);
+    const url: string = 'https://api-takumi.mihoyo.com/event/luna/resign';
+    const headers: Record<string, string> = { 'DS': ds, 'Cookie': cookie, 'x-rpc-signgame': 'hk4e' };
+    return HoyolabClient.client.postJson(url, bodyJson, HoyolabClient.merge(HoyolabClient.baseHeaders(),
+      HoyolabClient.merge(headers, extraHeaders ?? {})));
+  }
+
   /** genAuthKey（POST，DS Gen1/LK2 + SToken Cookie；对齐 Windows BindingClient2.cs:52 用 LK2 盐） */
   static async genAuthKey(bodyJson: string, cookie: string): Promise<ApiResponse> {
     const t: number = DsSigner.nowTimestamp();

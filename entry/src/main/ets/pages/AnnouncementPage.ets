@@ -253,11 +253,12 @@ export struct AnnouncementPage {
     .border({ width: 1, color: $r('app.color.divider') })
     .clip(true)
     .onClick(() => {
-      // 优先传 annId 拼官方详情页；无 annId 时用外链
+      // 优先传 annId 拼官方详情页；无 annId 时用外链；banner 供详情页正文顶部展示
       const params: AnnouncementDetailParams = {
         annId: item.id,
         title: item.title,
         url: item.url,
+        banner: item.banner,
       };
       router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: params });
     })

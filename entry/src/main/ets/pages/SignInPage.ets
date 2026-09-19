@@ -2,9 +2,10 @@
  * SignInPage.ets（@Entry）
  * 每日签到：奖励日历/列表、本月累计天数、签到按钮、已签状态、未登录引导。
  */
-import { router } from '@kit.ArkUI';
+import { router, ShowDialogSuccessResponse } from '@kit.ArkUI';
 import { SignInViewModel } from '../viewmodel/SignInViewModel';
 import { SignInInfo, SignInReward } from '../model/SignInInfo';
+import { SignInResult, ResignInfo } from '../service/SignInService';
 import { AppBackButton } from '../components/AppBackButton';
 import { NavIcon } from '../components/NavIcon';
 
@@ -115,6 +116,67 @@ export struct SignInPage {
     .border({ width: 1, color: $r('app.color.divider') })
   }
 
+  /**
+   * 补签卡（对齐 Windows ClaimResignInRewardCommand：漏签/配额/米游币确认后补签；
+   * 服务端自动补最近漏签日，无需选日期）。信息拉取失败时不显示。
+   */
+  @Builder
+  resignCard(resign: ResignInfo) {
+    Column({ space: 8 }) {
+      Row({ space: 6 }) {
+        Text('补签')
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+        Blank()
+        Text(`本月漏签 ${resign.missedDays} 天 · 配额 ${resign.usedCount}/${resign.limitCount}`)
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+      }
+      .width('100%')
+      Text(`每次补签消耗 米游币 ${resign.coinCost}（当前 ${resign.coinCount}），自动补最近漏签的一天`)
+        .fontSize(11)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+      Button(this.vm.resigning ? '补签中...' : '补签一天')
+        .width('100%')
+        .height(38)
+        .fontSize(14)
+        .backgroundColor(resign.canResign() ? $r('app.color.app_primary') : $r('app.color.card_background'))
+        .fontColor(resign.canResign() ? Color.White : $r('app.color.text_secondary'))
+        .borderRadius(10)
+        .border({ width: 1, color: $r('app.color.divider') })
+        .enabled(resign.canResign() && !this.vm.resigning)
+        .onClick(() => {
+          this.confirmResign(resign);
+        })
+    }
+    .width('100%')
+    .padding(12)
+    .borderRadius(12)
+    .backgroundColor($r('app.color.card_background'))
+    .border({ width: 1, color: $r('app.color.divider') })
+  }
+
+  /** 补签确认（对齐 Windows 补签确认弹窗：展示花费与剩余配额） */
+  confirmResign(resign: ResignInfo): void {
+    this.getUIContext().getPromptAction().showDialog({
+      title: '确认补签',
+      message: `将消耗 米游币 ${resign.coinCost}（剩余补签次数 ${resign.leftCount()}），补签最近漏签的一天。是否继续？`,
+      buttons: [
+        { text: '取消', color: $r('app.color.text_secondary') },
+        { text: '补签', color: $r('app.color.app_primary') },
+      ],
+    }).then((dlg: ShowDialogSuccessResponse) => {
+      if (dlg.index !== 1) {
+        return;
+      }
+      this.vm.doResign(this.currentUid).then((r: SignInResult) => {
+        this.toast(r.rewardText.length > 0 ? `${r.message}，${r.rewardText}` : r.message);
+      });
+    });
+  }
+
   @Builder
   rewardCell(reward: SignInReward) {
     Column({ space: 4 }) {
@@ -219,6 +281,9 @@ export struct SignInPage {
               .padding({ top: 60, bottom: 60 })
             } else {
               this.summaryCard(this.vm.info)
+              if (this.vm.resign !== undefined) {
+                this.resignCard(this.vm.resign)
+              }
               Text('每日奖励')
                 .fontSize(13)
                 .fontWeight(FontWeight.Medium)
@@ -248,8 +313,9 @@ export struct SignInPage {
                 .border({ width: 1, color: $r('app.color.divider') })
                 .enabled(!this.vm.info.isTodaySigned(this.todayDay) && !this.vm.signing)
                 .onClick(() => {
-                  this.vm.doSign(this.currentUid).then((r) => {
-                    this.toast(r.alreadySigned ? '今日已签到' : r.message);
+                  this.vm.doSign(this.currentUid).then((r: SignInResult) => {
+                    const text: string = r.rewardText.length > 0 ? `，${r.rewardText}` : '';
+                    this.toast(r.alreadySigned ? '今日已签到' : `${r.message}${text}`);
                   });
                 })
             }

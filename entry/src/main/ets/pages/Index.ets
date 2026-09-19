@@ -788,8 +788,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
           HomeAnnouncementCard({
             items: this.homeVm.announcements,
             loaded: this.homeVm.announcementsLoaded,
-            onTapAnnouncement: (id: number) => {
-              router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: { annId: id } });
+            onTapAnnouncement: (id: number, banner: string) => {
+              router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: { annId: id, title: '', banner: banner } });
             },
             onTapMore: () => {
               router.pushUrl({ url: 'pages/AnnouncementPage' });
@@ -1112,8 +1112,8 @@ import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
         HomeAnnouncementCard({
           items: this.homeVm.announcements,
           loaded: this.homeVm.announcementsLoaded,
-          onTapAnnouncement: (id: number) => {
-            router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: { annId: id } });
+          onTapAnnouncement: (id: number, banner: string) => {
+            router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: { annId: id, title: '', banner: banner } });
           },
           onTapMore: () => {
             router.pushUrl({ url: 'pages/AnnouncementPage' });

@@ -10,4 +10,6 @@ export interface AnnouncementDetailParams {
   title: string;
   /** 备用外链（有则直接用，无则用 annId 拼官方页） */
   url?: string;
+  /** 卡片 banner 图（详情页正文顶部展示，对齐 Windows GenerateHtml） */
+  banner?: string;
 }

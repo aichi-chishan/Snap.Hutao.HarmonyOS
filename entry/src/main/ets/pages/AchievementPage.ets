@@ -48,6 +48,8 @@ export struct AchievementPage {
   private groupSource: SimpleDataSource<DisplayGroup> = new SimpleDataSource([]);
   /** 筛选：0=全部 1=已完成 2=未完成 */
   @State statusFilter: number = 0;
+  /** 未完成优先排序（对齐 Windows IsUncompletedItemsFirst：未完成在前，完成组按完成时间倒序） */
+  @State uncompletedFirst: boolean = false;
   /** 分类筛选：-1=全部 */
   @State categoryFilter: number = -1;
   @State keyword: string = '';
@@ -55,6 +57,8 @@ export struct AchievementPage {
   @State showCreate: boolean = false;
   @State newName: string = '';
   @State busy: boolean = false;
+  /** 完成时间表（id -> 完成秒级时间戳，未完成优先排序用；非渲染状态） */
+  private doneTime: Map<number, number> = new Map();
   /** 搜索防抖定时器（每键击全量重建列表会卡死 UI） */
   private searchTimer: number = -1;
 
@@ -91,10 +95,13 @@ export struct AchievementPage {
     }
     const records: Map<number, AchievementRecord> = await AchievementRepo.getRecords(this.currentArchiveId);
     const doneMap: Map<number, boolean> = new Map<number, boolean>();
-    records.forEach((_rec: AchievementRecord, id: number) => {
+    const doneTime: Map<number, number> = new Map<number, number>();
+    records.forEach((rec: AchievementRecord, id: number) => {
       doneMap.set(id, true);
+      doneTime.set(id, rec.timestamp);
     });
     this.doneMap = doneMap;
+    this.doneTime = doneTime;
     this.catStats = await AchievementService.getCategoryStats(this.currentArchiveId);
     const stats: AchievementStats = new AchievementStats();
     for (const cs of this.catStats) {
@@ -151,14 +158,58 @@ export struct AchievementPage {
         if (this.statusFilter === 2 && achieved > 0) {
           return;
         }
-        if (this.keyword.length > 0 && !g.name.includes(this.keyword) && !g.desc.includes(this.keyword)) {
-          return;
+        // 搜索三态（对齐 Windows UpdateAchievementsFilterBySearch）：
+        // 纯数字 → 成就 ID；x.y 形式 → 版本号；其余 → 名称/描述包含
+        const kw: string = this.keyword.trim();
+        if (kw.length > 0) {
+          if (/^\d+$/.test(kw)) {
+            const qid: number = Number(kw);
+            if (!g.ids.includes(qid)) {
+              return;
+            }
+          } else if (/^\d+\.\d+$/.test(kw)) {
+            if (g.ver !== kw) {
+              return;
+            }
+          } else if (!g.name.includes(kw) && !g.desc.includes(kw)) {
+            return;
+          }
         }
         out.push(g);
       });
     }
+    if (this.uncompletedFirst) {
+      out.sort((a: DisplayGroup, b: DisplayGroup) => {
+        const aDone: number = a.achieved >= a.ids.length ? 1 : 0;
+        const bDone: number = b.achieved >= b.ids.length ? 1 : 0;
+        if (aDone !== bDone) {
+          return aDone - bDone;
+        }
+        // 都完成时按最近完成时间倒序（取组内最大时间戳）
+        if (aDone === 1) {
+          const at: number = this.groupLatestTime(a);
+          const bt: number = this.groupLatestTime(b);
+          if (at !== bt) {
+            return bt - at;
+          }
+        }
+        return 0;
+      });
+    }
     this.groups = out;
     this.groupSource.notifyDataReload(out);
+  }
+
+  /** 分组内最大完成时间戳（无记录返回 0） */
+  private groupLatestTime(g: DisplayGroup): number {
+    let latest: number = 0;
+    for (const id of g.ids) {
+      const t: number | undefined = this.doneTime.get(id);
+      if (t !== undefined && t > latest) {
+        latest = t;
+      }
+    }
+    return latest;
   }
 
   toast(msg: string): void {
@@ -488,8 +539,25 @@ export struct AchievementPage {
       .padding({ left: 10, right: 10, top: 6, bottom: 6 })
       .backgroundColor(this.statusFilter === value ? $r('app.color.app_primary_bg') : Color.Transparent)
       .borderRadius(10)
+      .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
         this.statusFilter = value;
+        this.rebuildGroups();
+      })
+  }
+
+  /** 未完成优先切换 chip（对齐 Windows SortUncompletedSwitchCommand） */
+  @Builder
+  sortChip() {
+    Text('未完成优先')
+      .fontSize(12)
+      .fontColor(this.uncompletedFirst ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+      .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+      .backgroundColor(this.uncompletedFirst ? $r('app.color.app_primary_bg') : Color.Transparent)
+      .borderRadius(10)
+      .hoverEffect(HoverEffect.Highlight)
+      .onClick(() => {
+        this.uncompletedFirst = !this.uncompletedFirst;
         this.rebuildGroups();
       })
   }
@@ -498,7 +566,7 @@ export struct AchievementPage {
   filterRow() {
     Column({ space: 8 }) {
       Row({ space: 8 }) {
-        TextInput({ placeholder: '搜索成就名称/描述' })
+        TextInput({ placeholder: '搜索名称/描述/ID/版本(如5.7)' })
           .fontSize(13)
           .height(36)
           .layoutWeight(1)
@@ -515,6 +583,7 @@ export struct AchievementPage {
           this.statusChip('全部', 0)
           this.statusChip('已完成', 1)
           this.statusChip('未完成', 2)
+          this.sortChip()
         }
         .borderRadius(10)
         .backgroundColor($r('app.color.card_background'))

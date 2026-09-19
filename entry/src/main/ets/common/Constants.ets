@@ -99,6 +99,14 @@ export class RetCodes {
   static readonly NOT_STARTED: number = -5002;
   /** 每日已签到次数超额（luna） */
   static readonly DAILY_LIMIT: number = -5004;
+  /** 补签配额用尽（luna/resign，对齐 Windows KnownReturnCode.ResignQuotaUsedUp） */
+  static readonly RESIGN_QUOTA_USED_UP: number = -5005;
+  /** 请先签到当日再补签（luna/resign，PleaseSignInFirst） */
+  static readonly PLEASE_SIGN_IN_FIRST: number = -5007;
+  /** 无可补签日期（luna/resign，NoAvailableResignDate） */
+  static readonly NO_AVAILABLE_RESIGN_DATE: number = -5008;
+  /** 米游币不足（luna/resign，NotEnoughCoin） */
+  static readonly NOT_ENOUGH_COIN: number = -5014;
   /** 实时便笺：当前账号存在风险，暂无数据 */
   static readonly ACCOUNT_RISK: number = 5003;
   /** 实时便笺：账号已被限制/封禁 */
