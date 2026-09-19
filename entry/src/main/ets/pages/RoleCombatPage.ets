@@ -297,6 +297,13 @@ export struct RoleCombatPage {
         }
       }
       .width('100%')
+      // 回合完成时间（对齐 Windows RoundView.FinishTimeString：yyyy.MM.dd HH:mm:ss）
+      if (round.finishTime > 0) {
+        Text(`完成于 ${RoleCombatPage.formatRoundTime(round.finishTime)}`)
+          .fontSize(10)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+      }
 
       Text('出战角色')
         .fontSize(11)
@@ -305,38 +312,50 @@ export struct RoleCombatPage {
       Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
         ForEach(round.avatars, (avatar: RoleCombatAvatar) => {
           Column({ space: 3 }) {
-            if (avatar.image.startsWith('http')) {
-              Image(avatar.image)
-                .width(36)
-                .height(36)
-                .borderRadius(18)
-                .objectFit(ImageFit.Cover)
-                .backgroundColor($r('app.color.card_background'))
-            } else if (avatar.image.length > 0) {
-              MetaIcon({ category: 'AvatarIcon', name: avatar.image, iconSize: 36 })
-                .borderRadius(18)
-                .clip(true)
-            } else if (WikiMetaService.iconOfAvatar(avatar.avatarId).length > 0) {
-              MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(avatar.avatarId), iconSize: 36 })
-                .borderRadius(18)
-                .clip(true)
-            } else if (AssetIcon.elemName(avatar.element).length > 0) {
-              Image(AssetIcon.resolve(AssetIcon.elemName(avatar.element)))
-                .width(36)
-                .height(36)
-                .borderRadius(18)
-                .objectFit(ImageFit.Cover)
-                .backgroundColor($r('app.color.app_primary_bg'))
-            } else {
-              Text(avatar.name.length > 0 ? avatar.name.substring(0, 1) : '★')
-                .fontSize(13)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(Color.White)
-                .width(36)
-                .height(36)
-                .textAlign(TextAlign.Center)
-                .borderRadius(18)
-                .backgroundColor($r('app.color.app_primary'))
+            Stack({ alignContent: Alignment.TopEnd }) {
+              if (avatar.image.startsWith('http')) {
+                Image(avatar.image)
+                  .width(36)
+                  .height(36)
+                  .borderRadius(18)
+                  .objectFit(ImageFit.Cover)
+                  .backgroundColor($r('app.color.card_background'))
+              } else if (avatar.image.length > 0) {
+                MetaIcon({ category: 'AvatarIcon', name: avatar.image, iconSize: 36 })
+                  .borderRadius(18)
+                  .clip(true)
+              } else if (WikiMetaService.iconOfAvatar(avatar.avatarId).length > 0) {
+                MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(avatar.avatarId), iconSize: 36 })
+                  .borderRadius(18)
+                  .clip(true)
+              } else if (AssetIcon.elemName(avatar.element).length > 0) {
+                Image(AssetIcon.resolve(AssetIcon.elemName(avatar.element)))
+                  .width(36)
+                  .height(36)
+                  .borderRadius(18)
+                  .objectFit(ImageFit.Cover)
+                  .backgroundColor($r('app.color.app_primary_bg'))
+              } else {
+                Text(avatar.name.length > 0 ? avatar.name.substring(0, 1) : '★')
+                  .fontSize(13)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(Color.White)
+                  .width(36)
+                  .height(36)
+                  .textAlign(TextAlign.Center)
+                  .borderRadius(18)
+                  .backgroundColor($r('app.color.app_primary'))
+              }
+              // 试用/声援角标（对齐 Windows RoleCombatAvatarTypeTemplateSelector：2=试用 3=声援）
+              if (avatar.avatarType === 2 || avatar.avatarType === 3) {
+                Text(avatar.avatarType === 2 ? '试用' : '声援')
+                  .fontSize(8)
+                  .fontColor(Color.White)
+                  .padding({ left: 4, right: 4 })
+                  .borderRadius(6)
+                  .backgroundColor(avatar.avatarType === 2 ? $r('app.color.app_primary') : $r('app.color.four_star'))
+                  .translate({ y: 2 })
+              }
             }
             Text(`Lv.${avatar.level}`)
               .fontSize(10)
@@ -376,8 +395,76 @@ export struct RoleCombatPage {
                 .textAlign(TextAlign.Center)
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
+              // 敌人等级（对齐 Windows EnemyView tooltip Level）
+              if (enemy.level > 0) {
+                Text(`Lv.${enemy.level}`)
+                  .fontSize(9)
+                  .fontColor($r('app.color.text_secondary'))
+                  .width(52)
+                  .textAlign(TextAlign.Center)
+              }
             }
           }, (enemy: RoleCombatEnemy) => `rc_en_${enemy.name}`)
+        }
+        .width('100%')
+      }
+
+      // 辉彩祝福（对齐 Windows SplendourSummary + SplendourBuffs：图标带等级角标）
+      if (round.buffs.length > 0) {
+        Text('辉彩祝福')
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+        Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+          ForEach(round.buffs, (buff: RoleCombatBuff) => {
+            Row({ space: 4 }) {
+              if (buff.icon.startsWith('http')) {
+                Stack({ alignContent: Alignment.BottomEnd }) {
+                  Image(buff.icon)
+                    .width(28)
+                    .height(28)
+                    .borderRadius(8)
+                    .objectFit(ImageFit.Cover)
+                    .backgroundColor($r('app.color.app_primary_bg'))
+                  if (buff.level > 0) {
+                    Text(`${buff.level}`)
+                      .fontSize(8)
+                      .fontColor(Color.White)
+                      .padding({ left: 4, right: 4 })
+                      .borderRadius(6)
+                      .backgroundColor('#99000000')
+                  }
+                }
+              } else {
+                Text('◆')
+                  .fontSize(11)
+                  .fontColor($r('app.color.app_primary'))
+                  .width(28)
+                  .height(28)
+                  .textAlign(TextAlign.Center)
+                  .borderRadius(8)
+                  .backgroundColor($r('app.color.app_primary_bg'))
+              }
+              Column({ space: 1 }) {
+                Text(buff.name)
+                  .fontSize(11)
+                  .fontColor($r('app.color.text_primary'))
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                if (buff.desc.length > 0) {
+                  Text(buff.desc.length > 14 ? `${buff.desc.substring(0, 14)}…` : buff.desc)
+                    .fontSize(9)
+                    .fontColor($r('app.color.text_secondary'))
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                }
+              }
+              .alignItems(HorizontalAlign.Start)
+              .constraintSize({ maxWidth: 150 })
+            }
+            .width('100%')
+            .padding({ top: 3, bottom: 3 })
+          }, (buff: RoleCombatBuff) => `rc_spb_${buff.id}_${round.roundId}`)
         }
         .width('100%')
       }
@@ -760,5 +847,13 @@ export struct RoleCombatPage {
     const m: number = Math.floor(sec / 60);
     const s: number = sec % 60;
     return `${m} 分 ${s} 秒`;
+  }
+
+  /** 回合完成时间（秒级时间戳 → yyyy.MM.dd HH:mm:ss，对齐 Windows RoundView.FinishTimeString） */
+  private static formatRoundTime(sec: number): string {
+    const d: Date = new Date(sec * 1000);
+    const p = (n: number): string => `${n}`.padStart(2, '0');
+    return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} `
+      + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
   }
 }

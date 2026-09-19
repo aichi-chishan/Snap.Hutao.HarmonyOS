@@ -41,6 +41,8 @@ export class ChamberWaves {
 export class TowerBuff {
   name: string = '';
   description: string = '';
+  /** 渊月祝福全部条目（对齐 Windows 渲染 Descriptions 列表） */
+  descriptions: string[] = [];
 }
 
 interface TowerScheduleRow {
@@ -54,6 +56,8 @@ interface TowerFloorRow {
   Id: number;
   Index: number;
   LevelGroupId: number;
+  /** 地脉紊乱（每层增益，对齐 Windows FloorView.Disorders） */
+  Descriptions?: string[];
 }
 
 interface TowerLevelRow {
@@ -174,14 +178,33 @@ export class TowerMetadataService {
     Logger.info(TAG, `tower meta loaded: schedules=${schedules.length} floors=${floors.length} levels=${levels.length}`);
   }
 
-  /** 渊月祝福（scheduleId → BuffName/Descriptions[0]） */
+  /** 渊月祝福（scheduleId → BuffName + 全部 Descriptions，展示前逐条清洗） */
   static buffOf(scheduleId: number): TowerBuff {
     const out: TowerBuff = new TowerBuff();
     const sc: TowerScheduleRow | undefined = TowerMetadataService.schedules?.get(scheduleId);
     if (sc !== undefined) {
       out.name = sc.BuffName;
-      // 渊月祝福描述含 <color=#> 富文本标记，展示前清洗
-      out.description = WikiMetaService.cleanText(sc.Descriptions.length > 0 ? sc.Descriptions[0] : '');
+      for (const d of sc.Descriptions) {
+        out.descriptions.push(WikiMetaService.cleanText(d));
+      }
+      out.description = out.descriptions.length > 0 ? out.descriptions[0] : '';
+    }
+    return out;
+  }
+
+  /** 某期某层的地脉紊乱（对齐 Windows FloorView.Disorders；无数据返回空集合） */
+  static floorDisorders(scheduleId: number, floorIndex: number): string[] {
+    const out: string[] = [];
+    if (TowerMetadataService.floorsBySchedule === undefined) {
+      return out;
+    }
+    for (const fl of TowerMetadataService.floorsBySchedule.get(scheduleId) ?? []) {
+      if (fl.Index === floorIndex) {
+        for (const d of fl.Descriptions ?? []) {
+          out.push(WikiMetaService.cleanText(d));
+        }
+        break;
+      }
     }
     return out;
   }

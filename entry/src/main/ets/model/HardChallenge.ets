@@ -4,10 +4,20 @@
  * 对齐 Windows HardChallenge.cs：data[]（数组，每期一条）；data: schedule/single/mp/blings。
  * single/mp 是 HardChallengeDataEntry（hasData/best/challenges[]）；challenge：name/second/teams/best_avatar/monster。
  */
+/** 怪物词缀标签（对齐 Windows HardChallengeMonsterTag） */
+export class HardChallengeMonsterTag {
+  type: number = 0;
+  desc: string = '';
+}
+
 export class HardChallengeMonster {
   name: string = '';
   icon: string = '';
   level: number = 0;
+  /** 怪物描述（富文本，展示前清洗） */
+  desc: string = '';
+  /** 词缀标签 */
+  tags: HardChallengeMonsterTag[] = [];
 }
 
 export class HardChallengeSimpleAvatar {
@@ -16,6 +26,8 @@ export class HardChallengeSimpleAvatar {
   element: string = '';
   image: string = '';
   rarity: number = 0;
+  /** 命座数（对齐 Windows HardChallengeAvatar.Rank） */
+  rank: number = 0;
 }
 
 /** 最速队伍 */
@@ -191,6 +203,17 @@ export class HardChallengeRoot {
       c.monster.name = HardChallengeRoot.str(monster['name']);
       c.monster.icon = HardChallengeRoot.str(monster['icon']);
       c.monster.level = HardChallengeRoot.number(monster['level'], 0);
+      c.monster.desc = HardChallengeRoot.str(monster['desc']);
+      const tags = monster['tags'] as Array<Object>;
+      if (tags !== undefined && tags !== null) {
+        for (let i = 0; i < tags.length; i++) {
+          const t = tags[i] as Record<string, Object>;
+          const tag: HardChallengeMonsterTag = new HardChallengeMonsterTag();
+          tag.type = HardChallengeRoot.number(t['type'], 0);
+          tag.desc = HardChallengeRoot.str(t['desc']);
+          c.monster.tags.push(tag);
+        }
+      }
     }
     return c;
   }
@@ -215,6 +238,7 @@ export class HardChallengeRoot {
     a.element = HardChallengeRoot.str(o['element']);
     a.image = HardChallengeRoot.str(o['image']);
     a.rarity = HardChallengeRoot.number(o['rarity'], 0);
+    a.rank = HardChallengeRoot.number(o['rank'], 0);
     return a;
   }
 

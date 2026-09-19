@@ -5,7 +5,7 @@
  */
 import { router, LengthMetrics } from '@kit.ArkUI';
 import { HardChallengeViewModel } from '../viewmodel/HardChallengeViewModel';
-import { HardChallengeChallenge, HardChallengeSimpleAvatar, HardChallengeBestAvatar, HardChallengeMonster, HardChallengeDataEntry } from '../model/HardChallenge';
+import { HardChallengeChallenge, HardChallengeSimpleAvatar, HardChallengeBestAvatar, HardChallengeMonster, HardChallengeMonsterTag, HardChallengeDataEntry } from '../model/HardChallenge';
 import { RiskUiHelper, RiskVerifyParams } from '../common/RiskUiHelper';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageHeader } from '../components/PageHeader';
@@ -113,17 +113,18 @@ export struct HardChallengePage {
   @Builder
   avatarCircle(avatar: HardChallengeSimpleAvatar) {
     Column({ space: 3 }) {
-      if (WikiMetaService.iconOfAvatar(avatar.avatarId).length > 0) {
-        MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(avatar.avatarId), iconSize: 38, circular: true })
-      } else if (WikiMetaService.iconOfAvatarName(avatar.name).length > 0) {
-        MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatarName(avatar.name), iconSize: 38, circular: true })
-      } else if (avatar.image.startsWith('http')) {
-        Image(avatar.image)
-          .width(38)
-          .height(38)
-          .borderRadius(19)
-          .objectFit(ImageFit.Cover)
-          .backgroundColor($r('app.color.app_primary_bg'))
+      Stack({ alignContent: Alignment.BottomEnd }) {
+        if (WikiMetaService.iconOfAvatar(avatar.avatarId).length > 0) {
+          MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(avatar.avatarId), iconSize: 38, circular: true })
+        } else if (WikiMetaService.iconOfAvatarName(avatar.name).length > 0) {
+          MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatarName(avatar.name), iconSize: 38, circular: true })
+        } else if (avatar.image.startsWith('http')) {
+          Image(avatar.image)
+            .width(38)
+            .height(38)
+            .borderRadius(19)
+            .objectFit(ImageFit.Cover)
+            .backgroundColor($r('app.color.app_primary_bg'))
       } else if (AssetIcon.elemName(avatar.element).length > 0) {
         Image(AssetIcon.resolve(AssetIcon.elemName(avatar.element)))
           .width(38)
@@ -141,6 +142,25 @@ export struct HardChallengePage {
           .textAlign(TextAlign.Center)
           .borderRadius(19)
           .backgroundColor($r('app.color.app_primary'))
+      }
+        // 命座角标（对齐 Windows AvatarView.ActivatedConstellationCount = Rank）
+        if (avatar.rank > 0 && avatar.rank < 6) {
+          Text(`${avatar.rank}命`)
+            .fontSize(8)
+            .fontColor(Color.White)
+            .padding({ left: 4, right: 4 })
+            .borderRadius(6)
+            .backgroundColor('#99000000')
+            .translate({ x: -1, y: -1 })
+        } else if (avatar.rank >= 6) {
+          Text('6命')
+            .fontSize(8)
+            .fontColor(Color.White)
+            .padding({ left: 4, right: 4 })
+            .borderRadius(6)
+            .backgroundColor($r('app.color.app_primary'))
+            .translate({ x: -1, y: -1 })
+        }
       }
       Text(avatar.name.length > 4 ? `${avatar.name.substring(0, 4)}…` : avatar.name)
         .fontSize(10)
@@ -231,15 +251,45 @@ export struct HardChallengePage {
       if (challenge.monster.name.length > 0) {
         Row({ space: 8 }) {
           NavIcon({ name: 'HardChallenge', iconSize: 18 })
-          Column({ space: 2 }) {
-            Text(challenge.monster.name)
-              .fontSize(12)
-              .fontColor($r('app.color.text_primary'))
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-            Text(`Lv.${challenge.monster.level}`)
-              .fontSize(10)
-              .fontColor($r('app.color.text_secondary'))
+          Column({ space: 3 }) {
+            Row({ space: 6 }) {
+              Text(challenge.monster.name)
+                .fontSize(12)
+                .fontColor($r('app.color.text_primary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .layoutWeight(1)
+              Text(`Lv.${challenge.monster.level}`)
+                .fontSize(10)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .width('100%')
+            // 词缀标签（对齐 Windows MonsterView.Tags 圆角词条）
+            if (challenge.monster.tags.length > 0) {
+              Flex({
+                wrap: FlexWrap.Wrap,
+                justifyContent: FlexAlign.Start,
+                space: { main: LengthMetrics.vp(4), cross: LengthMetrics.vp(4) }
+              }) {
+                ForEach(challenge.monster.tags, (tag: HardChallengeMonsterTag) => {
+                  Text(tag.desc)
+                    .fontSize(9)
+                    .fontColor($r('app.color.notice_on'))
+                    .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+                    .borderRadius(6)
+                    .border({ width: 1, color: $r('app.color.divider') })
+                    .backgroundColor($r('app.color.page_background'))
+                }, (tag: HardChallengeMonsterTag) => `hc_tag_${tag.type}_${tag.desc}`)
+              }
+              .width('100%')
+            }
+            // 怪物描述（富文本清洗后展示）
+            if (challenge.monster.desc.length > 0) {
+              Text(WikiMetaService.cleanText(challenge.monster.desc))
+                .fontSize(10)
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%')
+            }
           }
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1)
@@ -312,6 +362,34 @@ export struct HardChallengePage {
                 .padding({ top: 30, bottom: 30 })
                 .textAlign(TextAlign.Center)
             } else {
+              // 耀金角色区（对齐 Windows BlingAvatarView：本期闪耀登场角色，本地数据）
+              if (this.vm.blings.length > 0) {
+                Column({ space: 8 }) {
+                  Row({ space: 6 }) {
+                    Text('耀金角色')
+                      .fontSize(14)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor($r('app.color.text_primary'))
+                      .layoutWeight(1)
+                    Text('✨ 本期闪耀')
+                      .fontSize(10)
+                      .fontColor($r('app.color.notice_on'))
+                  }
+                  .width('100%')
+                  Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+                    ForEach(this.vm.blings, (avatar: HardChallengeSimpleAvatar) => {
+                      this.avatarCircle(avatar)
+                    }, (avatar: HardChallengeSimpleAvatar) => `hc_bl_${avatar.avatarId}`)
+                  }
+                  .width('100%')
+                }
+                .width('100%')
+                .padding(12)
+                .borderRadius(10)
+                .backgroundColor($r('app.color.card_background'))
+                .border({ width: 1, color: $r('app.color.divider') })
+                .alignItems(HorizontalAlign.Start)
+              }
               // 档位切换（单挑/联机，对齐 Windows Segmented）
               Row({ space: 8 }) {
                 Text('单挑')

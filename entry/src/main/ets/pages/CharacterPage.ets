@@ -35,6 +35,12 @@ export struct CharacterPage {
   @State currentDetail: CharacterDetail | undefined = undefined;
   /** 当前选中角色 id（页面态） */
   @State selectedId: number = 0;
+  /** 角色列表搜索关键字（名称包含，对齐 Windows AutoSuggestTokenBox 的名称过滤） */
+  @State charKeyword: string = '';
+  /** 角色列表排序：0=默认 1=等级 2=稀有度 3=好感（对齐 Windows AvatarPropertySortDescriptions） */
+  @State charSort: number = 0;
+  /** 元素筛选（空=全部；取 API 原始元素名 Pyro/Hydro/...） */
+  @State charElement: string = '';
 
   aboutToAppear(): void {
     this.isWide = CharacterPage.detectWide();
@@ -96,8 +102,106 @@ export struct CharacterPage {
     });
   }
 
+  /** 列表过滤+排序（对齐 Windows AvatarPropertyViewModel 排序/筛选：默认/等级/稀有度/好感） */
+  private filteredItems(): CharacterListItem[] {
+    const kw: string = this.charKeyword.trim();
+    const out: CharacterListItem[] = [];
+    for (const c of this.vm.items) {
+      if (kw.length > 0 && !c.name.includes(kw)) {
+        continue;
+      }
+      if (this.charElement.length > 0 && c.element !== this.charElement) {
+        continue;
+      }
+      out.push(c);
+    }
+    if (this.charSort === 1) {
+      out.sort((a: CharacterListItem, b: CharacterListItem) => b.level - a.level);
+    } else if (this.charSort === 2) {
+      out.sort((a: CharacterListItem, b: CharacterListItem) =>
+        b.rarity - a.rarity || b.level - a.level);
+    } else if (this.charSort === 3) {
+      out.sort((a: CharacterListItem, b: CharacterListItem) => b.fetter - a.fetter);
+    }
+    return out;
+  }
+
   toast(msg: string): void {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1500 });
+  }
+
+  /** 列表筛选栏：搜索 + 排序 + 元素 chips（对齐 Windows 角色页筛选/排序） */
+  @Builder
+  charFilterBar() {
+    Column({ space: 6 }) {
+      Row({ space: 6 }) {
+        TextInput({ placeholder: '搜索角色' })
+          .fontSize(12)
+          .height(30)
+          .layoutWeight(1)
+          .onChange((v: string) => {
+            this.charKeyword = v;
+          })
+        Text(this.charSortLabel())
+          .fontSize(11)
+          .fontColor($r('app.color.app_primary'))
+          .padding({ left: 8, right: 8, top: 5, bottom: 5 })
+          .borderRadius(8)
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            // 循环切换排序：默认→等级→稀有度→好感
+            this.charSort = (this.charSort + 1) % 4;
+          })
+      }
+      .width('100%')
+      Scroll() {
+        Row({ space: 4 }) {
+          this.elementChip('', '全部')
+          this.elementChip('Pyro', '火')
+          this.elementChip('Hydro', '水')
+          this.elementChip('Electro', '雷')
+          this.elementChip('Dendro', '草')
+          this.elementChip('Cryo', '冰')
+          this.elementChip('Anemo', '风')
+          this.elementChip('Geo', '岩')
+        }
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .scrollBar(BarState.Off)
+      .width('100%')
+    }
+    .width('100%')
+  }
+
+  /** 当前排序模式名 */
+  private charSortLabel(): string {
+    switch (this.charSort) {
+      case 1:
+        return '等级↓';
+      case 2:
+        return '稀有度↓';
+      case 3:
+        return '好感↓';
+      default:
+        return '默认序';
+    }
+  }
+
+  /** 元素筛选 chip */
+  @Builder
+  elementChip(element: string, label: string) {
+    Text(label)
+      .fontSize(11)
+      .fontColor(this.charElement === element ? Color.White : $r('app.color.text_secondary'))
+      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+      .borderRadius(10)
+      .backgroundColor(this.charElement === element ? $r('app.color.app_primary') : $r('app.color.card_background'))
+      .border({ width: 1, color: $r('app.color.divider') })
+      .hoverEffect(HoverEffect.Highlight)
+      .onClick(() => {
+        this.charElement = element;
+      })
   }
 
   @Builder
@@ -686,7 +790,8 @@ export struct CharacterPage {
               } else if (this.vm.items.length === 0) {
                 Text('暂无角色数据').fontSize(13).fontColor($r('app.color.text_secondary'))
               } else {
-                ForEach(this.vm.items, (c: CharacterListItem) => {
+                this.charFilterBar()
+                ForEach(this.filteredItems(), (c: CharacterListItem) => {
                   this.characterRow(c)
                 }, (c: CharacterListItem) => `${c.id}`)
               }

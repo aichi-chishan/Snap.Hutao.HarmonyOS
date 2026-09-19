@@ -4,7 +4,7 @@
  * 对齐 Windows DataEntryView：single/mp 各一个 DataEntry（hasData/best/challenges），
  * 仅「单挑/联机」两项切换（Segmented 两项），无难度列表。
  */
-import { HardChallengeRoot, HardChallengeDataEntry, HardChallengeChallenge, HardChallengeBest } from '../model/HardChallenge';
+import { HardChallengeRoot, HardChallengeDataEntry, HardChallengeChallenge, HardChallengeBest, HardChallengeSimpleAvatar } from '../model/HardChallenge';
 import { HardChallengeService } from '../service/HardChallengeService';
 import { RiskControlError } from '../data/network/RiskVerifier';
 import { RiskUiHelper } from '../common/RiskUiHelper';
@@ -16,6 +16,8 @@ export class HardChallengeViewModel {
   single: HardChallengeDataEntry = new HardChallengeDataEntry();
   /** 联机 DataEntry */
   mp: HardChallengeDataEntry = new HardChallengeDataEntry();
+  /** 耀金角色（对齐 Windows BlingAvatarView 列表；本地数据非云） */
+  blings: HardChallengeSimpleAvatar[] = [];
   /** 档位：0=单挑 1=联机 */
   modeIndex: number = 0;
   scheduleName: string = '';
@@ -42,6 +44,7 @@ export class HardChallengeViewModel {
       this.isUnlock = root.isUnlock;
       this.single = root.data.single;
       this.mp = root.data.mp;
+      this.blings = root.data.blings;
       if (root.data.schedule.length > 0) {
         this.scheduleName = root.data.schedule[0].name;
       }

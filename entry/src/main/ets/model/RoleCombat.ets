@@ -30,6 +30,8 @@ export class RoleCombatBuff {
   name: string = '';
   desc: string = '';
   isEnhanced: boolean = false;
+  /** 辉彩祝福等级（对齐 Windows RoleCombatSplendourBuff.Level） */
+  level: number = 0;
 }
 
 /** 单回合数据 */
@@ -251,6 +253,7 @@ export class RoleCombatRoot {
     b.name = RoleCombatRoot.str(o['name']);
     b.desc = RoleCombatRoot.str(o['desc']);
     b.isEnhanced = RoleCombatRoot.bool(o['is_enhanced']);
+    b.level = RoleCombatRoot.number(o['level'], 0);
     return b;
   }
 

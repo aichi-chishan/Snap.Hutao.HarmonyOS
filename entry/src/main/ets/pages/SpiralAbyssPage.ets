@@ -140,6 +140,24 @@ export struct SpiralAbyssPage {
       }
       .width('100%')
 
+      // 地脉紊乱（对齐 Windows FloorView.Disorders：本层增益描述）
+      ForEach(this.disordersFor(floor.index), (d: string, di: number) => {
+        Row({ space: 6 }) {
+          Text('地脉')
+            .fontSize(9)
+            .fontColor($r('app.color.app_primary'))
+            .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+            .borderRadius(6)
+            .backgroundColor($r('app.color.app_primary_bg'))
+          Text(d)
+            .fontSize(10)
+            .fontColor($r('app.color.text_secondary'))
+            .layoutWeight(1)
+        }
+        .width('100%')
+        .padding({ top: 2, bottom: 2 })
+      }, (d: string, di: number) => `dis_${floor.index}_${di}_${d}`)
+
       ForEach(floor.levels, (level: SpiralAbyssLevel, li: number) => {
         Column({ space: 6 }) {
           Row() {
@@ -368,7 +386,18 @@ export struct SpiralAbyssPage {
     const out: TowerBuff = new TowerBuff();
     out.name = this.vm.abyss !== undefined ? this.vm.abyss.buffName : '';
     out.description = this.vm.abyss !== undefined ? this.vm.abyss.buffDesc : '';
+    if (out.description.length > 0) {
+      out.descriptions.push(out.description);
+    }
     return out;
+  }
+
+  /** 本层地脉紊乱（塔元数据；无数据返回空集合） */
+  disordersFor(floorIndex: number): string[] {
+    if (this.vm.abyss === undefined) {
+      return [];
+    }
+    return TowerMetadataService.floorDisorders(this.vm.abyss.scheduleId, floorIndex);
   }
 
   /** 战斗时间格式化（yyyy/MM/dd HH:mm） */
@@ -484,7 +513,7 @@ export struct SpiralAbyssPage {
                   .width('100%')
                   .padding({ top: 20, bottom: 20 })
               }
-              // 渊月祝福卡（对齐 Windows 攻辉之月；塔元数据优先，API 解析兜底）
+              // 渊月祝福卡（对齐 Windows 渲染全部 Descriptions 条目；塔元数据优先，API 解析兜底）
               Column({ space: 6 }) {
                 Row({ space: 8 }) {
                   Text('◆')
@@ -497,10 +526,12 @@ export struct SpiralAbyssPage {
                     .layoutWeight(1)
                 }
                 .width('100%')
-                Text(this.abyssBuff().description)
-                  .fontSize(12)
-                  .fontColor($r('app.color.text_secondary'))
-                  .width('100%')
+                ForEach(this.abyssBuff().descriptions, (d: string, di: number) => {
+                  Text(d)
+                    .fontSize(12)
+                    .fontColor($r('app.color.text_secondary'))
+                    .width('100%')
+                }, (d: string, di: number) => `bless_${di}_${d}`)
               }
               .width('100%')
               .padding(14)
