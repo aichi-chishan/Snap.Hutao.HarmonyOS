@@ -17,12 +17,16 @@ import { BaseValueService, AvatarGrowInfo, AvatarBaseValues } from '../service/B
 import { Logger } from '../common/Logger';
 
 const AVATAR_PAGE_TAG: string = 'WikiAvatarPage';
-/** 立绘 CDN 类目（Snap.Hutao 静态 CDN：raw/GachaAvatarIcon/UI_Gacha_AvatarIcon_{后缀}.png） */
-const SPLASH_CATEGORY: string = 'GachaAvatarIcon';
+/** 立绘 CDN 类目（对齐 Windows GachaAvatarImgConverter：2048×1024 横版完整立绘） */
+const SPLASH_IMG_CATEGORY: string = 'GachaAvatarImg';
+/** 角色抠图类目（320×1024 竖版；完整立绘缺失时回退，包内已预打包） */
+const SPLASH_ICON_CATEGORY: string = 'GachaAvatarIcon';
 
 /**
- * 单张角色立绘（按需拉取 + 沙盒缓存，零包体）：
- * 命名规则 UI_Gacha_AvatarIcon_{icon 去掉 UI_AvatarIcon_ 前缀}；旅行者等无立绘时显示占位。
+ * 单张角色立绘（按需拉取 + 沙盒缓存）：
+ * 首选 GachaAvatarImg（UI_Gacha_AvatarImg_{icon 去掉 UI_AvatarIcon_ 前缀}，对齐 Windows
+ * GachaAvatarImgConverter，2048×1024 横版完整立绘，容器按 2:1 呈现）；
+ * 旅行者等 CDN 缺失时回退 GachaAvatarIcon 竖版抠图，均缺失显示占位。
  */
 @Component
 export struct SplashArtView {
@@ -45,24 +49,40 @@ export struct SplashArtView {
       this.src = '';
       return;
     }
-    const name: string = `UI_Gacha_AvatarIcon_${suffix}`;
-    const dir: string = `${AppContextProvider.getCacheDir()}/rawicons/${SPLASH_CATEGORY}`;
+    // 1) 完整立绘（GachaAvatarImg，未预打包，走缓存→CDN）
+    const imgPath: string = await SplashArtView.cachedOrFetch(SPLASH_IMG_CATEGORY,
+      `UI_Gacha_AvatarImg_${suffix}`);
+    if (imgPath.length > 0) {
+      if (token === this.resolveToken) {
+        this.src = imgPath;
+      }
+      return;
+    }
+    // 2) 竖版抠图兜底（GachaAvatarIcon，包内预打包 + CDN）
+    const iconPath: string = await SplashArtView.cachedOrFetch(SPLASH_ICON_CATEGORY,
+      `UI_Gacha_AvatarIcon_${suffix}`);
+    if (token === this.resolveToken) {
+      this.src = iconPath;
+      Logger.info(AVATAR_PAGE_TAG, `splash ${suffix} -> ${iconPath.length > 0 ? 'fallback icon' : 'miss'}`);
+    }
+  }
+
+  /** 单类目三级解析：沙盒缓存 → rawfile 预打包 → 静态 CDN（StandardIconService） */
+  private static async cachedOrFetch(category: string, name: string): Promise<string> {
+    const dir: string = `${AppContextProvider.getCacheDir()}/rawicons/${category}`;
     const dest: string = `${dir}/${name}.png`;
     // 1) 沙盒缓存命中（含已从 rawfile 落盘过的）
     try {
       if (fileIo.accessSync(dest)) {
-        if (token === this.resolveToken) {
-          this.src = `file://${dest}`;
-        }
-        return;
+        return `file://${dest}`;
       }
     } catch (e) {
       // 未缓存，继续
     }
-    // 2) rawfile 预打包立绘（离线可用）→ 落盘缓存
+    // 2) rawfile 预打包（离线可用）→ 落盘缓存
     try {
       const raw: Uint8Array = await AppContextProvider.getResourceManager()
-        .getRawFileContent(`icons/${SPLASH_CATEGORY}/${name}.png`);
+        .getRawFileContent(`icons/${category}/${name}.png`);
       await SplashArtView.ensureDir(dir);
       const file = fileIo.openSync(dest, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
       try {
@@ -70,26 +90,17 @@ export struct SplashArtView {
       } finally {
         fileIo.closeSync(file);
       }
-      if (token === this.resolveToken) {
-        this.src = `file://${dest}`;
-      }
-      Logger.info(AVATAR_PAGE_TAG, `splash ${suffix} -> rawfile`);
-      return;
+      Logger.info(AVATAR_PAGE_TAG, `splash ${name} -> rawfile`);
+      return `file://${dest}`;
     } catch (e) {
-      // 包内无该立绘（旅行者等），继续走 CDN
+      // 包内无该图，继续
     }
-    // 3) 静态 CDN 按需拉取（包内缺失时的兜底）
+    // 3) 静态 CDN 按需拉取
     try {
-      const path: string = await StandardIconService.ensure(SPLASH_CATEGORY, name);
-      if (token !== this.resolveToken) {
-        return;
-      }
-      this.src = path.length > 0 ? `file://${path}` : '';
-      Logger.info(AVATAR_PAGE_TAG, `splash ${suffix} -> ${path.length > 0 ? 'cdn' : 'miss'}`);
+      const path: string = await StandardIconService.ensure(category, name);
+      return path.length > 0 ? `file://${path}` : '';
     } catch (e) {
-      if (token === this.resolveToken) {
-        this.src = '';
-      }
+      return '';
     }
   }
 
@@ -613,7 +624,9 @@ export struct WikiAvatarPage {
           }
         })
         .width('100%')
-        .height(this.isWide ? 360 : 260)
+        // 2:1 比例（对齐 Windows ConstrainedBox AspectRatio 2048:1024）：完整立绘铺满不裁切
+        .aspectRatio(2)
+        .constraintSize({ minHeight: 170, maxHeight: 460 })
         .borderRadius($r('app.float.card_radius'))
         .clip(true)
       }
