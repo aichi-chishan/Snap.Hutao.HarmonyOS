@@ -14,6 +14,7 @@ import { GeetestVerifyParams } from './GeetestVerifyPage';
   import { DateUtil } from '../common/DateUtil';
   import { NavIcon } from '../components/NavIcon';
   import { MetaIcon } from '../components/MetaIcon';
+  import { PageBackdrop } from '../components/PageBackdrop';
 
 @Component
 export struct DailyNotePage {
@@ -108,7 +109,7 @@ export struct DailyNotePage {
     .height(28)
     .padding({ left: 12, right: 12 })
     .borderRadius(14)
-    .backgroundColor(slot === DailyNotePage.SLOT_REFRESH ? $r('app.color.app_primary') : $r('app.color.card_background'))
+    .backgroundColor(slot === DailyNotePage.SLOT_REFRESH ? $r('app.color.app_primary') : $r('app.color.card_surface'))
     .onClick(() => {
       this.onHeaderAction(slot);
     })
@@ -285,7 +286,7 @@ export struct DailyNotePage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   @Builder
@@ -307,7 +308,7 @@ export struct DailyNotePage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   @Builder
@@ -415,7 +416,7 @@ export struct DailyNotePage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   @Builder
@@ -449,7 +450,10 @@ export struct DailyNotePage {
   }
 
   build() {
-    Column() {
+    Stack() {
+      // 壁纸衬底：本页恒为 Index 壳层内嵌（壳层已铺壁纸），PageBackdrop 渲染为空仅透传
+      PageBackdrop({ embedMode: true })
+      Column() {
       if (!this.isLoggedIn) {
         this.loginGuide()
       } else if (this.currentUid.length === 0) {
@@ -565,7 +569,7 @@ export struct DailyNotePage {
           .width('100%')
           .layoutWeight(1)
           .align(Alignment.Top)
-          .backgroundColor(this.isWide ? '#00000000' : $r('app.color.page_background'))
+          .backgroundColor(Color.Transparent)
         }
         .width('100%')
         .layoutWeight(1)
@@ -580,8 +584,12 @@ export struct DailyNotePage {
       showClose: true,
       dragBar: true,
       detents: [SheetSize.MEDIUM, SheetSize.LARGE],
-      backgroundColor: $r('app.color.card_background'),
+      blurStyle: BlurStyle.Regular,
+      backgroundColor: $r('app.color.sheet_material_tint'),
     })
+    }
+    .width('100%')
+    .height('100%')
   }
 
   /**
@@ -666,8 +674,8 @@ export struct DailyNotePage {
     .width('100%')
     .padding(12)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   /** 追踪条目摘要（本地缓存快照） */

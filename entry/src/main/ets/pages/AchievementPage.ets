@@ -18,6 +18,7 @@ import {
 } from '../model/AchievementData';
 import { AppBackButton } from '../components/AppBackButton';
 import { SimpleDataSource } from '../components/SimpleDataSource';
+import { PageBackdrop } from '../components/PageBackdrop';
 
 /** 列表展示用分组行（多阶段成就归并） */
 class DisplayGroup {
@@ -374,7 +375,9 @@ export struct AchievementPage {
   }
 
   build() {
-    Column() {
+    Stack() {
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       this.header()
       if (this.loading) {
         Column({ space: 10 }) {
@@ -424,7 +427,10 @@ export struct AchievementPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
+    }
+    .width('100%')
+    .height('100%')
   }
 
   @Builder
@@ -591,7 +597,7 @@ export struct AchievementPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   @Builder
@@ -751,7 +757,7 @@ export struct AchievementPage {
     .width('100%')
     .padding(12)
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
     .opacity(g.achieved >= g.total ? 0.75 : 1)
     .onClick(() => {
       this.tapGroup(g);

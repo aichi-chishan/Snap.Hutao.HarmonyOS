@@ -184,7 +184,7 @@ export struct RiskVerifyDialog {
     }
     .width('100%')
     .height(360)
-    .backgroundColor($r('app.color.page_background'))
+    .backgroundColor($r('app.color.sheet_material_tint'))
     .onAppear(() => {
       // 注册 JS 桥后加载极验页面
       try {

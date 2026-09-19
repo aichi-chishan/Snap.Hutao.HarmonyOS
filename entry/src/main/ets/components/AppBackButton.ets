@@ -24,14 +24,14 @@ export struct AppBackButton {
     .type(ButtonType.Circle)
     .width(38)
     .height(38)
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
     .shadow({
       radius: 10,
       color: '#26000000',
       offsetX: 0,
       offsetY: 2,
     })
-    .border({ width: 1, color: $r('app.color.divider') })
+    .border({ width: 1, color: $r('app.color.card_stroke') })
     .onClick(() => {
       this.onBack();
     })

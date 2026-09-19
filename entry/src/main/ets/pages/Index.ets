@@ -265,12 +265,12 @@ class DashCardSpec {
           .width(360)
           .padding(16)
           .borderRadius(16)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#99000000')
+        .backgroundColor($r('app.color.overlay_scrim'))
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .onClick(() => {
@@ -472,54 +472,61 @@ class DashCardSpec {
   /** 宽窄判定统一阈值（vp）：与 detectWideScreen 一致，避免 720/840 竞态 */
   private static readonly WIDE_VP: number = 720;
 
-  /** 窄屏：底部 HdsTabs 悬浮页签（手机） */
+  /** 窄屏：底部 HdsTabs 悬浮页签（手机）；最底全屏壁纸层，内容/悬浮页签浮上（对齐 Windows 透明页面栈） */
   @Builder
   phoneShell() {
-    HdsTabs({ controller: this.controller }) {
-      TabContent() {
-        this.homeTab()
-      }
-      .tabBar(this.bottomTab(0, 'Announcement', '首页'))
+    Stack({ alignContent: Alignment.TopStart }) {
+      // 全屏壁纸层（手机壳最底层，与宽屏壳同构；渐变 + 本地胡桃横幅 + 可选）
+      WallpaperLayer({ bgType: this.bgType, folderPath: this.bgFolderPath })
 
-      TabContent() {
-        this.gachaTab()
-      }
-      .tabBar(this.bottomTab(1, 'GachaLog', '祈愿'))
+      HdsTabs({ controller: this.controller }) {
+        TabContent() {
+          this.homeTab()
+        }
+        .tabBar(this.bottomTab(0, 'Announcement', '首页'))
 
-      TabContent() {
-        this.noteTab()
-      }
-      .tabBar(this.bottomTab(2, 'DailyNote', '便笺'))
+        TabContent() {
+          this.gachaTab()
+        }
+        .tabBar(this.bottomTab(1, 'GachaLog', '祈愿'))
 
-      TabContent() {
-        this.mineTab()
+        TabContent() {
+          this.noteTab()
+        }
+        .tabBar(this.bottomTab(2, 'DailyNote', '便笺'))
+
+        TabContent() {
+          this.mineTab()
+        }
+        .tabBar(this.bottomTab(3, 'Passport', '我的'))
       }
-      .tabBar(this.bottomTab(3, 'Passport', '我的'))
+      .barOverlap(true)
+      .vertical(false)
+      .barPosition(BarPosition.End)
+      .onChange((index: number) => {
+        this.currentIndex = index;
+      })
+      .barFloatingStyle({
+        barBottomMargin: 20,
+        gradientMask: { maskColor: $r('app.color.mask_scrim'), maskHeight: 96 },
+        systemMaterialEffect: this.materialEffect(),
+      })
+      .barBackgroundColor('#00FFFFFF')
+      .width('100%')
+      .height('100%')
+      .backgroundColor(Color.Transparent)
+      .onAreaChange((oldValue: Area, newValue: Area) => {
+        const w: number = newValue.width as number;
+        this.isWide = w >= Index.WIDE_VP;
+        // 窗口不足平板宽（<840）时自动折叠侧栏（图标态）给内容让位；用户此后可手动展开，
+        // 仅在宽度变化跨越时触发，不与手动操作打架
+        if (w > 0 && w < 840) {
+          this.sidebarFold = true;
+        }
+      })
     }
-    .barOverlap(true)
-    .vertical(false)
-    .barPosition(BarPosition.End)
-    .onChange((index: number) => {
-      this.currentIndex = index;
-    })
-    .barFloatingStyle({
-      barBottomMargin: 20,
-      gradientMask: { maskColor: $r('app.color.mask_scrim'), maskHeight: 96 },
-      systemMaterialEffect: this.materialEffect(),
-    })
-    .barBackgroundColor('#00FFFFFF')
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.page_background'))
-    .onAreaChange((oldValue: Area, newValue: Area) => {
-      const w: number = newValue.width as number;
-      this.isWide = w >= Index.WIDE_VP;
-      // 窗口不足平板宽（<840）时自动折叠侧栏（图标态）给内容让位；用户此后可手动展开，
-      // 仅在宽度变化跨越时触发，不与手动操作打架
-      if (w > 0 && w < 840) {
-        this.sidebarFold = true;
-      }
-    })
   }
 
   /** 宽屏：全屏壁纸底 + 顶部自定义 TitleBar + 左侧分组导航（可折叠）+ 右侧内容区 */
@@ -877,9 +884,7 @@ class DashCardSpec {
   @Builder
   homeTab() {
     Stack({ alignContent: Alignment.TopStart }) {
-      // 壁纸层（渐变 + 本地胡桃横幅 + 可选）
-      WallpaperLayer({ bgType: this.bgType, folderPath: this.bgFolderPath })
-
+      // 壁纸层已上移至 phoneShell 最底（全 Tab 共享一份，避免双份加载）；此处仅内容 + 弹层
       Scroll() {
         Column({ space: 12 }) {
           // 欢迎横幅（对齐电脑版主页顶部；文案含随机彩蛋，对齐 Windows GreetingText）
@@ -1462,8 +1467,8 @@ class DashCardSpec {
     .height(height)
     .justifyContent(FlexAlign.Center)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   /** 日历事件日期（活动/卡池结束日） */
@@ -1527,7 +1532,7 @@ class DashCardSpec {
     .height(64)
     .padding(10)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
     .transition(Motion.riseIn())
     .hoverEffect(HoverEffect.Highlight)
     .onClick(onClick)
@@ -1571,7 +1576,7 @@ class DashCardSpec {
     .width('100%')
     .padding(12)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
     .onClick(onClick)
   }
 

@@ -11,6 +11,7 @@ import { CharacterListItem, CharacterDetail, Reliquary, RelicProperty, BasePrope
 import { ReliquaryScore } from '../common/ReliquaryScore';
 import { RiskUiHelper, RiskVerifyParams } from '../common/RiskUiHelper';
 import { AppBackButton } from '../components/AppBackButton';
+import { PageBackdrop } from '../components/PageBackdrop';
 import { PageHeader } from '../components/PageHeader';
 import { NavIcon } from '../components/NavIcon';
 import { AssetIcon } from '../components/AssetIcon';
@@ -208,8 +209,8 @@ export struct CharacterPage {
       .fontColor(this.charElement === element ? Color.White : $r('app.color.text_secondary'))
       .padding({ left: 10, right: 10, top: 4, bottom: 4 })
       .borderRadius(10)
-      .backgroundColor(this.charElement === element ? $r('app.color.app_primary') : $r('app.color.card_background'))
-      .border({ width: 1, color: $r('app.color.divider') })
+      .backgroundColor(this.charElement === element ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+      .border({ width: 1, color: $r('app.color.card_stroke') })
       .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
         this.charElement = element;
@@ -286,8 +287,8 @@ export struct CharacterPage {
     .width('100%')
     .padding(10)
     .borderRadius(10)
-    .backgroundColor(this.selectedId === c.id ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor(this.selectedId === c.id ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
     .onClick(() => {
       this.selectCharacter(c.id);
     })
@@ -329,8 +330,8 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
         }
         Row({ space: 10 }) {
           Button('米游社攻略')
@@ -408,8 +409,8 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
         }
         if (this.currentDetail.weapon.id > 0) {
           Row({ space: 10 }) {
@@ -430,8 +431,8 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
         }
 
         if (this.currentDetail.selectedProperties.length > 0) {
@@ -457,8 +458,8 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
         }
 
         if (this.currentDetail.reliquaries.length > 0) {
@@ -540,8 +541,8 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
         }
         if (this.currentDetail.constellations.length > 0) {
           Column({ space: 6 }) {
@@ -599,8 +600,8 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
         }
       }
       }
@@ -643,8 +644,8 @@ export struct CharacterPage {
     .width('100%')
     .padding(14)
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   /**
@@ -953,7 +954,10 @@ export struct CharacterPage {
   }
 
   build() {
-    Column() {
+    Stack() {
+      // 壁纸衬底：router 独立页透出壁纸，embed 内嵌时由壳层统一铺（组件内渲染为空）
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       this.header()
       if (!this.isLoggedIn) {
         this.loginGuide()
@@ -1027,7 +1031,7 @@ export struct CharacterPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
     .bindSheet(this.showVerify, () => {
       RiskVerifyDialog({
         isShow: this.showVerify,
@@ -1040,14 +1044,18 @@ export struct CharacterPage {
           this.vm.resetRiskAndReload(this.currentUid);
         },
       })
-    }, { height: 420, backgroundColor: $r('app.color.page_background'), showClose: false, blurStyle: BlurStyle.Regular })
+    }, { height: 420, backgroundColor: $r('app.color.sheet_material_tint'), showClose: false, blurStyle: BlurStyle.Regular })
     // 养成计划选择半窗（多项目时让用户选目标计划；$$ 双向同步下滑关闭）
     .bindSheet($$this.showPlanSheet, this.planPickerSheet(), {
       title: { title: '加入养成计划' },
       showClose: true,
       dragBar: true,
       height: 360,
-      backgroundColor: $r('app.color.card_background'),
+      blurStyle: BlurStyle.Regular,
+      backgroundColor: $r('app.color.sheet_material_tint'),
     })
+    }
+    .width('100%')
+    .height('100%')
   }
 }

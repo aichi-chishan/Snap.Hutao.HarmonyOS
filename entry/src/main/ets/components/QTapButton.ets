@@ -67,8 +67,8 @@ export struct QTapButton {
       bottom: this.capsule ? 10 : 8,
     })
     .borderRadius(this.capsule ? 22 : 12)
-    .backgroundColor(this.primary ? $r('app.color.app_primary') : $r('app.color.card_background'))
-    .border({ width: this.primary ? 0 : 1, color: $r('app.color.divider') })
+    .backgroundColor(this.primary ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+    .border({ width: this.primary ? 0 : 1, color: $r('app.color.card_stroke') })
     .opacity(this.disabled ? 0.5 : 1)
     .hoverEffect(this.disabled ? HoverEffect.None : HoverEffect.Highlight)
     .scale({ x: this.pressScale, y: this.pressScale })

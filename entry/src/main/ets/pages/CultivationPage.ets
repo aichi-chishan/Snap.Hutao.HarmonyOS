@@ -12,6 +12,7 @@ import { CultivateEntry, CultivateEntryItem, CultivateProject } from '../data/re
 import { ResinStatisticsService, ResinCategoryRow, ResinStatisticsResult } from '../service/ResinStatisticsService';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageHeader } from '../components/PageHeader';
+import { PageBackdrop } from '../components/PageBackdrop';
 import { NavIcon } from '../components/NavIcon';
 import { MetaIcon } from '../components/MetaIcon';
 import { WikiMetaService } from '../service/WikiMetaService';
@@ -469,8 +470,8 @@ export struct CultivationPage {
     .width('100%')
     .padding(12)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   /** 树脂统计表头（树脂图标已内置 rawfile；脆弱树脂无图标用文字） */
@@ -606,8 +607,8 @@ export struct CultivationPage {
     .width('100%')
     .padding(10)
     .borderRadius(10)
-    .backgroundColor($r('app.color.page_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   /** 养成计划区（项目条 + 条目清单；置于计算区上方，可持续追踪） */
@@ -645,8 +646,8 @@ export struct CultivationPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   /** 计算结果材料汇总 */
@@ -673,8 +674,8 @@ export struct CultivationPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_background'))
-      .border({ width: 1, color: $r('app.color.divider') })
+      .backgroundColor($r('app.color.card_surface'))
+      .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
 
@@ -718,8 +719,8 @@ export struct CultivationPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
 
     // 结果区
     this.resultSection()
@@ -747,7 +748,9 @@ export struct CultivationPage {
   }
 
   build() {
-    Column() {
+    Stack() {
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       this.header()
       if (!this.isLoggedIn) {
         this.loginGuide()
@@ -803,9 +806,12 @@ export struct CultivationPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
     .onAreaChange((oldValue: Area, newValue: Area) => {
       this.isWide = (newValue.width as number) >= 840;
     })
+    }
+    .width('100%')
+    .height('100%')
   }
 }

@@ -80,7 +80,7 @@ export struct LoginStatusBar {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
     .onClick(() => {
       if (this.isLoggedIn) {
         router.pushUrl({ url: 'pages/UserPage' });

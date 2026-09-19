@@ -27,6 +27,7 @@ import { CachedImageService } from '../service/CachedImageService';
 import { Loading } from '../components/Loading';
 import { MetaIcon } from '../components/MetaIcon';
 import { NavIcon } from '../components/NavIcon';
+import { PageBackdrop } from '../components/PageBackdrop';
 import { Logger } from '../common/Logger';
 
 const GACHA_TAG: string = 'GachaLogPage';
@@ -661,8 +662,8 @@ export struct GachaLogPage {
             .fontColor(this.vm.currentPoolType === type ? Color.White : $r('app.color.text_primary'))
             .padding({ left: 12, right: 12, top: 6, bottom: 6 })
             .borderRadius(14)
-            .backgroundColor(this.vm.currentPoolType === type ? $r('app.color.app_primary') : $r('app.color.card_background'))
-            .border({ width: 1, color: $r('app.color.divider') })
+            .backgroundColor(this.vm.currentPoolType === type ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+            .border({ width: 1, color: $r('app.color.card_stroke') })
             .constraintSize({ minWidth: 56 })
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
@@ -689,10 +690,10 @@ export struct GachaLogPage {
       .fontColor(this.beyondMode ? Color.White : $r('app.color.text_secondary'))
       .padding({ left: 12, right: 12, top: 6, bottom: 6 })
       .borderRadius(14)
-      .backgroundColor(this.beyondMode ? $r('app.color.app_primary') : $r('app.color.card_background'))
+      .backgroundColor(this.beyondMode ? $r('app.color.app_primary') : $r('app.color.card_surface'))
       .border({
         width: 1,
-        color: this.beyondMode ? $r('app.color.app_primary') : $r('app.color.divider')
+        color: this.beyondMode ? $r('app.color.app_primary') : $r('app.color.card_stroke')
       })
       .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
@@ -835,7 +836,7 @@ export struct GachaLogPage {
               .fontColor(Color.White)
               .padding({ left: 4, right: 4 })
               .borderRadius(6)
-              .backgroundColor('#99000000')
+              .backgroundColor($r('app.color.overlay_scrim'))
               .margin({ right: 1, bottom: 1 })
           }
           .width(40)
@@ -987,10 +988,10 @@ export struct GachaLogPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
     .border({
       width: card.isCurrent && !this.isWide ? 2 : 1,
-      color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.divider'),
+      color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.card_stroke'),
     })
   }
 
@@ -1171,7 +1172,7 @@ export struct GachaLogPage {
           .fontSize(11)
           .height(26)
           .margin({ right: 4 })
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .fontColor($r('app.color.text_primary'))
           .onClick(() => {
             this.importFromClipboard();
@@ -1180,7 +1181,7 @@ export struct GachaLogPage {
           .fontSize(11)
           .height(26)
           .margin({ right: 4 })
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .fontColor($r('app.color.text_primary'))
           .onClick(() => {
             this.uigfImport();
@@ -1189,7 +1190,7 @@ export struct GachaLogPage {
           .fontSize(11)
           .height(26)
           .margin({ right: 4 })
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .fontColor($r('app.color.text_primary'))
           .onClick(() => {
             this.uigfExport();
@@ -1235,7 +1236,7 @@ export struct GachaLogPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   @Builder
@@ -1293,7 +1294,7 @@ export struct GachaLogPage {
                           .fontColor(Color.White)
                           .padding({ left: 4, right: 4, top: 1, bottom: 1 })
                           .borderRadius(6)
-                          .backgroundColor('#B3000000')
+                          .backgroundColor($r('app.color.overlay_scrim'))
                       }
                     }
                     .width(44)
@@ -1323,7 +1324,7 @@ export struct GachaLogPage {
         .width('100%')
         .padding({ top: 6, left: 4, right: 4 })
         .borderRadius(8)
-        .backgroundColor($r('app.color.card_background'))
+        .backgroundColor($r('app.color.card_surface'))
       }
     }
     .width('100%')
@@ -1438,7 +1439,7 @@ export struct GachaLogPage {
       Row({ space: 10 }) {
         Button('取消')
           .layoutWeight(1)
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .fontColor($r('app.color.text_primary'))
           .fontSize(14)
           .onClick(() => {
@@ -1464,11 +1465,14 @@ export struct GachaLogPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   build() {
-    Column() {
+    Stack() {
+      // 壁纸衬底：本页恒为 Index 壳层内嵌（壳层已铺壁纸），PageBackdrop 渲染为空仅透传
+      PageBackdrop({ embedMode: true })
+      Column() {
       if (!this.isLoggedIn) {
         this.loginGuide()
       } else {
@@ -1569,6 +1573,9 @@ export struct GachaLogPage {
     .onAreaChange((oldValue: Area, newValue: Area) => {
       this.onPoolAreaChange(Number(newValue.width));
     })
+    }
+    .width('100%')
+    .height('100%')
   }
 
   /** Pivot 页签按钮 */
@@ -1580,8 +1587,8 @@ export struct GachaLogPage {
       .fontColor(this.pivotIndex === index ? Color.White : $r('app.color.text_primary'))
       .padding({ left: 14, right: 14, top: 7, bottom: 7 })
       .borderRadius(16)
-      .backgroundColor(this.pivotIndex === index ? $r('app.color.app_primary') : $r('app.color.card_background'))
-      .border({ width: 1, color: this.pivotIndex === index ? $r('app.color.app_primary') : $r('app.color.divider') })
+      .backgroundColor(this.pivotIndex === index ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+      .border({ width: 1, color: this.pivotIndex === index ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
       .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
         this.pivotIndex = index;
@@ -1803,8 +1810,8 @@ export struct GachaLogPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
           .alignItems(HorizontalAlign.Start)
         }, (view: HistoryWishView) => `hw_${view.from}_${view.type}_${view.totalCount}`)
       }
@@ -1883,7 +1890,7 @@ export struct GachaLogPage {
                   .fontColor(Color.White)
                   .padding({ left: 4, right: 4 })
                   .borderRadius(6)
-                  .backgroundColor('#99000000')
+                  .backgroundColor($r('app.color.overlay_scrim'))
                   .margin({ right: 1, bottom: 1 })
               }
             }
@@ -1902,8 +1909,8 @@ export struct GachaLogPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
 
@@ -1974,7 +1981,7 @@ export struct GachaLogPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_background'))
+      .backgroundColor($r('app.color.card_surface'))
     }
   }
 
@@ -2088,8 +2095,8 @@ export struct GachaLogPage {
         .width('100%')
         .padding(14)
         .borderRadius($r('app.float.card_radius'))
-        .backgroundColor($r('app.color.card_background'))
-        .border({ width: 1, color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.divider') })
+        .backgroundColor($r('app.color.card_surface'))
+        .border({ width: 1, color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
       }, (card: PoolCardData) => `cd_${card.gachaType}`)
       }
       .width('100%')

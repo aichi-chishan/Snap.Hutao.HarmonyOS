@@ -9,6 +9,7 @@ import { User } from '../model/User';
 import { UserGameRole } from '../model/UserGameRole';
 import { UserService } from '../service/UserService';
 import { AppBackButton } from '../components/AppBackButton';
+import { PageBackdrop } from '../components/PageBackdrop';
 import { NavIcon } from '../components/NavIcon';
 
 @Entry
@@ -224,10 +225,10 @@ export struct UserPage {
       Button('删除')
         .fontSize(12)
         .height(28)
-        .backgroundColor($r('app.color.card_background'))
+        .backgroundColor($r('app.color.card_surface'))
         .hoverEffect(HoverEffect.Highlight)
         .fontColor($r('app.color.danger'))
-        .border({ width: 1, color: $r('app.color.divider') })
+        .border({ width: 1, color: $r('app.color.card_stroke') })
         .onClick(() => {
           this.confirmDelete(user);
         })
@@ -235,7 +236,7 @@ export struct UserPage {
     .width('100%')
     .padding(12)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   confirmDelete(user: User): void {
@@ -348,7 +349,7 @@ export struct UserPage {
         .width('100%')
         .padding(10)
         .borderRadius(10)
-        .backgroundColor($r('app.color.card_background'))
+        .backgroundColor($r('app.color.card_surface'))
         .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           this.vm.setDefaultUid(role.gameUid).then(() => {
@@ -363,7 +364,10 @@ export struct UserPage {
   }
 
   build() {
-    Column() {
+    Stack() {
+      // 壁纸衬底：router 独立页透出壁纸，embed 内嵌时由壳层统一铺（组件内渲染为空）
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       this.header()
       Scroll() {
         Column({ space: 12 }) {
@@ -414,10 +418,10 @@ export struct UserPage {
             Button('退出登录')
               .width('100%')
               .height(44)
-              .backgroundColor($r('app.color.card_background'))
+              .backgroundColor($r('app.color.card_surface'))
         .hoverEffect(HoverEffect.Highlight)
               .fontColor($r('app.color.danger'))
-              .border({ width: 1, color: $r('app.color.divider') })
+              .border({ width: 1, color: $r('app.color.card_stroke') })
               .onClick(() => {
                 UserService.getInstance().logout().then(() => {
                   this.toast('已退出登录');
@@ -441,7 +445,10 @@ export struct UserPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
+    }
+    .width('100%')
+    .height('100%')
   }
 
   @Builder

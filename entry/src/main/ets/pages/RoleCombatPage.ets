@@ -11,6 +11,7 @@ import { RiskUiHelper, RiskVerifyParams } from '../common/RiskUiHelper';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageHeader } from '../components/PageHeader';
 import { MetaIcon } from '../components/MetaIcon';
+import { PageBackdrop } from '../components/PageBackdrop';
 import { NavIcon } from '../components/NavIcon';
 import { AssetIcon } from '../components/AssetIcon';
 import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
@@ -246,8 +247,8 @@ export struct RoleCombatPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   @Builder
@@ -528,8 +529,8 @@ export struct RoleCombatPage {
     .width('100%')
     .padding(12)
     .borderRadius(10)
-    .backgroundColor($r('app.color.page_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
     .alignItems(HorizontalAlign.Start)
   }
 
@@ -589,13 +590,15 @@ export struct RoleCombatPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_background'))
-      .border({ width: 1, color: $r('app.color.divider') })
+      .backgroundColor($r('app.color.card_surface'))
+      .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
 
   build() {
-    Column() {
+    Stack() {
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       this.header()
       if (!this.isLoggedIn) {
         this.loginGuide()
@@ -707,7 +710,7 @@ export struct RoleCombatPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
     .bindSheet(this.showVerify, () => {
       RiskVerifyDialog({
         isShow: this.showVerify,
@@ -719,7 +722,10 @@ export struct RoleCombatPage {
           this.vm.resetRiskAndReload(this.currentUid);
         },
       })
-    }, { height: 420, backgroundColor: $r('app.color.page_background'), showClose: false, blurStyle: BlurStyle.Regular })
+    }, { height: 420, backgroundColor: $r('app.color.sheet_material_tint'), showClose: false, blurStyle: BlurStyle.Regular })
+    }
+    .width('100%')
+    .height('100%')
   }
 
   /** 当前档期内容区 */
@@ -853,8 +859,8 @@ export struct RoleCombatPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_background'))
-      .border({ width: 1, color: $r('app.color.divider') })
+      .backgroundColor($r('app.color.card_surface'))
+      .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
 

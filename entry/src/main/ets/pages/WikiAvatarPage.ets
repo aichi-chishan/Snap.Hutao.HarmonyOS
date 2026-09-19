@@ -14,6 +14,7 @@ import { CultivationRepo, CultivateProject } from '../data/repo/CultivationRepo'
 import { fileIo } from '@kit.CoreFileKit';
 import { AppContextProvider } from '../common/AppContext';
 import { AppBackButton } from '../components/AppBackButton';
+import { PageBackdrop } from '../components/PageBackdrop';
 import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 import { BaseValueService, AvatarGrowInfo, AvatarBaseValues } from '../service/BaseValueService';
@@ -544,7 +545,10 @@ export struct WikiAvatarPage {
   }
 
   build() {
-    Column() {
+    Stack() {
+      // 壁纸衬底：router 独立页透出壁纸，embed 内嵌时由壳层统一铺（组件内渲染为空）
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       this.header()
       if (this.loading) {
         Column({ space: 10 }) {
@@ -574,7 +578,7 @@ export struct WikiAvatarPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
     .onAreaChange((oldValue: Area, newValue: Area) => {
       this.isWide = (newValue.width as number) >= 840;
     })
@@ -584,8 +588,12 @@ export struct WikiAvatarPage {
       showClose: true,
       dragBar: true,
       height: 360,
-      backgroundColor: $r('app.color.card_background'),
+      blurStyle: BlurStyle.Regular,
+      backgroundColor: $r('app.color.sheet_material_tint'),
     })
+    }
+    .width('100%')
+    .height('100%')
   }
 
   @Builder
@@ -679,7 +687,7 @@ export struct WikiAvatarPage {
             .width('100%')
             .padding(8)
             .borderRadius(10)
-            .backgroundColor(this.selectedId === a.id ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+            .backgroundColor(this.selectedId === a.id ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
             .border({
               width: 1,
               color: this.selectedId === a.id ? $r('app.color.app_primary') : WikiAvatarPage.qualityColor(a.quality),
@@ -801,7 +809,7 @@ export struct WikiAvatarPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_background'))
+      .backgroundColor($r('app.color.card_surface'))
     }
   }
 
@@ -874,7 +882,7 @@ export struct WikiAvatarPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   @Builder
@@ -994,7 +1002,7 @@ export struct WikiAvatarPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   /** 天赋技能卡（无参：读 @State current） */
@@ -1049,7 +1057,7 @@ export struct WikiAvatarPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   /** 命座卡（无参：读 @State current） */
@@ -1102,7 +1110,7 @@ export struct WikiAvatarPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   /** 料理卡（无参：读 @State current） */
@@ -1134,7 +1142,7 @@ export struct WikiAvatarPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   /** 语音/故事卡（kind：'fetters'|'stories'；直接读 @State current，切换角色自动刷新） */
@@ -1169,7 +1177,7 @@ export struct WikiAvatarPage {
         .width('100%')
         .padding(14)
         .borderRadius($r('app.float.card_radius'))
-        .backgroundColor($r('app.color.card_background'))
+        .backgroundColor($r('app.color.card_surface'))
       }
     }
   }
@@ -1238,7 +1246,7 @@ export struct WikiAvatarPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_background'))
+      .backgroundColor($r('app.color.card_surface'))
     }
   }
 
@@ -1279,7 +1287,7 @@ export struct WikiAvatarPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_background'))
+      .backgroundColor($r('app.color.card_surface'))
     }
   }
 

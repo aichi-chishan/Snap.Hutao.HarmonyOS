@@ -131,6 +131,22 @@
     {
       "name": "ann_time_red",
       "value": "#FFFF5252"
+    },
+    {
+      "name": "card_surface",
+      "value": "#B3FFFFFF"
+    },
+    {
+      "name": "card_stroke",
+      "value": "#29000000"
+    },
+    {
+      "name": "sheet_material_tint",
+      "value": "#BFFFFFFF"
+    },
+    {
+      "name": "overlay_scrim",
+      "value": "#52000000"
     }
   ]
 }

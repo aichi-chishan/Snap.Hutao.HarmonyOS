@@ -13,6 +13,7 @@ import { NavIcon } from '../components/NavIcon';
 import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
 import { DateUtil } from '../common/DateUtil';
 import { MetaIcon } from '../components/MetaIcon';
+import { PageBackdrop } from '../components/PageBackdrop';
 import { WikiMetaService } from '../service/WikiMetaService';
 import { TowerMetadataService, TowerBuff, TowerWaveView, ChamberWaves, TowerMonsterView } from '../service/TowerMetadataService';
 
@@ -106,8 +107,8 @@ export struct SpiralAbyssPage {
     .width('100%')
     .padding(14)
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   @Builder
@@ -243,15 +244,15 @@ export struct SpiralAbyssPage {
         .width('100%')
         .padding(10)
         .borderRadius(10)
-        .backgroundColor($r('app.color.card_background'))
-        .border({ width: 1, color: $r('app.color.divider') })
+        .backgroundColor($r('app.color.card_surface'))
+        .border({ width: 1, color: $r('app.color.card_stroke') })
       }, (level: SpiralAbyssLevel, li: number) => `${li}_${level.index}`)
     }
     .width('100%')
     .padding(12)
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   @Builder
@@ -362,8 +363,8 @@ export struct SpiralAbyssPage {
       .width('100%')
       .padding(14)
       .borderRadius(12)
-      .backgroundColor($r('app.color.card_background'))
-      .border({ width: 1, color: $r('app.color.divider') })
+      .backgroundColor($r('app.color.card_surface'))
+      .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
 
@@ -412,7 +413,9 @@ export struct SpiralAbyssPage {
   }
 
   build() {
-    Column() {
+    Stack() {
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       this.header()
       if (!this.isLoggedIn) {
         this.loginGuide()
@@ -536,8 +539,8 @@ export struct SpiralAbyssPage {
               .width('100%')
               .padding(14)
               .borderRadius(12)
-              .backgroundColor($r('app.color.card_background'))
-              .border({ width: 1, color: $r('app.color.divider') })
+              .backgroundColor($r('app.color.card_surface'))
+              .border({ width: 1, color: $r('app.color.card_stroke') })
               ForEach(this.vm.abyss.floors, (floor: SpiralAbyssFloor, fi: number) => {
                 this.floorSection(floor)
               }, (floor: SpiralAbyssFloor, fi: number) => `${fi}_${floor.index}`)
@@ -553,7 +556,7 @@ export struct SpiralAbyssPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
     .bindSheet(this.showVerify, () => {
       RiskVerifyDialog({
         isShow: this.showVerify,
@@ -565,7 +568,10 @@ export struct SpiralAbyssPage {
           this.vm.resetRiskAndReload(this.currentUid);
         },
       })
-    }, { height: 420, backgroundColor: $r('app.color.page_background'), showClose: false, blurStyle: BlurStyle.Regular })
+    }, { height: 420, backgroundColor: $r('app.color.sheet_material_tint'), showClose: false, blurStyle: BlurStyle.Regular })
+    }
+    .width('100%')
+    .height('100%')
   }
 
   @Builder

@@ -9,6 +9,7 @@ import { BaseValueService } from '../service/BaseValueService';
 import { CharacterViewModel, AddPlanResult } from '../viewmodel/CharacterViewModel';
 import { CultivationRepo, CultivateProject } from '../data/repo/CultivationRepo';
 import { AppBackButton } from '../components/AppBackButton';
+import { PageBackdrop } from '../components/PageBackdrop';
 import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 
@@ -256,7 +257,10 @@ export struct WikiWeaponPage {
   }
 
   build() {
-    Column() {
+    Stack() {
+      // 壁纸衬底：router 独立页透出壁纸，embed 内嵌时由壳层统一铺（组件内渲染为空）
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       this.header()
       if (this.loading) {
         Column({ space: 10 }) {
@@ -286,7 +290,7 @@ export struct WikiWeaponPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
     .onAreaChange((oldValue: Area, newValue: Area) => {
       this.isWide = (newValue.width as number) >= 840;
     })
@@ -296,8 +300,12 @@ export struct WikiWeaponPage {
       showClose: true,
       dragBar: true,
       height: 360,
-      backgroundColor: $r('app.color.card_background'),
+      blurStyle: BlurStyle.Regular,
+      backgroundColor: $r('app.color.sheet_material_tint'),
     })
+    }
+    .width('100%')
+    .height('100%')
   }
 
   @Builder
@@ -389,7 +397,7 @@ export struct WikiWeaponPage {
             .width('100%')
             .padding(8)
             .borderRadius(10)
-            .backgroundColor(this.selectedId === w.id ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+            .backgroundColor(this.selectedId === w.id ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
             .border({
               width: 1,
               color: this.selectedId === w.id ? $r('app.color.app_primary') : WikiWeaponPage.rankColor(w.rankLevel),
@@ -450,7 +458,7 @@ export struct WikiWeaponPage {
           .width('100%')
           .padding(14)
           .borderRadius($r('app.float.card_radius'))
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
 
           // 养成计划操作区（对齐 Windows WikiWeaponPage 命令区 CultivateCommand）
           this.planActionBlock()
@@ -487,7 +495,7 @@ export struct WikiWeaponPage {
             .width('100%')
             .padding(14)
             .borderRadius($r('app.float.card_radius'))
-            .backgroundColor($r('app.color.card_background'))
+            .backgroundColor($r('app.color.card_surface'))
           }
 
           // 养成材料卡
@@ -517,7 +525,7 @@ export struct WikiWeaponPage {
             .width('100%')
             .padding(14)
             .borderRadius($r('app.float.card_radius'))
-            .backgroundColor($r('app.color.card_background'))
+            .backgroundColor($r('app.color.card_surface'))
           }
 
           Text('数据来源：Snap.Metadata（本地打包）')
@@ -607,6 +615,6 @@ export struct WikiWeaponPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 }

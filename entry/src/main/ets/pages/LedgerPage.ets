@@ -10,6 +10,7 @@ import { LedgerIncomeSource } from '../model/Ledger';
 import { LedgerService } from '../service/LedgerService';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageHeader } from '../components/PageHeader';
+import { PageBackdrop } from '../components/PageBackdrop';
 import { NavIcon } from '../components/NavIcon';
 import { Logger } from '../common/Logger';
 
@@ -99,7 +100,9 @@ export struct LedgerPage {
   }
 
   build() {
-    Column() {
+    Stack() {
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       if (this.embedMode) {
         PageHeader({ title: '旅行者札记' })
       } else {
@@ -210,8 +213,8 @@ export struct LedgerPage {
             .width('100%')
             .padding(12)
             .borderRadius(12)
-            .backgroundColor($r('app.color.card_background'))
-            .border({ width: 1, color: $r('app.color.divider') })
+            .backgroundColor($r('app.color.card_surface'))
+            .border({ width: 1, color: $r('app.color.card_stroke') })
 
             // 当月原石
             Column({ space: 8 }) {
@@ -239,8 +242,8 @@ export struct LedgerPage {
             .width('100%')
             .padding(14)
             .borderRadius(12)
-            .backgroundColor($r('app.color.card_background'))
-            .border({ width: 1, color: $r('app.color.divider') })
+            .backgroundColor($r('app.color.card_surface'))
+            .border({ width: 1, color: $r('app.color.card_stroke') })
 
             // 当月摩拉
             Column({ space: 8 }) {
@@ -268,8 +271,8 @@ export struct LedgerPage {
             .width('100%')
             .padding(14)
             .borderRadius(12)
-            .backgroundColor($r('app.color.card_background'))
-            .border({ width: 1, color: $r('app.color.divider') })
+            .backgroundColor($r('app.color.card_surface'))
+            .border({ width: 1, color: $r('app.color.card_stroke') })
 
             // 分类来源明细（group_by 条形）
             Column({ space: 8 }) {
@@ -305,8 +308,8 @@ export struct LedgerPage {
             .width('100%')
             .padding(14)
             .borderRadius(12)
-            .backgroundColor($r('app.color.card_background'))
-            .border({ width: 1, color: $r('app.color.divider') })
+            .backgroundColor($r('app.color.card_surface'))
+            .border({ width: 1, color: $r('app.color.card_stroke') })
           }
           .width('100%')
           .padding({ left: 16, right: 16, bottom: 16 })
@@ -319,6 +322,9 @@ export struct LedgerPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
+    }
+    .width('100%')
+    .height('100%')
   }
 }

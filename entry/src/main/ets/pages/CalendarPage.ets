@@ -15,6 +15,7 @@ import { ErrorHint } from '../components/ErrorHint';
 import { AppBackButton } from '../components/AppBackButton';
 import { NavIcon } from '../components/NavIcon';
 import { MetaIcon } from '../components/MetaIcon';
+import { PageBackdrop } from '../components/PageBackdrop';
 
 @Entry
 @Component
@@ -171,8 +172,8 @@ export struct CalendarPage {
     .width('100%')
     .padding(14)
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   /** 周条（7 天切换；生日角色有角标，对齐 Windows CalendarCard 周历） */
@@ -435,13 +436,15 @@ export struct CalendarPage {
       .width('100%')
       .padding(12)
       .borderRadius(12)
-      .backgroundColor($r('app.color.card_background'))
-      .border({ width: 1, color: $r('app.color.divider') })
+      .backgroundColor($r('app.color.card_surface'))
+      .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
 
   build() {
-    Column() {
+    Stack() {
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       this.header()
       // 周视图（生日 + 材料轮换）不依赖登录，未登录也可见
       Column({ space: 8 }) {
@@ -508,14 +511,18 @@ export struct CalendarPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
     // 材料详情半窗（点击材料图标打开）
     .bindSheet($$this.showMatSheet, this.matSheet(), {
       title: { title: '材料详情' },
       showClose: true,
       dragBar: true,
       height: 420,
-      backgroundColor: $r('app.color.card_background'),
+      blurStyle: BlurStyle.Regular,
+      backgroundColor: $r('app.color.sheet_material_tint'),
     })
+    }
+    .width('100%')
+    .height('100%')
   }
 }

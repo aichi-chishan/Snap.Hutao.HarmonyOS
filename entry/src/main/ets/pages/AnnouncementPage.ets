@@ -12,6 +12,7 @@ import { Loading } from '../components/Loading';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorHint } from '../components/ErrorHint';
 import { AppBackButton } from '../components/AppBackButton';
+import { PageBackdrop } from '../components/PageBackdrop';
 
 @Entry
 @Component
@@ -93,7 +94,7 @@ export struct AnnouncementPage {
         .fontSize(13)
         .height(34)
         .width('100%')
-        .backgroundColor($r('app.color.card_background'))
+        .backgroundColor($r('app.color.card_surface'))
         .fontColor($r('app.color.text_primary'))
         .onClick(() => {
           this.showCodeSheet = false;
@@ -102,7 +103,7 @@ export struct AnnouncementPage {
     .width(360)
     .padding(16)
     .borderRadius(16)
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
   }
 
   @Builder
@@ -122,7 +123,7 @@ export struct AnnouncementPage {
           .fontSize(12)
           .height(28)
           .margin({ right: 8 })
-          .backgroundColor(this.showCodeSheet ? $r('app.color.app_primary') : $r('app.color.card_background'))
+          .backgroundColor(this.showCodeSheet ? $r('app.color.app_primary') : $r('app.color.card_surface'))
           .fontColor(this.showCodeSheet ? Color.White : $r('app.color.app_primary'))
           .border({ width: 1, color: $r('app.color.app_primary') })
           .hoverEffect(HoverEffect.Highlight)
@@ -155,8 +156,8 @@ export struct AnnouncementPage {
             .fontColor(this.vm.currentIndex === idx ? Color.White : $r('app.color.text_primary'))
             .padding({ left: 16, right: 16, top: 6, bottom: 6 })
             .borderRadius(12)
-            .backgroundColor(this.vm.currentIndex === idx ? $r('app.color.app_primary') : $r('app.color.card_background'))
-            .border({ width: 1, color: $r('app.color.divider') })
+            .backgroundColor(this.vm.currentIndex === idx ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+            .border({ width: 1, color: $r('app.color.card_stroke') })
             .onClick(() => {
               this.vm.selectGroup(idx);
             })
@@ -276,8 +277,8 @@ export struct AnnouncementPage {
     }
     .width('100%')
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_background'))
-    .border({ width: 1, color: $r('app.color.divider') })
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
     .clip(true)
     .onClick(() => {
       // 优先传 annId 拼官方详情页；无 annId 时用外链；banner 供详情页正文顶部展示
@@ -293,6 +294,8 @@ export struct AnnouncementPage {
 
   build() {
     Stack() {
+      // 壁纸衬底：router 独立页透出壁纸，embed 内嵌时由壳层统一铺（组件内渲染为空）
+      PageBackdrop({ embedMode: this.embedMode })
       Column() {
         this.header()
         this.categoryTabs()
@@ -341,7 +344,7 @@ export struct AnnouncementPage {
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
-        .backgroundColor('#66000000')
+        .backgroundColor($r('app.color.overlay_scrim'))
         .onClick(() => {
           this.showCodeSheet = false;
         })
@@ -349,7 +352,7 @@ export struct AnnouncementPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
     .onAreaChange((oldValue: Area, newValue: Area) => {
       this.vm.isWide = (newValue.width as number) >= 840;
     })

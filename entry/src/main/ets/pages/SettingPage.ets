@@ -16,6 +16,7 @@ import { GachaRepo } from '../data/repo/GachaRepo';
 import { GachaArchive } from '../model/GachaArchive';
 import { Logger } from '../common/Logger';
 import { AppBackButton } from '../components/AppBackButton';
+import { PageBackdrop } from '../components/PageBackdrop';
 import EntryAbility from '../entryability/EntryAbility';
 import { GameDataService } from '../service/GameDataService';
 import { GameDataUpdater } from '../data/remote/GameDataUpdater';
@@ -600,8 +601,8 @@ export struct SettingPage {
       .fontColor(this.themeMode === mode ? Color.White : $r('app.color.text_primary'))
       .padding({ left: 18, right: 18, top: 8, bottom: 8 })
       .borderRadius(12)
-      .backgroundColor(this.themeMode === mode ? $r('app.color.app_primary') : $r('app.color.card_background'))
-      .border({ width: 1, color: $r('app.color.divider') })
+      .backgroundColor(this.themeMode === mode ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+      .border({ width: 1, color: $r('app.color.card_stroke') })
       .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
         this.themeMode = mode;
@@ -616,8 +617,8 @@ export struct SettingPage {
       .fontColor(this.ambientLevel === level ? Color.White : $r('app.color.text_primary'))
       .padding({ left: 18, right: 18, top: 8, bottom: 8 })
       .borderRadius(12)
-      .backgroundColor(this.ambientLevel === level ? $r('app.color.app_primary') : $r('app.color.card_background'))
-      .border({ width: 1, color: $r('app.color.divider') })
+      .backgroundColor(this.ambientLevel === level ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+      .border({ width: 1, color: $r('app.color.card_stroke') })
       .layoutWeight(1)
       .textAlign(TextAlign.Center)
       .hoverEffect(HoverEffect.Highlight)
@@ -651,15 +652,18 @@ export struct SettingPage {
     }
     .width('100%')
     .padding(14)
-    .backgroundColor($r('app.color.card_background'))
+    .backgroundColor($r('app.color.card_surface'))
     .borderRadius(12)
-    .border({ width: 1, color: $r('app.color.divider') })
+    .border({ width: 1, color: $r('app.color.card_stroke') })
     .hoverEffect(HoverEffect.Highlight)
     .onClick(action)
   }
 
   build() {
-    Column() {
+    Stack() {
+      // 壁纸衬底：router 独立页透出壁纸，embed 内嵌时由壳层统一铺（组件内渲染为空）
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
       this.header()
       Scroll() {
         Column({ space: 10 }) {
@@ -674,9 +678,9 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .borderRadius(12)
-          .border({ width: 1, color: $r('app.color.divider') })
+          .border({ width: 1, color: $r('app.color.card_stroke') })
 
           this.sectionTitle('背景图片')
           Column({ space: 8 }) {
@@ -729,9 +733,9 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .borderRadius(12)
-          .border({ width: 1, color: $r('app.color.divider') })
+          .border({ width: 1, color: $r('app.color.card_stroke') })
 
           this.sectionTitle('云资源同步（GitHub 直连失败自动走镜像加速）')
           Row() {
@@ -748,9 +752,9 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .borderRadius(12)
-          .border({ width: 1, color: $r('app.color.divider') })
+          .border({ width: 1, color: $r('app.color.card_stroke') })
           Row() {
             Text('数据源地址')
               .fontSize(12)
@@ -846,8 +850,8 @@ export struct SettingPage {
                     .fontColor($r('app.color.danger'))
                     .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                     .borderRadius(10)
-                    .backgroundColor($r('app.color.card_background'))
-                    .border({ width: 1, color: $r('app.color.divider') })
+                    .backgroundColor($r('app.color.card_surface'))
+                    .border({ width: 1, color: $r('app.color.card_stroke') })
                     .onClick(() => {
                       this.confirmDeleteArchive(row);
                     })
@@ -857,9 +861,9 @@ export struct SettingPage {
             }
             .width('100%')
             .padding(14)
-            .backgroundColor($r('app.color.card_background'))
+            .backgroundColor($r('app.color.card_surface'))
             .borderRadius(12)
-            .border({ width: 1, color: $r('app.color.divider') })
+            .border({ width: 1, color: $r('app.color.card_stroke') })
           }
           Row() {
             Column({ space: 2 }) {
@@ -884,9 +888,9 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .borderRadius(12)
-          .border({ width: 1, color: $r('app.color.divider') })
+          .border({ width: 1, color: $r('app.color.card_stroke') })
 
           this.sectionTitle('无感验证')
           Row() {
@@ -912,8 +916,8 @@ export struct SettingPage {
           .width('100%')
           .padding(14)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
             this.geetestInput = RiskVerifyService.getCustomCompositeUrl();
@@ -933,9 +937,9 @@ export struct SettingPage {
             }
             .width('100%')
             .padding(14)
-            .backgroundColor($r('app.color.card_background'))
+            .backgroundColor($r('app.color.card_surface'))
             .borderRadius(12)
-            .border({ width: 1, color: $r('app.color.divider') })
+            .border({ width: 1, color: $r('app.color.card_stroke') })
             .onClick(() => {
               UserService.getInstance().logout().then(() => {
                 this.toast('已退出登录');
@@ -967,9 +971,9 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .borderRadius(12)
-          .border({ width: 1, color: $r('app.color.divider') })
+          .border({ width: 1, color: $r('app.color.card_stroke') })
 
           this.sectionTitle('主页卡片')
           Text('控制主页仪表板各卡片的显示与排列顺序（对齐 Windows 主页卡片设置）')
@@ -1017,9 +1021,9 @@ export struct SettingPage {
             }
             .width('100%')
             .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-            .backgroundColor($r('app.color.card_background'))
+            .backgroundColor($r('app.color.card_surface'))
             .borderRadius(12)
-            .border({ width: 1, color: $r('app.color.divider') })
+            .border({ width: 1, color: $r('app.color.card_stroke') })
           }, (row: HomeCardRow) => `${row.key}_${row.presented}_${row.order}`)
 
           this.sectionTitle('主页游戏活动区域设置')
@@ -1047,9 +1051,9 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .borderRadius(12)
-          .border({ width: 1, color: $r('app.color.divider') })
+          .border({ width: 1, color: $r('app.color.card_stroke') })
           Row() {
             Column({ space: 2 }) {
               Text('是否显示未在进行中的游戏内版本活动事件')
@@ -1074,9 +1078,9 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
           .borderRadius(12)
-          .border({ width: 1, color: $r('app.color.divider') })
+          .border({ width: 1, color: $r('app.color.card_stroke') })
 
           this.sectionTitle('备份与还原')
           Row() {
@@ -1100,8 +1104,8 @@ export struct SettingPage {
           .width('100%')
           .padding(14)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
             this.exportBackup();
@@ -1127,8 +1131,8 @@ export struct SettingPage {
           .width('100%')
           .padding(14)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
             this.confirmRestoreBackup();
@@ -1160,8 +1164,8 @@ export struct SettingPage {
           .width('100%')
           .padding(14)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_background'))
-          .border({ width: 1, color: $r('app.color.divider') })
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
             this.checkAppUpdate();
@@ -1199,7 +1203,7 @@ export struct SettingPage {
                 .fontSize(13)
                 .height(34)
                 .layoutWeight(1)
-                .backgroundColor($r('app.color.card_background'))
+                .backgroundColor($r('app.color.card_surface'))
                 .fontColor($r('app.color.text_primary'))
                 .onClick(() => {
                   this.showUrlEdit = false;
@@ -1219,12 +1223,12 @@ export struct SettingPage {
           .width('100%')
           .padding(16)
           .borderRadius(16)
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
         }
         .width('100%')
         .padding({ left: 20, right: 20 })
         .justifyContent(FlexAlign.Center)
-        .backgroundColor('#66000000')
+        .backgroundColor($r('app.color.overlay_scrim'))
         .onClick(() => {
           this.showUrlEdit = false;
         })
@@ -1253,7 +1257,7 @@ export struct SettingPage {
                 .fontSize(13)
                 .height(34)
                 .layoutWeight(1)
-                .backgroundColor($r('app.color.card_background'))
+                .backgroundColor($r('app.color.card_surface'))
                 .fontColor($r('app.color.text_primary'))
                 .onClick(() => {
                   this.showGeetestEdit = false;
@@ -1273,12 +1277,12 @@ export struct SettingPage {
           .width('100%')
           .padding(16)
           .borderRadius(16)
-          .backgroundColor($r('app.color.card_background'))
+          .backgroundColor($r('app.color.card_surface'))
         }
         .width('100%')
         .padding({ left: 20, right: 20 })
         .justifyContent(FlexAlign.Center)
-        .backgroundColor('#66000000')
+        .backgroundColor($r('app.color.overlay_scrim'))
         .onClick(() => {
           this.showGeetestEdit = false;
         })
@@ -1286,6 +1290,9 @@ export struct SettingPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .backgroundColor(Color.Transparent)
+    }
+    .width('100%')
+    .height('100%')
   }
 }

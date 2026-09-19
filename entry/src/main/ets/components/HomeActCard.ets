@@ -196,15 +196,16 @@ export struct HomeActCard {
       .width('100%')
       .padding(12)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_background'))
-      .border({ width: 1, color: this.isCardPool() ? $r('app.color.app_primary') : $r('app.color.divider') })
+      .backgroundColor($r('app.color.card_surface'))
+      .border({ width: 1, color: this.isCardPool() ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
       // 奖励网格半窗（$$ 双向同步下滑关闭）
       .bindSheet($$this.showRewardSheet, this.rewardSheet(), {
         title: { title: '活动奖励' },
         showClose: true,
         dragBar: true,
         height: 420,
-        backgroundColor: $r('app.color.card_background'),
+        blurStyle: BlurStyle.Regular,
+        backgroundColor: $r('app.color.sheet_material_tint'),
       })
     }
   }

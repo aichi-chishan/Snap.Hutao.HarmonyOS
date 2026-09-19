@@ -159,7 +159,8 @@ export default class EntryAbility extends UIAbility {
   static applyWindowBackdrop(mainWindow: window.Window): void {
     const isDark: boolean = AppStorage.get<boolean>('isDarkMode') ?? false;
     try {
-      mainWindow.setWindowBackgroundColor(isDark ? '#FF141418' : '#FFFFFFFF');
+      // 浅色与 wallpaper_base 同系（#F2F0EC 加 FF 不透明前缀，#AARRGGBB），对齐 Windows Mica Base 底色
+      mainWindow.setWindowBackgroundColor(isDark ? '#FF141418' : '#FFF2F0EC');
     } catch (e) {
       hilog.warn(DOMAIN, TAG, 'setWindowBackgroundColor fail: %{public}s', JSON.stringify(e));
     }
