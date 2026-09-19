@@ -7,6 +7,7 @@ import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { UserService } from '../service/UserService';
 import { NotificationHelper } from '../data/local/NotificationHelper';
 import { DailyNoteService } from '../service/DailyNoteService';
+import { AutoSignInService } from '../service/AutoSignInService';
 import { AppContextProvider } from '../common/AppContext';
 import { buildRiskVerifyOverlay } from '../components/RiskVerifyModal';
 
@@ -206,6 +207,10 @@ export default class EntryAbility extends UIAbility {
       await NotificationHelper.init();
       // 恢复登录态（预登录态）：AppStorage currentUser/currentUid/isLoggedIn
       await UserService.getInstance().restoreSession();
+      // 启动自动签到（默认开启；今日已签/失败冷却中静默跳过，对齐 Windows AutoSignInService）
+      AutoSignInService.getInstance().bootstrapAutoSignIn().catch((e: Error) => {
+        hilog.warn(DOMAIN, TAG, 'auto sign in fail: %{public}s', e.message);
+      });
       // 便笺自动刷新：按偏好启动定时器，缓存过期则后台补一次（不 await，避免阻塞首帧）
       DailyNoteService.getInstance().bootstrapAutoRefresh().catch((e: Error) => {
         hilog.warn(DOMAIN, TAG, 'bootstrap auto refresh fail: %{public}s', e.message);

@@ -122,6 +122,8 @@ export struct SettingPage {
   @State homeActPreview: boolean = false;
   /** 主页卡片配置行（显隐 + 顺序，对齐 Windows SettingHomeCardViewModel） */
   @State homeCardRows: HomeCardRow[] = [];
+  /** 自动签到开关（默认开，对齐 Windows AutoSignInEnabled 默认 true） */
+  @State autoSignIn: boolean = true;
   @StorageProp('isLoggedIn') isLoggedIn: boolean = false;
   /** 祈愿归档（数据管理） */
   @State gachaRows: GachaArchiveRow[] = [];
@@ -146,6 +148,7 @@ export struct SettingPage {
       this.loadHutaoDaily();
     }
     this.homeActCalendarShown = PreferencesStore.getHomeActCalendar();
+    this.autoSignIn = PreferencesStore.getAutoSignInEnabled();
     this.loadHomeCardRows();
     this.homeActPreview = PreferencesStore.getHomeActPreview();
     this.loadAppVersion();
@@ -939,6 +942,34 @@ export struct SettingPage {
               });
             })
           }
+
+          this.sectionTitle('每日签到')
+          Row() {
+            Column({ space: 2 }) {
+              Text('启动时自动签到')
+                .fontSize(15)
+                .fontColor($r('app.color.text_primary'))
+              Text('按当前 UID 记录进度：今日已签或失败 10 分钟冷却内跳过（对齐 Windows 自动签到）')
+                .fontSize(11)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text(this.autoSignIn ? '开启' : '关闭')
+              .fontSize(12)
+              .fontColor($r('app.color.text_secondary'))
+            Toggle({ type: ToggleType.Switch, isOn: this.autoSignIn })
+              .margin({ left: 10 })
+              .onChange((isOn: boolean) => {
+                this.autoSignIn = isOn;
+                PreferencesStore.setAutoSignInEnabled(isOn);
+              })
+          }
+          .width('100%')
+          .padding(14)
+          .backgroundColor($r('app.color.card_background'))
+          .borderRadius(12)
+          .border({ width: 1, color: $r('app.color.divider') })
 
           this.sectionTitle('主页卡片')
           Text('控制主页仪表板各卡片的显示与排列顺序（对齐 Windows 主页卡片设置）')

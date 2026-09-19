@@ -253,6 +253,43 @@ export class PreferencesStore {
     PreferencesStore.setNumber(`home.card_${key}_order`, order);
   }
 
+  // ---- 自动签到（对齐 Windows AutoSignInService：默认开，按 UID 记进度/冷却）----
+
+  static getAutoSignInEnabled(): boolean {
+    return PreferencesStore.getBool('signin.auto_enabled', true);
+  }
+
+  static setAutoSignInEnabled(v: boolean): void {
+    PreferencesStore.setBool('signin.auto_enabled', v);
+  }
+
+  /** 某 UID 已自动签到的服务器日 key（如 cn_gf01:2026-09-19） */
+  static getAutoSignInCompletedDay(uid: string): string {
+    return PreferencesStore.getString(`signin.auto_completed_${uid}`, '');
+  }
+
+  static setAutoSignInCompletedDay(uid: string, dayKey: string): void {
+    PreferencesStore.setString(`signin.auto_completed_${uid}`, dayKey);
+  }
+
+  /** 某 UID 上次自动签到失败时间戳（ms；0=无失败） */
+  static getAutoSignInLastFail(uid: string): number {
+    return PreferencesStore.getNumber(`signin.auto_lastfail_${uid}`, 0);
+  }
+
+  static setAutoSignInLastFail(uid: string, ms: number): void {
+    PreferencesStore.setNumber(`signin.auto_lastfail_${uid}`, ms);
+  }
+
+  /** 某 UID 上次自动签到的区服（变更时重置进度，对齐 Windows LastRegion） */
+  static getAutoSignInRegion(uid: string): string {
+    return PreferencesStore.getString(`signin.auto_region_${uid}`, '');
+  }
+
+  static setAutoSignInRegion(uid: string, region: string): void {
+    PreferencesStore.setString(`signin.auto_region_${uid}`, region);
+  }
+
   /** 启动次数自增（欢迎语文案；EntryAbility onCreate 调用一次） */
   static bumpLaunchTimes(): number {
     const n: number = PreferencesStore.getNumber(PreferencesStore.KEY_LAUNCH_TIMES, 0) + 1;

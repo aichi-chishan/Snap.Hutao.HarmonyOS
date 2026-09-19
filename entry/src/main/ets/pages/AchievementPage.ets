@@ -524,6 +524,28 @@ export struct AchievementPage {
           .fontColor($r('app.color.text_secondary'))
       }
       .width('100%')
+      // 分类完成率明细（对齐 Windows AchievementGoalView.FinishPercent 进度面板）
+      ForEach(this.catStats, (cs: CategoryStats) => {
+        Row({ space: 10 }) {
+          Text(cs.category.name)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .width(120)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Progress({ value: cs.stats.done, total: cs.stats.total, type: ProgressType.Linear })
+            .color($r('app.color.app_primary'))
+            .backgroundColor($r('app.color.divider'))
+            .layoutWeight(1)
+            .style({ strokeWidth: 6 })
+          Text(`${cs.stats.done}/${cs.stats.total}`)
+            .fontSize(10)
+            .fontColor($r('app.color.text_secondary'))
+            .width(64)
+            .textAlign(TextAlign.End)
+        }
+        .width('100%')
+      }, (cs: CategoryStats) => `catbar_${cs.category.id}_${cs.stats.done}`)
     }
     .width('100%')
     .padding(14)

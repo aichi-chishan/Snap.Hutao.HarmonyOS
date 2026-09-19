@@ -1,16 +1,19 @@
 /**
  * CalendarPage.ets（@Entry）
- * 活动日历：按时间排序列表，活动/卡池/签到条目含起止时间；未登录引导。
+ * 活动日历：周视图（生日角色 + 当日可刷天赋/武器材料，对齐 Windows CalendarCard）
+ * + 按时间排序列表（活动/卡池/签到条目）；周视图与材料不依赖登录。
  */
-import { router } from '@kit.ArkUI';
+import { router, LengthMetrics } from '@kit.ArkUI';
 import { CalendarViewModel } from '../viewmodel/CalendarViewModel';
 import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
 import { DateUtil } from '../common/DateUtil';
+import { CalendarWeekData, CalendarWeekDay, CalendarWeekService, CalendarBirthday } from '../service/CalendarWeekService';
 import { Loading } from '../components/Loading';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorHint } from '../components/ErrorHint';
 import { AppBackButton } from '../components/AppBackButton';
 import { NavIcon } from '../components/NavIcon';
+import { MetaIcon } from '../components/MetaIcon';
 
 @Entry
 @Component
@@ -22,9 +25,27 @@ export struct CalendarPage {
   @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
   @State vm: CalendarViewModel = new CalendarViewModel();
   @State now: number = Date.now();
+  /** 周视图数据（生日 + 材料轮换；不依赖登录） */
+  @State week: CalendarWeekData | undefined = undefined;
+  /** 选中的周历日下标 */
+  @State weekSelIdx: number = 0;
 
   aboutToAppear(): void {
+    this.loadWeek();
     this.loadData();
+  }
+
+  loadWeek(): void {
+    CalendarWeekService.loadWeek().then((w: CalendarWeekData) => {
+      this.week = w;
+      // 默认选中今日
+      for (let i = 0; i < w.days.length; i++) {
+        if (w.days[i].isToday) {
+          this.weekSelIdx = i;
+          break;
+        }
+      }
+    });
   }
 
   loadData(): void {
@@ -150,9 +171,172 @@ export struct CalendarPage {
     .border({ width: 1, color: $r('app.color.divider') })
   }
 
+  /** 周条（7 天切换；生日角色有角标，对齐 Windows CalendarCard 周历） */
+  @Builder
+  weekStrip() {
+    if (this.week !== undefined) {
+      Row({ space: 6 }) {
+        ForEach(this.week.days, (day: CalendarWeekDay, idx: number) => {
+          Column({ space: 2 }) {
+            Text(day.dayName)
+              .fontSize(10)
+              .fontColor(this.weekSelIdx === idx ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+            Text(day.monthDay)
+              .fontSize(13)
+              .fontWeight(day.isToday ? FontWeight.Bold : FontWeight.Normal)
+              .fontColor(this.weekSelIdx === idx ? $r('app.color.app_primary') : $r('app.color.text_primary'))
+            // 生日角标（🎂）与今日圆点
+            Text(this.week !== undefined && this.week.birthdayFlags[idx] ? '🎂' : (day.isToday ? '·' : ''))
+              .fontSize(10)
+              .height(14)
+          }
+          .layoutWeight(1)
+          .padding({ top: 8, bottom: 6 })
+          .borderRadius(10)
+          .backgroundColor(this.weekSelIdx === idx ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+          .border({
+            width: 1,
+            color: this.weekSelIdx === idx ? $r('app.color.app_primary') : $r('app.color.divider')
+          })
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.weekSelIdx = idx;
+          })
+        }, (day: CalendarWeekDay, idx: number) => `wd_${day.dateMs}_${this.weekSelIdx === idx}`)
+      }
+      .width('100%')
+    }
+  }
+
+  /** 生日头像（MetaIcon 本地图标） */
+  @Builder
+  birthdayCell(b: CalendarBirthday) {
+    Column({ space: 2 }) {
+      if (b.icon.length > 0) {
+        MetaIcon({ category: 'AvatarIcon', name: b.icon, iconSize: 36 })
+          .borderRadius(18)
+          .clip(true)
+      } else {
+        Text(b.name.substring(0, 1))
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .width(36)
+          .height(36)
+          .textAlign(TextAlign.Center)
+          .borderRadius(18)
+          .backgroundColor($r('app.color.app_primary'))
+      }
+      Text(b.name)
+        .fontSize(9)
+        .fontColor($r('app.color.text_secondary'))
+        .maxLines(1)
+    }
+    .width(44)
+  }
+
+  /** 当前选中的周历日（未就绪返回 undefined） */
+  private curWeekDay(): CalendarWeekDay | undefined {
+    if (this.week === undefined || this.weekSelIdx < 0 || this.weekSelIdx >= this.week.days.length) {
+      return undefined;
+    }
+    return this.week.days[this.weekSelIdx];
+  }
+
+  /** 选中日详情：生日角色 + 当日可刷材料（天赋/武器两段，对齐 Windows CalendarCard 内容） */
+  @Builder
+  weekDetail() {
+    if (this.curWeekDay() !== undefined) {
+      Column({ space: 8 }) {
+        Row({ space: 6 }) {
+          Text(`${this.curWeekDay()?.dayName ?? ''} ${this.curWeekDay()?.monthDay ?? ''}${this.curWeekDay()?.isToday === true ? '（今日）' : ''}`)
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .layoutWeight(1)
+          if ((this.curWeekDay()?.birthdays.length ?? 0) > 0) {
+            Text(`${this.curWeekDay()?.birthdays.length ?? 0} 位角色生日`)
+              .fontSize(11)
+              .fontColor($r('app.color.notice_on'))
+          }
+        }
+        .width('100%')
+
+        if ((this.curWeekDay()?.birthdays.length ?? 0) > 0) {
+          Row({ space: 6 }) {
+            ForEach(this.curWeekDay()?.birthdays ?? [], (b: CalendarBirthday) => {
+              this.birthdayCell(b)
+            }, (b: CalendarBirthday) => `bd_${b.name}`)
+          }
+          .width('100%')
+        }
+
+        if ((this.curWeekDay()?.talentNames.length ?? 0) === 0
+          && (this.curWeekDay()?.weaponNames.length ?? 0) === 0) {
+          Text('周日秘境全开，无固定轮换材料')
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+        } else {
+          Text('天赋书')
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+          Flex({
+            wrap: FlexWrap.Wrap,
+            justifyContent: FlexAlign.Start,
+            space: { main: LengthMetrics.vp(6), cross: LengthMetrics.vp(6) }
+          }) {
+            ForEach(this.curWeekDay()?.talentNames ?? [], (name: string, idx: number) => {
+              Text(name)
+                .fontSize(10)
+                .fontColor($r('app.color.text_primary'))
+                .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                .borderRadius(8)
+                .backgroundColor($r('app.color.page_background'))
+                .border({ width: 1, color: $r('app.color.divider') })
+            }, (name: string, idx: number) => `tal_${idx}_${name}`)
+          }
+          .width('100%')
+          Text('武器突破材料')
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+          Flex({
+            wrap: FlexWrap.Wrap,
+            justifyContent: FlexAlign.Start,
+            space: { main: LengthMetrics.vp(6), cross: LengthMetrics.vp(6) }
+          }) {
+            ForEach(this.curWeekDay()?.weaponNames ?? [], (name: string, idx: number) => {
+              Text(name)
+                .fontSize(10)
+                .fontColor($r('app.color.text_primary'))
+                .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                .borderRadius(8)
+                .backgroundColor($r('app.color.page_background'))
+                .border({ width: 1, color: $r('app.color.divider') })
+            }, (name: string, idx: number) => `wea_${idx}_${name}`)
+          }
+          .width('100%')
+        }
+      }
+      .width('100%')
+      .padding(12)
+      .borderRadius(12)
+      .backgroundColor($r('app.color.card_background'))
+      .border({ width: 1, color: $r('app.color.divider') })
+    }
+  }
+
   build() {
     Column() {
       this.header()
+      // 周视图（生日 + 材料轮换）不依赖登录，未登录也可见
+      Column({ space: 8 }) {
+        this.weekStrip()
+        this.weekDetail()
+      }
+      .width('100%')
       if (!this.isLoggedIn) {
         this.loginGuide()
       } else if (this.currentUid.length === 0) {
@@ -168,34 +352,46 @@ export struct CalendarPage {
             })
         }
         .width('100%')
-        .height('100%')
+        .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else {
-        Scroll() {
-          Column({ space: 10 }) {
-            if (this.vm.loading) {
-              Loading()
-            } else if (this.vm.entries.length === 0) {
-              if (this.vm.message.length > 0) {
-                ErrorHint({ text: this.vm.message, onRetry: () => {
-                  this.loadData();
-                } })
-              } else {
-                EmptyState({ icon: '🗓️', text: '暂无活动数据' })
-              }
-            } else {
-              ForEach(this.vm.entries, (entry: ActCalendarEntry) => {
-                this.calendarRow(entry)
-              }, (entry: ActCalendarEntry) => `${entry.name}_${entry.startTime}`)
-            }
+        Column() {
+          Row() {
+            Text('近期活动 / 卡池')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'))
           }
           .width('100%')
-          .padding(16)
-          .alignItems(HorizontalAlign.Center)
+          .padding({ left: 16, top: 6 })
+          Scroll() {
+            Column({ space: 10 }) {
+              if (this.vm.loading) {
+                Loading()
+              } else if (this.vm.entries.length === 0) {
+                if (this.vm.message.length > 0) {
+                  ErrorHint({ text: this.vm.message, onRetry: () => {
+                    this.loadData();
+                  } })
+                } else {
+                  EmptyState({ icon: '🗓️', text: '暂无活动数据' })
+                }
+              } else {
+                ForEach(this.vm.entries, (entry: ActCalendarEntry) => {
+                  this.calendarRow(entry)
+                }, (entry: ActCalendarEntry) => `${entry.name}_${entry.startTime}`)
+              }
+            }
+            .width('100%')
+            .padding(16)
+            .alignItems(HorizontalAlign.Center)
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .align(Alignment.Top)
         }
         .width('100%')
-        .height('100%')
-        .align(Alignment.Top)
+        .layoutWeight(1)
       }
     }
     .width('100%')

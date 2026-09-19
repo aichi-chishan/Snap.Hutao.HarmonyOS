@@ -3,6 +3,7 @@
  * 账号与数据：账号列表/添加/删除/切换；游戏角色绑定与默认 UID 选择；退出登录。
  */
 import { router } from '@kit.ArkUI';
+import { pasteboard } from '@kit.BasicServicesKit';
 import { UserViewModel } from '../viewmodel/UserViewModel';
 import { User } from '../model/User';
 import { UserGameRole } from '../model/UserGameRole';
@@ -79,6 +80,38 @@ export struct UserPage {
 
   toast(msg: string): void {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1800 });
+  }
+
+  /**
+   * 复制 Cookie（对齐 Windows CopyCookieCommand：SToken + LToken + CookieToken 依次拼接）。
+   * 只在剪贴板留痕，不上传；缺哪段跳过哪段。
+   */
+  copyCookie(): void {
+    const user: User | undefined = this.vm.currentUser;
+    if (user === undefined) {
+      this.toast('未登录');
+      return;
+    }
+    const parts: string[] = [];
+    if (user.stoken.length > 0) {
+      parts.push(user.stoken);
+    }
+    if (user.ltoken.length > 0) {
+      parts.push(user.ltoken);
+    }
+    if (user.cookieToken.length > 0) {
+      parts.push(user.cookieToken);
+    }
+    if (parts.length === 0) {
+      this.toast('当前账号没有可复制的凭证');
+      return;
+    }
+    const data: pasteboard.PasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, parts.join(';'));
+    pasteboard.getSystemPasteboard().setData(data).then(() => {
+      this.toast('Cookie 已复制到剪贴板');
+    }).catch(() => {
+      this.toast('复制失败');
+    });
   }
 
   goLogin(): void {
@@ -253,6 +286,16 @@ export struct UserPage {
             UserService.getInstance().refreshCookieTokenForced(user).then((ok: boolean) => {
               this.toast(ok ? '凭证已刷新' : '刷新失败：SToken 已失效，请重新登录');
             });
+          })
+        // 对齐 Windows CopyCookieCommand：拼 SToken/LToken/CookieToken 入剪贴板
+        Button('复制 Cookie')
+          .fontSize(12)
+          .height(26)
+          .margin({ right: 8 })
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary'))
+          .onClick(() => {
+            this.copyCookie();
           })
         Button('刷新角色')
           .fontSize(12)

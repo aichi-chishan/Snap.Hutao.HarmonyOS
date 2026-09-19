@@ -183,7 +183,13 @@ export struct DailyNotePage {
           .fontSize(11)
           .fontColor(Color.White)
           .opacity(0.85)
-        Text(`洞天宝钱 ${note.currentHomeCoin}/${note.maxHomeCoin}`)
+        if (note.resinRecoveryTargetText().length > 0) {
+          Text(note.resinRecoveryTargetText())
+            .fontSize(11)
+            .fontColor(Color.White)
+            .opacity(0.85)
+        }
+        Text(`洞天宝钱 ${note.currentHomeCoin}/${note.maxHomeCoin}${note.homeCoinRecoveryTargetText().length > 0 ? ` · ${note.homeCoinRecoveryTargetText()}` : ''}`)
           .fontSize(11)
           .fontColor(Color.White)
           .opacity(0.85)

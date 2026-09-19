@@ -188,6 +188,39 @@ export class DailyNote {
     return '--';
   }
 
+  /**
+   * 树脂回满目标时刻（"HH:mm 回满"，对齐 Windows ResinRecoveryTargetTime；已满/无数据返回空串）
+   */
+  resinRecoveryTargetText(): string {
+    const sec: number = this.resinRecoverySeconds();
+    if (sec <= 0 || this.currentResin >= this.maxResin) {
+      return '';
+    }
+    return DailyNote.clockText(this.resinRecoveryRemainMs());
+  }
+
+  /** 洞天宝钱回满目标时刻（同树脂口径；已满/无数据返回空串） */
+  homeCoinRecoveryTargetText(): string {
+    const n: number = Number(this.homeCoinRecoveryTime);
+    const sec: number = !Number.isNaN(n) && n > 0 ? (n > 100000000000 ? Math.floor(n / 1000) : n) : 0;
+    if (sec <= 0 || this.currentHomeCoin >= this.maxHomeCoin) {
+      return '';
+    }
+    const anchor: number = this.refreshTime > 0 ? this.refreshTime : Date.now();
+    return DailyNote.clockText(Math.max(0, anchor + sec * 1000 - Date.now()));
+  }
+
+  /** 剩余毫秒 → "HH:mm" 时刻文案 */
+  private static clockText(remainMs: number): string {
+    if (remainMs <= 0) {
+      return '';
+    }
+    const d: Date = new Date(Date.now() + remainMs);
+    const hh: string = `${d.getHours()}`.padStart(2, '0');
+    const mm: string = `${d.getMinutes()}`.padStart(2, '0');
+    return `${hh}:${mm} 回满`;
+  }
+
   /** 回满剩余秒数（resin_recovery_time；兼容历史库里存的字符串形态） */
   resinRecoverySeconds(): number {
     if (this.resinRecoverySecond > 0) {
