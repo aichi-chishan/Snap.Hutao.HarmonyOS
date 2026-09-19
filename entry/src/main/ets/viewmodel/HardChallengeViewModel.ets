@@ -4,8 +4,10 @@
  * 对齐 Windows DataEntryView：single/mp 各一个 DataEntry（hasData/best/challenges），
  * 仅「单挑/联机」两项切换（Segmented 两项），无难度列表。
  */
-import { HardChallengeRoot, HardChallengeDataEntry, HardChallengeChallenge, HardChallengeBest, HardChallengeSimpleAvatar } from '../model/HardChallenge';
+import { HardChallengeRoot, HardChallengeDataEntry, HardChallengeChallenge, HardChallengeBest,
+  HardChallengeSimpleAvatar, HardChallengeScheduleItem } from '../model/HardChallenge';
 import { HardChallengeService } from '../service/HardChallengeService';
+import { HardChallengeRepo, HardChallengeHistoryEntry } from '../data/repo/HardChallengeRepo';
 import { RiskControlError } from '../data/network/RiskVerifier';
 import { RiskUiHelper } from '../common/RiskUiHelper';
 
@@ -21,6 +23,12 @@ export class HardChallengeViewModel {
   /** 档位：0=单挑 1=联机 */
   modeIndex: number = 0;
   scheduleName: string = '';
+  /** 当前期 schedule_id（实时/历史存档均更新；期数 chips 高亮与入库键） */
+  scheduleId: number = 0;
+  /** 本地累积的期数历史（新期在前） */
+  history: HardChallengeHistoryEntry[] = [];
+  /** 当前数据是否来自历史存档（false=实时数据） */
+  fromHistory: boolean = false;
   loading: boolean = false;
   message: string = '';
   loaded: boolean = false;
@@ -45,10 +53,21 @@ export class HardChallengeViewModel {
       this.single = root.data.single;
       this.mp = root.data.mp;
       this.blings = root.data.blings;
+      this.scheduleId = 0;
       if (root.data.schedule.length > 0) {
         this.scheduleName = root.data.schedule[0].name;
+        this.scheduleId = root.data.schedule[0].scheduleId;
       }
       this.message = '';
+      this.fromHistory = false;
+      // 期数历史入库（当期一条，按 schedule_id UPSERT，对齐 Windows HardChallengeEntry：
+      // 单挑/联机均无数据不入库）
+      if (this.scheduleId > 0 && (this.single.hasData || this.mp.hasData)) {
+        const s: HardChallengeScheduleItem = root.data.schedule[0];
+        await HardChallengeRepo.saveHistory(this.scheduleId, s.startTime * 1000, s.endTime * 1000,
+          root.rawJson);
+      }
+      this.history = await HardChallengeRepo.listHistory();
     } catch (e) {
       if (e instanceof RiskControlError) {
         this.needRiskVerify = true;
@@ -68,6 +87,38 @@ export class HardChallengeViewModel {
   /** 按档位取 DataEntry（页面 @State modeIndex 驱动） */
   entryOf(mode: number): HardChallengeDataEntry {
     return mode === 0 ? this.single : this.mp;
+  }
+
+  /** 刷新本地期数历史列表（进页时） */
+  async loadHistoryList(): Promise<void> {
+    this.history = await HardChallengeRepo.listHistory();
+  }
+
+  /** 回看历史期数（本地存档重建，不发网络请求） */
+  async loadFromHistory(scheduleId: number): Promise<void> {
+    const raw: string = await HardChallengeRepo.getRawJson(scheduleId);
+    if (raw.length === 0) {
+      return;
+    }
+    const root: HardChallengeRoot = HardChallengeRoot.fromJson(JSON.parse(raw));
+    this.isUnlock = root.isUnlock;
+    this.single = root.data.single;
+    this.mp = root.data.mp;
+    this.blings = root.data.blings;
+    this.scheduleId = 0;
+    if (root.data.schedule.length > 0) {
+      this.scheduleName = root.data.schedule[0].name;
+      this.scheduleId = root.data.schedule[0].scheduleId;
+    }
+    this.fromHistory = true;
+    this.message = `历史存档 · 第 ${scheduleId} 期`;
+    this.loaded = true;
+  }
+
+  /** 回到实时数据（重新拉取） */
+  async backToLive(uid: string): Promise<void> {
+    this.fromHistory = false;
+    await this.load(uid);
   }
 
   /** 兼容旧调用：页面切档 */

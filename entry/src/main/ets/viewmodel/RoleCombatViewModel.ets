@@ -4,6 +4,7 @@
  */
 import { RoleCombatRoot, RoleCombatDataItem, RoleCombatRoundData } from '../model/RoleCombat';
 import { RoleCombatService } from '../service/RoleCombatService';
+import { RoleCombatRepo, RoleCombatHistoryEntry } from '../data/repo/RoleCombatRepo';
 import { RiskControlError } from '../data/network/RiskVerifier';
 import { RiskUiHelper } from '../common/RiskUiHelper';
 
@@ -17,6 +18,10 @@ export class RoleCombatViewModel {
   loading: boolean = false;
   message: string = '';
   loaded: boolean = false;
+  /** 本地累积的期数历史（新期在前） */
+  history: RoleCombatHistoryEntry[] = [];
+  /** 当前数据是否来自历史存档（false=实时数据） */
+  fromHistory: boolean = false;
   /** 风控需人机验证（true 时 UI 跳转极验页） */
   needRiskVerify: boolean = false;
   riskGt: string = '';
@@ -46,6 +51,19 @@ export class RoleCombatViewModel {
       if (this.dataItems.length > 0 && this.currentIndex >= this.dataItems.length) {
         this.currentIndex = 0;
       }
+      this.fromHistory = false;
+      this.message = '';
+      // 期数历史入库（每期一条，按 schedule_id UPSERT，对齐 Windows RoleCombatEntry）
+      for (let i = 0; i < root.data.length; i++) {
+        const item: RoleCombatDataItem = root.data[i];
+        if (!item.hasData || item.schedule.scheduleId <= 0) {
+          continue;
+        }
+        const raw: string = i < root.itemRawJson.length ? root.itemRawJson[i] : '';
+        await RoleCombatRepo.saveHistory(item.schedule.scheduleId, item.schedule.startTime * 1000,
+          item.schedule.endTime * 1000, raw);
+      }
+      this.history = await RoleCombatRepo.listHistory();
     } catch (e) {
       if (e instanceof RiskControlError) {
         this.needRiskVerify = true;
@@ -64,6 +82,35 @@ export class RoleCombatViewModel {
 
   select(index: number): void {
     this.currentIndex = index;
+  }
+
+  /** 刷新本地期数历史列表（进页时） */
+  async loadHistoryList(): Promise<void> {
+    this.history = await RoleCombatRepo.listHistory();
+  }
+
+  /** 回看历史期数（本地存档重建，不发网络请求） */
+  async loadFromHistory(scheduleId: number): Promise<void> {
+    const raw: string = await RoleCombatRepo.getRawJson(scheduleId);
+    if (raw.length === 0) {
+      return;
+    }
+    const item: RoleCombatDataItem = RoleCombatRoot.dataItemFromJson(JSON.parse(raw));
+    if (!item.hasData) {
+      return;
+    }
+    this.dataItems = [item];
+    this.currentIndex = 0;
+    this.isUnlock = true;
+    this.fromHistory = true;
+    this.message = `历史存档 · 第 ${scheduleId} 期`;
+    this.loaded = true;
+  }
+
+  /** 回到实时数据（重新拉取） */
+  async backToLive(uid: string): Promise<void> {
+    this.fromHistory = false;
+    await this.load(uid);
   }
 
   /** 当前档期回合数列表（有回合数据的） */

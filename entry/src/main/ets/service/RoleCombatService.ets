@@ -70,6 +70,13 @@ export class RoleCombatService {
       throw new Error(resp.userFriendlyMessage());
     }
     const root: RoleCombatRoot = RoleCombatRoot.fromJson(resp.data);
+    // 各期原始 JSON（与 data[] 下标一一对应，期数历史入库用；回看时 dataItemFromJson 重建）
+    const dataArr = (resp.data as Record<string, Object>)['data'] as Array<Object>;
+    if (dataArr !== undefined && dataArr !== null) {
+      for (let i = 0; i < dataArr.length; i++) {
+        root.itemRawJson.push(JSON.stringify(dataArr[i]));
+      }
+    }
     Logger.info(TAG, `roleCombat unlock=${root.isUnlock} data=${root.data.length}`);
     return root;
   }

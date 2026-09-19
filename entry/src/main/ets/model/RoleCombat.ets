@@ -121,6 +121,13 @@ export class RoleCombatDataItem {
 export class RoleCombatRoot {
   data: RoleCombatDataItem[] = [];
   isUnlock: boolean = false;
+  /** 各期原始 JSON（与 data[] 下标一一对应，service 填充；期数历史入库用，仅内存） */
+  itemRawJson: string[] = [];
+
+  /** 单期数据重建（历史存档回看：入库的单期 raw JSON → RoleCombatDataItem） */
+  static dataItemFromJson(obj: Object): RoleCombatDataItem {
+    return RoleCombatRoot.parseDataItem(obj);
+  }
 
   static fromJson(obj: Object): RoleCombatRoot {
     const root: RoleCombatRoot = new RoleCombatRoot();

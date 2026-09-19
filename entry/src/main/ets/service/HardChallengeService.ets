@@ -68,6 +68,8 @@ export class HardChallengeService {
       throw new Error(resp.userFriendlyMessage());
     }
     const root: HardChallengeRoot = HardChallengeRoot.fromJson(resp.data);
+    // 内层 data 原始 JSON（期数历史入库用；回看时 HardChallengeRoot.fromJson 直读）
+    root.rawJson = JSON.stringify(resp.data);
     Logger.info(TAG, `hardChallenge unlock=${root.isUnlock} single=${root.data.single.hasData}/${root.data.single.challenges.length} mp=${root.data.mp.hasData}/${root.data.mp.challenges.length}`);
     return root;
   }

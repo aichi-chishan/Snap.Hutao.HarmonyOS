@@ -6,6 +6,7 @@
 import { router } from '@kit.ArkUI';
 import { RoleCombatViewModel } from '../viewmodel/RoleCombatViewModel';
 import { RoleCombatDataItem, RoleCombatRoundData, RoleCombatAvatar, RoleCombatBuff, RoleCombatEnemy, RoleCombatAvatarStat } from '../model/RoleCombat';
+import { RoleCombatHistoryEntry } from '../data/repo/RoleCombatRepo';
 import { RiskUiHelper, RiskVerifyParams } from '../common/RiskUiHelper';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageHeader } from '../components/PageHeader';
@@ -14,6 +15,7 @@ import { NavIcon } from '../components/NavIcon';
 import { AssetIcon } from '../components/AssetIcon';
 import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
 import { WikiMetaService, RoleCombatScheduleMeta } from '../service/WikiMetaService';
+import { DateUtil } from '../common/DateUtil';
 import { Logger } from '../common/Logger';
 
 @Entry
@@ -52,6 +54,9 @@ export struct RoleCombatPage {
 
   loadData(): void {
     if (this.isLoggedIn && this.currentUid.length > 0) {
+      // 先装载本地期数历史（实时拉取失败也可回看往期），再拉实时
+      this.vm.loadHistoryList().then(() => {
+      });
       this.vm.load(this.currentUid).then(() => {
         this.syncScheduleMeta();
       });
@@ -97,6 +102,7 @@ export struct RoleCombatPage {
         .fontColor(Color.White)
         .onClick(() => {
           this.vm.load(this.currentUid).then(() => {
+            this.syncScheduleMeta();
             this.toast(this.vm.message.length > 0 ? this.vm.message : '已刷新');
           });
         })
@@ -161,6 +167,16 @@ export struct RoleCombatPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
+        // 历史存档小标签（与实时数据区分）
+        if (this.vm.fromHistory) {
+          Text('历史存档')
+            .fontSize(10)
+            .fontColor($r('app.color.app_primary'))
+            .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+            .borderRadius(6)
+            .backgroundColor($r('app.color.app_primary_bg'))
+            .margin({ right: 8 })
+        }
         Text(RoleCombatPage.formatSpan(item.schedule.startDateTime, item.schedule.endDateTime))
           .fontSize(11)
           .fontColor($r('app.color.text_secondary'))
@@ -597,6 +613,53 @@ export struct RoleCombatPage {
       } else {
         Scroll() {
           Column({ space: 10 }) {
+            // 期数历史（本地累积存档，对齐 Windows 左侧期数列表；点历史期回看，⟲ 实时回当前）
+            if (this.vm.history.length > 0) {
+              Scroll() {
+                Row({ space: 8 }) {
+                  if (this.vm.fromHistory) {
+                    Text('⟲ 实时')
+                      .fontSize(12)
+                      .fontColor($r('app.color.app_primary'))
+                      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                      .borderRadius(14)
+                      .backgroundColor($r('app.color.app_primary_bg'))
+                      .border({ width: 1, color: $r('app.color.app_primary') })
+                      .onClick(() => {
+                        this.vm.backToLive(this.currentUid).then(() => {
+                          this.syncScheduleMeta();
+                        });
+                      })
+                  }
+                  ForEach(this.vm.history, (h: RoleCombatHistoryEntry, hi: number) => {
+                    Text(this.histChipLabel(h))
+                      .fontSize(12)
+                      .fontColor(this.isHistSelected(h)
+                        ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+                      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                      .borderRadius(14)
+                      .backgroundColor(this.isHistSelected(h)
+                        ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+                      .border({
+                        width: 1,
+                        color: this.isHistSelected(h)
+                          ? $r('app.color.app_primary') : $r('app.color.divider'),
+                      })
+                      .hoverEffect(HoverEffect.Highlight)
+                      .onClick(() => {
+                        this.vm.loadFromHistory(h.scheduleId).then(() => {
+                          this.syncScheduleMeta();
+                        });
+                      })
+                  }, (h: RoleCombatHistoryEntry, hi: number) => `rch_${h.scheduleId}_${h.recordTime}_${hi}`)
+                }
+              }
+              .scrollable(ScrollDirection.Horizontal)
+              .scrollBar(BarState.Off)
+              .edgeEffect(EdgeEffect.Spring)
+              .width('100%')
+            }
+
             if (this.vm.dataItems.length === 0) {
               Text(this.vm.message.length > 0 ? this.vm.message : '暂无数据，点击右上角「刷新」重试')
                 .fontSize(13)
@@ -838,6 +901,26 @@ export struct RoleCombatPage {
     const s: string = start.length >= 10 ? start.substring(0, 10) : start;
     const e: string = end.length >= 10 ? end.substring(0, 10) : end;
     return `${s} ~ ${e}`;
+  }
+
+  /** 期数历史 chip 是否为当前查看期（实时/存档均按 scheduleId 匹配） */
+  private isHistSelected(h: RoleCombatHistoryEntry): boolean {
+    const cur: RoleCombatDataItem | undefined = this.vm.current();
+    return cur !== undefined && cur.schedule.scheduleId === h.scheduleId;
+  }
+
+  /** 期数历史 chip 文案：第 X 期(MM/DD~MM/DD) */
+  private histChipLabel(h: RoleCombatHistoryEntry): string {
+    return `第 ${h.scheduleId} 期(${RoleCombatPage.md(h.startTime)}~${RoleCombatPage.md(h.endTime)})`;
+  }
+
+  /** 毫秒时间戳 → 'MM/DD' */
+  private static md(ms: number): string {
+    if (ms <= 0) {
+      return '--';
+    }
+    const d: Date = new Date(ms);
+    return `${DateUtil.pad2(d.getMonth() + 1)}/${DateUtil.pad2(d.getDate())}`;
   }
 
   private static formatMinutes(sec: number): string {

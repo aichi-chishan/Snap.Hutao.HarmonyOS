@@ -172,7 +172,7 @@ export class RelationalStoreHelper {
   }
 
   /** 当前数据库结构版本（每次结构变更 +1，并在 MIGRATIONS 末尾追加对应迁移） */
-  private static readonly DB_VERSION: number = 4;
+  private static readonly DB_VERSION: number = 5;
 
   /**
    * 有序迁移列表：MIGRATIONS[i] 把版本 i+1 升到 i+2。
@@ -213,6 +213,24 @@ export class RelationalStoreHelper {
         icon TEXT NOT NULL DEFAULT '',
         count INTEGER NOT NULL DEFAULT 0,
         finished INTEGER NOT NULL DEFAULT 0
+      )`,
+    ],
+    [
+      // v4 → v5：剧诗/幽境危战期数历史持久化（列与 abyss_history 同款，按 schedule_id UPSERT；
+      // raw_json 存 API 原始 JSON，回看时模型 fromJson 完整重建）
+      `CREATE TABLE IF NOT EXISTS role_combat_history (
+        schedule_id INTEGER PRIMARY KEY,
+        start_time INTEGER,
+        end_time INTEGER,
+        raw_json TEXT,
+        record_time INTEGER
+      )`,
+      `CREATE TABLE IF NOT EXISTS hard_challenge_history (
+        schedule_id INTEGER PRIMARY KEY,
+        start_time INTEGER,
+        end_time INTEGER,
+        raw_json TEXT,
+        record_time INTEGER
       )`,
     ],
   ];

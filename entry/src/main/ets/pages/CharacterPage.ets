@@ -5,7 +5,8 @@
  */
 import { router, display } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
-import { CharacterViewModel } from '../viewmodel/CharacterViewModel';
+import { pasteboard } from '@kit.BasicServicesKit';
+import { CharacterViewModel, AddPlanResult } from '../viewmodel/CharacterViewModel';
 import { CharacterListItem, CharacterDetail, Reliquary, RelicProperty, BaseProperty, Constellation, avatarIconUrl } from '../model/CharacterData';
 import { ReliquaryScore } from '../common/ReliquaryScore';
 import { RiskUiHelper, RiskVerifyParams } from '../common/RiskUiHelper';
@@ -16,6 +17,8 @@ import { AssetIcon } from '../components/AssetIcon';
 import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
 import { MetaIcon } from '../components/MetaIcon';
 import { WikiMetaService, MetaSkill } from '../service/WikiMetaService';
+import { CharacterExportService } from '../service/CharacterExportService';
+import { CultivationRepo, CultivateProject } from '../data/repo/CultivationRepo';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'CharacterPage';
@@ -41,6 +44,14 @@ export struct CharacterPage {
   @State charSort: number = 0;
   /** 元素筛选（空=全部；取 API 原始元素名 Pyro/Hydro/...） */
   @State charElement: string = '';
+  /** 养成计划选择半窗（多项目时让用户选，对齐 Windows 当前养成计划口径） */
+  @State showPlanSheet: boolean = false;
+  /** 待选养成计划列表（bindSheet 数据源） */
+  @State pendingProjects: CultivateProject[] = [];
+  /** 待加入计划的角色详情快照（选项目期间固定） */
+  @State pendingDetail: CharacterDetail | undefined = undefined;
+  /** 加入计划进行中（防重复点击） */
+  @State addingPlan: boolean = false;
 
   aboutToAppear(): void {
     this.isWide = CharacterPage.detectWide();
@@ -295,6 +306,8 @@ export struct CharacterPage {
       Column({ space: 10 }) {
       if (this.currentDetail !== undefined) {
         this.detailHeader()
+        // 详情操作命令行（对齐 Windows AvatarView 底部命令区：导出文本 / 加入养成计划）
+        this.detailActions()
         // 名片 + 攻略外链（对齐 Windows：名片展示 + 米游社/B站攻略入口）
         if (WikiMetaService.nameCardPicOf(this.currentDetail.name).length > 0) {
           Column({ space: 6 }) {
@@ -628,6 +641,148 @@ export struct CharacterPage {
     .backgroundColor($r('app.color.card_background'))
     .border({ width: 1, color: $r('app.color.divider') })
   }
+
+  /**
+   * 详情操作命令行（对齐 Windows AvatarPropertyPage 命令区）：
+   * 导出文本（默认模板结构固定拼装 → 剪贴板）/ 加入养成计划（多项目先弹选择）。
+   * 无参 @Builder 直接读 @State，传参会固定快照不刷新（同 detailHeader 约定）。
+   */
+  @Builder
+  detailActions() {
+    Row({ space: 10 }) {
+      Button('导出文本')
+        .fontSize(this.isWide ? 13 : 12)
+        .height(34)
+        .layoutWeight(1)
+        .backgroundColor($r('app.color.app_primary_bg'))
+        .fontColor($r('app.color.app_primary'))
+        .hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          this.exportDetailText();
+        })
+      Button(this.addingPlan ? '加入中...' : '加入养成计划')
+        .fontSize(this.isWide ? 13 : 12)
+        .height(34)
+        .layoutWeight(1)
+        .backgroundColor($r('app.color.app_primary_bg'))
+        .fontColor($r('app.color.app_primary'))
+        .hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          this.addCurrentToPlan();
+        })
+    }
+    .width('100%')
+  }
+
+  /** 养成计划选择半窗内容（多项目时列出项目供选择） */
+  @Builder
+  planPickerSheet() {
+    Column({ space: 10 }) {
+      Text('选择要加入的养成计划')
+        .fontSize(15)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .width('100%')
+      Scroll() {
+        Column({ space: 8 }) {
+          ForEach(this.pendingProjects, (p: CultivateProject) => {
+            Row({ space: 10 }) {
+              NavIcon({ name: 'Cultivation', iconSize: 20 })
+              Text(p.name)
+                .fontSize(14)
+                .fontColor($r('app.color.text_primary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .layoutWeight(1)
+              Text('加入')
+                .fontSize(12)
+                .fontColor($r('app.color.app_primary'))
+            }
+            .width('100%')
+            .padding(12)
+            .borderRadius(10)
+            .backgroundColor($r('app.color.page_background'))
+            .border({ width: 1, color: $r('app.color.divider') })
+            .hoverEffect(HoverEffect.Highlight)
+            .onClick(() => {
+              this.pickPlanProject(p);
+            })
+          }, (p: CultivateProject) => `plan_${p.id}`)
+        }
+        .width('100%')
+      }
+      .layoutWeight(1)
+      .scrollBar(BarState.Off)
+    }
+    .width('100%')
+    .padding(16)
+  }
+
+  /** 导出当前角色文本到剪贴板（对齐 Windows ExportToTextCommand，默认模板固定拼装） */
+  private exportDetailText(): void {
+    const d: CharacterDetail | undefined = this.currentDetail;
+    if (d === undefined) {
+      return;
+    }
+    const text: string = CharacterExportService.buildExportText(d,
+      (t: string): string => CharacterPage.propLabel(t));
+    const data: pasteboard.PasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text);
+    pasteboard.getSystemPasteboard().setData(data).then(() => {
+      this.toast('已复制');
+    }).catch(() => {
+      this.toast('复制失败');
+    });
+  }
+
+  /** 加入养成计划入口：0 项目自动建默认 → 1 项目直接加入 → 多项目弹半窗选择 */
+  private async addCurrentToPlan(): Promise<void> {
+    const d: CharacterDetail | undefined = this.currentDetail;
+    if (d === undefined || d.id <= 0 || this.addingPlan) {
+      return;
+    }
+    try {
+      const projects: CultivateProject[] = await CultivationRepo.getProjects();
+      if (projects.length === 0) {
+        const p: CultivateProject = await CultivationRepo.createProject('默认养成计划');
+        await this.addToProject(d, p);
+      } else if (projects.length === 1) {
+        await this.addToProject(d, projects[0]);
+      } else {
+        this.pendingDetail = d;
+        this.pendingProjects = projects;
+        this.showPlanSheet = true;
+      }
+    } catch (e) {
+      this.toast(`加入失败：${(e as Error).message}`);
+    }
+  }
+
+  /** 半窗内选中项目：关闭半窗并加入 */
+  private pickPlanProject(p: CultivateProject): void {
+    const d: CharacterDetail | undefined = this.pendingDetail;
+    this.showPlanSheet = false;
+    if (d === undefined) {
+      return;
+    }
+    this.addToProject(d, p);
+  }
+
+  /** 加入指定项目并 toast 结果（对齐 Windows：成功/已存在提示） */
+  private async addToProject(d: CharacterDetail, p: CultivateProject): Promise<void> {
+    if (this.addingPlan) {
+      return;
+    }
+    this.addingPlan = true;
+    try {
+      const r: AddPlanResult = await this.vm.addAvatarToPlan(d, p);
+      this.toast(r.message);
+    } catch (e) {
+      this.toast(`加入失败：${(e as Error).message}`);
+    } finally {
+      this.addingPlan = false;
+    }
+  }
+
   static kindLabel(k: string): string {
     switch (k) {
       case 'A': return '普攻';
@@ -857,5 +1012,13 @@ export struct CharacterPage {
         },
       })
     }, { height: 420, backgroundColor: $r('app.color.page_background'), showClose: false, blurStyle: BlurStyle.Regular })
+    // 养成计划选择半窗（多项目时让用户选目标计划；$$ 双向同步下滑关闭）
+    .bindSheet($$this.showPlanSheet, this.planPickerSheet(), {
+      title: { title: '加入养成计划' },
+      showClose: true,
+      dragBar: true,
+      height: 360,
+      backgroundColor: $r('app.color.card_background'),
+    })
   }
 }

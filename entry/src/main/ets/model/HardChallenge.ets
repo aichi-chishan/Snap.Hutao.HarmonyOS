@@ -94,6 +94,8 @@ export class HardChallengeData {
 export class HardChallengeRoot {
   data: HardChallengeData = new HardChallengeData();
   isUnlock: boolean = false;
+  /** 内层 data 原始 JSON（service 填充；期数历史入库用，仅内存） */
+  rawJson: string = '';
 
   static fromJson(obj: Object): HardChallengeRoot {
     const root: HardChallengeRoot = new HardChallengeRoot();
@@ -111,23 +113,34 @@ export class HardChallengeRoot {
       root.data.single = HardChallengeRoot.parseEntry(data['single']);
       root.data.mp = HardChallengeRoot.parseEntry(data['mp']);
       root.data.blings = HardChallengeRoot.parseAvatars(data['blings']);
-      const schedules = data['schedule'] as Array<Object>;
-      if (schedules !== undefined && schedules !== null) {
-        for (let i = 0; i < schedules.length; i++) {
-          const s = schedules[i] as Record<string, Object>;
-          const item: HardChallengeScheduleItem = new HardChallengeScheduleItem();
-          item.scheduleId = HardChallengeRoot.number(s['schedule_id'], 0);
-          item.startTime = HardChallengeRoot.number(s['start_time'], 0);
-          item.endTime = HardChallengeRoot.number(s['end_time'], 0);
-          item.startDateTime = HardChallengeRoot.dtStr(s['start_date_time']);
-          item.endDateTime = HardChallengeRoot.dtStr(s['end_date_time']);
-          item.isValid = HardChallengeRoot.bool(s['is_valid']);
-          item.name = HardChallengeRoot.str(s['name']);
-          root.data.schedule.push(item);
+      // schedule：真实接口为单对象（对齐 Windows HardChallengeData.Schedule），兼容数组形态
+      const schedRaw: Object = data['schedule'] as Object;
+      if (schedRaw !== undefined && schedRaw !== null) {
+        if (Array.isArray(schedRaw)) {
+          const schedArr = schedRaw as Array<Object>;
+          for (let i = 0; i < schedArr.length; i++) {
+            root.data.schedule.push(HardChallengeRoot.parseSchedule(schedArr[i]));
+          }
+        } else {
+          root.data.schedule.push(HardChallengeRoot.parseSchedule(schedRaw));
         }
       }
     }
     return root;
+  }
+
+  /** 档期条目解析（schedule_id 为期数历史键） */
+  private static parseSchedule(obj: Object): HardChallengeScheduleItem {
+    const s = obj as Record<string, Object>;
+    const item: HardChallengeScheduleItem = new HardChallengeScheduleItem();
+    item.scheduleId = HardChallengeRoot.number(s['schedule_id'], 0);
+    item.startTime = HardChallengeRoot.number(s['start_time'], 0);
+    item.endTime = HardChallengeRoot.number(s['end_time'], 0);
+    item.startDateTime = HardChallengeRoot.dtStr(s['start_date_time']);
+    item.endDateTime = HardChallengeRoot.dtStr(s['end_date_time']);
+    item.isValid = HardChallengeRoot.bool(s['is_valid']);
+    item.name = HardChallengeRoot.str(s['name']);
+    return item;
   }
 
   private static parseEntry(obj: Object | undefined): HardChallengeDataEntry {

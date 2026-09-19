@@ -6,6 +6,7 @@
 import { router, LengthMetrics } from '@kit.ArkUI';
 import { HardChallengeViewModel } from '../viewmodel/HardChallengeViewModel';
 import { HardChallengeChallenge, HardChallengeSimpleAvatar, HardChallengeBestAvatar, HardChallengeMonster, HardChallengeMonsterTag, HardChallengeDataEntry } from '../model/HardChallenge';
+import { HardChallengeHistoryEntry } from '../data/repo/HardChallengeRepo';
 import { RiskUiHelper, RiskVerifyParams } from '../common/RiskUiHelper';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageHeader } from '../components/PageHeader';
@@ -13,6 +14,7 @@ import { NavIcon } from '../components/NavIcon';
 import { AssetIcon } from '../components/AssetIcon';
 import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
 import { WikiMetaService } from '../service/WikiMetaService';
+import { DateUtil } from '../common/DateUtil';
 import { MetaIcon } from '../components/MetaIcon';
 import { Logger } from '../common/Logger';
 
@@ -49,6 +51,9 @@ export struct HardChallengePage {
 
   loadData(): void {
     if (this.isLoggedIn && this.currentUid.length > 0) {
+      // 先装载本地期数历史（实时拉取失败也可回看往期），再拉实时
+      this.vm.loadHistoryList().then(() => {
+      });
       this.vm.load(this.currentUid).then(() => {
         this.syncEntry();
       });
@@ -85,6 +90,7 @@ export struct HardChallengePage {
         .fontColor(Color.White)
         .onClick(() => {
           this.vm.load(this.currentUid).then(() => {
+            this.syncEntry();
             this.toast(this.vm.message.length > 0 ? this.vm.message : '已刷新');
           });
         })
@@ -315,6 +321,15 @@ export struct HardChallengePage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
+        // 历史存档小标签（与实时数据区分）
+        if (this.vm.fromHistory) {
+          Text('历史存档')
+            .fontSize(10)
+            .fontColor($r('app.color.app_primary'))
+            .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+            .borderRadius(6)
+            .backgroundColor($r('app.color.app_primary_bg'))
+        }
         if (this.currentEntry.best.second > 0) {
           Text(`最佳 ${HardChallengePage.formatSeconds(this.currentEntry.best.second)}`)
             .fontSize(11)
@@ -354,6 +369,53 @@ export struct HardChallengePage {
       } else {
         Scroll() {
           Column({ space: 10 }) {
+            // 期数历史（本地累积存档，对齐 Windows 左侧期数列表；点历史期回看，⟲ 实时回当前）
+            if (this.vm.history.length > 0) {
+              Scroll() {
+                Row({ space: 8 }) {
+                  if (this.vm.fromHistory) {
+                    Text('⟲ 实时')
+                      .fontSize(12)
+                      .fontColor($r('app.color.app_primary'))
+                      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                      .borderRadius(14)
+                      .backgroundColor($r('app.color.app_primary_bg'))
+                      .border({ width: 1, color: $r('app.color.app_primary') })
+                      .onClick(() => {
+                        this.vm.backToLive(this.currentUid).then(() => {
+                          this.syncEntry();
+                        });
+                      })
+                  }
+                  ForEach(this.vm.history, (h: HardChallengeHistoryEntry, hi: number) => {
+                    Text(this.histChipLabel(h))
+                      .fontSize(12)
+                      .fontColor(this.isHistSelected(h)
+                        ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+                      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                      .borderRadius(14)
+                      .backgroundColor(this.isHistSelected(h)
+                        ? $r('app.color.app_primary_bg') : $r('app.color.card_background'))
+                      .border({
+                        width: 1,
+                        color: this.isHistSelected(h)
+                          ? $r('app.color.app_primary') : $r('app.color.divider'),
+                      })
+                      .hoverEffect(HoverEffect.Highlight)
+                      .onClick(() => {
+                        this.vm.loadFromHistory(h.scheduleId).then(() => {
+                          this.syncEntry();
+                        });
+                      })
+                  }, (h: HardChallengeHistoryEntry, hi: number) => `hch_${h.scheduleId}_${h.recordTime}_${hi}`)
+                }
+              }
+              .scrollable(ScrollDirection.Horizontal)
+              .scrollBar(BarState.Off)
+              .edgeEffect(EdgeEffect.Spring)
+              .width('100%')
+            }
+
             if (!this.vm.isUnlock && !this.vm.single.hasData && !this.vm.mp.hasData) {
               Text(this.vm.message.length > 0 ? this.vm.message : '本账号暂无幽境危战数据')
                 .fontSize(13)
@@ -454,6 +516,25 @@ export struct HardChallengePage {
       default:
         return '最佳';
     }
+  }
+
+  /** 期数历史 chip 是否为当前查看期（实时/存档均按 scheduleId 匹配） */
+  private isHistSelected(h: HardChallengeHistoryEntry): boolean {
+    return this.vm.scheduleId > 0 && this.vm.scheduleId === h.scheduleId;
+  }
+
+  /** 期数历史 chip 文案：第 X 期(MM/DD~MM/DD) */
+  private histChipLabel(h: HardChallengeHistoryEntry): string {
+    return `第 ${h.scheduleId} 期(${HardChallengePage.md(h.startTime)}~${HardChallengePage.md(h.endTime)})`;
+  }
+
+  /** 毫秒时间戳 → 'MM/DD' */
+  private static md(ms: number): string {
+    if (ms <= 0) {
+      return '--';
+    }
+    const d: Date = new Date(ms);
+    return `${DateUtil.pad2(d.getMonth() + 1)}/${DateUtil.pad2(d.getDate())}`;
   }
 
   private static formatSeconds(sec: number): string {
