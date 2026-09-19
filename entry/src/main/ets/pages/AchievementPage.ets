@@ -4,6 +4,7 @@
  * 元数据：本地 rawfile（paimon-moe 社区数据集，无胡桃云依赖），对齐 Windows 版成就页。
  */
 import { router, ShowDialogSuccessResponse } from '@kit.ArkUI';
+import { pasteboard } from '@kit.BasicServicesKit';
 import { fileIo, picker } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { AchievementService, UiafImportResult } from '../service/AchievementService';
@@ -29,6 +30,8 @@ class DisplayGroup {
   ids: number[] = [];
   total: number = 1;
   achieved: number = 0;
+  /** 组内最近完成时间戳（秒；0=未完成） */
+  latestTime: number = 0;
 }
 
 @Entry
@@ -152,6 +155,8 @@ export struct AchievementPage {
         const nextIdx: number = Math.min(achieved, g.ids.length - 1);
         const desc: string | undefined = descByEntry.get(g.ids[nextIdx]);
         g.desc = desc !== undefined ? desc : '';
+        // 组内最近完成时间（排序与展示共用）
+        g.latestTime = this.groupLatestTime(g);
         if (this.statusFilter === 1 && achieved === 0) {
           return;
         }
@@ -210,6 +215,14 @@ export struct AchievementPage {
       }
     }
     return latest;
+  }
+
+  /** 完成时间戳 → "yyyy.MM.dd HH:mm:ss"（对齐 Windows AchievementView.Time 格式） */
+  private static formatStamp(sec: number): string {
+    const d: Date = new Date(sec * 1000);
+    const p = (n: number): string => `${n}`.padStart(2, '0');
+    return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} `
+      + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
   }
 
   toast(msg: string): void {
@@ -286,6 +299,25 @@ export struct AchievementPage {
         });
       }
     });
+  }
+
+  /** 剪贴板导入 UIAF（对齐 Windows ImportUIAFFromClipboardCommand：剪贴板 JSON 直接解析） */
+  async importUiafFromClipboard(): Promise<void> {
+    try {
+      const pd: pasteboard.PasteData = await pasteboard.getSystemPasteboard().getData();
+      const text: string = pd.getPrimaryText();
+      if (text.length === 0 || !text.includes('uiaf_version')) {
+        this.toast('剪贴板中没有 UIAF 数据');
+        return;
+      }
+      const result: UiafImportResult = await AchievementService.importUiaf(this.currentArchiveId, text);
+      this.toast(result.ok ? result.message : `导入失败：${result.message}`);
+      if (result.ok) {
+        await this.refreshData();
+      }
+    } catch (e) {
+      this.toast(`导入失败：${(e as Error).message}`);
+    }
   }
 
   /** 选择文件导入 UIAF */
@@ -408,9 +440,18 @@ export struct AchievementPage {
           .fontColor($r('app.color.text_primary'))
           .margin({ left: this.embedMode ? 0 : 10 })
         Blank()
+        Button('剪贴板导入')
+          .fontSize(12)
+          .height(30)
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary'))
+          .onClick(() => {
+            this.importUiafFromClipboard();
+          })
         Button('导入 UIAF')
           .fontSize(12)
           .height(30)
+          .margin({ left: 6 })
           .backgroundColor($r('app.color.app_primary_bg'))
           .fontColor($r('app.color.app_primary'))
           .onClick(() => {
@@ -696,6 +737,13 @@ export struct AchievementPage {
           .fontSize(10)
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
+        // 最近完成时间（对齐 Windows AchievementView.Time：yyyy.MM.dd HH:mm:ss）
+        if (g.latestTime > 0) {
+          Text(`完成于 ${AchievementPage.formatStamp(g.latestTime)}`)
+            .fontSize(10)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+        }
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)

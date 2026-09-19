@@ -4,7 +4,7 @@
  */
 import { router, display } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
-import { DailyNoteViewModel } from '../viewmodel/DailyNoteViewModel';
+import { DailyNoteViewModel, TrackedNoteEntry } from '../viewmodel/DailyNoteViewModel';
 import { DailyNote, Expedition } from '../model/DailyNote';
 import { NotificationHelper } from '../data/local/NotificationHelper';
 import { NotifyFlags } from '../service/DailyNoteService';
@@ -549,6 +549,8 @@ export struct DailyNotePage {
                 this.expeditionCard(this.vm.note)
                 this.transformerCard(this.vm.note)
               }
+              // 追踪列表（对齐 Windows 多 UID 追踪：逐卡片展示各 UID 本地快照）
+              this.trackedSection()
               this.notifySettingCard()
               Text('提示：在「设置 → 实时便笺」可调整自动刷新间隔')
                 .fontSize(11)
@@ -580,6 +582,108 @@ export struct DailyNotePage {
       detents: [SheetSize.MEDIUM, SheetSize.LARGE],
       backgroundColor: $r('app.color.card_background'),
     })
+  }
+
+  /**
+   * 追踪列表区（对齐 Windows DailyNotePage 追踪列表）：追踪当前 UID / 全部刷新 /
+   * 各 UID 摘要卡（树脂/每日委托/派遣，本地缓存）+ 移除。
+   */
+  @Builder
+  trackedSection() {
+    Column({ space: 8 }) {
+      Row({ space: 8 }) {
+        Text('追踪列表')
+          .fontSize(15)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
+        Button(this.vm.trackedBusy ? '刷新中...' : '全部刷新')
+          .fontSize(11)
+          .height(26)
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary'))
+          .onClick(() => {
+            this.vm.refreshTracked().then((n: number) => {
+              this.toast(n > 0 ? `已刷新 ${n} 个追踪 UID` : '追踪列表已是最新（或拉取失败）');
+            });
+          })
+        Button(this.vm.trackedEntries.some((e: TrackedNoteEntry): boolean => e.uid === this.vm.currentUid)
+          ? '已追踪当前' : '追踪当前 UID')
+          .fontSize(11)
+          .height(26)
+          .backgroundColor($r('app.color.app_primary'))
+          .fontColor(Color.White)
+          .onClick(() => {
+            this.vm.trackCurrent().then((added: boolean) => {
+              this.toast(added ? '已追踪当前 UID' : '当前 UID 已在追踪列表');
+            });
+          })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+
+      if (this.vm.trackedEntries.length === 0) {
+        Text('尚未追踪任何 UID：点「追踪当前 UID」把账号加入列表，将随自动刷新一并轮询')
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+      } else {
+        ForEach(this.vm.trackedEntries, (e: TrackedNoteEntry) => {
+          Row({ space: 8 }) {
+            Column({ space: 2 }) {
+              Text(`UID ${e.uid}${e.uid === this.vm.currentUid ? '（当前）' : ''}`)
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.text_primary'))
+              Text(this.trackedSummary(e))
+                .fontSize(10)
+                .fontColor($r('app.color.text_secondary'))
+                .maxLines(1)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text('移除')
+              .fontSize(11)
+              .fontColor($r('app.color.danger'))
+              .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+              .borderRadius(8)
+              .backgroundColor($r('app.color.page_background'))
+              .hoverEffect(HoverEffect.Highlight)
+              .onClick(() => {
+                this.vm.untrack(e.uid).then(() => {
+                  this.toast('已移除追踪');
+                });
+              })
+          }
+          .width('100%')
+          .padding(10)
+          .borderRadius(10)
+          .backgroundColor($r('app.color.page_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
+        }, (e: TrackedNoteEntry) => `trk_${e.uid}_${e.note !== undefined ? e.note.currentResin : -1}`)
+      }
+    }
+    .width('100%')
+    .padding(12)
+    .borderRadius($r('app.float.card_radius'))
+    .backgroundColor($r('app.color.card_background'))
+    .border({ width: 1, color: $r('app.color.divider') })
+  }
+
+  /** 追踪条目摘要（本地缓存快照） */
+  private trackedSummary(e: TrackedNoteEntry): string {
+    if (e.note === undefined) {
+      return '暂无缓存数据（点「全部刷新」拉取）';
+    }
+    const n: DailyNote = e.note;
+    const parts: string[] = [`树脂 ${n.currentResin}/${n.maxResin}`];
+    if (n.totalTaskNum > 0) {
+      parts.push(`每日 ${n.finishedTaskNum}/${n.totalTaskNum}`);
+    }
+    if (n.maxExpeditionNum > 0) {
+      parts.push(`派遣 ${n.currentExpeditionNum}/${n.maxExpeditionNum}`);
+    }
+    return parts.join(' · ');
   }
 
   /** 半屏设置面板：自动刷新开关 + 刷新间隔（对齐 Windows 便笺设置弹窗） */

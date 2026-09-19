@@ -87,13 +87,39 @@ export class DailyNoteService {
   /** 桌面卡片手动刷新：带超时的刷新（命中需 UI 的风控时不无限挂起卡片进程） */
   async refreshForCard(uid: string, timeoutMs: number): Promise<DailyNote> {
     const work: Promise<DailyNote> = this.refresh(uid);
-    const limit: Promise<DailyNote> = new Promise<DailyNote>(
-      (resolve: (value: DailyNote) => void, reject: (reason: Error) => void) => {
-        setTimeout(() => {
-          reject(new Error('刷新超时，请打开应用完成人机验证'));
-        }, timeoutMs);
-      });
+    const limit: Promise<DailyNote> = new Promise<DailyNote>((resolve: (v: DailyNote) => void,
+      reject: (e: Error) => void) => {
+      setTimeout(() => {
+        reject(new Error('刷新超时'));
+      }, timeoutMs);
+    });
     return Promise.race<DailyNote>([work, limit]);
+  }
+
+  /**
+   * 追踪列表刷新（对齐 Windows 多 UID 追踪）：顺序刷新当前账号下全部被追踪 UID
+   * （不含当前 UID——它已由常规刷新覆盖），单个失败不影响其余。
+   */
+  async refreshTrackedList(): Promise<number> {
+    const user = UserService.getInstance().getCurrentUser();
+    if (user === undefined || !user.hasCookie()) {
+      return 0;
+    }
+    const uids: string[] = PreferencesStore.getTrackedUids(user.id);
+    const currentUid: string = PreferencesStore.getCurrentUid();
+    let ok: number = 0;
+    for (const uid of uids) {
+      if (uid === currentUid) {
+        continue;
+      }
+      try {
+        await this.doRefresh(uid);
+        ok++;
+      } catch (e) {
+        Logger.warn(TAG, `tracked refresh fail uid=${uid} msg=${(e as Error).message}`);
+      }
+    }
+    return ok;
   }
 
   /** 实际刷新流程：网络拉取 → 落库 → 广播版本戳 → 卡片快照 → 阈值通知 */
@@ -358,6 +384,8 @@ export class DailyNoteService {
       DailyNoteService.publishError((e as Error).message);
       Logger.warn(TAG, `auto refresh fail ${(e as Error).message}`);
     }
+    // 追踪列表随自动刷新一起轮询（单个失败静默）
+    await this.refreshTrackedList();
   }
 
   /** 自增数据版本戳：AppStorage 全局广播（页面/主页订阅后重读本地缓存） */

@@ -7,6 +7,9 @@
  */
 import { router } from '@kit.ArkUI';
 import { curves, display, uiMaterial, window } from '@kit.ArkUI';
+import { pasteboard } from '@kit.BasicServicesKit';
+import { MiyoliveCode } from '../model/MiyoliveCode';
+import { MiyoliveService } from '../service/MiyoliveService';
 import { HdsTabs, HdsTabsController, hdsMaterial, SystemMaterialParams } from '@kit.UIDesignKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { Motion } from '../common/Motion';
@@ -113,6 +116,10 @@ class DashCardSpec {
     @State dashCards: DashCardSpec[] = [];
     /** 欢迎语文案（对齐 Windows GreetingText：随机彩蛋 / 启动次数） */
     @State greeting: string = '旅行者，欢迎来到提瓦特大陆！';
+    /** 前瞻直播兑换码弹层（对齐 Windows 主页兑换码 Flyout） */
+    @State showHomeCodes: boolean = false;
+    @State homeCodes: MiyoliveCode[] = [];
+    @State homeCodesLoading: boolean = false;
     /** 是否正在通过自绘 TitleBar 拖拽窗口（避免重复触发 startMoving） */
     private windowDragging: boolean = false;
     private controller: HdsTabsController = new HdsTabsController();
@@ -148,6 +155,125 @@ class DashCardSpec {
       }
       const times: number = PreferencesStore.getLaunchTimes();
       return times > 1 ? `你已经启动了胡桃 ${times} 次` : '旅行者，欢迎来到提瓦特大陆！';
+    }
+
+    /** 打开兑换码弹层（首次打开时拉取，无需登录） */
+    openHomeCodes(): void {
+      this.showHomeCodes = true;
+      if (this.homeCodes.length > 0 || this.homeCodesLoading) {
+        return;
+      }
+      this.homeCodesLoading = true;
+      MiyoliveService.getInstance().fetchRedeemCodes().then((codes: MiyoliveCode[]) => {
+        this.homeCodes = codes;
+      }).catch(() => {
+        // 拉取失败保持空列表（弹层内提示暂无）
+      }).finally(() => {
+        this.homeCodesLoading = false;
+      });
+    }
+
+    /** 复制兑换码 */
+    private copyHomeCode(code: string): void {
+      const data: pasteboard.PasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, code);
+      pasteboard.getSystemPasteboard().setData(data).then(() => {
+        this.getUIContext().getPromptAction().showToast({ message: `已复制：${code}`, duration: 1500 });
+      });
+    }
+
+    /** 兑换码弹层（遮罩 + 居中卡片，对齐 AnnouncementPage codeSheet 行布局） */
+    @Builder
+    homeCodeSheet() {
+      if (this.showHomeCodes) {
+        Column() {
+          Column({ space: 10 }) {
+            Text('前瞻直播兑换码')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'))
+              .width('100%')
+            Scroll() {
+              Column({ space: 8 }) {
+                if (this.homeCodesLoading) {
+                  Text('获取中...')
+                    .fontSize(13)
+                    .fontColor($r('app.color.text_secondary'))
+                    .width('100%')
+                    .textAlign(TextAlign.Center)
+                    .padding({ top: 20, bottom: 20 })
+                } else if (this.homeCodes.length === 0) {
+                  Text('暂无可用兑换码（直播开启后可获取）')
+                    .fontSize(13)
+                    .fontColor($r('app.color.text_secondary'))
+                    .width('100%')
+                    .textAlign(TextAlign.Center)
+                    .padding({ top: 20, bottom: 20 })
+                } else {
+                  ForEach(this.homeCodes, (c: MiyoliveCode) => {
+                    Row({ space: 10 }) {
+                      Column({ space: 2 }) {
+                        Text(c.title)
+                          .fontSize(12)
+                          .fontColor($r('app.color.text_secondary'))
+                          .maxLines(1)
+                          .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        Text(c.code)
+                          .fontSize(16)
+                          .fontWeight(FontWeight.Medium)
+                          .fontColor($r('app.color.text_primary'))
+                          .letterSpacing(1)
+                      }
+                      .alignItems(HorizontalAlign.Start)
+                      .layoutWeight(1)
+                      Text('复制')
+                        .fontSize(12)
+                        .fontColor($r('app.color.app_primary'))
+                        .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                        .borderRadius(10)
+                        .border({ width: 1, color: $r('app.color.app_primary') })
+                        .hoverEffect(HoverEffect.Highlight)
+                        .onClick(() => {
+                          this.copyHomeCode(c.code);
+                        })
+                    }
+                    .width('100%')
+                    .padding(10)
+                    .borderRadius(10)
+                    .backgroundColor($r('app.color.page_background'))
+                    .border({ width: 1, color: $r('app.color.divider') })
+                  }, (c: MiyoliveCode) => `hcode_${c.code}`)
+                }
+              }
+              .width('100%')
+            }
+            .width('100%')
+            .constraintSize({ maxHeight: 320 })
+            .scrollBar(BarState.Auto)
+            Button('关闭')
+              .fontSize(13)
+              .height(34)
+              .width('100%')
+              .backgroundColor($r('app.color.card_background'))
+              .fontColor($r('app.color.text_primary'))
+              .onClick(() => {
+                this.showHomeCodes = false;
+              })
+          }
+          .width(360)
+          .padding(16)
+          .borderRadius(16)
+          .backgroundColor($r('app.color.card_background'))
+          .border({ width: 1, color: $r('app.color.divider') })
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor('#99000000')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .onClick(() => {
+          this.showHomeCodes = false;
+        })
+      }
     }
 
     /** 从设置页返回本页时重读卡片配置（路由返回不走 aboutToAppear） */
@@ -641,9 +767,12 @@ class DashCardSpec {
   wideContent() {
     Column() {
       if (this.currentIndex === 0) {
-        PageContainer() {
-          this.homeTabWide()
-          }
+        Stack({ alignContent: Alignment.TopStart }) {
+          PageContainer() {
+            this.homeTabWide()
+            }
+          this.homeCodeSheet()
+        }
       } else if (this.currentIndex === 1) {
         PageContainer() {
           this.gachaTab()
@@ -857,7 +986,7 @@ class DashCardSpec {
               .textAlign(TextAlign.Center)
           }
 
-          // 游戏公告预览（真实数据：最新 3 条）
+          // 游戏公告预览（真实数据：最新 3 条；头部含兑换码入口）
           HomeAnnouncementCard({
             items: this.homeVm.announcements,
             loaded: this.homeVm.announcementsLoaded,
@@ -866,6 +995,9 @@ class DashCardSpec {
             },
             onTapMore: () => {
               router.pushUrl({ url: 'pages/AnnouncementPage' });
+            },
+            onRedeem: () => {
+              this.openHomeCodes();
             },
           })
 
@@ -949,6 +1081,8 @@ class DashCardSpec {
       .height('100%')
       .align(Alignment.Top)
       .backgroundColor(Color.Transparent)
+      // 前瞻直播兑换码弹层（覆盖全页）
+      this.homeCodeSheet()
     }
     .width('100%')
     .height('100%')
@@ -966,9 +1100,9 @@ class DashCardSpec {
   homeTabWide() {
     Scroll() {
       Column({ space: 12 }) {
-        // Row1：顶部欢迎大标题（对齐 Windows 顶部大标题）
+        // Row1：顶部欢迎大标题（对齐 Windows 顶部大标题；文案含随机彩蛋）
         HomeHeroBanner({
-          title: '旅行者，欢迎来到提瓦特大陆！',
+          title: this.greeting,
           subtitle: '胡桃工具箱 · 祈愿记录 / 实时便笺 / 签到日历',
         })
 
@@ -1174,7 +1308,7 @@ class DashCardSpec {
         .onAreaChange((oldValue: Area, newValue: Area) => {
           this.homeW = Number(newValue.width);
         })
-        // Row5：游戏公告（全宽）
+        // Row5：游戏公告（全宽；头部含前瞻直播兑换码入口，对齐 Windows 主页兑换码 Flyout）
         HomeAnnouncementCard({
           items: this.homeVm.announcements,
           loaded: this.homeVm.announcementsLoaded,
@@ -1183,6 +1317,9 @@ class DashCardSpec {
           },
           onTapMore: () => {
             router.pushUrl({ url: 'pages/AnnouncementPage' });
+          },
+          onRedeem: () => {
+            this.openHomeCodes();
           },
         })
         .width('100%')

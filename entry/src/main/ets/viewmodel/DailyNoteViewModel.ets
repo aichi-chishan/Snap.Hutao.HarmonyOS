@@ -11,6 +11,12 @@ import { Logger } from '../common/Logger';
 
 const TAG: string = 'DailyNoteViewModel';
 
+/** 追踪列表条目（uid + 本地缓存快照；未拉取过则 note 为空） */
+export class TrackedNoteEntry {
+  uid: string = '';
+  note: DailyNote | undefined = undefined;
+}
+
 @Observed
 export class DailyNoteViewModel {
   currentUid: string = '';
@@ -27,6 +33,9 @@ export class DailyNoteViewModel {
   needGeetest: boolean = false;
   geetestGt: string = '';
   geetestChallenge: string = '';
+  /** 追踪列表（对齐 Windows 多 UID 追踪：uid + 本地缓存快照） */
+  trackedEntries: TrackedNoteEntry[] = [];
+  trackedBusy: boolean = false;
 
   /** 从本地缓存装载 */
   async load(uid: string): Promise<void> {
@@ -43,7 +52,71 @@ export class DailyNoteViewModel {
       }
     }
     this.isAutoRunning = DailyNoteService.getInstance().isTimerRunning();
+    await this.loadTracked();
     this.loaded = true;
+  }
+
+  /** 追踪列表快照（本地缓存，不联网；对齐 Windows 追踪列表展示） */
+  async loadTracked(): Promise<void> {
+    const user = UserService.getInstance().getCurrentUser();
+    if (user === undefined) {
+      this.trackedEntries = [];
+      return;
+    }
+    const uids: string[] = PreferencesStore.getTrackedUids(user.id);
+    const entries: TrackedNoteEntry[] = [];
+    for (const uid of uids) {
+      const rec: DailyNoteRecord | undefined = await DailyNoteRepo.get(user.id, uid);
+      const e: TrackedNoteEntry = new TrackedNoteEntry();
+      e.uid = uid;
+      e.note = rec !== undefined ? rec.note : undefined;
+      entries.push(e);
+    }
+    this.trackedEntries = entries;
+  }
+
+  /** 追踪当前 UID（已存在则跳过） */
+  async trackCurrent(): Promise<boolean> {
+    const user = UserService.getInstance().getCurrentUser();
+    if (user === undefined || this.currentUid.length === 0) {
+      this.message = '请先绑定 UID';
+      return false;
+    }
+    const uids: string[] = PreferencesStore.getTrackedUids(user.id);
+    if (uids.includes(this.currentUid)) {
+      return false;
+    }
+    uids.push(this.currentUid);
+    PreferencesStore.setTrackedUids(user.id, uids);
+    await this.loadTracked();
+    return true;
+  }
+
+  /** 移除追踪 */
+  async untrack(uid: string): Promise<void> {
+    const user = UserService.getInstance().getCurrentUser();
+    if (user === undefined) {
+      return;
+    }
+    const uids: string[] = PreferencesStore.getTrackedUids(user.id);
+    const next: string[] = uids.filter((v: string): boolean => v !== uid);
+    PreferencesStore.setTrackedUids(user.id, next);
+    await this.loadTracked();
+  }
+
+  /** 刷新追踪列表（顺序联网拉取全部被追踪 UID） */
+  async refreshTracked(): Promise<number> {
+    if (this.trackedBusy) {
+      return 0;
+    }
+    this.trackedBusy = true;
+    try {
+      const n: number = await DailyNoteService.getInstance().refreshTrackedList();
+      await this.loadTracked();
+      return n;
+    } finally {
+      this.trackedBusy = false;
+    }
   }
 
   /** 服务层刷新成功（自动刷新定时器 / 桌面卡片手动刷新）后重读本地缓存，保持界面数值同步 */

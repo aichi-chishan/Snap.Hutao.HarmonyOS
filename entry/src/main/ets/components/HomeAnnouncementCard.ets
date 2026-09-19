@@ -14,6 +14,8 @@ export struct HomeAnnouncementCard {
   };
   onTapMore: () => void = () => {
   };
+  /** 前瞻直播兑换码入口（对齐 Windows 主页兑换码 Flyout；传空则不显示） */
+  onRedeem: (() => void) | undefined = undefined;
 
   @Builder
   header() {
@@ -24,6 +26,20 @@ export struct HomeAnnouncementCard {
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .layoutWeight(1)
+      if (this.onRedeem !== undefined) {
+        Text('兑换码')
+          .fontSize(11)
+          .fontColor($r('app.color.app_primary'))
+          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .borderRadius(9)
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            if (this.onRedeem !== undefined) {
+              this.onRedeem();
+            }
+          })
+      }
       Text('查看全部 ›')
         .fontSize(12)
         .fontColor($r('app.color.app_primary'))

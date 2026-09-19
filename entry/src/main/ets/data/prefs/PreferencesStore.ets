@@ -290,6 +290,31 @@ export class PreferencesStore {
     PreferencesStore.setString(`signin.auto_region_${uid}`, region);
   }
 
+  // ---- 便笺追踪列表（对齐 Windows DailyNote 多 UID 追踪；按登录用户隔离）----
+
+  static getTrackedUids(userId: number): string[] {
+    const raw: string = PreferencesStore.getString(`dailynote.tracked_${userId}`, '');
+    if (raw.length === 0) {
+      return [];
+    }
+    try {
+      const arr = JSON.parse(raw) as Array<string>;
+      const out: string[] = [];
+      for (const v of arr) {
+        if (typeof v === 'string' && v.length > 0) {
+          out.push(v);
+        }
+      }
+      return out;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  static setTrackedUids(userId: number, uids: string[]): void {
+    PreferencesStore.setString(`dailynote.tracked_${userId}`, JSON.stringify(uids));
+  }
+
   /** 启动次数自增（欢迎语文案；EntryAbility onCreate 调用一次） */
   static bumpLaunchTimes(): number {
     const n: number = PreferencesStore.getNumber(PreferencesStore.KEY_LAUNCH_TIMES, 0) + 1;
