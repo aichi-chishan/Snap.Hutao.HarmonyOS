@@ -9,6 +9,7 @@ import { CultivationViewModel, CultivateTarget } from '../viewmodel/CultivationV
 import { CalItem } from '../model/Calculate';
 import { elementName } from '../model/CharacterData';
 import { CultivateEntry, CultivateEntryItem, CultivateProject } from '../data/repo/CultivationRepo';
+import { ResinStatisticsService, ResinCategoryRow, ResinStatisticsResult } from '../service/ResinStatisticsService';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageHeader } from '../components/PageHeader';
 import { NavIcon } from '../components/NavIcon';
@@ -26,6 +27,8 @@ export struct CultivationPage {
   @State vm: CultivationViewModel = new CultivationViewModel();
   /** 目标等级输入（临时） */
   @State levelTmp: string = '';
+  /** 内容区宽 >=840 双栏（对齐 WikiAvatarPage 断点写法） */
+  @State isWide: boolean = false;
 
   aboutToAppear(): void {
     this.loadData();
@@ -46,6 +49,36 @@ export struct CultivationPage {
 
   toast(msg: string): void {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1800 });
+  }
+
+  /** 材料今日是否可刷（周一四/二五/三六轮换，周日全开；对齐 Windows Material.IsItemOfToday） */
+  isTodayItem(itemId: number): boolean {
+    return ResinStatisticsService.isItemOfToday(itemId, new Date().getDay());
+  }
+
+  /** 树脂统计行（Builder 内经方法读取，规避属性窄化与 @Builder 多参刷新问题） */
+  resinRows(): ResinCategoryRow[] {
+    const stats: ResinStatisticsResult | undefined = this.vm.resinStats;
+    return stats !== undefined ? stats.rows : [];
+  }
+
+  hasResinRows(): boolean {
+    return this.resinRows().length > 0;
+  }
+
+  resinTotalResin(): number {
+    const stats: ResinStatisticsResult | undefined = this.vm.resinStats;
+    return stats !== undefined ? stats.totalResin : 0;
+  }
+
+  resinTotalFragile(): number {
+    const stats: ResinStatisticsResult | undefined = this.vm.resinStats;
+    return stats !== undefined ? stats.totalFragile : 0;
+  }
+
+  resinTotalDays(): number {
+    const stats: ResinStatisticsResult | undefined = this.vm.resinStats;
+    return stats !== undefined ? stats.totalDays : 0;
   }
 
   @Builder
@@ -73,6 +106,7 @@ export struct CultivationPage {
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
         .fontColor(Color.White)
+        .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -183,6 +217,7 @@ export struct CultivationPage {
           .padding({ left: 10, right: 10, top: 4, bottom: 4 })
           .borderRadius(9)
           .backgroundColor($r('app.color.app_primary_bg'))
+          .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
             for (let i = 0; i < this.vm.targets.length; i++) {
               if (this.vm.targets[i].selected) {
@@ -232,6 +267,7 @@ export struct CultivationPage {
         .backgroundColor($r('app.color.app_primary'))
         .fontColor(Color.White)
         .borderRadius(10)
+        .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           this.vm.saveResultToPlan().then((ok: boolean) => {
             this.toast(ok ? this.vm.message : (this.vm.message.length > 0 ? this.vm.message : '保存失败'));
@@ -342,6 +378,14 @@ export struct CultivationPage {
         .layoutWeight(1)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
+      if (this.isTodayItem(item.itemId)) {
+        Text('今日')
+          .fontSize(9)
+          .fontColor($r('app.color.notice_on'))
+          .backgroundColor($r('app.color.notice_bg'))
+          .padding({ left: 5, right: 5, top: 1, bottom: 1 })
+          .borderRadius(6)
+      }
       Text(`× ${item.count}`)
         .fontSize(12)
         .fontWeight(FontWeight.Bold)
@@ -420,12 +464,149 @@ export struct CultivationPage {
         .color($r('app.color.divider'))
       ForEach(entry.items, (item: CultivateEntryItem) => {
         this.planItemRow(entry, item)
-      }, (item: CultivateEntryItem) => `pe_${item.id}_${item.finished}`)
+      }, (item: CultivateEntryItem) => `pe_${item.id}_${item.finished}_t${this.isTodayItem(item.itemId) ? 1 : 0}`)
     }
     .width('100%')
     .padding(12)
     .borderRadius($r('app.float.card_radius'))
     .backgroundColor($r('app.color.card_background'))
+    .border({ width: 1, color: $r('app.color.divider') })
+  }
+
+  /** 树脂统计表头（树脂图标已内置 rawfile；脆弱树脂无图标用文字） */
+  @Builder
+  resinHeaderRow() {
+    Row({ space: 6 }) {
+      Text('类别')
+        .fontSize(10)
+        .fontColor($r('app.color.text_secondary'))
+        .layoutWeight(1)
+        .textAlign(TextAlign.Start)
+      Row({ space: 2 }) {
+        MetaIcon({ category: 'ItemIcon', name: 'UI_ItemIcon_106', iconSize: 12 })
+        Text('树脂')
+          .fontSize(10)
+          .fontColor($r('app.color.text_secondary'))
+      }
+      .width(58)
+      Text('脆弱')
+        .fontSize(10)
+        .fontColor($r('app.color.text_secondary'))
+        .width(44)
+        .textAlign(TextAlign.Center)
+      Text('天数')
+        .fontSize(10)
+        .fontColor($r('app.color.text_secondary'))
+        .width(48)
+        .textAlign(TextAlign.End)
+    }
+    .width('100%')
+  }
+
+  /** 树脂统计单行（单参数 @Builder，按引用传递可动态渲染） */
+  @Builder
+  resinRow(row: ResinCategoryRow) {
+    Row({ space: 6 }) {
+      Column({ space: 1 }) {
+        Text(row.title)
+          .fontSize(12)
+          .fontColor($r('app.color.text_primary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(row.demandText)
+          .fontSize(9)
+          .fontColor($r('app.color.text_tertiary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+      Text(`${row.totalResin}`)
+        .fontSize(13)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.app_primary'))
+        .width(58)
+        .textAlign(TextAlign.Center)
+      Text(row.fragileResin > 0 ? `${row.fragileResin}` : '—')
+        .fontSize(12)
+        .fontColor($r('app.color.text_secondary'))
+        .width(44)
+        .textAlign(TextAlign.Center)
+      Text(`${row.days}天`)
+        .fontSize(12)
+        .fontColor($r('app.color.text_secondary'))
+        .width(48)
+        .textAlign(TextAlign.End)
+    }
+    .width('100%')
+    .padding({ top: 4, bottom: 4 })
+  }
+
+  /** 树脂换算统计卡（对齐 Windows 统计区：分类 × 总树脂 × 脆弱树脂 × 自然恢复天数） */
+  @Builder
+  resinSection() {
+    Column({ space: 8 }) {
+      Row({ space: 6 }) {
+        Text('树脂统计')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+        Blank()
+        Text('世界等级')
+          .fontSize(10)
+          .fontColor($r('app.color.text_secondary'))
+        ForEach([5, 6, 7, 8, 9], (lv: number) => {
+          Text(`${lv}`)
+            .fontSize(10)
+            .fontColor(this.vm.resinWorldLevel === lv ? Color.White : $r('app.color.text_secondary'))
+            .width(24)
+            .height(20)
+            .textAlign(TextAlign.Center)
+            .borderRadius(10)
+            .backgroundColor(this.vm.resinWorldLevel === lv
+              ? $r('app.color.app_primary') : $r('app.color.page_background'))
+            .border({ width: 1, color: this.vm.resinWorldLevel === lv
+              ? $r('app.color.app_primary') : $r('app.color.divider') })
+            .hoverEffect(HoverEffect.Highlight)
+            .onClick(() => {
+              this.vm.setResinWorldLevel(lv).then(() => {
+              });
+            })
+        }, (lv: number) => `resin_wl_${lv}_${this.vm.resinWorldLevel === lv ? 1 : 0}`)
+      }
+      .width('100%')
+      if (this.hasResinRows()) {
+        Row({ space: 8 }) {
+          Text(`共需树脂 ${this.resinTotalResin()}`)
+            .fontSize(12)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.app_primary'))
+          Text(`脆弱 ×${this.resinTotalFragile()}`)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+          Text(`自然恢复约 ${this.resinTotalDays()} 天`)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+          Blank()
+        }
+        .width('100%')
+        this.resinHeaderRow()
+        ForEach(this.resinRows(), (row: ResinCategoryRow) => {
+          this.resinRow(row)
+        }, (row: ResinCategoryRow) => `resin_row_${row.kind}_${row.totalResin}_${row.runs}`)
+      } else {
+        Text('当前计划暂无未完成的树脂类材料（摩拉/经验书/天赋书/武器突破/Boss 掉落）')
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+          .textAlign(TextAlign.Center)
+          .padding({ top: 4, bottom: 4 })
+      }
+    }
+    .width('100%')
+    .padding(10)
+    .borderRadius(10)
+    .backgroundColor($r('app.color.page_background'))
     .border({ width: 1, color: $r('app.color.divider') })
   }
 
@@ -446,6 +627,8 @@ export struct CultivationPage {
       }
       .width('100%')
       this.projectBar()
+      // 树脂换算统计（当前项目聚合，展示在项目详情顶部；对齐 Windows 统计区）
+      this.resinSection()
       if (this.vm.planEntries.length === 0) {
         Text('暂无培养目标：勾选角色并计算材料后，点「保存计算结果到养成计划」')
           .fontSize(12)
@@ -495,6 +678,74 @@ export struct CultivationPage {
     }
   }
 
+  /** 宽屏左栏：养成计划（项目/树脂统计/条目） */
+  @Builder
+  planColumn() {
+    Column({ space: 10 }) {
+      this.planSection()
+    }
+    .width('100%')
+  }
+
+  /** 右栏（窄屏下半区）：计算操作 + 结果 + 候选角色 */
+  @Builder
+  computeColumn() {
+    // 操作区
+    Column({ space: 8 }) {
+      this.quickLevelBar()
+      Row({ space: 8 }) {
+        Button(`已选 ${this.vm.selectedCount} 个角色`)
+          .fontSize(12)
+          .height(30)
+          .layoutWeight(1)
+          .backgroundColor($r('app.color.card_background'))
+          .fontColor($r('app.color.text_primary'))
+        Button(this.vm.computing ? '计算中...' : '计算材料')
+          .fontSize(12)
+          .height(30)
+          .layoutWeight(1)
+          .backgroundColor($r('app.color.app_primary'))
+          .fontColor(Color.White)
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.vm.compute(this.currentUid).then(() => {
+              this.toast(this.vm.message.length > 0 ? this.vm.message : '计算完成');
+            });
+          })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(14)
+    .borderRadius($r('app.float.card_radius'))
+    .backgroundColor($r('app.color.card_background'))
+    .border({ width: 1, color: $r('app.color.divider') })
+
+    // 结果区
+    this.resultSection()
+    this.savePlanBar()
+
+    // 候选角色网格
+    Row() {
+      Text('选择角色')
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .layoutWeight(1)
+      Text(`共 ${this.vm.targets.length} 名`)
+        .fontSize(11)
+        .fontColor($r('app.color.text_secondary'))
+    }
+    .width('100%')
+
+    Column({ space: 8 }) {
+      ForEach(this.vm.targets, (target: CultivateTarget, idx: number) => {
+        this.targetRow(target, idx)
+      }, (target: CultivateTarget, idx: number) => `cult_${target.avatarId}`)
+    }
+    .width('100%')
+  }
+
   build() {
     Column() {
       this.header()
@@ -514,83 +765,47 @@ export struct CultivationPage {
         .padding({ top: 80, bottom: 80 })
       } else {
         Scroll() {
-          Column({ space: 10 }) {
-            if (this.vm.targets.length === 0) {
-              Text(this.vm.message.length > 0 ? this.vm.message : '暂无角色数据')
-                .fontSize(13)
-                .fontColor($r('app.color.text_secondary'))
-                .width('100%')
-                .padding({ top: 30, bottom: 30 })
-                .textAlign(TextAlign.Center)
-            } else {
-              // 养成计划区（持久化：项目/条目/材料勾选）
-              this.planSection()
-
-              // 操作区
-              Column({ space: 8 }) {
-                this.quickLevelBar()
-                Row({ space: 8 }) {
-                  Button(`已选 ${this.vm.selectedCount} 个角色`)
-                    .fontSize(12)
-                    .height(30)
-                    .layoutWeight(1)
-                    .backgroundColor($r('app.color.card_background'))
-                    .fontColor($r('app.color.text_primary'))
-                  Button(this.vm.computing ? '计算中...' : '计算材料')
-                    .fontSize(12)
-                    .height(30)
-                    .layoutWeight(1)
-                    .backgroundColor($r('app.color.app_primary'))
-                    .fontColor(Color.White)
-                    .onClick(() => {
-                      this.vm.compute(this.currentUid).then(() => {
-                        this.toast(this.vm.message.length > 0 ? this.vm.message : '计算完成');
-                      });
-                    })
-                }
-                .width('100%')
-              }
+          if (this.vm.targets.length === 0) {
+            Text(this.vm.message.length > 0 ? this.vm.message : '暂无角色数据')
+              .fontSize(13)
+              .fontColor($r('app.color.text_secondary'))
               .width('100%')
-              .padding(14)
-              .borderRadius($r('app.float.card_radius'))
-              .backgroundColor($r('app.color.card_background'))
-              .border({ width: 1, color: $r('app.color.divider') })
-
-              // 结果区
-              this.resultSection()
-              this.savePlanBar()
-
-              // 候选角色网格
-              Row() {
-                Text('选择角色')
-                  .fontSize(14)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor($r('app.color.text_primary'))
-                  .layoutWeight(1)
-                Text(`共 ${this.vm.targets.length} 名`)
-                  .fontSize(11)
-                  .fontColor($r('app.color.text_secondary'))
+              .padding({ top: 30, bottom: 30 })
+              .textAlign(TextAlign.Center)
+          } else if (this.isWide) {
+            // 宽屏双栏：左计划 / 右计算（内容区宽 >=840，对齐页面断点规范）
+            Row({ space: 10 }) {
+              Column() {
+                this.planColumn()
               }
-              .width('100%')
+              .layoutWeight(1)
 
-              Column({ space: 8 }) {
-                ForEach(this.vm.targets, (target: CultivateTarget, idx: number) => {
-                  this.targetRow(target, idx)
-                }, (target: CultivateTarget, idx: number) => `cult_${target.avatarId}`)
+              Column() {
+                this.computeColumn()
               }
-              .width('100%')
+              .layoutWeight(1)
             }
+            .width('100%')
+            .alignItems(VerticalAlign.Top)
+          } else {
+            Column({ space: 10 }) {
+              this.planColumn()
+              this.computeColumn()
+            }
+            .width('100%')
           }
-          .width('100%')
-          .padding({ left: 16, right: 16, bottom: 16 })
         }
         .width('100%')
         .layoutWeight(1)
         .align(Alignment.Top)
+        .padding({ left: 16, right: 16, bottom: 16 })
       }
     }
     .width('100%')
     .height('100%')
     .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
+    .onAreaChange((oldValue: Area, newValue: Area) => {
+      this.isWide = (newValue.width as number) >= 840;
+    })
   }
 }

@@ -52,6 +52,7 @@ import { HomeViewModel, HomePoolSummary, HomeChallengeSummary } from '../viewmod
 import { Logger } from '../common/Logger';
 import { SignInService, SignInResult } from '../service/SignInService';
 import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
+import { GachaHomeStatService, GachaArchiveStatPage } from '../service/GachaHomeStatService';
 
 /** 主页仪表板卡片规格（设置页可隐藏/重排，对齐 Windows SettingHomeCardViewModel） */
 class DashCardSpec {
@@ -118,6 +119,8 @@ class DashCardSpec {
     @State greeting: string = '旅行者，欢迎来到提瓦特大陆！';
     /** 前瞻直播兑换码弹层（对齐 Windows 主页兑换码 Flyout） */
     @State showHomeCodes: boolean = false;
+    /** 祈愿多归档翻页数据（归档数 >= 2 才填充；单归档卡片走原单 UID 路径） */
+    @State gachaPages: GachaArchiveStatPage[] = [];
     @State homeCodes: MiyoliveCode[] = [];
     @State homeCodesLoading: boolean = false;
     /** 是否正在通过自绘 TitleBar 拖拽窗口（避免重复触发 startMoving） */
@@ -322,6 +325,7 @@ class DashCardSpec {
       }
       this.homeReloading = true;
       this.todayDay = new Date().getDate();
+      this.loadGachaPages();
       const uid: string = AppStorage.get<string>('currentUid') ?? '';
       this.homeVm.load(uid).then(() => {
         // 同步周期挑战快照（@Observed 深属性不触发 Index 重建）
@@ -336,11 +340,22 @@ class DashCardSpec {
       });
     }
 
+    /** 祈愿多归档翻页数据重载（仅读本地库；归档数 >= 2 才启用翻页） */
+    loadGachaPages(): void {
+      GachaHomeStatService.loadArchivePages().then((pages: GachaArchiveStatPage[]) => {
+        this.gachaPages = pages.length >= 2 ? pages : [];
+      }).catch((e: Error) => {
+        Logger.warn('Index', `load gacha pages fail: ${e.message}`);
+        this.gachaPages = [];
+      });
+    }
+
     /** 祈愿页刷新成功：主页祈愿卡重读本地库 */
     onGachaDataChanged(): void {
       const uid: string = AppStorage.get<string>('currentUid') ?? '';
       this.homeVm.reloadGacha(uid).then(() => {
       });
+      this.loadGachaPages();
     }
 
     /** 便笺刷新成功：主页便笺卡重读本地库（不触发其他数据源网络请求） */
@@ -882,6 +897,7 @@ class DashCardSpec {
               pools: this.homeVm.gachaPools,
               total: this.homeVm.gachaTotal,
               loaded: this.homeVm.gachaLoaded,
+              pages: this.gachaPages,
               onTap: () => {
                 if (this.isWide) {
                   this.switchTo(1);
@@ -1235,6 +1251,7 @@ class DashCardSpec {
                   pools: this.homeVm.gachaPools,
                   total: this.homeVm.gachaTotal,
                   loaded: this.homeVm.gachaLoaded,
+                  pages: this.gachaPages,
                   onTap: () => {
                     this.switchTo(1);
                   },

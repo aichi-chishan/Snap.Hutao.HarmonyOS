@@ -149,6 +149,16 @@ export struct LedgerPage {
       } else {
         Scroll() {
           Column({ space: 12 }) {
+            // 昵称 / UID（对齐 Windows TravelersDiaryCard 头部右侧 Uid）
+            Row() {
+              Blank()
+              Text(this.ledger.nickname.length > 0
+                ? `${this.ledger.nickname} · UID ${this.ledger.uid}` : `UID ${this.ledger.uid}`)
+                .fontSize(12)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .width('100%')
+
             // 月份切换（optional_month 提供可选月份，1-12 倒序）
             Scroll() {
               Row({ space: 8 }) {

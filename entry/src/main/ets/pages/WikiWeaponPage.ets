@@ -6,6 +6,8 @@
  */
 import { WikiMetaService, WikiWeaponMeta, MetaMaterial } from '../service/WikiMetaService';
 import { BaseValueService } from '../service/BaseValueService';
+import { CharacterViewModel, AddPlanResult } from '../viewmodel/CharacterViewModel';
+import { CultivationRepo, CultivateProject } from '../data/repo/CultivationRepo';
 import { AppBackButton } from '../components/AppBackButton';
 import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
@@ -30,6 +32,21 @@ export struct WikiWeaponPage {
   @State curLevel: number = 1;
   @State curPromoted: boolean = false;
   @State curAttack: number = 0;
+
+  toast(msg: string): void {
+    this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1500 });
+  }
+  /** 养成计划加入动作（复用 CharacterViewModel.addWeaponToPlan，对齐 Windows WikiWeaponPage CultivateCommand） */
+  private planVm: CharacterViewModel = new CharacterViewModel();
+  /** 养成计划选择半窗（多项目时让用户选，逻辑与 CharacterPage 同款） */
+  @State showPlanSheet: boolean = false;
+  /** 待选养成计划列表（bindSheet 数据源） */
+  @State pendingProjects: CultivateProject[] = [];
+  /** 待加入计划的武器快照（选项目期间固定） */
+  @State pendingWeaponId: number = 0;
+  @State pendingWeaponName: string = '';
+  /** 加入计划进行中（防重复点击） */
+  @State addingPlan: boolean = false;
 
   aboutToAppear(): void {
     this.load();
@@ -78,6 +95,125 @@ export struct WikiWeaponPage {
   /** 当前武器最大等级 */
   maxLevel(): number {
     return BaseValueService.weaponMaxLevel(this.current?.rankLevel ?? 0);
+  }
+
+  /** 加入养成计划入口（对齐 CharacterPage）：确认弹窗 → 0 项目自动建默认 / 1 项目直接加入 / 多项目弹半窗选择 */
+  private async addCurrentToPlan(): Promise<void> {
+    const w: WikiWeaponMeta | undefined = this.current;
+    if (w === undefined || this.addingPlan) {
+      return;
+    }
+    try {
+      const projects: CultivateProject[] = await CultivationRepo.getProjects();
+      if (projects.length === 0) {
+        const p: CultivateProject = await CultivationRepo.createProject('默认养成计划');
+        await this.addToProject(w.id, w.name, p);
+      } else if (projects.length === 1) {
+        await this.addToProject(w.id, w.name, projects[0]);
+      } else {
+        this.pendingWeaponId = w.id;
+        this.pendingWeaponName = w.name;
+        this.pendingProjects = projects;
+        this.showPlanSheet = true;
+      }
+    } catch (e) {
+      this.toast(`加入失败：${(e as Error).message}`);
+    }
+  }
+
+  /** 确认弹窗：说明图鉴数据限制（按 Lv.90 目标记录），确认后走项目选择流程 */
+  private confirmAddPlan(): void {
+    const w: WikiWeaponMeta | undefined = this.current;
+    if (w === undefined) {
+      return;
+    }
+    this.getUIContext().showAlertDialog({
+      title: '加入养成计划',
+      message: `图鉴为离线数据，将按 Lv.1 → Lv.90 目标记录「${w.name}」的养成目标（材料清单暂无法自动计算）。`,
+      autoCancel: true,
+      primaryButton: {
+        value: '取消',
+        action: () => {
+        },
+      },
+      secondaryButton: {
+        value: '加入',
+        fontColor: $r('app.color.app_primary'),
+        action: () => {
+          this.addCurrentToPlan();
+        },
+      },
+    });
+  }
+
+  /** 半窗内选中项目：关闭半窗并加入 */
+  private pickPlanProject(p: CultivateProject): void {
+    const id: number = this.pendingWeaponId;
+    const name: string = this.pendingWeaponName;
+    this.showPlanSheet = false;
+    if (id <= 0) {
+      return;
+    }
+    this.addToProject(id, name, p);
+  }
+
+  /** 加入指定项目并 toast 结果（重复加入/失败提示对齐 Windows 口径） */
+  private async addToProject(weaponId: number, weaponName: string, p: CultivateProject): Promise<void> {
+    if (this.addingPlan) {
+      return;
+    }
+    this.addingPlan = true;
+    try {
+      const r: AddPlanResult = await this.planVm.addWeaponToPlan(weaponId, weaponName, p);
+      this.toast(r.ok ? `${r.message}（按 Lv.90 目标记录）` : r.message);
+    } catch (e) {
+      this.toast(`加入失败：${(e as Error).message}`);
+    } finally {
+      this.addingPlan = false;
+    }
+  }
+
+  /** 养成计划选择半窗内容（多项目时列出项目供选择，样式与 CharacterPage 同款） */
+  @Builder
+  planPickerSheet() {
+    Column({ space: 10 }) {
+      Text('选择要加入的养成计划')
+        .fontSize(15)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .width('100%')
+      Scroll() {
+        Column({ space: 8 }) {
+          ForEach(this.pendingProjects, (p: CultivateProject) => {
+            Row({ space: 10 }) {
+              Text(p.name)
+                .fontSize(14)
+                .fontColor($r('app.color.text_primary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .layoutWeight(1)
+              Text('加入')
+                .fontSize(12)
+                .fontColor($r('app.color.app_primary'))
+            }
+            .width('100%')
+            .padding(12)
+            .borderRadius(10)
+            .backgroundColor($r('app.color.page_background'))
+            .border({ width: 1, color: $r('app.color.divider') })
+            .hoverEffect(HoverEffect.Highlight)
+            .onClick(() => {
+              this.pickPlanProject(p);
+            })
+          }, (p: CultivateProject) => `plan_${p.id}`)
+        }
+        .width('100%')
+      }
+      .layoutWeight(1)
+      .scrollBar(BarState.Off)
+    }
+    .width('100%')
+    .padding(16)
   }
 
   filtered(): WikiWeaponMeta[] {
@@ -153,6 +289,14 @@ export struct WikiWeaponPage {
     .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
     .onAreaChange((oldValue: Area, newValue: Area) => {
       this.isWide = (newValue.width as number) >= 840;
+    })
+    // 养成计划选择半窗（多项目时让用户选目标计划；$$ 双向同步下滑关闭）
+    .bindSheet($$this.showPlanSheet, this.planPickerSheet(), {
+      title: { title: '加入养成计划' },
+      showClose: true,
+      dragBar: true,
+      height: 360,
+      backgroundColor: $r('app.color.card_background'),
     })
   }
 
@@ -308,6 +452,9 @@ export struct WikiWeaponPage {
           .borderRadius($r('app.float.card_radius'))
           .backgroundColor($r('app.color.card_background'))
 
+          // 养成计划操作区（对齐 Windows WikiWeaponPage 命令区 CultivateCommand）
+          this.planActionBlock()
+
           // 基础数值卡（等级滑条 + 攻击力/突破）
           this.baseValueCard()
 
@@ -387,6 +534,24 @@ export struct WikiWeaponPage {
       .layoutWeight(1)
       .scrollBar(BarState.Auto)
     }
+  }
+
+  /** 养成计划操作区按钮（加入动作见 confirmAddPlan → addCurrentToPlan） */
+  @Builder
+  planActionBlock() {
+    Row({ space: 10 }) {
+      Button(this.addingPlan ? '加入中...' : '加入养成计划')
+        .fontSize(13)
+        .height(36)
+        .layoutWeight(1)
+        .backgroundColor($r('app.color.app_primary_bg'))
+        .fontColor($r('app.color.app_primary'))
+        .hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          this.confirmAddPlan();
+        })
+    }
+    .width('100%')
   }
 
   /** 基础数值卡：等级滑条 + 突破开关 + 攻击力（对齐 Windows BaseValueSlider） */

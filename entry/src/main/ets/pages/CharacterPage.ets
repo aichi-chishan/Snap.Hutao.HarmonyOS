@@ -18,6 +18,7 @@ import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
 import { MetaIcon } from '../components/MetaIcon';
 import { WikiMetaService, MetaSkill } from '../service/WikiMetaService';
 import { CharacterExportService } from '../service/CharacterExportService';
+import { SkillLevelService } from '../service/SkillLevelService';
 import { CultivationRepo, CultivateProject } from '../data/repo/CultivationRepo';
 import { Logger } from '../common/Logger';
 
@@ -360,7 +361,7 @@ export struct CharacterPage {
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'))
               .width('100%')
-            ForEach(WikiMetaService.skillsOfAvatar(this.currentDetail.name), (sk: MetaSkill) => {
+            ForEach(WikiMetaService.skillsOfAvatar(this.currentDetail.name), (sk: MetaSkill, idx: number) => {
               Column({ space: 3 }) {
                 Row({ space: 8 }) {
                   if (sk.i.length > 0) {
@@ -379,10 +380,14 @@ export struct CharacterPage {
                       .fontSize(13)
                       .fontWeight(FontWeight.Medium)
                       .fontColor($r('app.color.text_primary'))
-                    if (sk.k.length > 0) {
-                      Text(CharacterPage.kindLabel(sk.k))
-                        .fontSize(10)
-                        .fontColor($r('app.color.app_primary'))
+                    Row({ space: 4 }) {
+                      if (sk.k.length > 0) {
+                        Text(CharacterPage.kindLabel(sk.k))
+                          .fontSize(10)
+                          .fontColor($r('app.color.app_primary'))
+                      }
+                      // 战斗天赋等级徽章（对齐 Windows SkillView.Level：普攻/战技/爆发三行 Lv.x）
+                      this.skillLevelBadge(this.currentDetail!.name, idx)
                     }
                   }
                   .alignItems(HorizontalAlign.Start)
@@ -398,7 +403,7 @@ export struct CharacterPage {
               .padding({ top: 8, bottom: 8, left: 12, right: 12 })
               .borderRadius(10)
               .backgroundColor($r('app.color.page_background'))
-            }, (sk: MetaSkill) => `sk_${sk.n}`)
+            }, (sk: MetaSkill, idx: number) => `sk_${sk.n}_${this.skillLevelAt(this.currentDetail!.name, idx)}`)
           }
           .width('100%')
           .padding(12)
@@ -790,6 +795,30 @@ export struct CharacterPage {
       case 'Q': return '元素爆发';
       case 'P': return '被动';
       default: return '其他';
+    }
+  }
+
+  /** 元数据第 idx 项天赋对应的 API 等级（SkillLevelService 按接口顺序对齐；0=无数据不显示） */
+  private skillLevelAt(name: string, idx: number): number {
+    const d: CharacterDetail | undefined = this.currentDetail;
+    if (d === undefined) {
+      return 0;
+    }
+    const levels: number[] = SkillLevelService.matchLevels(WikiMetaService.skillsOfAvatar(name), d.skills);
+    return idx >= 0 && idx < levels.length ? levels[idx] : 0;
+  }
+
+  /** 战斗天赋等级徽章（无参读取组件状态；参数 name/idx 为常量槽位，满足 @Builder 刷新规则） */
+  @Builder
+  skillLevelBadge(name: string, idx: number) {
+    if (this.skillLevelAt(name, idx) > 0) {
+      Text(`Lv.${this.skillLevelAt(name, idx)}`)
+        .fontSize(10)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.app_primary'))
+        .padding({ left: 6, right: 6, top: 1, bottom: 1 })
+        .borderRadius(7)
+        .backgroundColor($r('app.color.app_primary_bg'))
     }
   }
 

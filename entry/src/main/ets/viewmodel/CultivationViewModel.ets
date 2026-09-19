@@ -9,9 +9,12 @@ import { CalculateService, CalAvatarDelta, CalSkillDelta, CalWeaponDelta } from 
 import { CalBatchResult, CalItem } from '../model/Calculate';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { CultivationRepo, CultivateProject, CultivateEntry } from '../data/repo/CultivationRepo';
+import { ResinStatisticsService, ResinStatisticsResult, ResinDropDistribution } from '../service/ResinStatisticsService';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'CultivationViewModel';
+/** 树脂统计世界等级偏好键（对齐 Windows SettingKeys.ResinStatisticsSelectedDropDistribution） */
+const KEY_RESIN_WORLD_LEVEL: string = 'cultivation_resin_world_level';
 
 /** 养成候选角色 */
 export class CultivateTarget {
@@ -52,6 +55,19 @@ export class CultivationViewModel {
   planEntries: CultivateEntry[] = [];
   /** 计划写操作进行中（防连点） */
   planBusy: boolean = false;
+  /** 树脂换算统计（当前项目聚合；对齐 Windows ResinStatistics） */
+  resinStats: ResinStatisticsResult | undefined = undefined;
+  /** 树脂统计世界等级（持久化，默认 9 对齐 Windows；偏好未就绪时回退默认） */
+  resinWorldLevel: number = CultivationViewModel.loadResinWorldLevel();
+
+  private static loadResinWorldLevel(): number {
+    try {
+      const lv: number = PreferencesStore.getNumber(KEY_RESIN_WORLD_LEVEL, 9);
+      return lv >= 5 && lv <= 9 ? lv : 9;
+    } catch (e) {
+      return 9;
+    }
+  }
 
   async load(uid: string): Promise<void> {
     if (uid.length === 0) {
@@ -246,13 +262,40 @@ export class CultivationViewModel {
     return false;
   }
 
-  /** 重读当前项目条目 */
+  /** 重读当前项目条目（并联动刷新树脂统计） */
   async reloadEntries(): Promise<void> {
     if (this.currentProjectId <= 0) {
       this.planEntries = [];
+      this.resinStats = undefined;
       return;
     }
     this.planEntries = await CultivationRepo.getEntries(this.currentProjectId);
+    await this.refreshResinStats();
+  }
+
+  /** 树脂统计：聚合当前项目未完成材料 → 折算树脂/脆弱树脂/天数（对齐 Windows ResinStatistics） */
+  async refreshResinStats(): Promise<void> {
+    try {
+      const dist: ResinDropDistribution = ResinStatisticsService.distributionOf(this.resinWorldLevel);
+      this.resinStats = await ResinStatisticsService.compute(this.planEntries, dist);
+    } catch (e) {
+      Logger.warn(TAG, `resin stats fail ${(e as Error).message}`);
+      this.resinStats = undefined;
+    }
+  }
+
+  /** 切换树脂统计世界等级（持久化 + 重算，对齐 Windows SelectedDropDistribution） */
+  async setResinWorldLevel(worldLevel: number): Promise<void> {
+    if (worldLevel === this.resinWorldLevel) {
+      return;
+    }
+    this.resinWorldLevel = worldLevel;
+    try {
+      PreferencesStore.setNumber(KEY_RESIN_WORLD_LEVEL, worldLevel);
+    } catch (e) {
+      Logger.warn(TAG, `save resin world level fail ${(e as Error).message}`);
+    }
+    await this.refreshResinStats();
   }
 
   selectProject(id: number): void {

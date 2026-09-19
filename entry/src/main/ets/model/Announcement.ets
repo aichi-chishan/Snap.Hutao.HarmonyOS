@@ -46,6 +46,7 @@ export class Announcement {
   title: string = '';
   subtitle: string = '';
   startTime: number = 0;
+  endTime: number = 0;
   url: string = '';
   /** 公告横幅图（米哈游官方 URL） */
   banner: string = '';
@@ -62,6 +63,7 @@ export class Announcement {
     a.title = String(item['title'] ?? '');
     a.subtitle = String(item['subtitle'] ?? '');
     a.startTime = Announcement.parseTime(item['start_time']);
+    a.endTime = Announcement.parseTime(item['end_time']);
     a.url = String(item['url'] ?? '');
     a.banner = String(item['banner'] ?? '');
     return a;

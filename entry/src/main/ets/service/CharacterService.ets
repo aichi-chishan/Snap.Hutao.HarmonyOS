@@ -8,7 +8,7 @@ import { ApiResponse } from '../model/ApiResponse';
 import { HoyolabClient } from '../data/network/HoyolabClient';
 import { DsSigner } from '../data/network/DsSigner';
 import { RiskVerifier, RiskControlError } from '../data/network/RiskVerifier';
-import { CharacterListItem, CharacterDetail, ListWeapon, DetailedWeapon, Reliquary, Constellation, BaseProperty, RelicProperty, RecommendRelic } from '../model/CharacterData';
+import { CharacterListItem, CharacterDetail, ListWeapon, DetailedWeapon, Reliquary, Constellation, BaseProperty, RelicProperty, RecommendRelic, AvatarSkill } from '../model/CharacterData';
 import { WikiMetaService } from './WikiMetaService';
 import { UserService } from './UserService';
 import { RegionUtil, AppConstants } from '../common/Constants';
@@ -251,6 +251,19 @@ export class CharacterService {
         bp.add = String(p['add'] ?? '');
         bp.final = String(p['final'] ?? '');
         d.selectedProperties.push(bp);
+      }
+    }
+    // 技能等级（对齐 Windows DetailedCharacter.Skills：skill_id/skill_type/level；
+    // skill_type 1=战斗天赋（普攻/战技/爆发），2=固有天赋（level 恒 0））
+    const skills = item['skills'] as Array<Object>;
+    if (skills !== undefined && skills !== null) {
+      for (let i = 0; i < skills.length; i++) {
+        const s = skills[i] as Record<string, Object>;
+        const sk: AvatarSkill = new AvatarSkill();
+        sk.skillId = CharacterService.num(s['skill_id']);
+        sk.skillType = CharacterService.num(s['skill_type']);
+        sk.level = CharacterService.num(s['level']);
+        d.skills.push(sk);
       }
     }
     // 推荐圣遗物词条（Windows 评分权重依据）

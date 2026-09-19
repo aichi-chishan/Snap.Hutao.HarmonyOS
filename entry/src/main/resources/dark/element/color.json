@@ -65,6 +65,10 @@
       "value": "#33111113"
     },
     {
+      "name": "reward_badge_scrim",
+      "value": "#99000000"
+    },
+    {
       "name": "nav_scrim",
       "value": "#66000000"
     },
@@ -115,6 +119,18 @@
     {
       "name": "card_inner_tint",
       "value": "#14FFFFFF"
+    },
+    {
+      "name": "cultivate_highlight",
+      "value": "#20A5D610"
+    },
+    {
+      "name": "ann_time_blue",
+      "value": "#FF7EB3F7"
+    },
+    {
+      "name": "ann_time_red",
+      "value": "#FFFF6B6B"
     }
   ]
 }

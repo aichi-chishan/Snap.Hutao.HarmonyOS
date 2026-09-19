@@ -5,10 +5,9 @@
 import { router } from '@kit.ArkUI';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { AnnouncementViewModel } from '../viewmodel/AnnouncementViewModel';
-import { Announcement, AnnouncementGroup } from '../model/Announcement';
+import { Announcement, AnnouncementGroup, AnnouncementType } from '../model/Announcement';
 import { AnnouncementDetailParams } from '../model/RouteParams';
 import { MiyoliveCode } from '../model/MiyoliveCode';
-import { DateUtil } from '../common/DateUtil';
 import { Loading } from '../components/Loading';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorHint } from '../components/ErrorHint';
@@ -171,23 +170,51 @@ export struct AnnouncementPage {
     .padding({ top: 8, bottom: 8 })
   }
 
-  /** 剩余天数角标（活动进行中显示"剩余 N 天"，已结束/未开始显示日期） */
-  private static remainText(item: Announcement): string {
-    const now: number = Date.now();
-    if (item.startTime > 0) {
-      const days: number = Math.ceil((item.startTime - now) / (24 * 3600 * 1000));
-      if (days > 730) {
-        return `${DateUtil.formatDate(item.startTime)}`;
-      }
-      if (days > 0) {
-        return `${days} 天后开始`;
-      }
-      if (days > -730) {
-        const left: number = Math.abs(days);
-        return `${left} 天后结束`;
-      }
+  /**
+   * 剩余时间角标文案（对齐 Windows Announcement.TimeDescription 语义）：
+   * 仅活动类（type==1）显示；未开始显示至开始的倒计时，进行中显示至结束的倒计时；
+   * >24h 显示"N天N小时"，≤24h 显示"N小时"；长期（>730 天）/已结束不显示倒计时。
+   */
+  private remainText(item: Announcement): string {
+    if (item.type !== AnnouncementType.ACTIVITY) {
+      return '';
     }
-    return '';
+    const now: number = Date.now();
+    if (item.startTime > now) {
+      return AnnouncementPage.spanText(item.startTime - now, true);
+    }
+    const end: number = item.endTime;
+    if (end <= now) {
+      // 结束时间缺失（接口未返回）不显示，避免误导
+      return '';
+    }
+    const span: number = end - now;
+    if (span > 730 * 24 * 3600 * 1000) {
+      return '';
+    }
+    return AnnouncementPage.spanText(span, false);
+  }
+
+  /** span(ms) → 倒计时文案：>24h "N天N小时"，≤24h "N小时" */
+  private static spanText(span: number, isBegin: boolean): string {
+    const totalHours: number = Math.floor(span / 3600000);
+    const days: number = Math.floor(totalHours / 24);
+    const hours: number = totalHours % 24;
+    const body: string = days > 0 ? `${days}天${hours}小时` : `${totalHours}小时`;
+    return isBegin ? `${body}后开始` : `${body}后结束`;
+  }
+
+  /** 角标颜色语义（对齐 Windows TimeDescriptionBrush）：蓝=未开始 / 红=剩≤10天 / 白=其他 */
+  private remainColor(item: Announcement): ResourceColor {
+    const now: number = Date.now();
+    if (item.startTime > now) {
+      return $r('app.color.ann_time_blue');
+    }
+    const end: number = item.endTime;
+    if (end > now && end - now <= 10 * 24 * 3600 * 1000) {
+      return $r('app.color.ann_time_red');
+    }
+    return Color.White;
   }
 
   @Builder
@@ -203,12 +230,12 @@ export struct AnnouncementPage {
           .onError((err: ImageError) => {
             // 加载失败：保持占位渐变
           })
-        // 剩余天数角标
-        if (AnnouncementPage.remainText(item).length > 0) {
-          Text(AnnouncementPage.remainText(item))
+        // 剩余时间角标（仅活动类；蓝=未开始 / 红=剩≤10天 / 白=其他）
+        if (this.remainText(item).length > 0) {
+          Text(this.remainText(item))
             .fontSize(10)
             .fontWeight(FontWeight.Medium)
-            .fontColor(Color.White)
+            .fontColor(this.remainColor(item))
             .padding({ left: 8, right: 8, top: 4, bottom: 4 })
             .borderRadius({ topLeft: 0, bottomLeft: 6, bottomRight: 0, topRight: 6 })
             .backgroundColor('#66000000')

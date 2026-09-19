@@ -149,7 +149,7 @@ export class CharacterViewModel {
           return r;
         }
       }
-      // 材料：角色突破+天赋消耗（对齐 Windows SaveAvatarOnlyCultivationAsync 的合并口径）
+      // 材料：角色突破消耗（对齐 Windows SaveAvatarOnlyCultivationAsync 的合并口径）
       const items: CalItem[] = [];
       let computed: boolean = false;
       try {
@@ -159,7 +159,8 @@ export class CharacterViewModel {
         delta.levelTarget = Math.max(detail.level, 90);
         delta.elementAttrId = CultivationViewModel.elementAttrIdOf(detail.element);
         delta.avatarPromoteLevel = detail.promoteLevel;
-        // 技能清单：详情无技能等级数据（batch_compute 允许空 skill_list，与养成页计算口径一致）
+        // 技能清单：batch_compute 的 skill id 空间（元数据 GroupId）与 game_record 的 skill_id
+        // 对应关系无法离线确证，保持空 skill_list（与养成页计算口径一致，避免整体计算失败）
         delta.skills = [];
         const result: CalBatchResult = await CalculateService.getInstance().batchCompute([delta]);
         if (result.items.length > 0) {
@@ -190,6 +191,35 @@ export class CharacterViewModel {
       r.ok = false;
       r.message = `加入失败：${(e as Error).message}`;
       Logger.warn(TAG, `addAvatarToPlan fail: ${r.message}`);
+    }
+    return r;
+  }
+
+  /**
+   * 图鉴武器加入养成计划（对齐 Windows WikiWeaponViewModel.CultivateCommand）：
+   * 重复加入（同项目同武器）返回 ok=false；条目 level/targetLevel 固定 1→90。
+   * Windows 用 OfflineCalculator 按武器突破表离线算材料，鸿蒙元数据无突破消耗表、
+   * batch_compute 又必须挂角色（avatar_id），故仅落目标条目不含材料清单（提示里说明）。
+   */
+  async addWeaponToPlan(weaponId: number, weaponName: string, project: CultivateProject): Promise<AddPlanResult> {
+    const r: AddPlanResult = new AddPlanResult();
+    try {
+      const entries: CultivateEntry[] = await CultivationRepo.getEntries(project.id);
+      for (const e of entries) {
+        if (e.avatarId === weaponId) {
+          r.ok = false;
+          r.message = `该武器已在养成计划「${project.name}」中`;
+          return r;
+        }
+      }
+      // icon 留空：养成页条目图标回退首字占位（cultivate_entries.avatar_id 语义为条目对象 id，武器/角色共用一张表）
+      await CultivationRepo.addEntry(project.id, weaponId, weaponName, '', 1, 90, []);
+      r.ok = true;
+      r.message = `已加入养成计划：${project.name}`;
+    } catch (e) {
+      r.ok = false;
+      r.message = `加入失败：${(e as Error).message}`;
+      Logger.warn(TAG, `addWeaponToPlan fail: ${r.message}`);
     }
     return r;
   }

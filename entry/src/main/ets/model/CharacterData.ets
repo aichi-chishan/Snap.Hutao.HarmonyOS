@@ -73,6 +73,14 @@ export class RecommendRelic {
   energyType: string = '';
 }
 
+/** 技能等级（character/detail 的 skills 数组项，对齐 Windows GameRecord Avatar.Skill：
+ *  skill_type 1=战斗天赋（普攻/战技/爆发） 2=固有天赋；固有天赋不升级，level 恒为 0） */
+export class AvatarSkill {
+  skillId: number = 0;
+  skillType: number = 0;
+  level: number = 0;
+}
+
 /** 角色详情 */
 export class CharacterDetail {
   id: number = 0;
@@ -88,6 +96,8 @@ export class CharacterDetail {
   reliquaries: Reliquary[] = [];
   constellations: Constellation[] = [];
   selectedProperties: BaseProperty[] = [];
+  /** 技能等级（detail 接口 skills 数组；战斗天赋 A/E/Q 有等级，固有天赋恒 0） */
+  skills: AvatarSkill[] = [];
   promoteLevel: number = 0;
   /** 推荐圣遗物词条（Window 评分权重依据） */
   recommend: RecommendRelic = new RecommendRelic();
