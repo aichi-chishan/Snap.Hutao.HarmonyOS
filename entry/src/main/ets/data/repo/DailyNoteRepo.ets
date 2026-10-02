@@ -43,7 +43,8 @@ export class DailyNoteRepo {
       'max_expedition_num': note.maxExpeditionNum,
       'expeditions_json': JSON.stringify(note.expeditions),
       'transformer_json': JSON.stringify(note.transformer),
-      'archon_json': '',
+      'archon_json': JSON.stringify(note.archonQuests),
+      'raw_json': note.rawJson,
       'resin_notify_threshold': resinTh,
       'home_coin_notify_threshold': homeTh,
       'notify_flags': flags,
@@ -149,6 +150,7 @@ export class DailyNoteRepo {
     if (trJson.length > 0) {
       try {
         const t = JSON.parse(trJson) as Record<string, Object>;
+        note.transformer.obtained = t['obtained'] === true;
         note.transformer.day = Number(t['day'] ?? 0);
         note.transformer.hour = Number(t['hour'] ?? 0);
         note.transformer.minute = Number(t['minute'] ?? 0);
@@ -158,7 +160,20 @@ export class DailyNoteRepo {
         Logger.warn(TAG, 'transformer json parse fail');
       }
     }
-    rec.note = note;
+    note.archonQuests = DailyNote.archonListFromJson(rs.getString(rs.getColumnIndex('archon_json')));
+    const raw: string = rs.getString(rs.getColumnIndex('raw_json'));
+    if (raw.length > 0) {
+      try {
+        const complete: DailyNote = DailyNote.fromJson(JSON.parse(raw));
+        complete.refreshTime = note.refreshTime;
+        rec.note = complete;
+      } catch (e) {
+        Logger.warn(TAG, 'daily note payload invalid, falling back to legacy columns');
+        rec.note = note;
+      }
+    } else {
+      rec.note = note;
+    }
     rec.resinNotifyThreshold = rs.getLong(rs.getColumnIndex('resin_notify_threshold'));
     rec.homeCoinNotifyThreshold = rs.getLong(rs.getColumnIndex('home_coin_notify_threshold'));
     rec.notifyFlags = rs.getLong(rs.getColumnIndex('notify_flags'));

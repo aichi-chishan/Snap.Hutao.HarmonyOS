@@ -23,8 +23,8 @@ export class RelationalStoreHelper {
       securityLevel: relationalStore.SecurityLevel.S1,
     };
     const store: relationalStore.RdbStore = await relationalStore.getRdbStore(context, storeConfig);
-    RelationalStoreHelper.rdbStore = store;
     await RelationalStoreHelper.createTables(store);
+    RelationalStoreHelper.rdbStore = store;
     Logger.info(TAG, 'database initialized');
   }
 
@@ -159,6 +159,7 @@ export class RelationalStoreHelper {
         archive_id INTEGER,
         ach_id INTEGER,
         current INTEGER DEFAULT 1,
+        status INTEGER NOT NULL DEFAULT 3,
         timestamp INTEGER DEFAULT 0
       )`,
       `CREATE INDEX IF NOT EXISTS idx_achievement_entries_archive ON achievement_entries (archive_id)`,
@@ -172,7 +173,7 @@ export class RelationalStoreHelper {
   }
 
   /** 当前数据库结构版本（每次结构变更 +1，并在 MIGRATIONS 末尾追加对应迁移） */
-  private static readonly DB_VERSION: number = 5;
+  private static readonly DB_VERSION: number = 6;
 
   /**
    * 有序迁移列表：MIGRATIONS[i] 把版本 i+1 升到 i+2。
@@ -233,6 +234,33 @@ export class RelationalStoreHelper {
         record_time INTEGER
       )`,
     ],
+    [
+      // v5 → v6：新记录按玩法、UID、区服、期数隔离。旧表无身份，保留原样供显式恢复。
+      `CREATE TABLE IF NOT EXISTS challenge_records (
+        kind TEXT NOT NULL,
+        uid TEXT NOT NULL,
+        region TEXT NOT NULL,
+        schedule_id INTEGER NOT NULL,
+        start_time INTEGER NOT NULL DEFAULT 0,
+        end_time INTEGER NOT NULL DEFAULT 0,
+        total_star INTEGER NOT NULL DEFAULT 0,
+        raw_json TEXT NOT NULL,
+        record_time INTEGER NOT NULL,
+        PRIMARY KEY (kind, uid, region, schedule_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS backup_recovery (
+        id INTEGER PRIMARY KEY CHECK(id=1),
+        marker TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS cultivate_inventory (
+        project_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL,
+        count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (project_id, item_id)
+      )`,
+      'ALTER TABLE achievement_entries ADD COLUMN status INTEGER NOT NULL DEFAULT 3',
+      'ALTER TABLE daily_notes ADD COLUMN raw_json TEXT NOT NULL DEFAULT \'\'',
+    ],
   ];
 
   /** 版本驱动的迁移执行器 */
@@ -248,19 +276,25 @@ export class RelationalStoreHelper {
     }
     while (v < RelationalStoreHelper.DB_VERSION) {
       const steps: string[] = RelationalStoreHelper.MIGRATIONS[v - 1] ?? [];
-      for (let i = 0; i < steps.length; i++) {
-        try {
-          await store.executeSql(steps[i]);
-        } catch (e) {
-          // 幂等容错：重复加列/已清理过等场景放行
-          Logger.info(TAG, `migration v${v} stmt${i} skip: ${(e as Error).message}`);
-        }
-      }
-      v += 1;
+      store.beginTransaction();
       try {
-        store.version = v;
+        for (let i = 0; i < steps.length; i++) {
+          try {
+            await store.executeSql(steps[i]);
+          } catch (e) {
+            // 新库建表已含新增列时允许重复列；其他错误必须回滚，不能标成迁移成功。
+            const message: string = (e as Error).message.toLowerCase();
+            if (!steps[i].startsWith('ALTER TABLE ') || !message.includes('duplicate column')) {
+              throw new Error((e as Error).message);
+            }
+          }
+        }
+        store.version = v + 1;
+        store.commit();
+        v += 1;
       } catch (e) {
-        Logger.warn(TAG, 'write db version fail');
+        store.rollBack();
+        throw new Error(`数据库升级 v${v} 失败：${(e as Error).message}`);
       }
     }
   }

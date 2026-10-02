@@ -43,6 +43,7 @@ export class Reliquary {
   rarity: number = 0;
   level: number = 0;
   posName: string = '';
+  setName: string = '';
   mainProperty: RelicProperty = new RelicProperty();
   subProperties: RelicProperty[] = [];
 }
@@ -105,6 +106,9 @@ export class CharacterDetail {
 
 /** 详情武器 */
 export class DetailedWeapon {
+  name: string = '';
+  mainProperty: RelicProperty = new RelicProperty();
+  subProperty: RelicProperty = new RelicProperty();
   id: number = 0;
   type: number = 0;
   rarity: number = 0;

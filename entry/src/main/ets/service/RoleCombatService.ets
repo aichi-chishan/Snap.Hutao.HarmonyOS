@@ -11,10 +11,11 @@ import { RiskVerifier } from '../data/network/RiskVerifier';
 import { RoleCombatRoot } from '../model/RoleCombat';
 import { UserService } from './UserService';
 import { RegionUtil, AppConstants } from '../common/Constants';
+import { HoyolabEndpoints } from '../common/HoyolabEndpoints';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'RoleCombatService';
-const URL: string = 'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api/role_combat';
+const API_PATH: string = 'role_combat';
 
 export class RoleCombatService {
   private static instance: RoleCombatService = new RoleCombatService();
@@ -47,24 +48,41 @@ export class RoleCombatService {
     const sorted: string = DsSigner.sortQuery(query);
     const t: number = DsSigner.nowTimestamp();
     const r: string = DsSigner.randomNumber();
-    const ds: string = await DsSigner.signGen2(AppConstants.DS_SALT_X4, t, r, '', sorted);
-    const url: string = `${URL}?${sorted}`;
+    const ds: string = await DsSigner.signGen2(HoyolabEndpoints.gameRecordSalt(region), t, r, '', sorted);
+    const url: string = `${HoyolabEndpoints.gameRecordUrl(API_PATH, region)}?${sorted}`;
     const headers: Record<string, string> = { 'DS': ds, 'Cookie': cookie };
     if (challenge !== undefined && challenge.length > 0) {
       headers['x-rpc-challenge'] = challenge;
     }
     const resp0: ApiResponse = await ApiClient.getInstance().get(url,
-      HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
+      HoyolabClient.merge(HoyolabClient.getBaseHeaders(region), headers));
     let resp: ApiResponse = resp0;
     if (resp0.isRiskControl()) {
+      if (HoyolabEndpoints.isOverseaRegion(region)) {
+        throw new Error('HoYoLAB 需要完成验证，请在官方应用验证后重试');
+      }
       // 1034：自动弹统一验证窗，成功后带 challenge 服务内重放一次
-      const replayChallenge: string = await RiskVerifier.tryResolveRisk(resp0, cookie, URL);
+      const replayChallenge: string = await RiskVerifier.tryResolveRisk(resp0, cookie, url);
       if (replayChallenge.length === 0) {
         throw new Error('人机验证未完成或被取消，请稍后再试');
       }
       headers['x-rpc-challenge'] = replayChallenge;
       resp = await ApiClient.getInstance().get(url,
-        HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
+        HoyolabClient.merge(HoyolabClient.getBaseHeaders(region), headers));
+    }
+    if (!resp.success && UserService.isCookieAuthError(resp)) {
+      resp = await UserService.retryWithRefreshedCookie(user, async (): Promise<ApiResponse> => {
+        const retryHeaders: Record<string, string> = {
+          'Cookie': user.gameRecordCookie(),
+          'DS': await DsSigner.signGen2(HoyolabEndpoints.gameRecordSalt(region),
+            DsSigner.nowTimestamp(), DsSigner.randomNumber(), '', sorted),
+        };
+        if (headers['x-rpc-challenge'] !== undefined) {
+          retryHeaders['x-rpc-challenge'] = headers['x-rpc-challenge'];
+        }
+        return ApiClient.getInstance().get(url,
+          HoyolabClient.merge(HoyolabClient.getBaseHeaders(region), retryHeaders));
+      });
     }
     if (!resp.success || resp.data === undefined) {
       throw new Error(resp.userFriendlyMessage());

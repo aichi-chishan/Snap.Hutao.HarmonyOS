@@ -12,6 +12,7 @@ import { ApiClient } from './ApiClient';
 import { RsaEncryptor } from './RsaEncryptor';
 import { PreferencesStore } from '../prefs/PreferencesStore';
 import { RiskVerifyService } from '../../service/RiskVerifyService';
+import { CredentialPolicy } from '../../common/CredentialPolicy';
 import { Logger } from '../../common/Logger';
 
 const TAG: string = 'PassportClient';
@@ -304,19 +305,21 @@ export class PassportClient {
         connectTimeout: AppConstants.NETWORK_TIMEOUT_MS,
         readTimeout: AppConstants.NETWORK_TIMEOUT_MS,
         expectDataType: http.HttpDataType.STRING,
+        maxRedirects: 0,
+        usingCache: false,
       });
       if (resp.responseCode === http.ResponseCode.OK) {
         const parsed: ApiResponse = ApiResponse.fromJson(resp.result as string);
         parsed.respHeaders = ApiClient.normalizeHeaders(resp.header);
         return parsed;
       }
-      Logger.warn(TAG, `http code=${resp.responseCode} url=${url}`);
+      Logger.warn(TAG, `http code=${resp.responseCode} url=${CredentialPolicy.logUrl(url)}`);
       const failResp: ApiResponse = ApiResponse.fail(Number(resp.responseCode), `HTTP ${resp.responseCode}`);
       failResp.respHeaders = ApiClient.normalizeHeaders(resp.header);
       return failResp;
     } catch (e) {
       const err = e as BusinessError;
-      Logger.warn(TAG, `request error url=${url} code=${err.code} msg=${err.message}`);
+      Logger.warn(TAG, `request error url=${CredentialPolicy.logUrl(url)} code=${err.code}`);
       return ApiResponse.fail(-2, `网络异常：${err.message}`);
     } finally {
       httpRequest.destroy();

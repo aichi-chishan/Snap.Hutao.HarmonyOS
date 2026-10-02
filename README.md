@@ -4,7 +4,9 @@
 
 把 Windows 版 [Snap.Hutao](https://github.com/DGP-Studio/Snap.Hutao)（胡桃启动器）移植到
 HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），手机 / 平板 / PC（2in1）
-三端自适应布局，界面与功能对齐 Windows 版，仅支持国服（米哈游国服 API）。
+三端自适应布局。本轮按 Windows Remastered **v1.20.3** 对照补齐非注入功能，支持国服与 HoYoLAB 区域路由。
+
+源码基线、差距、实施顺序与验证边界见 [API24_PORT_PLAN.md](docs/API24_PORT_PLAN.md)。编译通过不代表所有功能已在真机和真实账号上验收。
 
 ![Platform](https://img.shields.io/badge/Platform-HarmonyOS%206.1.1-007DFF)
 ![API](https://img.shields.io/badge/API--24-blue)
@@ -15,7 +17,7 @@ HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），�
 > 🗺️ 后续完善计划（功能补全 / 体验优化 / 工程化 / 性能）见 [ROADMAP.md](ROADMAP.md)
 
 > ⚠️ **免责声明**：本项目与米哈游 / HoYoverse 无任何关联，仅供学习交流使用。
-> 不包含任何注入、内存读取、进程注入类功能；不包含胡桃云（通行证 / 云备份等）在线服务。
+> 不包含任何注入、内存读取、进程注入类功能。胡桃云使用独立通行证与凭据存储，上传/删除由用户显式操作；服务可用性以运营方实际响应为准。
 
 ---
 
@@ -32,15 +34,16 @@ HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），�
 ### 工具
 | 模块 | 说明 |
 |---|---|
-| 启动游戏 | 检测并拉起本机已安装的原神（不做注入 / 进程链 / 切号） |
+| 启动游戏 | 保存厂商公开 URI 或已知鸿蒙 Bundle/Ability 后拉起游戏；不猜测 Android 包名，不做注入 |
 | 祈愿记录 | 常规五池 + **千星奇域（颂愿）**总览统计（总抽 / 平均 / 最非最欧 / UP 平均）、五星头像网格、SToken 自动重签刷新、**UIGF v4.2** 导入导出（含 hk4e_ugc，兼容 v4.0 / v3.x）、剪贴板 URL 导入 |
 | 成就管理 | 73 分类 / 1800+ 成就、多档案、分类筛选搜索、UIAF v1.1 导入导出 |
 | 实时便笺 | 树脂 / 派遣 / 每日委托 / 周本折扣 / 洞天宝钱 / 参变仪，阈值系统通知，自动刷新（半屏设置弹窗） |
 | 我的角色 | 角色面板 / 圣遗物评分（Windows 加权算法）/ 名片专属背景 / 武器信息 |
-| 养成计划 | 养成目标 + 材料清单计算 |
+| 养成计划 | 离线角色/武器/天赋计算、项目材料清单、手工库存与 UIIF 互通、材料缺口 |
 | 深境螺旋 / 幻想真境剧诗 / 幽境危战 | 当期 / 上期战绩、奖章 / 回合统计、敌方阵容真图标 |
 | 角色资料 / 武器资料 / 怪物资料 | 本地元数据百科：属性数值曲线滑条、天赋 / 命座 / 精炼 / 抗性 / 掉落，离线可用 |
-| 账号与数据 | 扫码 / 验证码登录（极验自动处理）、多账号切换、角色绑定 |
+| 账号与数据 | 国服扫码/验证码、国服及 HoYoLAB 官方网页/手动 Cookie、多账号与角色绑定 |
+| 备份 | v2 业务数据库与可迁移偏好备份，兼容 v1；预检、事务回滚、凭据暂存与中断恢复 |
 
 ### 风控对抗（对齐 Windows RetryIf1034Async 链路）
 - 战记接口 1034 → createVerification → 统一验证浮层（极验）→ challenge 重放
@@ -59,7 +62,7 @@ HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），�
 
 | 项 | 说明 |
 |---|---|
-| 单元测试 | `entry/src/test`（hypium Local Test，纯逻辑：圣遗物评分 / 祈愿类型 / 富文本清洗 / 日期工具） |
+| 单元测试 | `entry/src/test`（hypium）及 `tests/run.cjs`（生产逻辑、SQLite、网络契约与失败回滚；不代替真机） |
 | CI | `.github/workflows/ci.yml`：仓库不变量 + 隐私门禁 + lint（0 error 门禁）+ 无签名 HAP 构建 |
 | 回归清单 | [docs/TESTING.md](docs/TESTING.md)（实机验证逐项打勾） |
 | 隐私门禁 | CI 自动扫描已跟踪文件中的私人邮箱 / 本机绝对路径，命中即失败 |
@@ -138,7 +141,9 @@ docs/             测试与回归清单
 ## 🔐 隐私
 
 - 所有账号数据（Cookie / SToken）仅存储在**设备本地**数据库与偏好文件中，经加密保存
-- 本项目**不包含任何遥测 / 数据上报**；网络请求仅发往米哈游官方 API 与 GitHub 资源源
+- 默认不自动上传游戏记录。云同步、战绩上传和便笺 Webhook 由用户显式开启/操作；公开资源可能访问 GitHub、胡桃服务、必应或 HoyoPlay。
+- 米哈游/HoYoLAB Cookie 按 HTTPS 精确主机及账号区域隔离，不发送给 GitHub、镜像、胡桃云或 Webhook。云 Bearer Token 使用独立安全存储。
+- 导出业务备份含明文游戏登录凭据，界面会明确提示。设备标识、签名材料、云设备会话与可重新下载的素材不作为可迁移设置。
 - 仓库不含任何签名密钥、账号信息与调试产物（详见 .gitignore）
 - CI 设有**隐私回归门禁**：自动扫描已跟踪文件中的私人邮箱与本机绝对路径，命中即构建失败
 - 提交者身份使用 GitHub noreply 邮箱，不暴露真实邮箱

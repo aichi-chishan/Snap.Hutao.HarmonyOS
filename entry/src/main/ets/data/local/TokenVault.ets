@@ -45,12 +45,13 @@ export class TokenVault {
         Logger.info(TAG, `updated cookie for user ${userId}`);
       } catch (e2) {
         Logger.warn(TAG, `save cookie fail: ${JSON.stringify(e2)}`);
+        throw new Error('凭据安全存储失败，未完成账号保存');
       }
     }
   }
 
   /** 读取某账号的完整 Cookie，未找到返回空串 */
-  static async loadCookie(userId: number): Promise<string> {
+  static async loadCookie(userId: number, strict: boolean = false): Promise<string> {
     const query: asset.AssetMap = new Map();
     query.set(asset.Tag.ALIAS, TokenVault.aliasOf(userId));
     query.set(asset.Tag.RETURN_TYPE, asset.ReturnType.ALL);
@@ -67,6 +68,7 @@ export class TokenVault {
       return TokenVault.bytesToStr(bytes);
     } catch (e) {
       Logger.warn(TAG, `load cookie fail: ${JSON.stringify(e)}`);
+      if (strict) { throw new Error('凭据安全存储读取失败，已取消备份'); }
       return '';
     }
   }

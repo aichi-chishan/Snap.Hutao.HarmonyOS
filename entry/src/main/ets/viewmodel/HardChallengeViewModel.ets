@@ -10,9 +10,12 @@ import { HardChallengeService } from '../service/HardChallengeService';
 import { HardChallengeRepo, HardChallengeHistoryEntry } from '../data/repo/HardChallengeRepo';
 import { RiskControlError } from '../data/network/RiskVerifier';
 import { RiskUiHelper } from '../common/RiskUiHelper';
+import { RegionUtil } from '../common/Constants';
 
 @Observed
 export class HardChallengeViewModel {
+  private requestedUid: string = '';
+  private requestVersion: number = 0;
   isUnlock: boolean = false;
   /** 单挑 DataEntry */
   single: HardChallengeDataEntry = new HardChallengeDataEntry();
@@ -20,6 +23,9 @@ export class HardChallengeViewModel {
   mp: HardChallengeDataEntry = new HardChallengeDataEntry();
   /** 耀金角色（对齐 Windows BlingAvatarView 列表；本地数据非云） */
   blings: HardChallengeSimpleAvatar[] = [];
+  popularity: HardChallengeSimpleAvatar[] = [];
+  popularityLoading: boolean = false;
+  popularityError: string = '';
   /** 档位：0=单挑 1=联机 */
   modeIndex: number = 0;
   scheduleName: string = '';
@@ -39,6 +45,14 @@ export class HardChallengeViewModel {
   riskPath: string = '';
 
   async load(uid: string): Promise<void> {
+    const requestVersion: number = ++this.requestVersion;
+    if (this.requestedUid !== uid) {
+      this.history = [];
+      this.fromHistory = false;
+      this.message = '';
+      this.clearData();
+    }
+    this.requestedUid = uid;
     if (uid.length === 0) {
       this.message = '请先登录并绑定 UID';
       this.loaded = true;
@@ -49,10 +63,14 @@ export class HardChallengeViewModel {
       const challenge: string = RiskUiHelper.consumePendingChallenge();
       const root: HardChallengeRoot = await HardChallengeService.getInstance().fetch(uid,
         challenge.length > 0 ? challenge : undefined);
+      if (requestVersion !== this.requestVersion || uid !== this.requestedUid) {
+        return;
+      }
       this.isUnlock = root.isUnlock;
       this.single = root.data.single;
       this.mp = root.data.mp;
       this.blings = root.data.blings;
+      this.loadPopularity(uid);
       this.scheduleId = 0;
       if (root.data.schedule.length > 0) {
         this.scheduleName = root.data.schedule[0].name;
@@ -60,15 +78,24 @@ export class HardChallengeViewModel {
       }
       this.message = '';
       this.fromHistory = false;
-      // 期数历史入库（当期一条，按 schedule_id UPSERT，对齐 Windows HardChallengeEntry：
-      // 单挑/联机均无数据不入库）
-      if (this.scheduleId > 0 && (this.single.hasData || this.mp.hasData)) {
-        const s: HardChallengeScheduleItem = root.data.schedule[0];
-        await HardChallengeRepo.saveHistory(this.scheduleId, s.startTime * 1000, s.endTime * 1000,
-          root.rawJson);
+      // 官方一次返回多期；逐期保存，不能将整个响应归到首期。
+      for (let i: number = 0; i < root.periods.length; i++) {
+        const period = root.periods[i];
+        if (period.schedule.length === 0 || (!period.single.hasData && !period.mp.hasData)) {
+          continue;
+        }
+        const schedule: HardChallengeScheduleItem = period.schedule[0];
+        await HardChallengeRepo.saveHistory(uid, RegionUtil.regionOfUid(uid), schedule.scheduleId,
+          schedule.startTime * 1000, schedule.endTime * 1000, root.itemRawJson[i]);
       }
-      this.history = await HardChallengeRepo.listHistory();
+      const history: HardChallengeHistoryEntry[] = await HardChallengeRepo.listHistory(uid, RegionUtil.regionOfUid(uid));
+      if (uid === this.requestedUid) {
+        this.history = history;
+      }
     } catch (e) {
+      if (requestVersion !== this.requestVersion || uid !== this.requestedUid) {
+        return;
+      }
       if (e instanceof RiskControlError) {
         this.needRiskVerify = true;
         this.riskGt = e.gt;
@@ -79,8 +106,23 @@ export class HardChallengeViewModel {
         this.message = (e as Error).message;
       }
     } finally {
-      this.loading = false;
-      this.loaded = true;
+      if (requestVersion === this.requestVersion && uid === this.requestedUid) {
+        this.loading = false;
+        this.loaded = true;
+      }
+    }
+  }
+
+  async loadPopularity(uid: string): Promise<void> {
+    this.popularityLoading = true;
+    this.popularityError = '';
+    try {
+      const result: HardChallengeSimpleAvatar[] = await HardChallengeService.getInstance().fetchPopularity(uid);
+      if (uid === this.requestedUid) { this.popularity = result; }
+    } catch (e) {
+      if (uid === this.requestedUid) { this.popularityError = (e as Error).message; }
+    } finally {
+      if (uid === this.requestedUid) { this.popularityLoading = false; }
     }
   }
 
@@ -90,14 +132,20 @@ export class HardChallengeViewModel {
   }
 
   /** 刷新本地期数历史列表（进页时） */
-  async loadHistoryList(): Promise<void> {
-    this.history = await HardChallengeRepo.listHistory();
+  async loadHistoryList(uid: string): Promise<void> {
+    const history: HardChallengeHistoryEntry[] = await HardChallengeRepo.listHistory(uid, RegionUtil.regionOfUid(uid));
+      if (uid === this.requestedUid) {
+        this.history = history;
+      }
   }
 
   /** 回看历史期数（本地存档重建，不发网络请求） */
-  async loadFromHistory(scheduleId: number): Promise<void> {
-    const raw: string = await HardChallengeRepo.getRawJson(scheduleId);
-    if (raw.length === 0) {
+  async loadFromHistory(uid: string, scheduleId: number): Promise<void> {
+    const requestVersion: number = ++this.requestVersion;
+    this.requestedUid = uid;
+    this.loading = false;
+    const raw: string = await HardChallengeRepo.getRawJson(uid, RegionUtil.regionOfUid(uid), scheduleId);
+    if (raw.length === 0 || requestVersion !== this.requestVersion || uid !== this.requestedUid) {
       return;
     }
     const root: HardChallengeRoot = HardChallengeRoot.fromJson(JSON.parse(raw));
@@ -138,6 +186,17 @@ export class HardChallengeViewModel {
   /** 当前档位全部挑战 */
   challenges(): HardChallengeChallenge[] {
     return this.currentEntry().challenges;
+  }
+
+  private clearData(): void {
+    this.single = new HardChallengeDataEntry();
+    this.mp = new HardChallengeDataEntry();
+    this.blings = [];
+    this.popularity = [];
+    this.popularityError = '';
+    this.scheduleId = 0;
+    this.scheduleName = '';
+    this.isUnlock = false;
   }
 
   /** 极验完成后由 UI 调用：清除标记并重新加载 */

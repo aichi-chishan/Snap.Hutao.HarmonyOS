@@ -4,9 +4,15 @@
  * 注：AppStorage 为 ArkUI 全局对象，无需 import。
  */
 import { formProvider, formBindingData, formInfo } from '@kit.FormKit';
+import { User } from '../model/User';
+import { UserRepo } from '../data/repo/UserRepo';
+import { HoyolabEndpoints } from '../common/HoyolabEndpoints';
+import { ServerTime } from '../common/ServerTime';
+import { DailyNoteReminderService } from './DailyNoteReminderService';
 import { UserService } from './UserService';
 import { HoyolabClient } from '../data/network/HoyolabClient';
 import { ApiResponse } from '../model/ApiResponse';
+import { DailyNoteWebhookClient } from '../data/network/DailyNoteWebhookClient';
 import { DailyNoteRepo, DailyNoteRecord } from '../data/repo/DailyNoteRepo';
 import { NotificationHelper } from '../data/local/NotificationHelper';
 import { FormSnapshot } from '../data/local/FormSnapshot';
@@ -69,16 +75,30 @@ export class DailyNoteService {
     return DailyNoteService.instance;
   }
 
+  static readonly WEBHOOK_KEY: string = 'dailynote.webhook_url';
+
+  static webhookUrl(): string {
+    return PreferencesStore.getString(DailyNoteService.WEBHOOK_KEY, '');
+  }
+
+  static setWebhookUrl(value: string): void {
+    const target: string = value.trim();
+    if (target.length > 0 && !/^https?:\/\/[^\s@/]+(?:[/?#][^\s]*)?$/.test(target)) {
+      throw new Error('请输入有效的 HTTP 或 HTTPS 地址');
+    }
+    PreferencesStore.setString(DailyNoteService.WEBHOOK_KEY, target);
+  }
+
   /** 手动/自动刷新便笺（重入保护：同一时刻仅一次在途请求）。
    * @param challenge 可选：极验通过后从 verifyVerification 换得的 challenge（重放头）
    */
-  async refresh(uid: string, challenge?: string): Promise<DailyNote> {
+  async refresh(uid: string, challenge?: string, interactive: boolean = true): Promise<DailyNote> {
     if (this.refreshing) {
       throw new Error('正在刷新中，请稍候');
     }
     this.refreshing = true;
     try {
-      return await this.doRefresh(uid, challenge);
+      return await this.doRefresh(uid, challenge, interactive);
     } finally {
       this.refreshing = false;
     }
@@ -86,7 +106,7 @@ export class DailyNoteService {
 
   /** 桌面卡片手动刷新：带超时的刷新（命中需 UI 的风控时不无限挂起卡片进程） */
   async refreshForCard(uid: string, timeoutMs: number): Promise<DailyNote> {
-    const work: Promise<DailyNote> = this.refresh(uid);
+    const work: Promise<DailyNote> = this.refresh(uid, undefined, false);
     const limit: Promise<DailyNote> = new Promise<DailyNote>((resolve: (v: DailyNote) => void,
       reject: (e: Error) => void) => {
       setTimeout(() => {
@@ -101,30 +121,38 @@ export class DailyNoteService {
    * （不含当前 UID——它已由常规刷新覆盖），单个失败不影响其余。
    */
   async refreshTrackedList(): Promise<number> {
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined || !user.hasCookie()) {
+    if (this.refreshing) {
       return 0;
     }
-    const uids: string[] = PreferencesStore.getTrackedUids(user.id);
-    const currentUid: string = PreferencesStore.getCurrentUid();
+    this.refreshing = true;
     let ok: number = 0;
-    for (const uid of uids) {
-      if (uid === currentUid) {
-        continue;
+    try {
+      const users: User[] = await UserRepo.getAllUsers();
+      const current = UserService.getInstance().getCurrentUser();
+      const currentUid: string = PreferencesStore.getCurrentUid();
+      for (const user of users) {
+        if (!user.hasCookie()) { continue; }
+        const uids: string[] = PreferencesStore.getTrackedUids(user.id);
+        for (const uid of uids) {
+          if (current !== undefined && user.id === current.id && uid === currentUid) { continue; }
+          try {
+            // 后台不切换全局账号，不弹出另一个账号的验证窗口。
+            await this.doRefresh(uid, undefined, false, user);
+            ok++;
+          } catch (e) {
+            Logger.warn(TAG, `tracked refresh failed uid=${uid}: ${(e as Error).message}`);
+          }
+        }
       }
-      try {
-        await this.doRefresh(uid);
-        ok++;
-      } catch (e) {
-        Logger.warn(TAG, `tracked refresh fail uid=${uid} msg=${(e as Error).message}`);
-      }
+    } finally {
+      this.refreshing = false;
     }
     return ok;
   }
 
   /** 实际刷新流程：网络拉取 → 落库 → 广播版本戳 → 卡片快照 → 阈值通知 */
-  private async doRefresh(uid: string, challenge?: string): Promise<DailyNote> {
-    const user = UserService.getInstance().getCurrentUser();
+  private async doRefresh(uid: string, challenge?: string, interactive: boolean = true, account?: User): Promise<DailyNote> {
+    const user: User | undefined = account ?? UserService.getInstance().getCurrentUser();
     if (user === undefined || !user.hasCookie()) {
       throw new Error('请先登录');
     }
@@ -150,6 +178,9 @@ export class DailyNoteService {
     // 拉取
     let resp: ApiResponse = await HoyolabClient.fetchDailyNote(uid, region, cookie, extra);
     if (resp.isRiskControl()) {
+      if (!interactive || HoyolabEndpoints.isOverseaRegion(region)) {
+        throw new Error('请打开应用完成人机验证');
+      }
       // 1034：自动弹统一验证窗，成功后带 challenge 服务内重放一次
       const replayChallenge: string = await RiskVerifier.tryResolveRisk(resp, cookie, DAILY_NOTE_PATH);
       if (replayChallenge.length === 0) {
@@ -177,6 +208,7 @@ export class DailyNoteService {
 
     const note: DailyNote = DailyNote.fromJson(resp.data);
     note.refreshTime = Date.now();
+    const prev: DailyNoteRecord | undefined = await DailyNoteRepo.get(user.id, uid);
     await DailyNoteRepo.upsert(user.id, uid, note);
 
     // 广播：本地缓存已更新（服务层自动刷新 / 桌面卡片刷新 / 页面手动刷新都会走到这里），
@@ -190,10 +222,28 @@ export class DailyNoteService {
     }
 
     // 写卡片快照 + 主动更新全部桌面卡片
-    await this.updateCardSnapshot(note, user.displayName);
+    // 默认桌面卡绑定当前 UID；刷新追踪 UID 不能覆盖当前账号的卡片。
+    const currentUser = UserService.getInstance().getCurrentUser();
+    if (currentUser !== undefined && user.id === currentUser.id && uid === PreferencesStore.getCurrentUid()) {
+      await this.updateCardSnapshot(note, user.displayName);
+    }
 
-    const prev: DailyNoteRecord | undefined = await DailyNoteRepo.get(user.id, uid);
     await this.evalAndNotify(user.id, uid, note, prev);
+    try {
+      await DailyNoteReminderService.sync(user.id, uid, note, prev);
+    } catch (e) {
+      AppStorage.setOrCreate<string>(DailyNoteReminderService.ERROR_KEY, (e as Error).message);
+      Logger.warn(TAG, `agent reminder failed: ${(e as Error).message}`);
+    }
+    const webhook: string = DailyNoteService.webhookUrl();
+    if (webhook.length > 0 && note.rawJson.length > 0) {
+      try {
+        await DailyNoteWebhookClient.send(webhook, uid, note.rawJson);
+      } catch (e) {
+        // 网络转发失败不能抹掉已成功更新的本地便笺。
+        Logger.warn(TAG, `webhook failed: ${(e as Error).message}`);
+      }
+    }
     Logger.info(TAG, `refresh ok uid=${uid} resin=${note.currentResin}/${note.maxResin}`);
     return note;
   }
@@ -203,7 +253,7 @@ export class DailyNoteService {
     try {
       let expText: string = '派遣 --';
       if (note.maxExpeditionNum > 0) {
-        const done: number = note.currentExpeditionNum >= note.maxExpeditionNum ? note.maxExpeditionNum : note.currentExpeditionNum;
+        const done: number = note.finishedExpeditionCount();
         expText = `派遣 ${done}/${note.maxExpeditionNum}`;
       }
       const daily: string = note.totalTaskNum > 0
@@ -251,30 +301,31 @@ export class DailyNoteService {
     if ((flags & NotifyFlags.RESIN) !== 0 && note.resinReached(resinTh)) {
       const wasMet: boolean = hasRec && prevNote.resinReached(resinTh);
       if (!wasMet) {
-        await NotificationHelper.publish('树脂已达标',
-          `当前树脂 ${note.currentResin}/${note.maxResin}，已达阈值 ${resinTh}`, NotifyIds.RESIN);
+        await NotificationHelper.publish(`UID ${uid} · 树脂已达标`,
+          `当前树脂 ${note.currentResin}/${note.maxResin}，已达阈值 ${resinTh}`, DailyNoteService.notificationId(uid, NotifyIds.RESIN));
       }
     }
     // 派遣全部完成
     if ((flags & NotifyFlags.EXPEDITION) !== 0) {
-      const allDone: boolean = note.currentExpeditionNum > 0 &&
-        note.currentExpeditionNum >= note.maxExpeditionNum;
+      const allDone: boolean = note.allExpeditionsFinished();
       if (allDone) {
-        const wasDone: boolean = hasRec && prevNote.currentExpeditionNum > 0 &&
-          prevNote.currentExpeditionNum >= prevNote.maxExpeditionNum;
+        const wasDone: boolean = hasRec && prevNote.allExpeditionsFinished();
         if (!wasDone) {
-          await NotificationHelper.publish('派遣已完成', '所有派遣任务已完成', NotifyIds.EXPEDITION);
+          await NotificationHelper.publish(`UID ${uid} · 派遣已完成`, '所有派遣任务已完成', DailyNoteService.notificationId(uid, NotifyIds.EXPEDITION));
         }
       }
     }
     // 每日委托全部完成
     if ((flags & NotifyFlags.DAILY_TASK) !== 0) {
-      const allTask: boolean = note.dailyTask.isAllFinished() || (note.totalTaskNum > 0 && note.finishedTaskNum >= note.totalTaskNum);
-      if (allTask) {
-        const wasAllTask: boolean = hasRec &&
-          (prevNote.dailyTask.isAllFinished() || (prevNote.totalTaskNum > 0 && prevNote.finishedTaskNum >= prevNote.totalTaskNum));
-        if (!wasAllTask) {
-          await NotificationHelper.publish('每日委托完成', `已完成 ${note.finishedTaskNum}/${note.totalTaskNum}`, NotifyIds.DAILY_TASK);
+      // Windows 提醒条件是每日奖励未领取，包括尚未完成委托；服务器新日重新提醒。
+      if (!note.isExtraTaskRewardReceived) {
+        const region: string = RegionUtil.regionOfUid(uid);
+        const sameDay: boolean = hasRec && prevNote.refreshTime > 0 &&
+          ServerTime.date(region, prevNote.refreshTime) === ServerTime.date(region, note.refreshTime);
+        const wasPending: boolean = hasRec && sameDay && !prevNote.isExtraTaskRewardReceived;
+        if (!wasPending) {
+          await NotificationHelper.publish(`UID ${uid} · 每日委托奖励未领取`, note.extraTaskRewardDescription(),
+            DailyNoteService.notificationId(uid, NotifyIds.DAILY_TASK));
         }
       }
     }
@@ -282,17 +333,25 @@ export class DailyNoteService {
     if ((flags & NotifyFlags.TRANSFORMER) !== 0 && note.transformer.isReady()) {
       const wasReady: boolean = hasRec && prevNote.transformer.isReady();
       if (!wasReady) {
-        await NotificationHelper.publish('参变仪就绪', '参量质变仪已可使用', NotifyIds.TRANSFORMER);
+        await NotificationHelper.publish(`UID ${uid} · 参变仪就绪`, '参量质变仪已可使用', DailyNoteService.notificationId(uid, NotifyIds.TRANSFORMER));
       }
     }
     // 洞天宝钱
     if ((flags & NotifyFlags.HOME_COIN) !== 0 && note.homeCoinReached(homeTh)) {
       const wasMet: boolean = hasRec && prevNote.homeCoinReached(homeTh);
       if (!wasMet) {
-        await NotificationHelper.publish('洞天宝钱已达标',
-          `当前宝钱 ${note.currentHomeCoin}/${note.maxHomeCoin}，已达阈值 ${homeTh}`, NotifyIds.HOME_COIN);
+        await NotificationHelper.publish(`UID ${uid} · 洞天宝钱已达标`,
+          `当前宝钱 ${note.currentHomeCoin}/${note.maxHomeCoin}，已达阈值 ${homeTh}`, DailyNoteService.notificationId(uid, NotifyIds.HOME_COIN));
       }
     }
+  }
+
+  private static notificationId(uid: string, kind: number): number {
+    let hash: number = 0;
+    for (let i: number = 0; i < uid.length; i++) {
+      hash = (hash * 31 + uid.charCodeAt(i)) % 200000000;
+    }
+    return hash * 10 + (kind - NotifyIds.RESIN);
   }
 
   /** 启动自动刷新（intervalMin 分钟）。已在运行且间隔未变时不重启，避免每次进页把计时清零 */

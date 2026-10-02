@@ -15,6 +15,9 @@ export class GachaRepo {
 
   /** 获取或创建归档（uid 唯一） */
   static async getOrCreateArchive(uid: string): Promise<GachaArchive> {
+    if (!/^[1-9][0-9]{8,9}$/.test(uid)) {
+      throw new Error('无效的祈愿 UID');
+    }
     const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('gacha_archives');
     pred.equalTo('uid', uid);
     pred.limitAs(1);
@@ -100,7 +103,11 @@ export class GachaRepo {
   static async getAllGachaIds(archiveId: number, gachaType: number): Promise<string[]> {
     const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('gacha_items');
     pred.equalTo('archive_id', archiveId);
-    pred.equalTo('gacha_type', gachaType);
+    if (gachaType === 301) {
+      pred.in('gacha_type', [301, 400]);
+    } else {
+      pred.equalTo('gacha_type', gachaType);
+    }
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(pred);
     const ids: string[] = [];
     try {
@@ -125,18 +132,7 @@ export class GachaRepo {
       const batch: Array<relationalStore.ValuesBucket> = [];
       for (let j = i; j < end; j++) {
         const it: GachaItem = items[j];
-        const values: relationalStore.ValuesBucket = {
-          'archive_id': it.archiveId,
-          'gacha_type': it.gachaType,
-          'item_id': it.itemId,
-          'count': it.count,
-          'time': it.time,
-          'name': it.name,
-          'item_type': it.itemType,
-          'rank_type': it.rankType,
-          'gacha_id': it.gachaId,
-          'schedule_id': it.scheduleId,
-        };
+        const values: relationalStore.ValuesBucket = GachaRepo.valuesOf(it);
         batch.push(values);
       }
       const affected: number = await RelationalStoreHelper.batchInsert('gacha_items', batch);
@@ -145,28 +141,82 @@ export class GachaRepo {
     return inserted;
   }
 
+  /** 全量刷新仅替换服务器实际返回窗口，较早的本地历史保留。 */
+  static async replaceFetchedWindow(items: GachaItem[], queryType: number): Promise<number> {
+    if (items.length === 0) {
+      return 0;
+    }
+    const archiveId: number = items[0].archiveId;
+    const ordered: GachaItem[] = GachaRepo.sortByCursor(items.slice(), false);
+    const oldest: string = ordered[0].gachaId;
+    const existing: GachaItem[] = await GachaRepo.getItemsByType(archiveId, queryType);
+    const replaceIds: string[] = existing.filter((item: GachaItem): boolean =>
+      item.gachaId.length > oldest.length || (item.gachaId.length === oldest.length && item.gachaId >= oldest))
+      .map((item: GachaItem): string => item.gachaId);
+    const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
+    store.beginTransaction();
+    try {
+      for (let index: number = 0; index < replaceIds.length; index += 500) {
+        const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('gacha_items');
+        pred.equalTo('archive_id', archiveId);
+        pred.in('gacha_type', queryType === 301 ? [301, 400] : [queryType]);
+        pred.in('gacha_id', replaceIds.slice(index, index + 500));
+        store.deleteSync(pred);
+      }
+      for (let index: number = 0; index < ordered.length; index += 500) {
+        const rows: relationalStore.ValuesBucket[] = ordered.slice(index, index + 500)
+          .map((item: GachaItem): relationalStore.ValuesBucket => GachaRepo.valuesOf(item));
+        if (store.batchInsertSync('gacha_items', rows) !== rows.length) {
+          throw new Error('祈愿记录未完整写入');
+        }
+      }
+      store.commit();
+      return ordered.length;
+    } catch (e) {
+      store.rollBack();
+      throw new Error(e instanceof Error ? e.message : '保存祈愿记录失败');
+    }
+  }
+
+  private static valuesOf(it: GachaItem): relationalStore.ValuesBucket {
+    const values: relationalStore.ValuesBucket = {
+      'archive_id': it.archiveId, 'gacha_type': it.gachaType, 'item_id': it.itemId,
+      'count': it.count, 'time': it.time, 'name': it.name, 'item_type': it.itemType,
+      'rank_type': it.rankType, 'gacha_id': it.gachaId, 'schedule_id': it.scheduleId
+    };
+    return values;
+  }
+
   /** 分页查询某池明细（倒序） */
   static async getItems(archiveId: number, gachaType: number, limit: number, offset: number): Promise<GachaItem[]> {
     const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('gacha_items');
     pred.equalTo('archive_id', archiveId);
-    pred.equalTo('gacha_type', gachaType);
+    if (gachaType === 301) {
+      pred.in('gacha_type', [301, 400]);
+    } else {
+      pred.equalTo('gacha_type', gachaType);
+    }
     pred.orderByDesc('time');
     pred.limitAs(limit);
     if (offset > 0) {
       pred.offsetAs(offset);
     }
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(pred);
-    return GachaRepo.readItems(rs);
+    return GachaRepo.sortByCursor(GachaRepo.readItems(rs), true);
   }
 
   /** 某归档某池全部明细（统计聚合用，量可控） */
   static async getItemsByType(archiveId: number, gachaType: number): Promise<GachaItem[]> {
     const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('gacha_items');
     pred.equalTo('archive_id', archiveId);
-    pred.equalTo('gacha_type', gachaType);
+    if (gachaType === 301) {
+      pred.in('gacha_type', [301, 400]);
+    } else {
+      pred.equalTo('gacha_type', gachaType);
+    }
     pred.orderByAsc('time');
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(pred);
-    return GachaRepo.readItems(rs);
+    return GachaRepo.sortByCursor(GachaRepo.readItems(rs), false);
   }
 
   static async getItemsByArchive(archiveId: number): Promise<GachaItem[]> {
@@ -174,7 +224,20 @@ export class GachaRepo {
     pred.equalTo('archive_id', archiveId);
     pred.orderByAsc('time');
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(pred);
-    return GachaRepo.readItems(rs);
+    return GachaRepo.sortByCursor(GachaRepo.readItems(rs), false);
+  }
+
+  /** 游标为64位十进制字符串；不转换为number，避免同秒十连乱序及精度损失。 */
+  private static sortByCursor(items: GachaItem[], descending: boolean): GachaItem[] {
+    return items.sort((a: GachaItem, b: GachaItem): number => {
+      const left: string = a.gachaId.replace(/^0+/, '') || '0';
+      const right: string = b.gachaId.replace(/^0+/, '') || '0';
+      let order: number = left.length - right.length;
+      if (order === 0) {
+        order = left < right ? -1 : (left > right ? 1 : 0);
+      }
+      return descending ? -order : order;
+    });
   }
 
   private static readItems(rs: relationalStore.ResultSet): GachaItem[] {
@@ -220,7 +283,11 @@ export class GachaRepo {
   static async countByType(archiveId: number, gachaType: number): Promise<number> {
     const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('gacha_items');
     pred.equalTo('archive_id', archiveId);
-    pred.equalTo('gacha_type', gachaType);
+    if (gachaType === 301) {
+      pred.in('gacha_type', [301, 400]);
+    } else {
+      pred.equalTo('gacha_type', gachaType);
+    }
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(pred);
     let count: number = 0;
     try {

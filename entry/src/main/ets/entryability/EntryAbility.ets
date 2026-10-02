@@ -4,6 +4,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { ComponentContent, UIContext, display, window } from '@kit.ArkUI';
 import { RelationalStoreHelper } from '../data/db/RelationalStoreHelper';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
+import { BackupService } from '../service/BackupService';
 import { UserService } from '../service/UserService';
 import { NotificationHelper } from '../data/local/NotificationHelper';
 import { DailyNoteService } from '../service/DailyNoteService';
@@ -205,6 +206,7 @@ export default class EntryAbility extends UIAbility {
       // 启动次数自增（主页欢迎语文案，对齐 Windows LaunchTimes）
       PreferencesStore.bumpLaunchTimes();
       await RelationalStoreHelper.init(ability.context);
+      await BackupService.getInstance().recoverInterruptedRestore();
       await NotificationHelper.init();
       // 恢复登录态（预登录态）：AppStorage currentUser/currentUid/isLoggedIn
       await UserService.getInstance().restoreSession();
@@ -263,6 +265,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onForeground(): void {
+    AppStorage.setOrCreate('appForeground', true);
     hilog.info(DOMAIN, TAG, 'Ability onForeground');
     // 回前台：定时器在后台可能被系统冻结，重新对齐并按需补刷（缓存超过刷新间隔才拉）
     DailyNoteService.getInstance().bootstrapAutoRefresh().catch((e: Error) => {
@@ -271,6 +274,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onBackground(): void {
+    AppStorage.setOrCreate('appForeground', false);
     hilog.info(DOMAIN, TAG, 'Ability onBackground');
   }
 }

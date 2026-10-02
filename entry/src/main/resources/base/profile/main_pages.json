@@ -19,6 +19,7 @@
     "pages/UserPage",
     "pages/WikiAvatarPage",
     "pages/WikiMonsterPage",
-    "pages/WikiWeaponPage"
+    "pages/WikiWeaponPage",
+    "pages/HutaoCloudPage"
   ]
 }

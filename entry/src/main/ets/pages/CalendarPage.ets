@@ -416,7 +416,7 @@ export struct CalendarPage {
 
         if ((this.curWeekDay()?.talentMats.length ?? 0) === 0
           && (this.curWeekDay()?.weaponMats.length ?? 0) === 0) {
-          Text('周日秘境全开，无固定轮换材料')
+          Text('全部材料副本均可挑战')
             .fontSize(11)
             .fontColor($r('app.color.text_secondary'))
             .width('100%')

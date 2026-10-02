@@ -13,6 +13,8 @@ export class SignInReward {
 
 export class SignInInfo {
   signedDays: number = 0;
+  signedToday: boolean = false;
+  serverDate: string = '';
   currentMonth: number = 0;
   rewards: SignInReward[] = [];
   message: string = '';
@@ -42,12 +44,9 @@ export class SignInInfo {
     const obj = data as Record<string, Object>;
     const info: SignInInfo = new SignInInfo();
     info.signedDays = Number(obj['total_sign_day'] ?? 0);
-    // is_sign 表示今日已签，则今日计入总天数
-    const isSign: boolean = Boolean(obj['is_sign'] ?? false);
-    const todayDay: number = new Date().getDate();
-    if (isSign && info.signedDays < todayDay) {
-      info.signedDays = todayDay;
-    }
+    // 累计奖励天数与日历日期无关：漏签后今日签到不会补齐此前日期。
+    info.signedToday = obj['is_sign'] === true || obj['is_sign'] === 1 || obj['is_sign'] === 'true';
+    info.serverDate = String(obj['today'] ?? '');
     return info;
   }
 
@@ -64,6 +63,6 @@ export class SignInInfo {
 
   /** 今天是否已签到 */
   isTodaySigned(todayDay: number): boolean {
-    return this.signedDays >= todayDay;
+    return this.signedToday;
   }
 }

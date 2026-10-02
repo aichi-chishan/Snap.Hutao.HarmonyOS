@@ -23,6 +23,8 @@ import { GameDataUpdater } from '../data/remote/GameDataUpdater';
 import { RiskVerifyService } from '../service/RiskVerifyService';
 import { ApiClient } from '../data/network/ApiClient';
 import { BackupService } from '../service/BackupService';
+import { SupportService } from '../service/SupportService';
+import { BackgroundMediaService } from '../service/BackgroundMediaService';
 import { HutaoDailyImageService } from '../service/HutaoDailyImageService';
 
 const TAG: string = 'SettingPage';
@@ -49,6 +51,16 @@ export struct SettingPage {
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
   @State themeMode: string = 'system';
+  @State mediaIndex: number = 0;
+  @State mediaMuted: boolean = true;
+  @State mediaLoop: boolean = true;
+  @State importingVideo: boolean = false;
+  @State firstWeekday: number = 1;
+  @StorageProp('backgroundMediaStatus') mediaStatus: string = '';
+  private mediaTypes: string[] = ['none', 'local', 'official'];
+  private mediaOptions: SelectOption[] = [{ value: '关闭' }, { value: '本地随机视频' }, { value: '官方启动器视频' }];
+  private weekdayOptions: SelectOption[] = [{ value: '周日' }, { value: '周一' }, { value: '周二' },
+    { value: '周三' }, { value: '周四' }, { value: '周五' }, { value: '周六' }];
   @State autoRefresh: boolean = true;
   @State interval: number = 30;
   @State ambientLevel: number = 1;
@@ -130,6 +142,10 @@ export struct SettingPage {
   @State gachaRows: GachaArchiveRow[] = [];
 
   aboutToAppear(): void {
+    this.mediaIndex = Math.max(0, this.mediaTypes.indexOf(PreferencesStore.getString(BackgroundMediaService.TYPE_KEY, 'none')));
+    this.mediaMuted = PreferencesStore.getBool(BackgroundMediaService.MUTED_KEY, true);
+    this.mediaLoop = PreferencesStore.getBool(BackgroundMediaService.LOOP_KEY, true);
+    this.firstWeekday = Math.max(0, Math.min(6, PreferencesStore.getNumber('calendar.first_day_of_week', 1)));
     this.themeMode = PreferencesStore.getThemeMode();
     this.autoRefresh = PreferencesStore.getAutoRefreshEnabled();
     this.interval = PreferencesStore.getRefreshIntervalMinutes();
@@ -145,7 +161,7 @@ export struct SettingPage {
     this.dailyBgEnabled = PreferencesStore.getDailyBgEnabled();
     this.dataUrl = GameDataUpdater.manifestUrl();
     this.geetestInput = RiskVerifyService.getCustomCompositeUrl();
-    if (this.bgType === 'hutao') {
+    if (this.bgType === 'hutao' || this.bgType === 'bing' || this.bgType === 'hoyoplay') {
       this.loadHutaoDaily();
     }
     this.homeActCalendarShown = PreferencesStore.getHomeActCalendar();
@@ -159,7 +175,9 @@ export struct SettingPage {
   /** 胡桃每日一图：预取并展示状态/署名 */
   loadHutaoDaily(): void {
     this.hutaoDailyStatus = '正在获取今日一图...';
-    HutaoDailyImageService.getInstance().getToday().then((img) => {
+    const source: string = this.bgType;
+    HutaoDailyImageService.getInstance().getToday(source).then((img) => {
+      if (this.bgType !== source) { return; }
       if (img !== undefined) {
         this.hutaoDailyStatus = img.fromCache
           ? `今日一图已就绪（当日缓存${img.author.length > 0 ? ` · 作者 ${img.author}` : ''}）`
@@ -279,7 +297,7 @@ export struct SettingPage {
   private confirmRestoreBackup(): void {
     this.getUIContext().showAlertDialog({
       title: '从备份还原',
-      message: '将清空并覆盖现有的全部账号、祈愿、成就与偏好设置，操作不可撤销。确定继续？',
+      message: '将用备份覆盖账号、祈愿、成就、养成、挑战、便笺和偏好。文件会先校验，写入失败会回滚。旧版备份保留已有养成和挑战记录。确定继续？',
       primaryButton: {
         value: '取消',
         action: () => {
@@ -513,7 +531,7 @@ export struct SettingPage {
         PreferencesStore.setBackgroundImageType(value);
         AppStorage.setOrCreate<string>('bgType', value);
         this.toast(`背景图片：${label}`);
-        if (value === 'hutao') {
+        if (value === 'hutao' || value === 'bing' || value === 'hoyoplay') {
           this.loadHutaoDaily();
         }
       })
@@ -592,6 +610,71 @@ export struct SettingPage {
     } catch (e) {
       this.toast(`选择文件夹失败：${(e as Error).message}`);
     }
+  }
+
+  async importBackgroundVideos(): Promise<void> {
+    if (this.importingVideo) { return; }
+    this.importingVideo = true;
+    try {
+      const options: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
+      options.maxSelectNumber = 10;
+      options.fileSuffixFilters = ['视频|.mp4,.mov,.webm,.mkv,.m4v'];
+      const uris: string[] = await new picker.DocumentViewPicker().select(options);
+      if (uris.length === 0) { return; }
+      const count: number = await BackgroundMediaService.importVideos(uris);
+      this.mediaIndex = 1;
+      this.toast(`已导入 ${count} 个视频`);
+    } catch (error) {
+      this.toast(`视频导入失败：${(error as Error).message}`);
+    } finally {
+      this.importingVideo = false;
+    }
+  }
+
+  @Builder
+  backgroundMediaSection() {
+    this.sectionTitle('背景视频')
+    Column({ space: 12 }) {
+      Select(this.mediaOptions).selected(this.mediaIndex).value(this.mediaOptions[this.mediaIndex].value)
+        .onSelect((index: number) => {
+          this.mediaIndex = index;
+          PreferencesStore.setString(BackgroundMediaService.TYPE_KEY, this.mediaTypes[index]);
+          BackgroundMediaService.changed();
+        }).hoverEffect(HoverEffect.Highlight)
+      if (this.mediaIndex === 1) {
+        Button(this.importingVideo ? '正在导入…' : '选择视频（可多选）').enabled(!this.importingVideo)
+          .onClick(() => { this.importBackgroundVideos(); }).hoverEffect(HoverEffect.Highlight)
+        Text('每次载入随机播放一段已导入的视频。').fontSize(12).fontColor($r('app.color.text_secondary'))
+      }
+      Row({ space: 12 }) {
+        Text('静音').fontColor($r('app.color.text_primary'))
+        Toggle({ type: ToggleType.Switch, isOn: this.mediaMuted }).onChange((value: boolean) => {
+          this.mediaMuted = value;
+          PreferencesStore.setBool(BackgroundMediaService.MUTED_KEY, value);
+          BackgroundMediaService.changed();
+        })
+        Text('循环').fontColor($r('app.color.text_primary'))
+        Toggle({ type: ToggleType.Switch, isOn: this.mediaLoop }).onChange((value: boolean) => {
+          this.mediaLoop = value;
+          PreferencesStore.setBool(BackgroundMediaService.LOOP_KEY, value);
+          BackgroundMediaService.changed();
+        })
+      }
+      Text(this.mediaStatus).fontSize(12).fontColor($r('app.color.text_secondary'))
+      Text('进入后台自动暂停；视频不可用时继续显示背景图片。')
+        .fontSize(12).fontColor($r('app.color.text_secondary'))
+    }.width('100%').padding(14).alignItems(HorizontalAlign.Start)
+      .backgroundColor($r('app.color.card_surface')).borderRadius(12)
+    this.sectionTitle('日历')
+    Row({ space: 12 }) {
+      Text('每周第一天').fontColor($r('app.color.text_primary')).layoutWeight(1)
+      Select(this.weekdayOptions).selected(this.firstWeekday).value(this.weekdayOptions[this.firstWeekday].value)
+        .onSelect((index: number) => {
+          this.firstWeekday = index;
+          PreferencesStore.setNumber('calendar.first_day_of_week', index);
+          AppStorage.setOrCreate('calendarSettingsVersion', Date.now());
+        }).hoverEffect(HoverEffect.Highlight)
+    }.width('100%').padding(14).backgroundColor($r('app.color.card_surface')).borderRadius(12)
   }
 
   @Builder
@@ -682,6 +765,7 @@ export struct SettingPage {
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
 
+          this.backgroundMediaSection()
           this.sectionTitle('背景图片')
           Column({ space: 8 }) {
             Row({ space: 8 }) {
@@ -690,8 +774,12 @@ export struct SettingPage {
               this.bgTypeChip('hutao', '胡桃每日一图')
             }
             .width('100%')
+            Row({ space: 8 }) {
+              this.bgTypeChip('bing', '必应每日一图')
+              this.bgTypeChip('hoyoplay', '官方启动器壁纸')
+            }.width('100%')
 
-            if (this.bgType === 'hutao') {
+            if (this.bgType === 'hutao' || this.bgType === 'bing' || this.bgType === 'hoyoplay') {
               Text(this.hutaoDailyStatus)
                 .fontSize(11)
                 .fontColor($r('app.color.text_secondary'))
@@ -1115,7 +1203,7 @@ export struct SettingPage {
               Text('从备份还原')
                 .fontSize(15)
                 .fontColor($r('app.color.danger'))
-              Text('选择备份文件，覆盖现有全部账号/祈愿/成就/偏好')
+              Text('恢复账号、祈愿、成就、养成、挑战、便笺与偏好')
                 .fontSize(11)
                 .fontColor($r('app.color.text_secondary'))
             }
@@ -1138,9 +1226,18 @@ export struct SettingPage {
             this.confirmRestoreBackup();
           })
 
+          this.sectionTitle('反馈与诊断')
+          this.rowItem('复制诊断信息', '应用版本、系统版本、API、设备类型与主题', () => {
+            SupportService.copyDiagnostics().then(() => {
+              this.toast('诊断信息已复制，可补充问题描述后提交反馈');
+            }).catch(() => { this.toast('复制失败，请重试'); });
+          })
+          this.rowItem('提交问题反馈', '打开本项目 GitHub Issues', () => {
+            SupportService.openIssues().catch(() => { this.toast('暂时无法打开反馈页面'); });
+          })
           this.sectionTitle('关于')
           this.rowItem(`胡桃工具箱（鸿蒙版）${this.appVersion.length > 0 ? ` v${this.appVersion}` : ''}`,
-            '仅支持国服 · 本地数据存储', () => {
+            '多账号与服务器 · 本地数据存储', () => {
             this.toast(`胡桃工具箱 Snap.Hutao.HarmonyOS v${this.appVersion}`);
           })
           Row() {

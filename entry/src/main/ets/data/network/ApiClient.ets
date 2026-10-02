@@ -5,6 +5,7 @@
 import { http } from '@kit.NetworkKit';
 import { ApiResponse } from '../../model/ApiResponse';
 import { AppConstants } from '../../common/Constants';
+import { CredentialPolicy } from '../../common/CredentialPolicy';
 import { Logger } from '../../common/Logger';
 
 const TAG: string = 'ApiClient';
@@ -12,6 +13,7 @@ const TAG: string = 'ApiClient';
 export class ApiClient {
   /** 当前注入的 Cookie（会话级，随账号切换更新） */
   private static currentCookie: string = '';
+  private static currentIsOversea: boolean = false;
   private static instance: ApiClient = new ApiClient();
 
   static getInstance(): ApiClient {
@@ -19,21 +21,32 @@ export class ApiClient {
   }
 
   /** 设置请求默认注入的 Cookie */
-  setCookie(cookie: string): void {
+  setCookie(cookie: string, isOversea: boolean = false): void {
     ApiClient.currentCookie = cookie;
+    ApiClient.currentIsOversea = isOversea;
   }
 
   getCurrentCookie(): string {
     return ApiClient.currentCookie;
   }
 
-  /** 若调用方未显式给出 Cookie，则注入当前 Cookie */
-  private mergeCookie(headers: Record<string, string>): Record<string, string> {
+  /** Explicit cookies are allowed only on exact first-party API origins. */
+  private mergeCookie(url: string, headers: Record<string, string>): Record<string, string> {
     const merged: Record<string, string> = { 'User-Agent': AppConstants.UA_MOBILE };
+    let hasCookie: boolean = false;
+    const region: string = CredentialPolicy.accountRegion(url);
     for (const k of Object.keys(headers)) {
-      merged[k] = headers[k];
+      if (k.toLowerCase() === 'cookie') {
+        hasCookie = true;
+        if (region.length > 0) {
+          merged['Cookie'] = headers[k];
+        }
+      } else {
+        merged[k] = headers[k];
+      }
     }
-    if (headers['Cookie'] === undefined && ApiClient.currentCookie.length > 0) {
+    if (!hasCookie && ApiClient.currentCookie.length > 0 &&
+      CredentialPolicy.allowsSessionCookie(url, ApiClient.currentIsOversea)) {
       merged['Cookie'] = ApiClient.currentCookie;
     }
     return merged;
@@ -78,7 +91,7 @@ export class ApiClient {
 
   private async request(url: string, method: http.RequestMethod,
     headers: Record<string, string>, bodyJson: string): Promise<ApiResponse> {
-    const merged: Record<string, string> = this.mergeCookie(headers);
+    const merged: Record<string, string> = this.mergeCookie(url, headers);
     const httpRequest = http.createHttp();
     try {
       const resp = await httpRequest.request(url, {
@@ -88,13 +101,16 @@ export class ApiClient {
         connectTimeout: AppConstants.NETWORK_TIMEOUT_MS,
         readTimeout: AppConstants.NETWORK_TIMEOUT_MS,
         expectDataType: http.HttpDataType.STRING,
+        // API 23+, supported by every API 24 target. Do not forward credentials via redirects.
+        maxRedirects: 0,
+        usingCache: false,
       });
       if (resp.responseCode === http.ResponseCode.OK) {
         const result: string = resp.result as string;
         const parsed: ApiResponse = ApiResponse.fromJson(result);
         parsed.respHeaders = ApiClient.normalizeHeaders(resp.header);
         if (!parsed.success && parsed.retcode !== 0) {
-          Logger.warn(TAG, `resp fail url=${url} retcode=${parsed.retcode} msg=${parsed.message}`);
+          Logger.warn(TAG, `resp fail url=${CredentialPolicy.logUrl(url)} retcode=${parsed.retcode}`);
         }
         return parsed;
       }
@@ -103,8 +119,8 @@ export class ApiClient {
       return failResp;
     } catch (e) {
       const err = e as BusinessError;
-      Logger.warn(TAG, `request error url=${url} code=${err.code} msg=${err.message}`);
-      return ApiResponse.fail(-2, `网络异常：${err.message}`);
+      Logger.warn(TAG, `request error url=${CredentialPolicy.logUrl(url)} code=${err.code}`);
+      return ApiResponse.fail(-2, `网络异常（${err.code}）`);
     } finally {
       httpRequest.destroy();
     }

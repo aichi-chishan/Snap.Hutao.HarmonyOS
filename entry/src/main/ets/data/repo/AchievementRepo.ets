@@ -1,6 +1,6 @@
 /**
  * AchievementRepo.ets
- * achievement_archives / achievement_entries 表 CRUD：多档案管理、完成记录读写、批量替换。
+ * achievement_archives / achievement_entries 表 CRUD：多档案管理、完整成就记录读写、原子替换。
  */
 import { relationalStore } from '@kit.ArkData';
 import { RelationalStoreHelper } from '../db/RelationalStoreHelper';
@@ -69,7 +69,7 @@ export class AchievementRepo {
 
   // ================= 完成记录 =================
 
-  /** 读某档案全部完成记录 */
+  /** 读某档案全部成就记录（含未完成进度） */
   static async getRecords(archiveId: number): Promise<Map<number, AchievementRecord>> {
     const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('achievement_entries');
     pred.equalTo('archive_id', archiveId);
@@ -81,6 +81,7 @@ export class AchievementRepo {
         r.archiveId = archiveId;
         r.achId = rs.getLong(rs.getColumnIndex('ach_id'));
         r.current = rs.getLong(rs.getColumnIndex('current'));
+        r.status = rs.getLong(rs.getColumnIndex('status'));
         r.timestamp = rs.getLong(rs.getColumnIndex('timestamp'));
         map.set(r.achId, r);
       }
@@ -90,50 +91,63 @@ export class AchievementRepo {
     return map;
   }
 
-  /** 置位/取消一条（取消=删除行） */
+  /** 手动勾选只更新完成状态及时间，保留原始进度（对齐 Windows AchievementView）。 */
   static async setRecord(archiveId: number, achId: number, done: boolean, timestampSec: number): Promise<void> {
-    if (!done) {
-      const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('achievement_entries');
-      pred.equalTo('archive_id', archiveId);
-      pred.and();
-      pred.equalTo('ach_id', achId);
-      await RelationalStoreHelper.delete('achievement_entries', pred);
-      return;
-    }
-    // upsert：先删后插（量小，逻辑简单可靠）
     const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('achievement_entries');
     pred.equalTo('archive_id', archiveId);
     pred.and();
     pred.equalTo('ach_id', achId);
-    await RelationalStoreHelper.delete('achievement_entries', pred);
+    const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
+    const state: relationalStore.ValuesBucket = {
+      'status': done ? 3 : 0,
+      'timestamp': done ? timestampSec : 0,
+    };
+    if (store.updateSync(state, pred) > 0 || !done) {
+      return;
+    }
     const values: relationalStore.ValuesBucket = {
       'archive_id': archiveId,
       'ach_id': achId,
-      'current': 1,
+      'current': 0,
+      'status': 3,
       'timestamp': timestampSec,
     };
-    await RelationalStoreHelper.insert('achievement_entries', values);
+    store.insertSync('achievement_entries', values);
   }
 
   /** 批量替换导入（UIAF：合并策略由调用方算好，此处全量覆盖该档案记录） */
   static async replaceRecords(archiveId: number, records: AchievementRecord[]): Promise<number> {
     const delPred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('achievement_entries');
     delPred.equalTo('archive_id', archiveId);
-    await RelationalStoreHelper.delete('achievement_entries', delPred);
+    const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
     let inserted: number = 0;
     const CHUNK: number = 500;
-    for (let i = 0; i < records.length; i += CHUNK) {
-      const end: number = Math.min(i + CHUNK, records.length);
-      const batch: Array<relationalStore.ValuesBucket> = [];
-      for (let j = i; j < end; j++) {
-        batch.push({
-          'archive_id': archiveId,
-          'ach_id': records[j].achId,
-          'current': records[j].current,
-          'timestamp': records[j].timestamp,
-        });
+    // API 12 起的同步写入避免事务中 await 让其他业务写入交错；导入失败完整回滚。
+    store.beginTransaction();
+    try {
+      store.deleteSync(delPred);
+      for (let i: number = 0; i < records.length; i += CHUNK) {
+        const end: number = Math.min(i + CHUNK, records.length);
+        const batch: Array<relationalStore.ValuesBucket> = [];
+        for (let j: number = i; j < end; j++) {
+          batch.push({
+            'archive_id': archiveId,
+            'ach_id': records[j].achId,
+            'current': records[j].current,
+            'status': records[j].status,
+            'timestamp': records[j].timestamp,
+          });
+        }
+        const count: number = store.batchInsertSync('achievement_entries', batch);
+        if (count !== batch.length) {
+          throw new Error('成就写入不完整，导入已回滚');
+        }
+        inserted += count;
       }
-      inserted += await RelationalStoreHelper.batchInsert('achievement_entries', batch);
+      store.commit();
+    } catch (e) {
+      store.rollBack();
+      throw new Error(e instanceof Error ? e.message : '成就导入失败，已回滚');
     }
     return inserted;
   }

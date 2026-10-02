@@ -69,7 +69,7 @@ export class DsSigner {
   static async signGen1(salt: string, t: number, r: string): Promise<string> {
     const plain: string = `salt=${salt}&t=${t}&r=${r}`;
     const hash: string = await DsSigner.md5Hex(plain);
-    Logger.debug(TAG, `gen1 plain=${plain} -> ${hash}`);
+
     return `${t},${r},${hash}`;
   }
 
@@ -82,7 +82,7 @@ export class DsSigner {
   static async signGen2(salt: string, t: number, r: string, body: string, querySorted: string): Promise<string> {
     const plain: string = `salt=${salt}&t=${t}&r=${r}&b=${body}&q=${querySorted}`;
     const hash: string = await DsSigner.md5Hex(plain);
-    Logger.debug(TAG, `gen2 plain=${plain} -> ${hash}`);
+
     return `${t},${r},${hash}`;
   }
 

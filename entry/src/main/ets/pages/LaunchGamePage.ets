@@ -1,215 +1,87 @@
-/**
- * LaunchGamePage.ets（@Entry）
- * 启动游戏（对齐 Windows 入口，仅拉起本机已安装原神 APP）：
- * 顶部状态：已安装/未安装检测；大按钮"启动游戏"；下方游戏列表（可切换）。
- * 不做注入/进程链/账号切换（鸿蒙版仅拉起，其余由游戏 App 自身处理）。
- */
-import { router } from '@kit.ArkUI';
 import { GameLauncherService, GamePackage, GameLaunchResult } from '../service/GameLauncherService';
-import { AppBackButton } from '../components/AppBackButton';
-import { NavIcon } from '../components/NavIcon';
 import { PageHeader } from '../components/PageHeader';
-import { PressCard } from '../components/PressCard';
-import { Logger } from '../common/Logger';
-
-const TAG: string = 'LaunchGamePage';
 
 @Entry
 @Component
 export struct LaunchGamePage {
-  /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
-  @StorageProp('isLoggedIn') isLoggedIn: boolean = false;
-  /** 已安装游戏列表 */
-  @State games: GamePackage[] = [];
-  /** 当前选中游戏（默认第一个） */
-  @State selected: GamePackage = new GamePackage();
-  /** 检测/启动状态 */
-  @State checking: boolean = true;
-  @State launching: boolean = false;
+  @State gameName: string = '原神';
+  @State bundleName: string = '';
+  @State abilityName: string = '';
+  @State launchUri: string = '';
   @State message: string = '';
+  @State launching: boolean = false;
 
   aboutToAppear(): void {
-    this.detect();
+    const target: GamePackage = GameLauncherService.getTarget();
+    this.gameName = target.displayName;
+    this.bundleName = target.packageName;
+    this.abilityName = target.abilityName;
+    this.launchUri = target.uri;
+    this.message = GameLauncherService.targetStatus(target);
   }
 
-  async detect(): Promise<void> {
-    this.checking = true;
-    this.message = '';
-    try {
-      const list: GamePackage[] = await GameLauncherService.detectInstalled();
-      this.games = list;
-      if (list.length > 0) {
-        this.selected = list[0];
-      } else {
-        this.message = '未检测到原神 APP。请先通过应用市场安装「原神」后重试';
-      }
-    } catch (e) {
-      this.message = `检测失败：${(e as Error).message}`;
-    } finally {
-      this.checking = false;
-    }
+  private save(): boolean {
+    const target: GamePackage = new GamePackage();
+    target.displayName = this.gameName;
+    target.packageName = this.bundleName;
+    target.abilityName = this.abilityName;
+    target.uri = this.launchUri;
+    const error: string = GameLauncherService.saveTarget(target);
+    this.message = error.length > 0 ? error : GameLauncherService.targetStatus(target);
+    return error.length === 0;
   }
 
-  toast(msg: string): void {
-    this.getUIContext().getPromptAction().showToast({ message: msg, duration: 2200 });
-  }
-
-  launch(): void {
-    if (this.launching) {
+  private async launch(): Promise<void> {
+    if (this.launching || !this.save()) {
       return;
     }
     this.launching = true;
-    this.message = '';
-    GameLauncherService.launch(this.selected.packageName).then((r: GameLaunchResult) => {
-      this.toast(r.ok ? `已拉起 ${r.bundleName}` : r.message);
-      if (!r.ok) {
-        this.message = r.message;
-      }
-    }).catch((e: Error) => {
-      this.message = `拉起失败：${e.message}`;
-    }).finally(() => {
+    try {
+      const result: GameLaunchResult = await GameLauncherService.launch();
+      this.message = result.message;
+    } finally {
       this.launching = false;
-    });
-  }
-
-  @Builder
-  header() {
-    PageHeader({ title: '启动游戏', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
-      Button('重新检测')
-        .fontSize(12)
-        .height(28)
-        .backgroundColor($r('app.color.app_primary_bg'))
-        .fontColor($r('app.color.app_primary'))
-        .onClick(() => {
-          this.detect();
-        })
     }
   }
 
   build() {
     Column() {
-      this.header()
-      if (this.checking) {
-        Column({ space: 10 }) {
-          LoadingProgress().width(36).height(36).color($r('app.color.app_primary'))
-          Text('正在检测米哈游游戏...')
-            .fontSize(13)
-            .fontColor($r('app.color.text_secondary'))
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-      } else {
-        Scroll() {
-          Column({ space: 14 }) {
-            // 启动主卡（包装 Column：自定义组件后接 .width 在 @Builder 中受限）
-            Column() {
-              PressCard({
-                onTap: () => {
-                  if (!this.launching && this.selected.packageName.length > 0) {
-                    this.launch();
-                  }
-                },
-                cardBg: $r('app.color.card_background'),
-                radius: 14,
-              }) {
-                Column({ space: 12 }) {
-                  Row({ space: 12 }) {
-                    NavIcon({ name: 'LaunchGame', iconSize: 44 })
-                    Column({ space: 3 }) {
-                      Text(this.selected.displayName.length > 0 ? `启动 ${this.selected.displayName}` : '启动游戏')
-                        .fontSize(19)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor($r('app.color.text_primary'))
-                      Text('拉起本机已安装的原神 APP（鸿蒙版不注入不改进程）')
-                        .fontSize(11)
-                        .fontColor($r('app.color.text_secondary'))
-                    }
-                    .alignItems(HorizontalAlign.Start)
-                    .layoutWeight(1)
-                    if (this.launching) {
-                      LoadingProgress().width(22).height(22).color($r('app.color.app_primary'))
-                    } else {
-                      Text('启动 ›')
-                        .fontSize(14)
-                        .fontWeight(FontWeight.Medium)
-                        .fontColor(Color.White)
-                        .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-                        .borderRadius(18)
-                        .backgroundColor($r('app.color.app_primary'))
-                    }
-                  }
-                  .width('100%')
-                }
-                .width('100%')
-                .padding(18)
-              }
-            }
-            .width('100%')
-
-            if (this.message.length > 0) {
-              Row({ space: 8 }) {
-                Circle({ width: 6, height: 6 })
-                  .fill($r('app.color.danger'))
-                Text(this.message)
-                  .fontSize(12)
-                  .fontColor($r('app.color.danger'))
-                  .layoutWeight(1)
-              }
-              .width('100%')
-              .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-              .borderRadius(10)
-              .backgroundColor($r('app.color.danger_bg'))
-              .border({ width: 1, color: $r('app.color.danger') })
-            }
-
-            // 已检测到的游戏列表
-            if (this.games.length > 1) {
-              Column({ space: 8 }) {
-                Text('检测到的米哈游游戏')
-                  .fontSize(13)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor($r('app.color.text_primary'))
-                  .width('100%')
-                ForEach(this.games, (g: GamePackage) => {
-                  Row({ space: 10 }) {
-                    NavIcon({ name: 'LaunchGame', iconSize: 22 })
-                    Text(g.displayName)
-                      .fontSize(14)
-                      .fontColor(this.selected.packageName === g.packageName ? $r('app.color.app_primary') : $r('app.color.text_primary'))
-                      .layoutWeight(1)
-                    Text(this.selected.packageName === g.packageName ? '选中' : '')
-                      .fontSize(10)
-                      .fontColor($r('app.color.app_primary'))
-                  }
-                  .width('100%')
-                  .padding(12)
-                  .borderRadius(12)
-                  .backgroundColor($r('app.color.page_background'))
-                  .border({
-                    width: 1,
-                    color: this.selected.packageName === g.packageName ? $r('app.color.app_primary') : $r('app.color.divider'),
-                  })
-                  .onClick(() => {
-                    this.selected = g;
-                  })
-                }, (g: GamePackage) => `gp_${g.packageName}`)
-              }
-              .width('100%')
-            }
+      PageHeader({ title: '启动游戏', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp })
+      Scroll() {
+        Column({ space: 16 }) {
+          Text('配置游戏入口')
+            .fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
+          Text('填写游戏提供的公开启动链接，或已确认的 HarmonyOS 应用入口。配置后可从主页一键启动。')
+            .fontSize(14).fontColor($r('app.color.text_secondary'))
+          TextInput({ text: this.gameName, placeholder: '游戏名称' })
+            .onChange((value: string) => { this.gameName = value; })
+          TextInput({ text: this.launchUri, placeholder: '公开启动链接（优先使用）' })
+            .onChange((value: string) => { this.launchUri = value; })
+          Text('没有启动链接时，填写应用提供的 Bundle 与 Ability 名称。')
+            .fontSize(13).fontColor($r('app.color.text_secondary'))
+          TextInput({ text: this.bundleName, placeholder: 'HarmonyOS Bundle 名称' })
+            .onChange((value: string) => { this.bundleName = value; })
+          TextInput({ text: this.abilityName, placeholder: '公开 Ability 名称' })
+            .onChange((value: string) => { this.abilityName = value; })
+          Row({ space: 12 }) {
+            Button('保存').onClick(() => { this.save(); }).hoverEffect(HoverEffect.Highlight)
+            Button(this.launching ? '正在启动…' : '启动游戏')
+              .enabled(!this.launching).onClick(() => { this.launch(); }).hoverEffect(HoverEffect.Highlight)
+            Button('清除').onClick(() => {
+              GameLauncherService.clearTarget();
+              this.aboutToAppear();
+            }).hoverEffect(HoverEffect.Highlight)
           }
-          .width('100%')
-          .padding({ left: 16, right: 16, bottom: 16 })
+          Text(this.message).fontSize(14).fontColor($r('app.color.text_secondary'))
+          Text('游戏安装、更新和游戏内账号切换由游戏或应用市场管理。')
+            .fontSize(13).fontColor($r('app.color.text_secondary'))
         }
-        .width('100%')
-        .layoutWeight(1)
-        .align(Alignment.Top)
-      }
+        .alignItems(HorizontalAlign.Start).width('100%').padding(20)
+      }.layoutWeight(1).width('100%')
     }
-    .width('100%')
-    .height('100%')
+    .width('100%').height('100%')
     .backgroundColor(this.embedMode ? Color.Transparent : $r('app.color.page_background'))
   }
 }

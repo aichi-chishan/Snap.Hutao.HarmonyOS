@@ -6,6 +6,7 @@
 
 # ===== 构建产物 =====
 /node_modules
+/ci/node_modules
 /oh_modules
 **/build
 /.hvigor

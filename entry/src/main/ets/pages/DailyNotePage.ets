@@ -14,6 +14,7 @@ import { DailyNote, Expedition } from '../model/DailyNote';
 import { NotificationHelper } from '../data/local/NotificationHelper';
 import { NotifyFlags } from '../service/DailyNoteService';
 import { DailyNoteService } from '../service/DailyNoteService';
+import { DailyNoteReminderService } from '../service/DailyNoteReminderService';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { GeetestVerifyParams } from './GeetestVerifyPage';
 import { DateUtil } from '../common/DateUtil';
@@ -52,6 +53,9 @@ export struct DailyNotePage {
   /** 每卡「通知设置」半窗：每 UID 开关位 + 树脂/宝钱阈值 */
   @State showUidSettings: boolean = false;
   @State noteAutoRefresh: boolean = PreferencesStore.getAutoRefreshEnabled();
+  @State systemReminders: boolean = DailyNoteReminderService.isEnabled();
+  @StorageLink('dailyNoteReminderError') reminderError: string = '';
+  @State webhookInput: string = DailyNoteService.webhookUrl();
   @State noteInterval: number = PreferencesStore.getRefreshIntervalMinutes();
   /** 最近一次后台（自动）刷新失败原因：风控拦截/网络异常时给用户可见反馈 */
   @StorageLink('dailyNoteLastError') lastNoteError: string = '';
@@ -78,6 +82,33 @@ export struct DailyNotePage {
     }
     this.vm.reloadFromCache(this.currentUid).then(() => {
     });
+  }
+
+  private async toggleSystemReminders(enabled: boolean): Promise<void> {
+    try {
+      if (enabled && !NotificationHelper.isEnabled()) {
+        const host = this.getUIContext().getHostContext();
+        if (host === undefined || !await NotificationHelper.requestPermission(host as common.UIAbilityContext)) {
+          this.systemReminders = false;
+          this.toast('未获得通知授权，代理提醒未启用');
+          return;
+        }
+      }
+      await DailyNoteReminderService.setEnabled(enabled);
+      this.systemReminders = enabled;
+      if (enabled) {
+        const refreshed: boolean = await this.vm.refresh(this.currentUid);
+        if (!refreshed) {
+          this.toast(this.vm.message.length > 0 ? this.vm.message : '便笺刷新失败，尚未安排新的提醒');
+        } else {
+          this.toast(this.reminderError.length > 0 ? this.reminderError : '代理提醒已启用，将按最新便笺安排');
+        }
+      }
+    } catch (e) {
+      this.systemReminders = DailyNoteReminderService.isEnabled();
+      this.reminderError = (e as Error).message;
+      this.toast(this.reminderError);
+    }
   }
 
   aboutToAppear(): void {
@@ -192,6 +223,7 @@ export struct DailyNotePage {
     // 通知设置：Windows 顶栏 Flyout（自动刷新开关 + 间隔）
     this.noteAutoRefresh = PreferencesStore.getAutoRefreshEnabled();
     this.noteInterval = PreferencesStore.getRefreshIntervalMinutes();
+    this.webhookInput = DailyNoteService.webhookUrl();
     this.showNoteSettings = true;
   }
 
@@ -806,7 +838,40 @@ export struct DailyNotePage {
       }
       .width('100%')
 
-      Text('树脂/派遣达到阈值时发送系统通知（需先授权通知）。应用进程被系统回收后，本地通知依赖系统提醒代理能力，当前版本在进程存活/后台驻留期间可靠。')
+      Row() {
+        Text('系统代理提醒').fontSize(14).fontColor($r('app.color.text_primary'))
+        Blank()
+        Toggle({ type: ToggleType.Switch, isOn: this.systemReminders })
+          .onChange((enabled: boolean) => { this.toggleSystemReminders(enabled); })
+      }.width('100%')
+      Text('按上次便笺估算树脂、宝钱、派遣和参量质变仪的到期时间。退出应用后由系统提醒；游戏内消耗后需刷新校正。')
+        .fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
+      if (this.reminderError.length > 0) {
+        Text(this.reminderError).fontSize(12).fontColor($r('app.color.notice_on')).width('100%')
+      }
+
+      Text('便笺 Webhook')
+        .fontSize(14)
+        .fontColor($r('app.color.text_primary'))
+        .width('100%')
+      TextInput({ text: this.webhookInput, placeholder: 'https://example.com/daily-note' })
+        .onChange((value: string) => { this.webhookInput = value; })
+      Text('配置后，每次刷新会发送 UID 和便笺数据。留空关闭。')
+        .fontSize(11)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+      Button('保存 Webhook')
+        .hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          try {
+            DailyNoteService.setWebhookUrl(this.webhookInput);
+            this.toast(this.webhookInput.trim().length > 0 ? 'Webhook 已保存' : 'Webhook 已关闭');
+          } catch (e) {
+            this.toast((e as Error).message);
+          }
+        })
+
+      Text('自动刷新在应用运行时获取服务器数据；桌面卡片刷新由系统调度。系统代理提醒按最近快照执行，无需保持应用运行。')
         .fontSize(11)
         .fontColor($r('app.color.text_secondary'))
         .width('100%')

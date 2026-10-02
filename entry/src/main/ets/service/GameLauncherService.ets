@@ -1,108 +1,119 @@
-/**
- * GameLauncherService.ets
- * 拉起本机已安装的原神 APP（对齐 Windows 启动游戏入口，但仅"拉起"，不做注入/进程链）：
- *  - 查询已知米哈游游戏包名（原神国服/国际服/云原神），返回安装状态
- *  - 通过 bundleManager.getBundleInfo + startAbility 拉起主 Ability
- *  - 未安装时返回明确提示（引导到应用市场）
- */
-import { bundleManager, common } from '@kit.AbilityKit';
-import { Want } from '@kit.AbilityKit';
+/** Native game routing through the target app's public HarmonyOS entry point. */
+import { common, Want } from '@kit.AbilityKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { AppContextProvider } from '../common/AppContext';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { Logger } from '../common/Logger';
 
-const TAG: string = 'GameLauncherService';
-
-/** 已知米哈游游戏包名（按优先级：国服原神优先） */
 export class GamePackage {
   packageName: string = '';
-  displayName: string = '';
+  displayName: string = '原神';
+  abilityName: string = '';
+  uri: string = '';
 }
 
 export class GameLaunchResult {
   ok: boolean = false;
   message: string = '';
-  /** 找到的游戏包名 */
   bundleName: string = '';
+  /** unconfigured / unknown / launched / unavailable / failed */
+  status: string = 'unknown';
+  errorCode: number = 0;
 }
 
 export class GameLauncherService {
-  private static instance: GameLauncherService = new GameLauncherService();
+  private static readonly KEY_BUNDLE: string = 'launcher.bundle';
+  private static readonly KEY_ABILITY: string = 'launcher.ability';
+  private static readonly KEY_URI: string = 'launcher.uri';
+  private static readonly KEY_NAME: string = 'launcher.name';
 
-  static getInstance(): GameLauncherService {
-    return GameLauncherService.instance;
+  static getTarget(): GamePackage {
+    const target: GamePackage = new GamePackage();
+    target.packageName = PreferencesStore.getString(GameLauncherService.KEY_BUNDLE, '');
+    target.abilityName = PreferencesStore.getString(GameLauncherService.KEY_ABILITY, '');
+    target.uri = PreferencesStore.getString(GameLauncherService.KEY_URI, '');
+    target.displayName = PreferencesStore.getString(GameLauncherService.KEY_NAME, '原神');
+    return target;
   }
 
-  /** 已知米哈游游戏（鸿蒙上架：米哈游云端化应用为 com.MiHoYo.xxx；此处尝试常见包名） */
-  private static readonly candidates: GamePackage[] = [
-    { packageName: 'com.miHoYo.Yuanshen', displayName: '原神' },
-    { packageName: 'com.miHoYo.hkrpg', displayName: '崩坏：星穹铁道' },
-    { packageName: 'com.miHoYo.bh3', displayName: '崩坏3' },
-  ];
-
-  /** 查询本机已安装的米哈游游戏（返回列表） */
-  static async detectInstalled(): Promise<GamePackage[]> {
-    const out: GamePackage[] = [];
-    for (const cand of GameLauncherService.candidates) {
-      try {
-        await bundleManager.getBundleInfo(cand.packageName, bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
-        out.push(cand);
-      } catch (e) {
-        // 未安装
+  static validationMessage(target: GamePackage): string {
+    if (target.uri.trim().length > 0) {
+      // A route is supplied by the user/vendor; do not guess a game scheme or scan packages.
+      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(target.uri.trim()) || /\s/.test(target.uri.trim())) {
+        return '请输入完整的公开启动链接（scheme://…）';
       }
+      if (/^(file|content|javascript|data):/i.test(target.uri.trim())) {
+        return '该链接类型不能用于启动游戏';
+      }
+      return '';
     }
-    Logger.info(TAG, `detectInstalled: ${out.map((g) => g.packageName).join(', ')}`);
-    return out;
+    if (target.packageName.trim().length === 0 && target.abilityName.trim().length === 0) {
+      return '请先配置游戏公开的启动链接或 HarmonyOS 应用入口';
+    }
+    if (target.packageName.trim().length === 0 || target.abilityName.trim().length === 0) {
+      return 'Bundle 名称和 Ability 名称须同时填写';
+    }
+    if (/\s/.test(target.packageName.trim()) || /\s/.test(target.abilityName.trim())) {
+      return '应用入口名称不能包含空白字符';
+    }
+    return '';
   }
 
-  /** 检测指定包名是否已安装 */
-  static async isInstalled(packageName: string): Promise<boolean> {
-    try {
-      await bundleManager.getBundleInfo(packageName, bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
-      return true;
-    } catch (e) {
-      return false;
+  static saveTarget(target: GamePackage): string {
+    const message: string = GameLauncherService.validationMessage(target);
+    if (message.length > 0) {
+      return message;
     }
+    PreferencesStore.setString(GameLauncherService.KEY_NAME, target.displayName.trim() || '原神');
+    PreferencesStore.setString(GameLauncherService.KEY_BUNDLE, target.packageName.trim());
+    PreferencesStore.setString(GameLauncherService.KEY_ABILITY, target.abilityName.trim());
+    PreferencesStore.setString(GameLauncherService.KEY_URI, target.uri.trim());
+    AppStorage.setOrCreate('gameLaunchTargetVersion', Date.now());
+    return '';
   }
 
-  /** 拉起游戏（首个已安装；指定包名可传递） */
-  static async launch(packageName?: string): Promise<GameLaunchResult> {
+  static clearTarget(): void {
+    PreferencesStore.setString(GameLauncherService.KEY_BUNDLE, '');
+    PreferencesStore.setString(GameLauncherService.KEY_ABILITY, '');
+    PreferencesStore.setString(GameLauncherService.KEY_URI, '');
+    AppStorage.setOrCreate('gameLaunchTargetVersion', Date.now());
+  }
+
+  /** Ordinary applications cannot query arbitrary installed bundles. No query is attempted. */
+  static targetStatus(target: GamePackage): string {
+    return GameLauncherService.validationMessage(target).length > 0
+      ? '尚未配置启动入口' : '已配置入口；安装状态无法直接查询';
+  }
+
+  static async launch(): Promise<GameLaunchResult> {
     const result: GameLaunchResult = new GameLaunchResult();
-    let target: string = packageName ?? '';
-    if (target.length === 0) {
-      const installed: GamePackage[] = await GameLauncherService.detectInstalled();
-      if (installed.length === 0) {
-        result.ok = false;
-        result.message = '未安装原神 APP。请通过应用市场安装后重试';
-        return result;
-      }
-      target = installed[0].packageName;
+    const target: GamePackage = GameLauncherService.getTarget();
+    const validation: string = GameLauncherService.validationMessage(target);
+    if (validation.length > 0) {
+      result.status = 'unconfigured';
+      result.message = validation;
+      return result;
     }
+    const want: Want = target.uri.length > 0
+      ? { action: 'ohos.want.action.viewData', uri: target.uri }
+      : { bundleName: target.packageName, abilityName: target.abilityName };
+    result.bundleName = target.packageName;
     try {
       const context: common.UIAbilityContext = AppContextProvider.getAppContext() as common.UIAbilityContext;
-      const want: Want = {
-        bundleName: target,
-        abilityName: 'EntryAbility',
-        parameters: {
-          'caller': 'com.example.snaphutaoharmonyos',
-        },
-      };
-      Logger.info(TAG, `launch ${target} via startAbility`);
       await context.startAbility(want);
       result.ok = true;
-      result.message = target;
-      result.bundleName = target;
-      return result;
-    } catch (e) {
-      Logger.warn(TAG, `launch ${target} fail: ${(e as Error).message}`);
-      result.ok = false;
-      result.message = '拉起失败，可能未安装或未登录米哈游账号，请先安装并启动一次游戏';
-      result.bundleName = target;
-      return result;
+      result.status = 'launched';
+      result.message = `已发送 ${target.displayName} 启动请求`;
+    } catch (error) {
+      const code: number = (error as BusinessError).code;
+      result.errorCode = code;
+      // An unavailable entry may mean absent app OR changed/private Ability. Do not claim absence.
+      result.status = code === 16000001 ? 'unavailable' : 'failed';
+      result.message = code === 16000001
+        ? '未找到可用入口：应用可能未安装，或入口名称已变更'
+        : `启动失败（${code}），请核对游戏公开的启动入口`;
+      Logger.warn('GameLauncherService', `launch failed code=${code}`);
     }
-  }
-
-  /** 应用市场跳转（未安装时引导；华为应用市场包名） */
-  static marketUrl(packageName: string): string {
-    return `https://appgallery.huawei.com/app/C100023552`;
+    return result;
   }
 }

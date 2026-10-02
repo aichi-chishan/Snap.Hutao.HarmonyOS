@@ -23,11 +23,16 @@ export struct SpiralAbyssPage {
   /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
-  @StorageLink('currentUid') currentUid: string = '';
+  @StorageLink('currentUid') @Watch('onUidChanged') currentUid: string = '';
   @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
   @State vm: SpiralAbyssViewModel = new SpiralAbyssViewModel();
   /** 风控验证弹窗开关（needRiskVerify 时自动弹出，对齐 Windows 验证小窗） */
   @State showVerify: boolean = false;
+
+  onUidChanged(): void {
+    this.vm = new SpiralAbyssViewModel();
+    this.reload();
+  }
 
   aboutToAppear(): void {
     this.reload();
@@ -45,7 +50,7 @@ export struct SpiralAbyssPage {
   }
 
   reload(): void {
-    this.vm.loadHistoryList().then(() => {
+    this.vm.loadHistoryList(this.currentUid).then(() => {
     });
     this.vm.load(this.currentUid).then(() => {
     });
@@ -463,7 +468,7 @@ export struct SpiralAbyssPage {
                       ? $r('app.color.app_primary') : $r('app.color.card_stroke'),
                   })
                   .onClick(() => {
-                    this.vm.loadFromHistory(h.scheduleId).then(() => {
+                    this.vm.loadFromHistory(this.currentUid, h.scheduleId).then(() => {
                     });
                   })
               }, (h: AbyssHistoryEntry, hi: number) => `ah_${h.scheduleId}_${h.totalStar}_${hi}`)

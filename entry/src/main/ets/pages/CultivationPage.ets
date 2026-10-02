@@ -4,8 +4,11 @@
  * 计算结果可保存为持久化培养条目（多项目 + 材料勾选，对齐 Windows CultivationPage）。
  * 数据源：character/list（角色）+ batch_compute（材料）+ 本地计划库。
  */
+import { common } from '@kit.AbilityKit';
+import { fileIo, picker } from '@kit.CoreFileKit';
+import { util } from '@kit.ArkTS';
 import { router, ShowDialogSuccessResponse } from '@kit.ArkUI';
-import { CultivationViewModel, CultivateTarget } from '../viewmodel/CultivationViewModel';
+import { CultivationViewModel, CultivateTarget, InventoryMaterialView } from '../viewmodel/CultivationViewModel';
 import { CalItem } from '../model/Calculate';
 import { elementName } from '../model/CharacterData';
 import { CultivateEntry, CultivateEntryItem, CultivateProject } from '../data/repo/CultivationRepo';
@@ -28,6 +31,9 @@ export struct CultivationPage {
   @State vm: CultivationViewModel = new CultivationViewModel();
   /** 目标等级输入（临时） */
   @State levelTmp: string = '';
+  @State showInventory: boolean = false;
+  @State inventoryIdText: string = '';
+  @State inventoryCountText: string = '';
   /** 内容区宽 >=840 双栏（对齐 WikiAvatarPage 断点写法） */
   @State isWide: boolean = false;
 
@@ -36,13 +42,9 @@ export struct CultivationPage {
   }
 
   loadData(): void {
-    if (this.isLoggedIn && this.currentUid.length > 0) {
-      this.vm.load(this.currentUid).then(() => {
-      });
-    } else {
-      this.vm.loaded = true;
-      this.vm.message = '请先登录';
-    }
+    this.vm.load(this.isLoggedIn ? this.currentUid : '').catch((e: Error) => {
+      this.vm.message = e.message;
+    });
     // 计划不依赖登录（本地库），进入页面即加载
     this.vm.loadPlan().then(() => {
     });
@@ -54,7 +56,7 @@ export struct CultivationPage {
 
   /** 材料今日是否可刷（周一四/二五/三六轮换，周日全开；对齐 Windows Material.IsItemOfToday） */
   isTodayItem(itemId: number): boolean {
-    return ResinStatisticsService.isItemOfToday(itemId, new Date().getDay());
+    return ResinStatisticsService.isItemOfToday(itemId, new Date(Date.now() + 4 * 3600000).getUTCDay());
   }
 
   /** 树脂统计行（Builder 内经方法读取，规避属性窄化与 @Builder 多参刷新问题） */
@@ -170,7 +172,7 @@ export struct CultivationPage {
             .fontSize(10)
             .fontColor($r('app.color.text_secondary'))
         }
-        Text(`当前 Lv.${target.level}`)
+        Text(`当前 Lv.${target.level} · 天赋目标${target.targetSkillLevel} · 武器目标${target.targetWeaponLevel}`)
           .fontSize(11)
           .fontColor($r('app.color.text_secondary'))
         Row({ space: 6 }) {
@@ -211,7 +213,7 @@ export struct CultivationPage {
       Text('目标等级')
         .fontSize(11)
         .fontColor($r('app.color.text_secondary'))
-      ForEach([60, 70, 80, 90], (lv: number) => {
+      ForEach([60, 70, 80, 90, 95, 100], (lv: number) => {
         Text(`${lv}`)
           .fontSize(11)
           .fontColor($r('app.color.app_primary'))
@@ -417,7 +419,7 @@ export struct CultivationPage {
                 .objectFit(ImageFit.Cover)
                 .borderRadius(20)
             } else {
-              MetaIcon({ category: 'AvatarIcon', name: entry.icon, iconSize: 40 })
+              MetaIcon({ category: entry.avatarId >= 10000000 ? 'AvatarIcon' : 'EquipIcon', name: entry.icon, iconSize: 40 })
                 .borderRadius(20)
                 .clip(true)
             }
@@ -613,6 +615,75 @@ export struct CultivationPage {
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
+  private async importInventoryFile(): Promise<void> {
+    try {
+      const context: common.Context | undefined = this.getUIContext().getHostContext();
+      if (context === undefined) {
+        throw new Error('页面尚未就绪');
+      }
+      const documentPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(context);
+      const options: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
+      options.maxSelectNumber = 1;
+      options.fileSuffixFilters = ['JSON|.json'];
+      const files: string[] = await documentPicker.select(options);
+      if (files.length === 0) {
+        return;
+      }
+      const file: fileIo.File = fileIo.openSync(files[0], fileIo.OpenMode.READ_ONLY);
+      try {
+        const size: number = fileIo.statSync(file.fd).size;
+        if (size > 16 * 1024 * 1024) {
+          throw new Error('库存文件超过16MB');
+        }
+        const buffer: ArrayBuffer = new ArrayBuffer(size);
+        fileIo.readSync(file.fd, buffer);
+        const text: string = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buffer));
+        await this.vm.importInventoryText(text);
+      } finally {
+        fileIo.closeSync(file.fd);
+      }
+      this.toast(this.vm.message);
+    } catch (e) {
+      this.toast((e as Error).message);
+    }
+  }
+
+  @Builder
+  inventorySection() {
+    Column({ space: 8 }) {
+      Button(this.showInventory ? '收起项目库存' : '管理项目库存')
+        .fontSize(12).height(30).hoverEffect(HoverEffect.Highlight)
+        .onClick(() => this.showInventory = !this.showInventory)
+      if (this.showInventory) {
+        Text('库存按计划保存；材料缺口和树脂估算会扣除库存，并考虑同系列低阶合成。')
+          .fontSize(11).fontColor($r('app.color.text_secondary'))
+        Row({ space: 6 }) {
+          TextInput({ text: this.inventoryIdText, placeholder: '材料 ID' })
+            .type(InputType.Number).layoutWeight(1)
+            .onChange((value: string) => this.inventoryIdText = value)
+          TextInput({ text: this.inventoryCountText, placeholder: '持有数量' })
+            .type(InputType.Number).layoutWeight(1)
+            .onChange((value: string) => this.inventoryCountText = value)
+          Button('保存').fontSize(12).hoverEffect(HoverEffect.Highlight)
+            .onClick(() => {
+              this.vm.setInventoryCount(Number(this.inventoryIdText), Number(this.inventoryCountText))
+                .then(() => this.toast(this.vm.message));
+            })
+        }
+        Row({ space: 6 }) {
+          Button('导入库存文件').fontSize(12).hoverEffect(HoverEffect.Highlight)
+            .onClick(() => this.importInventoryFile())
+          Button('计算器同步').fontSize(12).hoverEffect(HoverEffect.Highlight)
+            .onClick(() => this.vm.syncInventory().then(() => this.toast(this.vm.message)))
+        }
+        ForEach(this.vm.inventoryRows, (row: InventoryMaterialView) => {
+          Text(`${row.name} (${row.itemId}) · 持有 ${row.current} / 需要 ${row.required}`)
+            .fontSize(11).fontColor($r('app.color.text_primary')).width('100%')
+        }, (row: InventoryMaterialView) => `inv_${row.itemId}_${row.current}_${row.required}`)
+      }
+    }.width('100%')
+  }
+
   /** 养成计划区（项目条 + 条目清单；置于计算区上方，可持续追踪） */
   @Builder
   planSection() {
@@ -632,6 +703,7 @@ export struct CultivationPage {
       this.projectBar()
       // 树脂换算统计（当前项目聚合，展示在项目详情顶部；对齐 Windows 统计区）
       this.resinSection()
+      this.inventorySection()
       if (this.vm.planEntries.length === 0) {
         Text('暂无培养目标：勾选角色并计算材料后，点「保存计算结果到养成计划」')
           .fontSize(12)
@@ -696,6 +768,20 @@ export struct CultivationPage {
     // 操作区
     Column({ space: 8 }) {
       this.quickLevelBar()
+      Row({ space: 6 }) {
+        Text('天赋目标').fontSize(11).fontColor($r('app.color.text_secondary'))
+        ForEach([6, 8, 9, 10], (lv: number) => {
+          Button(`${lv}`).fontSize(11).height(28).hoverEffect(HoverEffect.Highlight)
+            .onClick(() => this.vm.setSkillTarget(lv))
+        })
+      }
+      Row({ space: 6 }) {
+        Text('武器目标').fontSize(11).fontColor($r('app.color.text_secondary'))
+        ForEach([60, 70, 80, 90], (lv: number) => {
+          Button(`${lv}`).fontSize(11).height(28).hoverEffect(HoverEffect.Highlight)
+            .onClick(() => this.vm.setWeaponTarget(lv))
+        })
+      }
       Row({ space: 8 }) {
         Button(`已选 ${this.vm.selectedCount} 个角色`)
           .fontSize(12)
@@ -746,7 +832,7 @@ export struct CultivationPage {
         this.targetRow(target, idx)
         // 键必须包含会变的字段（AGENTS @Builder 规则）：仅 avatarId 时 toggle 重赋值 targets 后
         // 键不变 → ForEach 复用旧组件、targetRow 不重建，选中态（圆点/勾选/高亮）永不刷新
-      }, (target: CultivateTarget) => `cult_${target.avatarId}_${target.selected ? 1 : 0}_${target.targetLevel}`)
+      }, (target: CultivateTarget) => `cult_${target.avatarId}_${target.selected ? 1 : 0}_${target.targetLevel}_${target.targetSkillLevel}_${target.targetWeaponLevel}`)
     }
     .width('100%')
   }

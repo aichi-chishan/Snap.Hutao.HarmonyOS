@@ -7,7 +7,7 @@
 import { GameLauncherService, GamePackage, GameLaunchResult } from '../service/GameLauncherService';
 import { PressCard } from './PressCard';
 import { NavIcon } from './NavIcon';
-import { Logger } from '../common/Logger';
+import { router } from '@kit.ArkUI';
 
 const TAG: string = 'HomeLaunchCard';
 
@@ -19,31 +19,33 @@ export struct HomeLaunchCard {
 
   @State game: GamePackage = new GamePackage();
   @State detected: boolean = false;
+  @StorageProp('gameLaunchTargetVersion') @Watch('onTargetChanged') targetVersion: number = 0;
   @State launching: boolean = false;
 
   aboutToAppear(): void {
     this.detect();
   }
 
-  async detect(): Promise<void> {
-    try {
-      const list: GamePackage[] = await GameLauncherService.detectInstalled();
-      if (list.length > 0) {
-        this.game = list[0];
-        this.detected = true;
-      }
-    } catch (e) {
-      Logger.warn(TAG, `detect fail ${(e as Error).message}`);
-    }
+  onTargetChanged(): void {
+    this.detect();
+  }
+
+  detect(): void {
+    this.game = GameLauncherService.getTarget();
+    this.detected = GameLauncherService.validationMessage(this.game).length === 0;
   }
 
   launch(): void {
-    if (this.launching || !this.detected) {
+    if (!this.detected) {
+      router.pushUrl({ url: 'pages/LaunchGamePage' });
+      return;
+    }
+    if (this.launching) {
       return;
     }
     this.launching = true;
-    GameLauncherService.launch(this.game.packageName).then((r: GameLaunchResult) => {
-      this.onLaunched(r.ok, r.ok ? `已拉起 ${r.bundleName}` : r.message);
+    GameLauncherService.launch().then((r: GameLaunchResult) => {
+      this.onLaunched(r.ok, r.message);
     }).catch((e: Error) => {
       this.onLaunched(false, `拉起失败：${e.message}`);
     }).finally(() => {
@@ -77,12 +79,12 @@ export struct HomeLaunchCard {
         .flexShrink(0)
 
         Column({ space: 2 }) {
-          Text(this.detected ? this.game.displayName : '未检测到游戏')
+          Text(this.detected ? this.game.displayName : '配置游戏入口')
             .fontSize(13)
             .fontColor(this.detected ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-          Text(this.detected ? '点击直接拉起游戏' : '请先通过应用市场安装')
+          Text(this.detected ? '点击发送启动请求' : '填写游戏公开的启动链接')
             .fontSize(12)
             .fontColor($r('app.color.text_secondary'))
             .maxLines(1)
@@ -93,7 +95,7 @@ export struct HomeLaunchCard {
         .justifyContent(FlexAlign.Center)
 
         Row() {
-          Text(this.launching ? '启动中...' : '启动游戏')
+          Text(this.launching ? '启动中...' : (this.detected ? '启动游戏' : '配置入口'))
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)

@@ -18,6 +18,7 @@ export class UigfImportResult {
   message: string = '';
   uid: string = '';
   inserted: number = 0;
+  archiveCount: number = 0;
 }
 
 /** UIGF v4.x 常规池单条记录 */
@@ -99,6 +100,8 @@ export class UigfService {
       const ugcEntry: UigfUgcEntry = new UigfUgcEntry();
       entry.uid = Number(archive.uid) || 0;
       ugcEntry.uid = entry.uid;
+      entry.timezone = UigfService.timezoneOfUid(archive.uid);
+      ugcEntry.timezone = entry.timezone;
       entry.lang = 'zh-cn';
       ugcEntry.lang = 'zh-cn';
       for (const it of items) {
@@ -117,7 +120,7 @@ export class UigfService {
           const u: UigfItem = new UigfItem();
           const typeStr: string = String(it.gachaType);
           u.gacha_type = typeStr;
-          u.uigf_gacha_type = typeStr;
+          u.uigf_gacha_type = it.gachaType === 400 ? '301' : typeStr;
           u.item_id = it.itemId;
           u.count = String(it.count > 0 ? it.count : 1);
           u.time = it.time;
@@ -139,136 +142,169 @@ export class UigfService {
     return JSON.stringify(root, null, 2);
   }
 
-  /** 解析并导入（v4.x hk4e + hk4e_ugc / v3.x 单游戏 list），按 gacha_id 去重合并 */
+  /** 先完整校验文件，再落库；时间统一为UID服务器时区的墙上时间。 */
   async importFromText(text: string): Promise<UigfImportResult> {
     const result: UigfImportResult = new UigfImportResult();
-    let root: Record<string, Object>;
     try {
-      root = JSON.parse(text) as Record<string, Object>;
+      const root: Record<string, Object> = JSON.parse(text) as Record<string, Object>;
+      if (root === null || typeof root !== 'object' || Array.isArray(root)) {
+        throw new Error('UIGF 根节点必须是对象');
+      }
+      const info: Record<string, Object> = root['info'] as Record<string, Object>;
+      if (info === undefined || info === null) {
+        throw new Error('UIGF 缺少 info');
+      }
+      const version: string = String(info['version'] ?? info['uigf_version'] ?? '');
+      if (['v2.2', 'v2.3', 'v2.4', 'v3.0', 'v4.0', 'v4.1', 'v4.2'].indexOf(version) < 0) {
+        throw new Error(`不支持的 UIGF 版本：${version}`);
+      }
+      const pending: Map<string, GachaItem[]> = new Map<string, GachaItem[]>();
+      if (version.startsWith('v4.')) {
+        if (root['hk4e'] === undefined && root['hk4e_ugc'] === undefined) {
+          throw new Error('UIGF 缺少 hk4e/hk4e_ugc');
+        }
+        this.parseSections(root['hk4e'], false, pending);
+        this.parseSections(root['hk4e_ugc'], true, pending);
+      } else {
+        const section: Record<string, Object> = {
+          'uid': info['uid'],
+          'timezone': info['region_time_zone'] ?? UigfService.timezoneOfUid(String(info['uid'] ?? '')),
+          'list': root['list']
+        };
+        this.parseSections([section], false, pending);
+      }
+      // 所有条目合法后才允许创建归档；ID以字符串比较，不经过浮点数。
+      for (const uid of pending.keys()) {
+        const archive = await GachaRepo.getOrCreateArchive(uid);
+        const existing: GachaItem[] = await GachaRepo.getItemsByArchive(archive.id);
+        const keys: Set<string> = new Set<string>();
+        for (const item of existing) {
+          keys.add(UigfService.itemKey(item));
+        }
+        const fresh: GachaItem[] = [];
+        const items: GachaItem[] = pending.get(uid) ?? [];
+        for (const item of items) {
+          const key: string = UigfService.itemKey(item);
+          if (!keys.has(key)) {
+            item.archiveId = archive.id;
+            fresh.push(item);
+            keys.add(key);
+          }
+        }
+        result.inserted += await GachaRepo.insertItems(fresh);
+        result.uid = uid;
+        result.archiveCount++;
+      }
+      result.ok = true;
+      result.message = `导入完成：${result.archiveCount} 个归档，新增 ${result.inserted} 条`;
     } catch (e) {
-      result.message = 'JSON 解析失败';
-      return result;
+      result.message = `导入失败：${(e as Error).message}`;
     }
-    // 收集 (uid, items[], isUgc) 组：v4.x → hk4e / hk4e_ugc 数组；v3.x → 根 list + info.uid
-    const uidSections: Array<Object> = [];
-    const ugcSections: Array<Object> = [];
-    const hk4e: Object | undefined = root['hk4e'];
-    if (hk4e !== undefined) {
-      const arr = hk4e as Object[];
-      for (const e of arr) {
-        uidSections.push(e);
-      }
-    } else if (root['list'] !== undefined) {
-      const info: Record<string, Object> = (root['info'] as Record<string, Object>) ?? {};
-      const single: Record<string, Object> = {
-        'uid': info['uid'] !== undefined ? info['uid'] : 0,
-        'timezone': 0,
-        'lang': '',
-        'list': root['list'],
-      };
-      uidSections.push(single as Object);
-    } else {
-      result.message = '未识别的 UIGF 文件（缺少 hk4e/list）';
-      return result;
-    }
-    const hk4eUgc: Object | undefined = root['hk4e_ugc'];
-    if (hk4eUgc !== undefined) {
-      const arr = hk4eUgc as Object[];
-      for (const e of arr) {
-        ugcSections.push(e);
-      }
-    }
-
-    let totalInserted: number = 0;
-    let lastUid: string = '';
-    for (let s = 0; s < uidSections.length + ugcSections.length; s++) {
-      const isUgc: boolean = s >= uidSections.length;
-      const section: Object = isUgc ? ugcSections[s - uidSections.length] : uidSections[s];
-      const sec: Record<string, Object> = section as Record<string, Object>;
-      const rawUid: Object | undefined = sec['uid'];
-      const uid: string = rawUid !== undefined ? String(rawUid) : '';
-      if (uid.length === 0 || uid === '0') {
-        continue;
-      }
-      lastUid = uid;
-      const archive = await GachaRepo.getOrCreateArchive(uid);
-      // 现有全部游标（去重键，含颂愿池）
-      const existingIds: Set<string> = new Set<string>();
-      const allTypes: number[] = GachaType.QUERY_ORDER.concat(GachaType.BEYOND_ORDER);
-      for (let i = 0; i < allTypes.length; i++) {
-        const ids: string[] = await GachaRepo.getAllGachaIds(archive.id, allTypes[i]);
-        for (const id of ids) {
-          existingIds.add(id);
-        }
-      }
-      const rawList: Object[] = (sec['list'] as Object[]) ?? [];
-      const fresh: GachaItem[] = [];
-      for (const rawItem of rawList) {
-        const it: Record<string, Object> = rawItem as Record<string, Object>;
-        const cursor: string = String(it['id'] ?? '');
-        if (cursor.length === 0 || existingIds.has(cursor)) {
-          continue;
-        }
-        const item: GachaItem = new GachaItem();
-        item.archiveId = archive.id;
-        if (isUgc) {
-          // v4.2 hk4e_ugc：op_gacha_type 指明颂愿池（1000/2000）
-          item.gachaType = Number(it['op_gacha_type'] ?? 0);
-          if (!GachaType.isBeyond(item.gachaType)) {
-            continue;
-          }
-          item.name = String(it['item_name'] ?? '');
-          item.scheduleId = Number(it['schedule_id'] ?? 0);
-        } else {
-          // 常规池：uigf_gacha_type 优先，400(角色活动祈愿-2) 归并为 301
-          let gachaType: number = Number(it['uigf_gacha_type'] ?? 0);
-          if (!GachaType.isStandard(gachaType)) {
-            gachaType = Number(it['gacha_type'] ?? 0);
-          }
-          if (gachaType === 400) {
-            gachaType = GachaType.AVATAR_EVENT;
-          }
-          if (!GachaType.isStandard(gachaType)) {
-            continue;
-          }
-          item.gachaType = gachaType;
-          item.name = String(it['name'] ?? '');
-        }
-        item.itemId = Number(it['item_id'] ?? 0);
-        const cnt: number = Number(it['count'] ?? 1);
-        item.count = cnt > 0 ? cnt : 1;
-        item.time = UigfService.normalizeTime(String(it['time'] ?? ''));
-        item.itemType = String(it['item_type'] ?? '');
-        item.rankType = Number(it['rank_type'] ?? 0);
-        item.gachaId = cursor;
-        existingIds.add(cursor);
-        fresh.push(item);
-      }
-      if (fresh.length > 0) {
-        totalInserted += await GachaRepo.insertItems(fresh);
-      }
-    }
-    result.ok = true;
-    result.uid = lastUid;
-    result.inserted = totalInserted;
-    result.message = totalInserted > 0
-      ? `导入成功：新增 ${totalInserted} 条（UID ${lastUid}）`
-      : '导入完成：没有新增记录（可能已全部存在）';
-    Logger.info(TAG, `import uigf: inserted=${totalInserted} uid=${lastUid}`);
     return result;
   }
 
-  /** '2023-01-01T00:00:00Z' → '2023-01-01 00:00:00'（截断毫秒/时区标记） */
-  private static normalizeTime(time: string): string {
-    let t: string = time.replace('T', ' ');
-    const zIdx: number = t.indexOf('Z');
-    if (zIdx > 0) {
-      t = t.substring(0, zIdx);
+  private parseSections(raw: Object | undefined, isUgc: boolean,
+    pending: Map<string, GachaItem[]>): void {
+    if (raw === undefined) {
+      return;
     }
-    const dotIdx: number = t.indexOf('.');
-    if (dotIdx > 0) {
-      t = t.substring(0, dotIdx);
+    if (!Array.isArray(raw)) {
+      throw new Error('UIGF 归档必须是数组');
     }
-    return t;
+    for (const section of raw as Object[]) {
+      const sec: Record<string, Object> = section as Record<string, Object>;
+      if (sec === null || typeof sec !== 'object') {
+        throw new Error('无效的 UIGF 归档');
+      }
+      const uid: string = String(sec['uid'] ?? '');
+      if (!/^[1-9][0-9]{8,9}$/.test(uid)) {
+        throw new Error(`无效的 UID：${uid}`);
+      }
+      const timezone: number = Number(sec['timezone'] ?? UigfService.timezoneOfUid(uid));
+      if (!Number.isFinite(timezone) || timezone < -12 || timezone > 14) {
+        throw new Error(`UID ${uid} 的时区无效`);
+      }
+      if (!Array.isArray(sec['list'])) {
+        throw new Error(`UID ${uid} 的 list 必须是数组`);
+      }
+      const items: GachaItem[] = pending.get(uid) ?? [];
+      for (const rawItem of sec['list'] as Object[]) {
+        const it: Record<string, Object> = rawItem as Record<string, Object>;
+        if (it === null || typeof it !== 'object') {
+          throw new Error(`UID ${uid} 含无效记录`);
+        }
+        const cursor: string = String(it['id'] ?? '');
+        if (!/^[0-9]+$/.test(cursor) || (typeof it['id'] === 'number' && !Number.isSafeInteger(Number(it['id'])))) {
+          throw new Error('祈愿 id 必须是精确的十进制字符串');
+        }
+        const item: GachaItem = new GachaItem();
+        item.uid = uid;
+        item.gachaId = cursor;
+        item.gachaType = Number(isUgc ? it['op_gacha_type'] : (it['gacha_type'] ?? it['uigf_gacha_type']));
+        if (isUgc ? !GachaType.isBeyond(item.gachaType)
+          : !(GachaType.isStandard(item.gachaType) || item.gachaType === 400)) {
+          throw new Error(`记录 ${cursor} 的卡池类型无效`);
+        }
+        item.itemId = Number(it['item_id'] ?? 0);
+        if (!Number.isSafeInteger(item.itemId) || item.itemId <= 0) {
+          throw new Error(`记录 ${cursor} 缺少有效 item_id`);
+        }
+        item.count = Number(it['count'] ?? 1);
+        item.rankType = Number(it['rank_type'] ?? 0);
+        if (!Number.isSafeInteger(item.count) || item.count <= 0 || !Number.isInteger(item.rankType)
+          || item.rankType < 3 || item.rankType > 5) {
+          throw new Error(`记录 ${cursor} 的数量或星级无效`);
+        }
+        item.time = UigfService.normalizeTime(String(it['time'] ?? ''), timezone,
+          UigfService.timezoneOfUid(uid));
+        item.name = String((isUgc ? it['item_name'] : it['name']) ?? '');
+        item.itemType = String(it['item_type'] ?? '');
+        item.scheduleId = Number(it['schedule_id'] ?? 0);
+        if (isUgc && (!Number.isSafeInteger(item.scheduleId) || item.scheduleId < 0)) {
+          throw new Error(`记录 ${cursor} 的卡池期次无效`);
+        }
+        items.push(item);
+      }
+      pending.set(uid, items);
+    }
+  }
+
+  private static itemKey(item: GachaItem): string {
+    return `${GachaType.isBeyond(item.gachaType) ? 'b' : 's'}:${item.gachaId}`;
+  }
+
+  /** Windows InferRegionTimeZone：美服UTC-5、欧服UTC+1，其余UTC+8。 */
+  static timezoneOfUid(uid: string): number {
+    return uid.startsWith('6') ? -5 : (uid.startsWith('7') ? 1 : 8);
+  }
+
+  /** UIGF时间为entry.timezone当地时间；显式ISO偏移优先，并换算至归档服务器时区。 */
+  static normalizeTime(value: string, sourceTimezone: number, targetTimezone: number): string {
+    const match: RegExpMatchArray | null = value.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/);
+    if (match === null) {
+      throw new Error(`无效的祈愿时间：${value}`);
+    }
+    const wall: number = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]),
+      Number(match[4]), Number(match[5]), Number(match[6]));
+    const check: Date = new Date(wall);
+    if (check.getUTCFullYear() !== Number(match[1]) || check.getUTCMonth() + 1 !== Number(match[2])
+      || check.getUTCDate() !== Number(match[3]) || Number(match[4]) > 23 || Number(match[5]) > 59
+      || Number(match[6]) > 59) {
+      throw new Error(`无效的祈愿日期：${value}`);
+    }
+    let offset: number = sourceTimezone;
+    const zone: string = match[7] ?? '';
+    if (zone === 'Z') {
+      offset = 0;
+    } else if (zone.length > 0) {
+      const z: string = zone.replace(':', '');
+      const hours: number = Number(z.substring(1, 3));
+      const minutes: number = Number(z.substring(3, 5));
+      if (hours > 14 || minutes > 59) {
+        throw new Error('无效的ISO时区');
+      }
+      offset = (hours + minutes / 60) * (zone.startsWith('-') ? -1 : 1);
+    }
+    return new Date(wall + (targetTimezone - offset) * 3600000).toISOString().substring(0, 19).replace('T', ' ');
   }
 }

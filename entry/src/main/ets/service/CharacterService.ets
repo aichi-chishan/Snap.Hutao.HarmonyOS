@@ -12,7 +12,9 @@ import { CharacterListItem, CharacterDetail, ListWeapon, DetailedWeapon, Reliqua
 import { WikiMetaService } from './WikiMetaService';
 import { UserService } from './UserService';
 import { RegionUtil, AppConstants } from '../common/Constants';
+import { HoyolabEndpoints } from '../common/HoyolabEndpoints';
 import { Logger } from '../common/Logger';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 
 const TAG: string = 'CharacterService';
 const LIST_URL: string = 'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api/character/list';
@@ -27,23 +29,123 @@ export class CharacterService {
     return CharacterService.instance;
   }
 
+  /** 持久缓存按游戏 UID 隔离；保留原始响应以通过同一解析器重建嵌套模型。 */
+  getCachedList(uid: string): CharacterListItem[] {
+    try {
+      const raw: Object[] = this.readCached(uid, false);
+      const items: CharacterListItem[] = [];
+      for (const item of raw) {
+        const parsed: CharacterListItem = this.parseListItem(item);
+        if (!Number.isSafeInteger(parsed.id) || parsed.id <= 0) {
+          return [];
+        }
+        items.push(parsed);
+      }
+      return items;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  getCachedDetails(uid: string): CharacterDetail[] {
+    try {
+      const raw: Object[] = this.readCached(uid, true);
+      const items: CharacterDetail[] = [];
+      for (const item of raw) {
+        const parsed: CharacterDetail = this.parseDetail(item);
+        if (!Number.isSafeInteger(parsed.id) || parsed.id <= 0) {
+          return [];
+        }
+        items.push(parsed);
+      }
+      return items;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  private readCached(uid: string, detail: boolean): Object[] {
+    if (!/^\d+$/.test(uid)) {
+      return [];
+    }
+    try {
+      const key: string = detail ? `character.details.${uid}` : `character.list.${uid}`;
+      const parsed: Object = JSON.parse(PreferencesStore.getString(key, '[]')) as Object;
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      const items: Object[] = parsed as Object[];
+      for (const item of items) {
+        if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+          return [];
+        }
+      }
+      return items;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  private saveCached(uid: string, raw: Object[], detail: boolean): void {
+    if (!/^\d+$/.test(uid)) {
+      return;
+    }
+    try {
+      const key: string = detail ? `character.details.${uid}` : `character.list.${uid}`;
+      if (!detail) {
+        PreferencesStore.setString(key, JSON.stringify(raw));
+        return;
+      }
+      const merged: Map<number, Object> = new Map<number, Object>();
+      for (const item of this.readCached(uid, true)) {
+        try {
+          const id: number = this.parseDetail(item).id;
+          if (Number.isSafeInteger(id) && id > 0) {
+            merged.set(id, item);
+          }
+        } catch (e) {
+          // 损坏的旧条目不阻碍本次成功批次修复缓存。
+          continue;
+        }
+      }
+      for (const item of raw) {
+        merged.set(this.parseDetail(item).id, item);
+      }
+      PreferencesStore.setString(key, JSON.stringify(Array.from(merged.values())));
+    } catch (e) {
+      // 缓存不可用不影响本次成功的网络结果，也不清除既有快照。
+      Logger.warn(TAG, 'character cache write failed');
+    }
+  }
+
   /** 角色列表
    *  @param challenge 可选：极验通过后的 x-rpc-challenge（重放头） */
   async fetchList(uid: string, challenge?: string): Promise<CharacterListItem[]> {
+    if (!/^\d+$/.test(uid)) {
+      throw new Error('请选择有效的游戏 UID');
+    }
     const body: Record<string, Object> = { 'role_id': uid, 'server': RegionUtil.regionOfUid(uid), 'sort_type': 1 };
-    const resp: ApiResponse = await this.postJson(LIST_URL, body, challenge);
+    const resp: ApiResponse = await this.postJson(HoyolabEndpoints.gameRecordUrl('character/list', RegionUtil.regionOfUid(uid)), body, challenge);
     if (!resp.success || resp.data === undefined) {
       throw new Error(resp.userFriendlyMessage());
     }
     const obj = resp.data as Record<string, Object>;
-    const list = obj['list'] as Array<Object>;
+    if (!Array.isArray(obj['list'])) {
+      throw new Error('角色列表响应不完整，已保留本地缓存');
+    }
+    const list: Object[] = obj['list'] as Object[];
     const items: CharacterListItem[] = [];
     if (list !== undefined && list !== null) {
       for (let i = 0; i < list.length; i++) {
-        items.push(this.parseListItem(list[i]));
+        const item: CharacterListItem = this.parseListItem(list[i]);
+        if (!Number.isSafeInteger(item.id) || item.id <= 0) {
+          throw new Error('角色列表包含无效条目，已保留本地缓存');
+        }
+        items.push(item);
       }
     }
     Logger.info(TAG, `characters count=${items.length}`);
+    this.saveCached(uid, list, false);
     return items;
   }
 
@@ -51,6 +153,12 @@ export class CharacterService {
    *  @param challenge 可选：极验通过后的 x-rpc-challenge（重放头）
    *  注意：character_ids 必须是数字数组（JSON 序列化后 [10000130]）；若发字符串 "[..]" 会被米哈游判为非法 → -502 */
   async fetchDetail(uid: string, ids: number[], challenge?: string): Promise<CharacterDetail[]> {
+    if (!/^\d+$/.test(uid)) {
+      throw new Error('请选择有效的游戏 UID');
+    }
+    if (ids.length === 0) {
+      return [];
+    }
     const body: Record<string, Object> = {
       'role_id': uid,
       'server': RegionUtil.regionOfUid(uid),
@@ -58,19 +166,27 @@ export class CharacterService {
       'character_ids': ids,
     };
     const resp: ApiResponse = await CharacterService.withBackoff(
-      () => this.postJson(DETAIL_URL, body, challenge), RETRY_TIMES);
+      () => this.postJson(HoyolabEndpoints.gameRecordUrl('character/detail', RegionUtil.regionOfUid(uid)), body, challenge), RETRY_TIMES);
     if (!resp.success || resp.data === undefined) {
       throw new Error(resp.userFriendlyMessage());
     }
     const obj = resp.data as Record<string, Object>;
-    const list = obj['list'] as Array<Object>;
+    if (!Array.isArray(obj['list'])) {
+      throw new Error('角色详情响应不完整，已保留本地缓存');
+    }
+    const list: Object[] = obj['list'] as Object[];
     const details: CharacterDetail[] = [];
     if (list !== undefined && list !== null) {
       for (let i = 0; i < list.length; i++) {
-        details.push(this.parseDetail(list[i]));
+        const detail: CharacterDetail = this.parseDetail(list[i]);
+        if (!Number.isSafeInteger(detail.id) || detail.id <= 0) {
+          throw new Error('角色详情包含无效条目，已保留本地缓存');
+        }
+        details.push(detail);
       }
     }
     Logger.info(TAG, `characters detail count=${details.length}`);
+    this.saveCached(uid, list, true);
     return details;
   }
 
@@ -114,13 +230,13 @@ export class CharacterService {
     const bodyJson: string = JSON.stringify(body);
     const t: number = DsSigner.nowTimestamp();
     const r: string = DsSigner.randomNumber();
-    const ds: string = await DsSigner.signGen2(AppConstants.DS_SALT_X4, t, r, bodyJson, '');
+    const ds: string = await DsSigner.signGen2(HoyolabEndpoints.gameRecordSalt(String(body['server'] ?? 'cn_gf01')), t, r, bodyJson, '');
     const headers: Record<string, string> = { 'DS': ds, 'Cookie': cookie };
     if (challenge !== undefined && challenge.length > 0) {
       headers['x-rpc-challenge'] = challenge;
     }
     const resp0: ApiResponse = await ApiClient.getInstance().postJson(url, bodyJson,
-      HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
+      HoyolabClient.merge(HoyolabClient.getBaseHeaders(String(body['server'] ?? 'cn_gf01')), headers));
     let resp: ApiResponse = resp0;
     if (resp0.isRiskControl()) {
       // 1034：自动弹统一验证窗，成功后带 challenge 服务内重放一次
@@ -130,7 +246,7 @@ export class CharacterService {
       }
       headers['x-rpc-challenge'] = replayChallenge;
       resp = await ApiClient.getInstance().postJson(url, bodyJson,
-        HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
+        HoyolabClient.merge(HoyolabClient.getBaseHeaders(String(body['server'] ?? 'cn_gf01')), headers));
     }
     return resp;
   }
@@ -191,6 +307,8 @@ export class CharacterService {
   private parseDetail(obj: Object): CharacterDetail {
     const item = obj as Record<string, Object>;
     const d: CharacterDetail = new CharacterDetail();
+    // -1 表示接口未提供突破阶段；等级处于突破边界时不能靠等级推断。
+    d.promoteLevel = -1;
     // base 嵌套
     const base = item['base'] as Record<string, Object>;
     if (base !== undefined && base !== null) {
@@ -198,6 +316,7 @@ export class CharacterService {
       d.name = String(base['name'] ?? '');
       d.element = String(base['element'] ?? '');
       d.level = CharacterService.num(base['level']);
+      d.promoteLevel = CharacterService.promoteLevelOf(base);
       d.rarity = CharacterService.num(base['rarity']);
       d.fetter = CharacterService.num(base['fetter']);
       d.activedConstellationNum = CharacterService.num(base['actived_constellation_num']);
@@ -210,6 +329,7 @@ export class CharacterService {
       d.name = String(item['name'] ?? '');
       d.element = String(item['element'] ?? '');
       d.level = CharacterService.num(item['level']);
+      d.promoteLevel = CharacterService.promoteLevelOf(item);
       d.rarity = CharacterService.num(item['rarity']);
     }
     const w = item['weapon'] as Record<string, Object>;
@@ -220,6 +340,17 @@ export class CharacterService {
       d.weapon.level = CharacterService.num(w['level']);
       d.weapon.affixLevel = CharacterService.num(w['affix_level']);
       d.weapon.promoteLevel = CharacterService.num(w['promote_level']);
+      d.weapon.name = String(w['name'] ?? '');
+      const main: Record<string, Object> = w['main_property'] as Record<string, Object>;
+      const sub: Record<string, Object> = w['sub_property'] as Record<string, Object>;
+      if (main !== undefined && main !== null) {
+        d.weapon.mainProperty.propertyType = String(main['property_type'] ?? '');
+        d.weapon.mainProperty.value = String(main['value'] ?? '');
+      }
+      if (sub !== undefined && sub !== null) {
+        d.weapon.subProperty.propertyType = String(sub['property_type'] ?? '');
+        d.weapon.subProperty.value = String(sub['value'] ?? '');
+      }
     }
     const relics = item['relics'] as Array<Object>;
     if (relics !== undefined && relics !== null) {
@@ -293,6 +424,8 @@ export class CharacterService {
     r.rarity = CharacterService.num(item['rarity']);
     r.level = CharacterService.num(item['level']);
     r.posName = String(item['pos_name'] ?? '');
+    const set: Record<string, Object> = item['set'] as Record<string, Object>;
+    r.setName = set !== undefined && set !== null ? String(set['name'] ?? '') : '';
     const main = item['main_property'] as Record<string, Object>;
     if (main !== undefined && main !== null) {
       r.mainProperty.propertyType = String(main['property_type'] ?? '');
@@ -318,5 +451,14 @@ export class CharacterService {
     }
     const n: number = Number(v);
     return Number.isNaN(n) ? 0 : n;
+  }
+
+  private static promoteLevelOf(item: Record<string, Object>): number {
+    const raw: Object = item['promote_level'] ?? item['avatar_promote_level'];
+    if ((typeof raw !== 'number' && typeof raw !== 'string') || String(raw).trim().length === 0) {
+      return -1;
+    }
+    const value: number = Number(raw);
+    return Number.isSafeInteger(value) && value >= 0 ? value : -1;
   }
 }

@@ -1,0 +1,6 @@
+{
+  "name": "snaphutao-host-regressions",
+  "private": true,
+  "description": "Host regression runner dependencies; HarmonyOS builds use OHPM/Hvigor.",
+  "devDependencies": { "typescript": "5.9.3" }
+}

@@ -12,7 +12,7 @@ import { AppContextProvider } from '../common/AppContext';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'HutaoDailyImage';
-const TODAY_URL: string = 'https://api.snaphutaorp.org/wallpaper/today';
+const WALLPAPER_ROOT: string = 'https://api.snaphutaorp.org/wallpaper/';
 
 /** 当日一图结果 */
 export class HutaoDailyImage {
@@ -34,18 +34,20 @@ export class HutaoDailyImageService {
   }
 
   /** 当日缓存文件路径（按日期滚动，跨天自动换新图） */
-  private static todayPath(): string {
+  private static todayPath(source: string): string {
     const d = new Date();
     const day: string = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-    return `${AppContextProvider.getCacheDir()}/wallpaper/hutao_daily_${day}.jpg`;
+    return `${AppContextProvider.getCacheDir()}/wallpaper/${source}_${day}.jpg`;
   }
 
   /**
    * 获取今日一图：当日文件已存在直接复用；否则请求接口下载。
    * 失败返回 undefined（调用方回退主题纯色底，与 none 一致）。
    */
-  async getToday(): Promise<HutaoDailyImage | undefined> {
-    const dest: string = HutaoDailyImageService.todayPath();
+  async getToday(source: string = 'hutao'): Promise<HutaoDailyImage | undefined> {
+    const type: string = source === 'bing' || source === 'hoyoplay' ? source : 'hutao';
+    const endpoint: string = type === 'hutao' ? 'today' : type;
+    const dest: string = HutaoDailyImageService.todayPath(type);
     const dir: string = dest.substring(0, dest.lastIndexOf('/'));
     try {
       try {
@@ -60,7 +62,7 @@ export class HutaoDailyImageService {
         return out;
       }
       // 1) 接口取图片 URL 与署名
-      const resp = await ApiClient.getInstance().get(TODAY_URL, { 'Accept': 'application/json' });
+      const resp = await ApiClient.getInstance().get(WALLPAPER_ROOT + endpoint, { 'Accept': 'application/json' });
       if (!resp.success || resp.data === undefined) {
         Logger.warn(TAG, `today api fail retcode=${resp.retcode}`);
         return undefined;
@@ -69,7 +71,7 @@ export class HutaoDailyImageService {
       const url: string = String(data['url'] ?? '');
       out.author = String(data['author'] ?? '');
       out.sourceUrl = String(data['source_url'] ?? '');
-      if (url.length === 0) {
+      if (!url.startsWith('https://')) {
         Logger.warn(TAG, 'today api empty url');
         return undefined;
       }

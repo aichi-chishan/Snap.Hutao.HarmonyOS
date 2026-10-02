@@ -28,6 +28,8 @@ export class HardChallengeSimpleAvatar {
   rarity: number = 0;
   /** 命座数（对齐 Windows HardChallengeAvatar.Rank） */
   rank: number = 0;
+  level: number = 0;
+  isPlus: boolean = false;
 }
 
 /** 最速队伍 */
@@ -93,6 +95,9 @@ export class HardChallengeData {
 
 export class HardChallengeRoot {
   data: HardChallengeData = new HardChallengeData();
+  /** 全部可返回档期，data 保留首项兼容首页调用。 */
+  periods: HardChallengeData[] = [];
+  itemRawJson: string[] = [];
   isUnlock: boolean = false;
   /** 内层 data 原始 JSON（service 填充；期数历史入库用，仅内存） */
   rawJson: string = '';
@@ -101,32 +106,34 @@ export class HardChallengeRoot {
     const root: HardChallengeRoot = new HardChallengeRoot();
     const wrapper = obj as Record<string, Object>;
     root.isUnlock = HardChallengeRoot.bool(wrapper['is_unlock']);
-    // Windows: data 为数组（每期一条 HardChallengeData），当前期在 data[0]。
-    // 兼容单对象（历史接口形态）。
-    const dataArr = wrapper['data'] as Array<Object>;
-    const dataObj = wrapper['data'] as Record<string, Object>;
-    const data: Record<string, Object> | undefined =
-      (dataArr !== undefined && dataArr !== null && dataArr.length > 0)
-        ? (dataArr[0] as Record<string, Object>)
-        : dataObj;
-    if (data !== undefined && data !== null) {
-      root.data.single = HardChallengeRoot.parseEntry(data['single']);
-      root.data.mp = HardChallengeRoot.parseEntry(data['mp']);
-      root.data.blings = HardChallengeRoot.parseAvatars(data['blings']);
-      // schedule：真实接口为单对象（对齐 Windows HardChallengeData.Schedule），兼容数组形态
-      const schedRaw: Object = data['schedule'] as Object;
-      if (schedRaw !== undefined && schedRaw !== null) {
-        if (Array.isArray(schedRaw)) {
-          const schedArr = schedRaw as Array<Object>;
-          for (let i = 0; i < schedArr.length; i++) {
-            root.data.schedule.push(HardChallengeRoot.parseSchedule(schedArr[i]));
-          }
-        } else {
-          root.data.schedule.push(HardChallengeRoot.parseSchedule(schedRaw));
-        }
-      }
+    const raw: Object = wrapper['data'];
+    const items: Object[] = Array.isArray(raw) ? raw as Object[] :
+      (raw !== undefined && raw !== null ? [raw] : []);
+    for (const item of items) {
+      root.periods.push(HardChallengeRoot.parseData(item));
+      const saved: Record<string, Object> = { 'is_unlock': root.isUnlock, 'data': [item] };
+      root.itemRawJson.push(JSON.stringify(saved));
+    }
+    if (root.periods.length > 0) {
+      root.data = root.periods[0];
     }
     return root;
+  }
+
+  private static parseData(obj: Object): HardChallengeData {
+    const data: Record<string, Object> = obj as Record<string, Object>;
+    const result: HardChallengeData = new HardChallengeData();
+    result.single = HardChallengeRoot.parseEntry(data['single']);
+    result.mp = HardChallengeRoot.parseEntry(data['mp']);
+    result.blings = HardChallengeRoot.avatarListFromJson(data['blings']);
+    const schedRaw: Object = data['schedule'];
+    if (schedRaw !== undefined && schedRaw !== null) {
+      const schedules: Object[] = Array.isArray(schedRaw) ? schedRaw as Object[] : [schedRaw];
+      for (const schedule of schedules) {
+        result.schedule.push(HardChallengeRoot.parseSchedule(schedule));
+      }
+    }
+    return result;
   }
 
   /** 档期条目解析（schedule_id 为期数历史键） */
@@ -181,16 +188,21 @@ export class HardChallengeRoot {
     c.second = HardChallengeRoot.number(o['second'], 0);
     const teams = o['teams'] as Array<Object>;
     if (teams !== undefined && teams !== null) {
-      for (let i = 0; i < teams.length; i++) {
-        const t = teams[i] as Record<string, Object>;
-        const team: HardChallengeTeam = new HardChallengeTeam();
-        const avatars = t['avatars'] as Array<Object>;
-        if (avatars !== undefined && avatars !== null) {
-          for (let j = 0; j < avatars.length; j++) {
-            team.avatars.push(HardChallengeRoot.parseAvatarSimple(avatars[j]));
-          }
+      const flatTeam: HardChallengeTeam = new HardChallengeTeam();
+      for (const raw of teams) {
+        const t: Record<string, Object> = raw as Record<string, Object>;
+        const avatars: Object = t['avatars'];
+        if (Array.isArray(avatars)) {
+          const team: HardChallengeTeam = new HardChallengeTeam();
+          team.avatars = HardChallengeRoot.avatarListFromJson(avatars);
+          c.teams.push(team);
+        } else {
+          // 官方 teams 是 HardChallengeAvatar[]，并非队伍对象数组。
+          flatTeam.avatars.push(HardChallengeRoot.parseAvatarSimple(raw));
         }
-        c.teams.push(team);
+      }
+      if (flatTeam.avatars.length > 0) {
+        c.teams.unshift(flatTeam);
       }
     }
     const bests = o['best_avatar'] as Array<Object>;
@@ -231,7 +243,7 @@ export class HardChallengeRoot {
     return c;
   }
 
-  private static parseAvatars(obj: Object | undefined): HardChallengeSimpleAvatar[] {
+  static avatarListFromJson(obj: Object | undefined): HardChallengeSimpleAvatar[] {
     const list: HardChallengeSimpleAvatar[] = [];
     if (obj === undefined || obj === null) {
       return list;
@@ -252,6 +264,11 @@ export class HardChallengeRoot {
     a.image = HardChallengeRoot.str(o['image']);
     a.rarity = HardChallengeRoot.number(o['rarity'], 0);
     a.rank = HardChallengeRoot.number(o['rank'], 0);
+    a.level = HardChallengeRoot.number(o['level'], 0);
+    a.isPlus = HardChallengeRoot.bool(o['is_plus']);
+    if (a.image.length === 0) {
+      a.image = HardChallengeRoot.str(o['side_icon']);
+    }
     return a;
   }
 

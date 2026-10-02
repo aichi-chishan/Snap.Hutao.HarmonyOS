@@ -8,6 +8,7 @@
  * 图片按亮度自适应透明度，并叠加 Mica 观感处理（blur 模糊 + saturation 降饱和 + 暗色提亮），
  * ImageFit.Cover。
  */
+import { BackgroundVideoLayer } from './BackgroundVideoLayer';
 import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
 import { AppContextProvider } from '../common/AppContext';
@@ -41,6 +42,9 @@ export struct WallpaperLayer {
   private localPool: string[] = [];
   /** 轮换计时器 */
   private rotateTimer: number = -1;
+  private imageSequence: number = 0;
+  private currentLuminance: number = 0.5;
+  private lastLocalIndex: number = -1;
 
   aboutToAppear(): void {
     Logger.info(TAG, `aboutToAppear bgType=${this.bgType} folder=${this.folderPath} isDark=${this.isDark}`);
@@ -54,6 +58,7 @@ export struct WallpaperLayer {
   }
 
   aboutToDisappear(): void {
+    this.imageSequence++;
     if (this.rotateTimer >= 0) {
       clearInterval(this.rotateTimer);
       this.rotateTimer = -1;
@@ -62,7 +67,7 @@ export struct WallpaperLayer {
 
   /** 主题切换实时触发（@StorageProp isDark 变化自动重建 build，无需手动占位） */
   onDarkChanged(): void {
-    Logger.info(TAG, `isDark changed -> ${this.isDark}, bgType=${this.bgType}`);
+    this.imgOpacity = this.isDark ? 1 - this.currentLuminance : this.currentLuminance;
   }
 
   /** 背景来源/目录变化时重新装载 */
@@ -80,12 +85,14 @@ export struct WallpaperLayer {
   }
 
   private loadImage(): void {
-    if (this.bgType === 'hutao') {
+    const sequence: number = ++this.imageSequence;
+    if (this.bgType === 'hutao' || this.bgType === 'bing' || this.bgType === 'hoyoplay') {
+      const source: string = this.bgType;
       // 胡桃每日一图：当日缓存复用，失败回退主题纯色底（与 none 一致）
       this.hasImage = false;
       this.imgSrc = '';
-      HutaoDailyImageService.getInstance().getToday().then((img) => {
-        if (img !== undefined && this.bgType === 'hutao') {
+      HutaoDailyImageService.getInstance().getToday(source).then((img) => {
+        if (img !== undefined && this.bgType === source && sequence === this.imageSequence) {
           this.applyImage(img.path);
           Logger.info(TAG, `hutao daily image ready (${img.author}${img.fromCache ? ', cached' : ''})`);
         }
@@ -109,15 +116,20 @@ export struct WallpaperLayer {
       this.imgSrc = '';
       return;
     }
-    const idx: number = Math.floor(Math.random() * this.localPool.length);
+    let idx: number = Math.floor(Math.random() * this.localPool.length);
+    if (this.localPool.length > 1 && idx === this.lastLocalIndex) { idx = (idx + 1) % this.localPool.length; }
+    this.lastLocalIndex = idx;
     this.applyImage(this.localPool[idx]);
   }
 
   /** 应用背景图：亮度→不透明度（Windows：深色 1-L / 浅色 L），1s Quartic 渐变 */
   private applyImage(path: string): void {
+    const sequence: number = ++this.imageSequence;
     this.imgSrc = `file://${path}`;
     this.hasImage = true;
     WallpaperLayer.luminance(path).then((l: number) => {
+      if (sequence !== this.imageSequence) { return; }
+      this.currentLuminance = l;
       const target: number = this.isDark ? 1 - l : l;
       this.getUIContext().animateTo({ duration: 1000, curve: Curve.EaseInOut }, () => {
         this.imgOpacity = Math.min(1, Math.max(0, target));
@@ -219,6 +231,7 @@ export struct WallpaperLayer {
           .opacity(this.imgOpacity)
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       }
+      BackgroundVideoLayer()
     }
     .width('100%')
     .height('100%')

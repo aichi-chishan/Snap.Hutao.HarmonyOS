@@ -666,6 +666,10 @@ export struct CharacterPage {
         .onClick(() => {
           this.exportDetailText();
         })
+      Button('全部导出')
+        .fontSize(12).height(34).layoutWeight(1)
+        .backgroundColor($r('app.color.app_primary_bg')).fontColor($r('app.color.app_primary'))
+        .hoverEffect(HoverEffect.Highlight).onClick(() => this.exportAllText())
       Button(this.addingPlan ? '加入中...' : '加入养成计划')
         .fontSize(this.isWide ? 13 : 12)
         .height(34)
@@ -738,6 +742,23 @@ export struct CharacterPage {
     }).catch(() => {
       this.toast('复制失败');
     });
+  }
+
+  private async exportAllText(): Promise<void> {
+    const texts: string[] = [];
+    for (const detail of this.vm.detailMap.values()) {
+      texts.push(CharacterExportService.buildExportText(detail, (type: string): string => CharacterPage.propLabel(type)));
+    }
+    if (texts.length === 0) {
+      this.toast('没有可导出的角色详情');
+      return;
+    }
+    try {
+      await pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, texts.join('\n\n')));
+      this.toast(`已复制 ${texts.length} 个角色；当前列表共 ${this.vm.items.length} 个`);
+    } catch (e) {
+      this.toast('复制失败');
+    }
   }
 
   /** 加入养成计划入口：0 项目自动建默认 → 1 项目直接加入 → 多项目弹半窗选择 */
@@ -861,15 +882,8 @@ export struct CharacterPage {
   }
 
   static relicScore(r: Reliquary, d: CharacterDetail): number {
-    if (d.recommend.subProperties.length > 0) {
-      const effective: boolean = ReliquaryScore.isCritEffective(d.id);
-      const full: number = ReliquaryScore.calculate(r.subProperties, d.recommend.subProperties,
-        d.recommend.energyType, effective);
-      if (full > 0) {
-        return Math.round(full * 10) / 10;
-      }
-    }
-    return ReliquaryScore.doubleCritScore(r, ReliquaryScore.isCritEffective(d.id));
+    return Math.round(ReliquaryScore.calculate(r.subProperties, d.recommend.subProperties,
+      d.recommend.energyType, ReliquaryScore.isCritEffective(d.id)) * 10) / 10;
   }
 
   /** 属性类型 → 中文标签（兼容：字符串 FIGHT_PROP_* 与数字 FightProperty 枚举） */

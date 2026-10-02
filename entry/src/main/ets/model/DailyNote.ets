@@ -155,6 +155,8 @@ export class DailyTaskStatus {
 }
 
 export class DailyNote {
+  /** 完整 API data，持久化以免新字段及子对象在缓存过程中丢失。 */
+  rawJson: string = '';
   currentResin: number = 0;
   maxResin: number = 160;
   /** 树脂恢复完成时间（ISO/日期字符串） */
@@ -189,6 +191,7 @@ export class DailyNote {
   static fromJson(data: Object): DailyNote {
     const obj = data as Record<string, Object>;
     const note: DailyNote = new DailyNote();
+    note.rawJson = JSON.stringify(data);
     note.currentResin = number(obj['current_resin'], 0);
     note.maxResin = number(obj['max_resin'], 160);
     // 注意：resin_recovery_time 是「距树脂回满的秒数」（对齐 Windows DailyNote.ResinRecoveryTime:int），
@@ -479,6 +482,15 @@ export class DailyNote {
     }
     const anchor: number = this.refreshTime > 0 ? this.refreshTime : Date.now();
     return Math.max(0, anchor + sec * 1000 - Date.now());
+  }
+
+  /** currentExpeditionNum 是已派出人数，不代表完成；完成按每项状态判定。 */
+  finishedExpeditionCount(): number {
+    return this.expeditions.filter((exp: Expedition): boolean => exp.isFinished()).length;
+  }
+
+  allExpeditionsFinished(): boolean {
+    return this.expeditions.length > 0 && this.expeditions.every((exp: Expedition): boolean => exp.isFinished());
   }
 
   /** 洞天宝钱是否达到阈值 */
