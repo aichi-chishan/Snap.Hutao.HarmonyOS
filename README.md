@@ -10,6 +10,8 @@ HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），�
 
 2026-10-02 UI/UX 专项调研（待实施）：[Windows 工作流对齐与优化清单](docs/UI_UX_RESEARCH_2026-10-02.md)、[API24+ 鸿蒙视觉与交互规格](docs/UI_UX_SPEC_API24_PLUS.md)、[源码及官方 API 证据](docs/UI_UX_EVIDENCE_2026-10-02.md)。包含 18 项优化、分批计划与 24 个验收场景。
 
+2026-10-02 最新功能复核（待实施）：[非注入功能差距与鸿蒙实现方案](docs/FUNCTION_GAP_ANALYSIS_2026-10-02.md)。按两端固定源码列出 32 项差距、具体实现落点、依赖、优先级及 32 个验收样例，区分功能缺失、平台替代和待验证事项。海外札记/公告、颂愿子池、祈愿预测等仍有缺口；以下功能总览不代表非注入移植已全部完成。
+
 ![Platform](https://img.shields.io/badge/Platform-HarmonyOS%206.1.1-007DFF)
 ![API](https://img.shields.io/badge/API--24-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
