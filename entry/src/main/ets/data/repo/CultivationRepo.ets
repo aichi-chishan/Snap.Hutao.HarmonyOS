@@ -182,33 +182,52 @@ export class CultivationRepo {
       'target_level': targetLevel,
       'created_at': Date.now(),
     };
-    const entryId: number = await RelationalStoreHelper.insert('cultivate_entries', entryValues);
-    // 同名合并
+    // 先合并到新对象，避免重复保存时改写原始计算结果；同步事务防止半条计划。
     const merged: Map<string, CalItem> = new Map<string, CalItem>();
     for (const it of items) {
-      const key: string = it.id > 0 ? String(it.id) : it.name;
-      const exist: CalItem | undefined = merged.get(key);
-      if (exist === undefined) {
-        merged.set(key, it);
-      } else {
-        exist.num += it.num;
+      if (it.num <= 0) {
+        continue;
       }
+      const key: string = it.id > 0 ? String(it.id) : it.name;
+      let target: CalItem | undefined = merged.get(key);
+      if (target === undefined) {
+        target = new CalItem();
+        target.id = it.id;
+        target.name = it.name;
+        target.icon = it.icon;
+        merged.set(key, target);
+      }
+      target.num += it.num;
     }
-    merged.forEach((it: CalItem) => {
-      const values: relationalStore.ValuesBucket = {
-        'entry_id': entryId,
-        'item_id': it.id,
-        'name': it.name,
-        'icon': it.icon,
-        'count': it.num,
-        'finished': 0,
-      };
-      RelationalStoreHelper.insert('cultivate_items', values).catch((e: Error) => {
-        Logger.warn(TAG, `insert item fail ${e.message}`);
-      });
-    });
-    Logger.info(TAG, `entry ${entryId} saved with ${merged.size} items`);
-    return entryId;
+    if (merged.size === 0) {
+      throw new Error('没有需要培养的材料；未创建空计划条目');
+    }
+    const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
+    store.beginTransaction();
+    try {
+      const entryId: number = store.insertSync('cultivate_entries', entryValues);
+      const rows: relationalStore.ValuesBucket[] = [];
+      for (const it of merged.values()) {
+        const values: relationalStore.ValuesBucket = {
+          'entry_id': entryId,
+          'item_id': it.id,
+          'name': it.name,
+          'icon': it.icon,
+          'count': it.num,
+          'finished': 0
+        };
+        rows.push(values);
+      }
+      const inserted: number = store.batchInsertSync('cultivate_items', rows);
+      if (inserted !== rows.length) {
+        throw new Error('材料写入不完整，已撤销本次保存');
+      }
+      store.commit();
+      return entryId;
+    } catch (e) {
+      store.rollBack();
+      throw new Error(e instanceof Error ? e.message : '保存养成计划失败');
+    }
   }
 
   static async removeEntry(entryId: number): Promise<void> {

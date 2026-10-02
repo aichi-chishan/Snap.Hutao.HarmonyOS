@@ -4,6 +4,7 @@
  * 数据：本地元数据 rawfile/metadata/avatar_meta.json（Snap.Metadata 公开仓库提取）；
  * 图标：rawfile/icons（离线）。区块：简介(元素/武器/生日/命座/CV)、养成材料、基础属性曲线(滑条+突破)、天赋技能、命座、料理、语音、故事。
  */
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { router } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { WikiMetaService, WikiAvatarMeta, MetaSkill, MetaText, MetaMaterial } from '../service/WikiMetaService';
@@ -170,7 +171,16 @@ export struct WikiAvatarPage {
   /** 当前详情对象（页面 @State 显式赋值驱动刷新；@Builder 内方法派生在当前构建不触发重绘） */
   @State current: WikiAvatarMeta | undefined = undefined;
   @State keyword: string = '';
+  @State gridMode: boolean = false;
   @State qualityFilter: number = 0;
+  @State elementFilter: number = 0;
+  @State weaponFilter: number = 0;
+  private elementValues: string[] = ['', '火', '水', '风', '雷', '草', '冰', '岩'];
+  private weaponValues: number[] = [0, 1, 11, 13, 10, 12];
+  private elementOptions: SelectOption[] = [{ value: '全部元素' }, { value: '火' }, { value: '水' },
+    { value: '风' }, { value: '雷' }, { value: '草' }, { value: '冰' }, { value: '岩' }];
+  private weaponOptions: SelectOption[] = [{ value: '全部武器' }, { value: '单手剑' }, { value: '双手剑' },
+    { value: '长柄武器' }, { value: '法器' }, { value: '弓' }];
   @State isWide: boolean = false;
   /** 角色列表懒加载数据源（140+ 项全量渲染开销大，LazyForEach 只画可视区） */
   private listSource: SimpleDataSource<WikiAvatarMeta> = new SimpleDataSource([]);
@@ -208,6 +218,7 @@ export struct WikiAvatarPage {
   }
 
   aboutToAppear(): void {
+    this.gridMode = PreferencesStore.getBool('wiki.avatar.grid', false);
     this.load();
   }
 
@@ -498,6 +509,12 @@ export struct WikiAvatarPage {
       if (this.qualityFilter > 0 && a.quality !== this.qualityFilter) {
         continue;
       }
+      if (this.elementFilter > 0 && WikiMetaService.elementName(a.vision) !== this.elementValues[this.elementFilter]) {
+        continue;
+      }
+      if (this.weaponFilter > 0 && a.weapon !== this.weaponValues[this.weaponFilter]) {
+        continue;
+      }
       if (this.keyword.length > 0 && !a.name.includes(this.keyword) && !a.title.includes(this.keyword)) {
         continue;
       }
@@ -661,6 +678,39 @@ export struct WikiAvatarPage {
       }
       .width('100%')
 
+      Row({ space: 6 }) {
+        Select(this.elementOptions).selected(this.elementFilter)
+          .value(this.elementOptions[this.elementFilter].value)
+          .onSelect((index: number) => { this.elementFilter = index; this.applyFilter(); })
+          .hoverEffect(HoverEffect.Highlight)
+        Select(this.weaponOptions).selected(this.weaponFilter)
+          .value(this.weaponOptions[this.weaponFilter].value)
+          .onSelect((index: number) => { this.weaponFilter = index; this.applyFilter(); })
+          .hoverEffect(HoverEffect.Highlight)
+      }.width('100%')
+
+      Button(this.gridMode ? '切换列表视图' : '切换网格视图')
+        .fontSize(12).height(30).hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          this.gridMode = !this.gridMode;
+          PreferencesStore.setBool('wiki.avatar.grid', this.gridMode);
+        })
+      if (this.gridMode) {
+        Grid() {
+          LazyForEach(this.listSource, (a: WikiAvatarMeta) => {
+            GridItem() {
+              Column({ space: 6 }) {
+                MetaIcon({ category: 'AvatarIcon', name: a.icon, iconSize: 56 })
+                Text(a.name).fontSize(12).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .fontColor($r('app.color.text_primary'))
+              }.width('100%').height(98).padding(8).borderRadius(10)
+                .backgroundColor(this.selectedId === a.id ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
+                .hoverEffect(HoverEffect.Highlight).onClick(() => { this.select(a); })
+            }
+          }, (a: WikiAvatarMeta) => `grid_${a.id}_${this.selectedId}`)
+        }.columnsTemplate(this.isWide ? '1fr 1fr' : '1fr 1fr 1fr')
+          .columnsGap(8).rowsGap(8).cachedCount(4).width('100%').layoutWeight(1)
+      } else {
       List({ space: 4 }) {
         LazyForEach(this.listSource, (a: WikiAvatarMeta) => {
           ListItem() {
@@ -703,6 +753,7 @@ export struct WikiAvatarPage {
       .width('100%')
       .layoutWeight(1)
       .scrollBar(BarState.Auto)
+      }
     }
     .width(this.isWide ? 300 : '100%')
     .height('100%')

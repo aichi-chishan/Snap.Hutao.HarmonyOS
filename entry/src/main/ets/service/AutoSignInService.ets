@@ -9,6 +9,7 @@ import { UserService } from './UserService';
 import { SignInService, SignInResult } from './SignInService';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { RegionUtil } from '../common/Constants';
+import { ServerTime } from '../common/ServerTime';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'AutoSignIn';
@@ -51,7 +52,7 @@ export class AutoSignInService {
         PreferencesStore.setAutoSignInLastFail(uid, 0);
         PreferencesStore.setAutoSignInRegion(uid, region);
       }
-      const dayKey: string = `${region}:${AutoSignInService.serverDay()}`;
+      const dayKey: string = `${region}:${ServerTime.date(region)}`;
       if (PreferencesStore.getAutoSignInCompletedDay(uid) === dayKey) {
         return;
       }
@@ -70,13 +71,10 @@ export class AutoSignInService {
         Logger.warn(TAG, `auto sign fail uid=${uid} msg=${result.message}`);
       }
     } catch (e) {
-      // 静默失败：仅记录日志（对齐 Windows RunOnceAsync 捕获不外抛）
+      // 网络异常同样进入冷却，避免每次回前台都重试失败请求。
+      PreferencesStore.setAutoSignInLastFail(uid, Date.now());
       Logger.warn(TAG, `runOnce fail uid=${uid} ${(e as Error).message}`);
     }
   }
 
-  /** 服务器日 key 的日期部分（东八区，与签到口径一致） */
-  private static serverDay(): string {
-    return new Date(Date.now() + 8 * 3600 * 1000).toISOString().substring(0, 10);
-  }
 }

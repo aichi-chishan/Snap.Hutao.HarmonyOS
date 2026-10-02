@@ -2,7 +2,7 @@
  * AchievementService.ets
  * 成就系统业务层（对齐 Windows AchievementService/AchievementStatisticsService，无云依赖）：
  * - 元数据：本地 rawfile achievement_zh.json（paimon-moe 社区数据集，73 分类 / 1500+ 成就）
- * - 多档案管理、完成记录、UIAF v1.1 导入导出（合并策略：双方皆完成保留原时间戳）
+ * - 多档案管理、完整成就进度、UIAF v1.1 导入导出与三种导入策略
  */
 import { util } from '@kit.ArkTS';
 import { AppContextProvider } from '../common/AppContext';
@@ -15,46 +15,28 @@ import {
   AchievementRecord,
   AchievementStats,
   CategoryStats,
+  UiafCodec,
+  UiafImportStrategy,
 } from '../model/AchievementData';
 import { Logger } from '../common/Logger';
 import { GameDataService, GameDataDomain } from './GameDataService';
 import { AppConstants } from '../common/Constants';
 
 const TAG: string = 'AchievementService';
-const UIAF_VERSION: string = 'v1.1';
 
 /** UIAF 导入结果 */
 export class UiafImportResult {
   fileCount: number = 0;
   mergedDone: number = 0;
+  mergedTotal: number = 0;
   ok: boolean = false;
   message: string = '';
-}
-
-/** UIAF v1.1 导出结构（对齐 Windows UIAF/UIAFItem 模型） */
-class UiafItem {
-  id: number = 0;
-  timestamp: number = 0;
-  current: number = 1;
-  /** 3 = REWARD_TAKEN */
-  status: number = 3;
-}
-
-class UiafInfo {
-  export_app: string = '';
-  export_app_version: string = '';
-  export_timestamp: number = 0;
-  uiaf_version: string = '';
-}
-
-class UiafRoot {
-  info: UiafInfo = new UiafInfo();
-  list: UiafItem[] = [];
 }
 
 export class AchievementService {
   private static categories: AchievementCategory[] | undefined = undefined;
   private static idIndex: Map<number, AchievementEntry> = new Map();
+  private static metadataVersion: string = '';
 
   /** 分类图标池（rawfile/icons/AchievementIcon 已有文件；paimon 分类按序循环映射） */
   private static readonly CATEGORY_ICONS: string[] = [
@@ -88,15 +70,25 @@ export class AchievementService {
 
   /** 元数据分类列表（官方包优先 → 远端 paimon 遗留 → rawfile paimon 兜底；进程内缓存一次） */
   static async getCategories(): Promise<AchievementCategory[]> {
-    if (AchievementService.categories !== undefined) {
+    const version: string = GameDataService.getInstance().remoteVersion();
+    if (AchievementService.categories !== undefined && AchievementService.metadataVersion === version) {
       return AchievementService.categories;
     }
+    AchievementService.categories = undefined;
+    AchievementService.metadataVersion = version;
     // 1) 官方元数据（rawfile/metadata，对齐 Snap.Metadata：1844 条 > paimon-moe 社区集 1548 条）
     try {
       const achText: string = await GameDataService.readMetadataFile('Achievement.json');
       const goalText: string = await GameDataService.readMetadataFile('AchievementGoal.json');
       AchievementService.parseOfficialMetadata(achText, goalText);
       if ((AchievementService.idIndex?.size ?? 0) > 0) {
+        // 旧官方包省略 IsDailyQuest；仅用社区已有 commissions 标记按 ID 补齐。
+        try {
+          const community: string = await GameDataService.getInstance().readText(GameDataDomain.Achievement);
+          AchievementService.applyCommissionMetadata(community);
+        } catch (e) {
+          Logger.warn(TAG, 'achievement commission markers unavailable');
+        }
         return AchievementService.categories ?? [];
       }
       AchievementService.categories = undefined;
@@ -152,11 +144,15 @@ export class AchievementService {
       entry.id = Number(a['Id'] ?? 0);
       entry.name = (a['Title'] as string) ?? '';
       entry.desc = WikiMetaService.cleanText((a['Description'] as string) ?? '');
-      entry.reward = Number(a['Reward'] ?? 0);
+      const reward: Record<string, Object> | undefined = a['FinishReward'] as Record<string, Object> | undefined;
+      entry.reward = reward !== undefined && reward !== null
+        ? (Number(reward['Id']) === 201 ? Number(reward['Count'] ?? 0) : 0) : Number(a['Reward'] ?? 0);
       entry.ver = (a['Version'] as string) ?? '';
       entry.previousId = Number(a['PreviousId'] ?? 0);
       entry.goalId = Number(a['Goal'] ?? 0);
       entry.order = Number(a['Order'] ?? 0);
+      entry.dailyQuestKnown = typeof a['IsDailyQuest'] === 'boolean';
+      entry.isDailyQuest = a['IsDailyQuest'] === true;
       entryById.set(entry.id, entry);
     }
     for (const entry of entryById.values()) {
@@ -233,6 +229,9 @@ export class AchievementService {
           entry.desc = (st['desc'] as string) ?? '';
           entry.reward = Number(st['reward'] ?? 0);
           entry.ver = (st['ver'] as string) ?? '';
+          entry.isDailyQuest = typeof st['commissions'] === 'string'
+            && (st['commissions'] as string).trim().length > 0;
+          entry.dailyQuestKnown = entry.isDailyQuest;
           entry.groupKey = groupKey;
           entry.stageIndex = stageIdx;
           stageIdx += 1;
@@ -249,6 +248,37 @@ export class AchievementService {
     Logger.info(TAG, `metadata loaded: ${list.length} categories, ${index.size} entries`);
   }
 
+  private static applyCommissionMetadata(text: string): void {
+    const root: Record<string, Object> = JSON.parse(text) as Record<string, Object>;
+    for (const key of Object.keys(root)) {
+      const category: Record<string, Object> = root[key] as Record<string, Object>;
+      if (!Array.isArray(category['achievements'])) {
+        continue;
+      }
+      for (const raw of category['achievements'] as Object[]) {
+        const stages: Object[] = Array.isArray(raw) ? raw as Object[] : [raw];
+        for (const stage of stages) {
+          const item: Record<string, Object> = stage as Record<string, Object>;
+          const entry: AchievementEntry | undefined = AchievementService.idIndex.get(Number(item['id']));
+          if (entry === undefined || entry.dailyQuestKnown) {
+            continue;
+          }
+          if (typeof item['commissions'] === 'string' && (item['commissions'] as string).trim().length > 0) {
+            entry.isDailyQuest = true;
+            entry.dailyQuestKnown = true;
+          }
+        }
+      }
+    }
+  }
+
+  /** 与 Windows SearchInMiyoushe/HoYoLAB 相同的官方社区搜索地址。 */
+  static guideUrl(title: string, hoyolab: boolean): string {
+    const keyword: string = encodeURIComponent(`${title.trim()} 成就`);
+    return hoyolab ? `https://www.hoyolab.com/search?keyword=${keyword}`
+      : `https://www.miyoushe.com/ys/search?keyword=${keyword}`;
+  }
+
   /** 完成度统计（总览） */
   static async getOverallStats(archiveId: number): Promise<AchievementStats> {
     const cats: AchievementCategory[] = await AchievementService.getCategories();
@@ -258,7 +288,7 @@ export class AchievementService {
       for (const e of cat.entries) {
         stats.total += 1;
         stats.primogemsTotal += e.reward;
-        if (records.has(e.id)) {
+        if (AchievementRecord.isDone(records.get(e.id))) {
           stats.done += 1;
           stats.primogemsEarned += e.reward;
         }
@@ -278,7 +308,7 @@ export class AchievementService {
       for (const e of cat.entries) {
         cs.stats.total += 1;
         cs.stats.primogemsTotal += e.reward;
-        if (records.has(e.id)) {
+        if (AchievementRecord.isDone(records.get(e.id))) {
           cs.stats.done += 1;
           cs.stats.primogemsEarned += e.reward;
         }
@@ -291,7 +321,7 @@ export class AchievementService {
   /** 手动切换完成状态 */
   static async toggle(archiveId: number, achId: number): Promise<boolean> {
     const records: Map<number, AchievementRecord> = await AchievementRepo.getRecords(archiveId);
-    const done: boolean = !records.has(achId);
+    const done: boolean = !AchievementRecord.isDone(records.get(achId));
     await AchievementRepo.setRecord(archiveId, achId, done, Math.floor(Date.now() / 1000));
     return done;
   }
@@ -299,80 +329,34 @@ export class AchievementService {
   /** UIAF v1.1 导出（JSON 字符串） */
   static async exportUiaf(archiveId: number): Promise<string> {
     const records: Map<number, AchievementRecord> = await AchievementRepo.getRecords(archiveId);
-    const list: UiafItem[] = [];
-    const ids: number[] = Array.from(records.keys()).sort((a: number, b: number) => a - b);
-    for (const id of ids) {
-      const r: AchievementRecord | undefined = records.get(id);
-      const item: UiafItem = new UiafItem();
-      item.id = id;
-      item.timestamp = r !== undefined ? r.timestamp : 0;
-      item.current = 1;
-      item.status = 3;
-      list.push(item);
-    }
-    const info: UiafInfo = new UiafInfo();
-    info.export_app = 'Snap.Hutao.HarmonyOS';
-    info.export_app_version = AppConstants.APP_VERSION;
-    info.export_timestamp = Math.floor(Date.now() / 1000);
-    info.uiaf_version = UIAF_VERSION;
-    const root: UiafRoot = new UiafRoot();
-    root.info = info;
-    root.list = list;
-    Logger.info(TAG, `export uiaf: ${list.length} entries`);
-    return JSON.stringify(root, null, 2);
+    Logger.info(TAG, `export uiaf: ${records.size} entries`);
+    return UiafCodec.export(Array.from(records.values()), AppConstants.APP_VERSION, Math.floor(Date.now() / 1000));
   }
 
-  /** UIAF v1.1 导入（合并策略：并集；完成优先；同完成保留原时间戳） */
-  static async importUiaf(archiveId: number, text: string): Promise<UiafImportResult> {
+  /** UIAF v1.1 导入；默认惰性合并，不覆盖已有数据。验证失败不写数据库。 */
+  static async importUiaf(archiveId: number, text: string,
+    strategy: UiafImportStrategy = UiafImportStrategy.Lazy): Promise<UiafImportResult> {
     const result: UiafImportResult = new UiafImportResult();
-    let root: Record<string, Object>;
+    let incoming: AchievementRecord[];
     try {
-      root = JSON.parse(text) as Record<string, Object>;
+      incoming = UiafCodec.parse(text, archiveId);
     } catch (e) {
-      result.message = 'JSON 解析失败';
+      result.message = (e as Error).message;
       return result;
     }
-    const rawList: Object[] = (root['list'] as Object[]) ?? [];
-    if (rawList.length === 0) {
-      result.message = '文件中没有成就记录（list 为空）';
+    if (archiveId <= 0) {
+      result.message = '请先选择成就档案';
       return result;
     }
     const existing: Map<number, AchievementRecord> = await AchievementRepo.getRecords(archiveId);
-    const merged: Map<number, AchievementRecord> = new Map(existing);
-    let fileCount: number = 0;
-    for (const rawItem of rawList) {
-      const item: Record<string, Object> = rawItem as Record<string, Object>;
-      const id: number = Number(item['id'] ?? 0);
-      if (id <= 0) {
-        continue;
-      }
-      fileCount += 1;
-      const status: number = Number(item['status'] ?? 0);
-      const current: number = Number(item['current'] ?? 0);
-      // status: 2=FINISHED 3=REWARD_TAKEN（对齐 Windows AchievementStatus）
-      const done: boolean = status >= 2 || current >= 1;
-      if (!done) {
-        continue;
-      }
-      let ts: number = Number(item['timestamp'] ?? 0);
-      if (ts > 1e12) {
-        ts = Math.floor(ts / 1000);
-      }
-      const prev: AchievementRecord | undefined = merged.get(id);
-      const rec: AchievementRecord = new AchievementRecord();
-      rec.archiveId = archiveId;
-      rec.achId = id;
-      rec.current = 1;
-      rec.timestamp = prev !== undefined && prev.timestamp > 0 ? prev.timestamp : ts;
-      merged.set(id, rec);
-    }
-    const records: AchievementRecord[] = Array.from(merged.values());
+    const records: AchievementRecord[] = UiafCodec.merge(existing, incoming, strategy);
     await AchievementRepo.replaceRecords(archiveId, records);
     result.ok = true;
-    result.fileCount = fileCount;
-    result.mergedDone = records.length;
-    result.message = `导入成功：${records.length} 项完成`;
-    Logger.info(TAG, `import uiaf: file=${fileCount} mergedDone=${records.length}`);
+    result.fileCount = incoming.length;
+    result.mergedTotal = records.length;
+    result.mergedDone = records.filter((record: AchievementRecord) => AchievementRecord.isDone(record)).length;
+    result.message = `导入成功：${result.mergedDone} 项完成，共保留 ${result.mergedTotal} 项记录`;
+    Logger.info(TAG, `import uiaf: file=${result.fileCount} total=${result.mergedTotal} done=${result.mergedDone}`);
     return result;
   }
 }

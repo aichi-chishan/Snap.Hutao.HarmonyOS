@@ -4,6 +4,7 @@
  * 数据：rawfile/metadata/weapon_meta.json；图标：rawfile/icons（离线）。
  * 区块：简介（大图/类型/稀有度/描述）、精炼 1-5、养成材料。
  */
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { WikiMetaService, WikiWeaponMeta, MetaMaterial } from '../service/WikiMetaService';
 import { BaseValueService } from '../service/BaseValueService';
 import { CharacterViewModel, AddPlanResult } from '../viewmodel/CharacterViewModel';
@@ -25,7 +26,17 @@ export struct WikiWeaponPage {
   /** 当前详情对象（页面 @State 显式赋值驱动刷新） */
   @State current: WikiWeaponMeta | undefined = undefined;
   @State keyword: string = '';
+  @State gridMode: boolean = false;
   @State rankFilter: number = 0;
+  @State typeFilter: number = 0;
+  @State propertyFilter: number = 0;
+  private weaponValues: number[] = [0, 1, 11, 13, 10, 12];
+  private propertyValues: number[] = [0, 3, 6, 9, 20, 22, 23, 28, 30];
+  private weaponOptions: SelectOption[] = [{ value: '全部类型' }, { value: '单手剑' }, { value: '双手剑' },
+    { value: '长柄武器' }, { value: '法器' }, { value: '弓' }];
+  private propertyOptions: SelectOption[] = [{ value: '全部副属性' }, { value: '生命值' }, { value: '攻击力' },
+    { value: '防御力' }, { value: '暴击率' }, { value: '暴击伤害' }, { value: '元素充能效率' },
+    { value: '元素精通' }, { value: '物理伤害加成' }];
   @State isWide: boolean = false;
   /** 列表懒加载数据源 */
   private listSource: SimpleDataSource<WikiWeaponMeta> = new SimpleDataSource([]);
@@ -33,6 +44,7 @@ export struct WikiWeaponPage {
   @State curLevel: number = 1;
   @State curPromoted: boolean = false;
   @State curAttack: number = 0;
+  private valueSequence: number = 0;
 
   toast(msg: string): void {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1500 });
@@ -50,6 +62,7 @@ export struct WikiWeaponPage {
   @State addingPlan: boolean = false;
 
   aboutToAppear(): void {
+    this.gridMode = PreferencesStore.getBool('wiki.weapon.grid', false);
     this.load();
   }
 
@@ -79,11 +92,13 @@ export struct WikiWeaponPage {
 
   /** 依据当前选中武器+等级+突破重算攻击力 */
   async calcAttack(): Promise<void> {
+    const sequence: number = ++this.valueSequence;
     const maxLv: number = BaseValueService.weaponMaxLevel(this.current?.rankLevel ?? 0);
     if (this.curLevel > maxLv) {
       this.curLevel = maxLv;
     }
-    this.curAttack = await BaseValueService.weaponAttack(this.selectedId, this.curLevel, this.curPromoted);
+    const attack: number = await BaseValueService.weaponAttack(this.selectedId, this.curLevel, this.curPromoted);
+    if (sequence === this.valueSequence) { this.curAttack = attack; }
   }
 
   /** 重置滑条为选中武器状态 */
@@ -223,6 +238,8 @@ export struct WikiWeaponPage {
       if (this.rankFilter > 0 && w.rankLevel !== this.rankFilter) {
         continue;
       }
+      if (this.typeFilter > 0 && w.weaponType !== this.weaponValues[this.typeFilter]) { continue; }
+      if (this.propertyFilter > 0 && w.secondaryProperty !== this.propertyValues[this.propertyFilter]) { continue; }
       if (this.keyword.length > 0 && !w.name.includes(this.keyword)) {
         continue;
       }
@@ -373,6 +390,39 @@ export struct WikiWeaponPage {
       }
       .width('100%')
 
+      Column({ space: 6 }) {
+        Select(this.weaponOptions).selected(this.typeFilter)
+          .value(this.weaponOptions[this.typeFilter].value)
+          .onSelect((index: number) => { this.typeFilter = index; this.applyFilter(); })
+          .hoverEffect(HoverEffect.Highlight)
+        Select(this.propertyOptions).selected(this.propertyFilter)
+          .value(this.propertyOptions[this.propertyFilter].value)
+          .onSelect((index: number) => { this.propertyFilter = index; this.applyFilter(); })
+          .hoverEffect(HoverEffect.Highlight)
+      }.width('100%').alignItems(HorizontalAlign.Start)
+
+      Button(this.gridMode ? '切换列表视图' : '切换网格视图')
+        .fontSize(12).height(30).hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          this.gridMode = !this.gridMode;
+          PreferencesStore.setBool('wiki.weapon.grid', this.gridMode);
+        })
+      if (this.gridMode) {
+        Grid() {
+          LazyForEach(this.listSource, (w: WikiWeaponMeta) => {
+            GridItem() {
+              Column({ space: 6 }) {
+                MetaIcon({ category: 'EquipIcon', name: w.icon, iconSize: 56 })
+                Text(w.name).fontSize(12).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .fontColor($r('app.color.text_primary'))
+              }.width('100%').height(98).padding(8).borderRadius(10)
+                .backgroundColor(this.selectedId === w.id ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
+                .hoverEffect(HoverEffect.Highlight).onClick(() => { this.select(w); })
+            }
+          }, (w: WikiWeaponMeta) => `grid_${w.id}_${this.selectedId}`)
+        }.columnsTemplate(this.isWide ? '1fr 1fr' : '1fr 1fr 1fr')
+          .columnsGap(8).rowsGap(8).cachedCount(4).width('100%').layoutWeight(1)
+      } else {
       List({ space: 4 }) {
         LazyForEach(this.listSource, (w: WikiWeaponMeta) => {
           ListItem() {
@@ -413,6 +463,7 @@ export struct WikiWeaponPage {
       .width('100%')
       .layoutWeight(1)
       .scrollBar(BarState.Auto)
+      }
     }
     .width(this.isWide ? 300 : '100%')
     .height('100%')

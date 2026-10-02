@@ -5,6 +5,7 @@
  * 首页：每日背景（可开关）+ 登录状态 + 功能入口；我的：账号入口 + 设置。
  * 状态栏：自动读取本机状态栏高度（topAvoidVp），背景延伸、内容整体下移不重叠。
  */
+import { GuardedMaterialModifier } from '../common/GuardedMaterialModifier';
 import { router } from '@kit.ArkUI';
 import { curves, display, uiMaterial, window } from '@kit.ArkUI';
 import { pasteboard } from '@kit.BasicServicesKit';
@@ -44,6 +45,7 @@ import { WikiWeaponPage } from './WikiWeaponPage';
 import { WikiMonsterPage } from './WikiMonsterPage';
 import { LedgerPage } from './LedgerPage';
 import { AchievementPage } from './AchievementPage';
+import { HutaoCloudPage } from './HutaoCloudPage';
 import { LaunchGamePage } from './LaunchGamePage';
 import { NavIcon } from '../components/NavIcon';
 import { PageContainer } from '../components/PageContainer';
@@ -103,6 +105,7 @@ class DashCardSpec {
     @State homeRefreshing: boolean = false;
     /** 主页数据在途加载标记（reloadHome 防抖） */
     private homeReloading: boolean = false;
+    private homeRequestSequence: number = 0;
     /** 系统三键区（最小化/全屏/关闭）占位宽度 vp（PC 自定义窗口装饰；0=无系统三键） */
     @StorageProp('titleBtnWidthVp') titleBtnWidthVp: number = 0;
     @StorageProp('appVersion') appVersion: string = '';
@@ -320,14 +323,18 @@ class DashCardSpec {
 
     /** 聚合加载主页仪表盘数据（祈愿/便笺/签到/活动/公告） */
     reloadHome(): void {
-      if (this.homeReloading) {
+      const requestedUid: string = AppStorage.get<string>('currentUid') ?? '';
+      if (this.homeReloading && this.homeVm.currentUid === requestedUid) {
         return; // 在途加载中：避免连点/快速切页重复拉网络
       }
+      const sequence: number = ++this.homeRequestSequence;
+      this.challengeSnap = new HomeChallengeSummary();
       this.homeReloading = true;
       this.todayDay = new Date().getDate();
       this.loadGachaPages();
       const uid: string = AppStorage.get<string>('currentUid') ?? '';
       this.homeVm.load(uid).then(() => {
+        if (sequence !== this.homeRequestSequence) { return; }
         // 同步周期挑战快照（@Observed 深属性不触发 Index 重建）
         this.challengeSnap = HomeChallengeSummary.of(this.homeVm.challenge);
         Logger.info('Index', `challengeSnap loaded=${this.challengeSnap.loaded} abyss=${this.challengeSnap.abyssFloor}/${this.challengeSnap.abyssStar} ` +
@@ -335,6 +342,7 @@ class DashCardSpec {
         this.homeRefreshing = false;
         this.homeReloading = false;
       }).catch(() => {
+        if (sequence !== this.homeRequestSequence) { return; }
         this.homeRefreshing = false;
         this.homeReloading = false;
       });
@@ -682,6 +690,7 @@ class DashCardSpec {
         this.navItem(15, 'TravelersDiary', '旅行者札记')
 
         this.navSectionTitle('系统')
+        this.navItem(16, 'Passport', '胡桃通行证与云')
         this.navItem(12, 'Passport', '账号与数据')
         this.navItem(13, '⚙️', '设置')
 
@@ -698,7 +707,7 @@ class DashCardSpec {
     // brightness 0.9"双层压暗，壁纸几乎不可见 → 侧栏接近纯黑。现改为：底色只留一层极淡 tint
     // （暗色 card_inner_tint 8% 白轻微提亮 / 浅色 nav_scrim），玻璃感交给系统模糊材质；
     // 材质若渲染失效，半透明底自身依旧通透（壁纸可透出）。
-    .systemMaterial(this.panelMaterial)
+    .attributeModifier(new GuardedMaterialModifier(this.panelMaterial))
     .backgroundColor(this.panelMaterial !== undefined ? Color.Transparent
       : (this.isDark ? $r('app.color.card_inner_tint') : $r('app.color.nav_scrim')))
     .backgroundBlurStyle(this.panelMaterial !== undefined ? BlurStyle.NONE : BlurStyle.COMPONENT_THICK, {
@@ -857,6 +866,10 @@ class DashCardSpec {
         PageContainer() {
           LaunchGamePage({ embedMode: true })
           }
+      } else if (this.currentIndex === 16) {
+        PageContainer() {
+          HutaoCloudPage({ embedMode: true })
+        }
       } else if (this.currentIndex === 15) {
         PageContainer() {
           LedgerPage({ embedMode: true })
@@ -891,6 +904,83 @@ class DashCardSpec {
     .animation({ curve: Motion.springFast() })
   }
 
+  /** All form factors consume the same ordered/visible dashboard card configuration. */
+  @Builder
+  dashboardCard(key: string) {
+              if (key === 'launch') {
+                HomeLaunchCard({
+                  fillHeight: this.isWide,
+                  onLaunched: (ok: boolean, message: string) => {
+                    this.getUIContext().getPromptAction().showToast({ message: message, duration: 2200 });
+                  },
+                })
+              } else if (key === 'gacha') {
+                HomeGachaCard({
+                  fillHeight: this.isWide,
+                  uid: this.homeVm.currentUid,
+                  pools: this.homeVm.gachaPools,
+                  total: this.homeVm.gachaTotal,
+                  loaded: this.homeVm.gachaLoaded,
+                  pages: this.gachaPages,
+                  onTap: () => {
+                    if (this.isWide) { this.switchTo(1); } else { this.controller.changeIndex(1); }
+                  },
+                })
+              } else if (key === 'achievement') {
+                HomeAchievementCard({
+                  fillHeight: this.isWide,
+                  onTap: () => {
+                    if (this.isWide) { this.switchTo(2); } else { router.pushUrl({ url: 'pages/AchievementPage' }); }
+                  },
+                })
+              } else if (key === 'dailynote') {
+                HomeDailyNoteCard({
+                  fillHeight: this.isWide,
+                  uid: this.homeVm.currentUid,
+                  note: this.homeVm.note,
+                  refreshTime: this.homeVm.noteRefreshTime,
+                  loaded: this.homeVm.noteLoaded,
+                  onTap: () => {
+                    if (this.isWide) { this.switchTo(3); } else { this.controller.changeIndex(2); }
+                  },
+                })
+              } else if (key === 'ledger') {
+                HomeTravelersDiaryCard({
+                  fillHeight: this.isWide,
+                  onTap: () => {
+                    if (this.isWide) { this.switchTo(15); } else { router.pushUrl({ url: 'pages/LedgerPage' }); }
+                  },
+                })
+              } else if (key === 'calendar') {
+                HomeCalendarCard({
+                  fillHeight: this.isWide,
+                  eventDays: this.calendarEventDays(),
+                  todayActs: this.todayActNames(),
+                  onTap: () => {
+                    router.pushUrl({ url: 'pages/CalendarPage' });
+                  },
+                })
+              } else {
+                HomeSignInCard({
+                  fillHeight: this.isWide,
+                  uid: this.homeVm.currentUid,
+                  info: this.homeVm.signInfo,
+                  loaded: this.homeVm.signLoaded,
+                  signing: this.homeSigning,
+                  todayDay: this.todayDay,
+                  onTap: () => {
+                    router.pushUrl({ url: 'pages/SignInPage' });
+                  },
+                  onSignIn: () => {
+                    this.doHomeSignIn();
+                  },
+                  onResignIn: () => {
+                    router.pushUrl({ url: 'pages/SignInPage' });
+                  },
+                })
+              }
+  }
+
   @Builder
   homeTab() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -905,73 +995,9 @@ class DashCardSpec {
 
           LoginStatusBar()
 
-          // 祈愿统计卡（真实数据：各池抽数 + 橙/紫保底进度；受设置页主页卡片显隐控制）
-          if (this.dashCardVisible('gacha')) {
-            HomeGachaCard({
-              uid: this.homeVm.currentUid,
-              pools: this.homeVm.gachaPools,
-              total: this.homeVm.gachaTotal,
-              loaded: this.homeVm.gachaLoaded,
-              pages: this.gachaPages,
-              onTap: () => {
-                if (this.isWide) {
-                  this.switchTo(1);
-                } else {
-                  this.controller.changeIndex(1);
-                }
-              },
-            })
-          }
-
-          // 实时便笺卡（真实数据：树脂/宝钱/委托/周本折扣/参变仪/派遣）
-          if (this.dashCardVisible('dailynote')) {
-            HomeDailyNoteCard({
-              uid: this.homeVm.currentUid,
-              note: this.homeVm.note,
-              refreshTime: this.homeVm.noteRefreshTime,
-              loaded: this.homeVm.noteLoaded,
-              onTap: () => {
-                if (this.isWide) {
-                  this.switchTo(3);
-                } else {
-                  this.controller.changeIndex(2);
-                }
-              },
-            })
-          }
-
-          // 签到卡（真实数据：奖励网格 + 签到/补签按钮）
-          if (this.dashCardVisible('signin')) {
-            HomeSignInCard({
-              uid: this.homeVm.currentUid,
-              info: this.homeVm.signInfo,
-              loaded: this.homeVm.signLoaded,
-              signing: this.homeSigning,
-              todayDay: this.todayDay,
-              onTap: () => {
-                router.pushUrl({ url: 'pages/SignInPage' });
-              },
-              onSignIn: () => {
-                this.doHomeSignIn();
-              },
-              onResignIn: () => {
-                router.pushUrl({ url: 'pages/SignInPage' });
-              },
-            })
-          }
-
-          // 成就管理卡（完成度统计，点击进成就管理页）
-          if (this.dashCardVisible('achievement')) {
-            HomeAchievementCard({
-              onTap: () => {
-                if (this.isWide) {
-                  this.switchTo(2);
-                } else {
-                  router.pushUrl({ url: 'pages/AchievementPage' });
-                }
-              },
-            })
-          }
+          ForEach(this.dashCards, (spec: DashCardSpec) => {
+            this.dashboardCard(spec.key)
+          }, (spec: DashCardSpec) => spec.key)
 
           // 近期活动/卡池（真实数据：进行中 + 即将开始）
           Row() {
@@ -1252,78 +1278,7 @@ class DashCardSpec {
         Grid() {
           ForEach(this.dashCards, (spec: DashCardSpec) => {
             GridItem() {
-              if (spec.key === 'launch') {
-                HomeLaunchCard({
-                  fillHeight: true,
-                  onLaunched: (ok: boolean, message: string) => {
-                    this.getUIContext().getPromptAction().showToast({ message: message, duration: 2200 });
-                  },
-                })
-              } else if (spec.key === 'gacha') {
-                HomeGachaCard({
-                  fillHeight: true,
-                  uid: this.homeVm.currentUid,
-                  pools: this.homeVm.gachaPools,
-                  total: this.homeVm.gachaTotal,
-                  loaded: this.homeVm.gachaLoaded,
-                  pages: this.gachaPages,
-                  onTap: () => {
-                    this.switchTo(1);
-                  },
-                })
-              } else if (spec.key === 'achievement') {
-                HomeAchievementCard({
-                  fillHeight: true,
-                  onTap: () => {
-                    this.switchTo(2);
-                  },
-                })
-              } else if (spec.key === 'dailynote') {
-                HomeDailyNoteCard({
-                  fillHeight: true,
-                  uid: this.homeVm.currentUid,
-                  note: this.homeVm.note,
-                  refreshTime: this.homeVm.noteRefreshTime,
-                  loaded: this.homeVm.noteLoaded,
-                  onTap: () => {
-                    this.switchTo(3);
-                  },
-                })
-              } else if (spec.key === 'ledger') {
-                HomeTravelersDiaryCard({
-                  fillHeight: true,
-                  onTap: () => {
-                    this.switchTo(15);
-                  },
-                })
-              } else if (spec.key === 'calendar') {
-                HomeCalendarCard({
-                  fillHeight: true,
-                  eventDays: this.calendarEventDays(),
-                  todayActs: this.todayActNames(),
-                  onTap: () => {
-                    router.pushUrl({ url: 'pages/CalendarPage' });
-                  },
-                })
-              } else {
-                HomeSignInCard({
-                  fillHeight: true,
-                  uid: this.homeVm.currentUid,
-                  info: this.homeVm.signInfo,
-                  loaded: this.homeVm.signLoaded,
-                  signing: this.homeSigning,
-                  todayDay: this.todayDay,
-                  onTap: () => {
-                    router.pushUrl({ url: 'pages/SignInPage' });
-                  },
-                  onSignIn: () => {
-                    this.doHomeSignIn();
-                  },
-                  onResignIn: () => {
-                    router.pushUrl({ url: 'pages/SignInPage' });
-                  },
-                })
-              }
+              this.dashboardCard(spec.key)
             }
             .height(Index.DASH_CARD_H)
           }, (spec: DashCardSpec) => spec.key)
@@ -1334,7 +1289,7 @@ class DashCardSpec {
         .columnsGap(Index.DASH_GAP)
         .rowsGap(Index.DASH_GAP)
         .width('100%')
-        .height(Math.ceil(this.dashCards.length / this.homeCols(300, Index.DASH_GAP)) * (Index.DASH_CARD_H + Index.DASH_GAP) - Index.DASH_GAP)
+        .height(Math.max(0, Math.ceil(this.dashCards.length / this.homeCols(300, Index.DASH_GAP)) * (Index.DASH_CARD_H + Index.DASH_GAP) - Index.DASH_GAP))
         // 页面 Scroll 负责视口裁剪；卡组不裁掉首末行的阴影和受光。
         .clip(false)
         .onAreaChange((oldValue: Area, newValue: Area) => {
@@ -1637,6 +1592,12 @@ class DashCardSpec {
         })
         this.entryCard('WikiMonster', '怪物资料', '全怪物资料 / 元素 / 阵营', () => {
           router.pushUrl({ url: 'pages/WikiMonsterPage' });
+        })
+        this.entryCard('Passport', '胡桃通行证与云', '通行证 / 云服务', () => {
+          router.pushUrl({ url: 'pages/HutaoCloudPage' });
+        })
+        this.entryCard('LaunchGame', '启动游戏', '配置公开启动入口', () => {
+          router.pushUrl({ url: 'pages/LaunchGamePage' });
         })
         this.entryCard('Passport', '账号与数据', '多账号管理与角色绑定', () => {
           router.pushUrl({ url: 'pages/UserPage' });

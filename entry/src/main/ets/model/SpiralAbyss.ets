@@ -153,7 +153,11 @@ export class SpiralAbyssData {
 
   /** 从 API data 解析 */
   static fromJson(data: Object): SpiralAbyssData {
-    const obj = data as Record<string, Object>;
+    let obj: Record<string, Object> = data as Record<string, Object>;
+    // 兼容旧存档保存的 {retcode,message,data}；新存档直接保存 data。
+    if (obj['retcode'] !== undefined && obj['data'] !== undefined && obj['data'] !== null) {
+      obj = obj['data'] as Record<string, Object>;
+    }
     const s: SpiralAbyssData = new SpiralAbyssData();
     s.scheduleId = num(obj['schedule_id']);
     s.startTime = num(obj['start_time']) * 1000;

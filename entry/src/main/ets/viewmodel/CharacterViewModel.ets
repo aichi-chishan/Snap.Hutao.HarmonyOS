@@ -5,8 +5,9 @@
  * 角色点击仅本地切换（不再逐角色发 detail 请求 → 避免米哈游 -502 限流）。
  */
 import { CharacterService } from '../service/CharacterService';
-import { CalculateService, CalAvatarDelta } from '../service/CalculateService';
-import { WikiMetaService } from '../service/WikiMetaService';
+import { CalculateService, CalAvatarDelta, CalSkillDelta } from '../service/CalculateService';
+import { OfflineCultivationService } from '../service/OfflineCultivationService';
+import { WikiMetaService, WikiWeaponMeta } from '../service/WikiMetaService';
 import { CharacterListItem, CharacterDetail } from '../model/CharacterData';
 import { CalBatchResult, CalAvatarConsume, CalItem } from '../model/Calculate';
 import { CultivationRepo, CultivateProject, CultivateEntry } from '../data/repo/CultivationRepo';
@@ -36,6 +37,7 @@ export class CharacterViewModel {
   loaded: boolean = false;
   /** 当前选中的角色 id */
   selectedId: number = 0;
+  private currentUid: string = '';
   /** 风控需人机验证（true 时 UI 弹验证窗） */
   needRiskVerify: boolean = false;
   /** 极验参数（弹窗用） */
@@ -44,16 +46,26 @@ export class CharacterViewModel {
   riskPath: string = '';
 
   async load(uid: string): Promise<void> {
+    this.currentUid = uid;
     if (uid.length === 0) {
       this.message = '请先在「账号与数据」选择默认 UID';
       this.loaded = true;
       return;
     }
+    this.items = CharacterService.getInstance().getCachedList(uid);
+    this.detailMap = new Map<number, CharacterDetail>();
+    for (const detail of CharacterService.getInstance().getCachedDetails(uid)) {
+      this.detailMap.set(detail.id, detail);
+    }
+    if (this.items.length > 0) {
+      this.selectedId = this.items[0].id;
+      this.syncCurrentDetail();
+    }
     this.loading = true;
     try {
       const challenge: string = RiskUiHelper.consumePendingChallenge();
       this.items = await CharacterService.getInstance().fetchList(uid, challenge.length > 0 ? challenge : undefined);
-      this.detailMap = new Map();
+
       if (this.items.length > 0) {
         this.selectedId = this.items[0].id;
         await this.loadAllDetails(uid);
@@ -79,7 +91,7 @@ export class CharacterViewModel {
         ids.push(this.items[i].id);
       }
       const challenge: string = RiskUiHelper.consumePendingChallenge();
-      const cache: Map<number, CharacterDetail> = new Map();
+      const cache: Map<number, CharacterDetail> = new Map(this.detailMap);
       // 分批拉取（每批 20），失败重试一次，避免整批 -502
       const batchSize: number = 20;
       for (let i = 0; i < ids.length; i += batchSize) {
@@ -89,6 +101,8 @@ export class CharacterViewModel {
         for (let j = 0; j < details.length; j++) {
           cache.set(details[j].id, details[j]);
         }
+        this.detailMap = new Map(cache);
+        this.syncCurrentDetail();
       }
       this.detailMap = cache;
       this.syncCurrentDetail();
@@ -135,8 +149,7 @@ export class CharacterViewModel {
 
   /**
    * 加入养成计划（对齐 Windows AvatarPropertyViewModel.AddAvatarToPlanCommand：仅角色侧，不含武器）。
-   * 重复加入（同项目同角色）返回 ok=false；材料经 batch_compute 计算（角色突破+天赋材料，
-   * 详情无技能等级故技能清单为空），计算失败时仍落目标条目（无材料清单）。
+   * 重复加入（同项目同角色）返回 ok=false；材料使用准确的同步进度与本地算法计算，失败时不创建空材料条目。
    */
   async addAvatarToPlan(detail: CharacterDetail, project: CultivateProject): Promise<AddPlanResult> {
     const r: AddPlanResult = new AddPlanResult();
@@ -149,33 +162,33 @@ export class CharacterViewModel {
           return r;
         }
       }
-      // 材料：角色突破消耗（对齐 Windows SaveAvatarOnlyCultivationAsync 的合并口径）
-      const items: CalItem[] = [];
-      let computed: boolean = false;
-      try {
-        const delta: CalAvatarDelta = new CalAvatarDelta();
-        delta.avatarId = detail.id;
-        delta.levelCurrent = detail.level;
-        delta.levelTarget = Math.max(detail.level, 90);
-        delta.elementAttrId = CultivationViewModel.elementAttrIdOf(detail.element);
-        delta.avatarPromoteLevel = detail.promoteLevel;
-        // 技能清单：batch_compute 的 skill id 空间（元数据 GroupId）与 game_record 的 skill_id
-        // 对应关系无法离线确证，保持空 skill_list（与养成页计算口径一致，避免整体计算失败）
-        delta.skills = [];
-        const result: CalBatchResult = await CalculateService.getInstance().batchCompute([delta]);
-        if (result.items.length > 0) {
-          const c: CalAvatarConsume = result.items[0];
-          for (const it of c.avatarConsume) {
-            items.push(it);
-          }
-          for (const it of c.avatarSkillConsume) {
-            items.push(it);
-          }
+      const delta: CalAvatarDelta = new CalAvatarDelta();
+      delta.avatarId = detail.id;
+      delta.levelCurrent = detail.level;
+      delta.levelTarget = Math.max(detail.level, 90);
+      delta.elementAttrId = CultivationViewModel.elementAttrIdOf(detail.element);
+      if (this.currentUid.length > 0) {
+        const promotes: Map<number, number> = await CalculateService.getInstance().fetchPromoteLevels(this.currentUid);
+        if (!promotes.has(detail.id)) {
+          throw new Error('当前角色突破等级未同步');
         }
-        computed = true;
-      } catch (e) {
-        Logger.warn(TAG, `addAvatarToPlan compute fail: ${(e as Error).message}`);
+        delta.avatarPromoteLevel = promotes.get(detail.id) ?? 0;
+        await CalculateService.getInstance().fillSyncedDetails(this.currentUid, delta, 10);
+      } else {
+        // 图鉴入口明确从1级开始，离线计算无需账号；不把未知实况当作1级。
+        if (detail.level !== 1) {
+          throw new Error('未关联角色 UID，无法确认当前养成进度');
+        }
+        for (let index: number = 0; index < 3; index++) {
+          const skill: CalSkillDelta = new CalSkillDelta();
+          skill.id = index + 1;
+          skill.levelCurrent = 1;
+          skill.levelTarget = 10;
+          delta.skills.push(skill);
+        }
       }
+      const result: CalBatchResult = await OfflineCultivationService.batchCompute([delta]);
+      const items: CalItem[] = result.items[0].avatarConsume;
       // 条目头像：本地元数据图标名（MetaIcon/AvatarIcon）优先，回退详情自带字段（可能是 http 直图）
       let icon: string = detail.icon;
       const metaIcon: string = WikiMetaService.iconOfAvatar(detail.id);
@@ -185,8 +198,7 @@ export class CharacterViewModel {
       await CultivationRepo.addEntry(project.id, detail.id, detail.name, icon,
         detail.level, Math.max(detail.level, 90), items);
       r.ok = true;
-      r.message = computed ? `已加入养成计划：${project.name}`
-        : `已加入养成计划：${project.name}（材料清单获取失败，仅记录目标）`;
+      r.message = `已加入养成计划：${project.name}（等级、突破与天赋材料）`;
     } catch (e) {
       r.ok = false;
       r.message = `加入失败：${(e as Error).message}`;
@@ -198,8 +210,7 @@ export class CharacterViewModel {
   /**
    * 图鉴武器加入养成计划（对齐 Windows WikiWeaponViewModel.CultivateCommand）：
    * 重复加入（同项目同武器）返回 ok=false；条目 level/targetLevel 固定 1→90。
-   * Windows 用 OfflineCalculator 按武器突破表离线算材料，鸿蒙元数据无突破消耗表、
-   * batch_compute 又必须挂角色（avatar_id），故仅落目标条目不含材料清单（提示里说明）。
+   * 按上游离线经验与突破表计算完整材料；1/2星武器上限70级，其余90级。
    */
   async addWeaponToPlan(weaponId: number, weaponName: string, project: CultivateProject): Promise<AddPlanResult> {
     const r: AddPlanResult = new AddPlanResult();
@@ -212,8 +223,11 @@ export class CharacterViewModel {
           return r;
         }
       }
-      // icon 留空：养成页条目图标回退首字占位（cultivate_entries.avatar_id 语义为条目对象 id，武器/角色共用一张表）
-      await CultivationRepo.addEntry(project.id, weaponId, weaponName, '', 1, 90, []);
+      const weapons: WikiWeaponMeta[] = await WikiMetaService.getWeapons();
+      const meta: WikiWeaponMeta | undefined = weapons.find((weapon: WikiWeaponMeta): boolean => weapon.id === weaponId);
+      const target: number = meta !== undefined && meta.rankLevel <= 2 ? 70 : 90;
+      const items: CalItem[] = await OfflineCultivationService.weaponCompute(weaponId, 1, target, 0);
+      await CultivationRepo.addEntry(project.id, weaponId, weaponName, meta?.icon ?? '', 1, target, items);
       r.ok = true;
       r.message = `已加入养成计划：${project.name}`;
     } catch (e) {

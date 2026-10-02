@@ -5,6 +5,8 @@
 export class GachaItem {
   id: number = 0;
   archiveId: number = 0;
+  /** 仅接口传输使用；落库归属以响应UID校验，不信任页面当前账号。 */
+  uid: string = '';
   gachaType: number = 0;
   itemId: number = 0;
   count: number = 1;
@@ -23,6 +25,7 @@ export class GachaItem {
     const item = obj as Record<string, Object>;
     const gachaItem: GachaItem = new GachaItem();
     gachaItem.gachaId = String(item['id'] ?? '');
+    gachaItem.uid = String(item['uid'] ?? '');
     if (isBeyond) {
       gachaItem.gachaType = Number(item['op_gacha_type'] ?? 0);
     } else {
@@ -31,7 +34,7 @@ export class GachaItem {
     gachaItem.itemId = Number(item['item_id'] ?? 0);
     gachaItem.count = Number(item['count'] ?? 1);
     gachaItem.time = String(item['time'] ?? '');
-    gachaItem.name = String(item['name'] ?? '');
+    gachaItem.name = String((isBeyond ? item['item_name'] : item['name']) ?? item['name'] ?? '');
     gachaItem.itemType = String(item['item_type'] ?? '');
     gachaItem.rankType = Number(item['rank_type'] ?? 0);
     gachaItem.scheduleId = Number(item['schedule_id'] ?? 0);

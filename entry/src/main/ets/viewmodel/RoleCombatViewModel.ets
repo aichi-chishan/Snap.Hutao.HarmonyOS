@@ -1,4 +1,4 @@
-﻿/**
+/**
  * RoleCombatViewModel.ets
  * 幻象真境剧诗页状态容器（含 1034 风控极验重放）。
  */
@@ -7,9 +7,12 @@ import { RoleCombatService } from '../service/RoleCombatService';
 import { RoleCombatRepo, RoleCombatHistoryEntry } from '../data/repo/RoleCombatRepo';
 import { RiskControlError } from '../data/network/RiskVerifier';
 import { RiskUiHelper } from '../common/RiskUiHelper';
+import { RegionUtil } from '../common/Constants';
 
 @Observed
 export class RoleCombatViewModel {
+  private requestedUid: string = '';
+  private requestVersion: number = 0;
   /** 有数据的档期 */
   dataItems: RoleCombatDataItem[] = [];
   /** 当前选中档期索引 */
@@ -36,6 +39,14 @@ export class RoleCombatViewModel {
   }
 
   async load(uid: string): Promise<void> {
+    const requestVersion: number = ++this.requestVersion;
+    if (this.requestedUid !== uid) {
+      this.history = [];
+      this.fromHistory = false;
+      this.message = '';
+      this.clearData();
+    }
+    this.requestedUid = uid;
     if (uid.length === 0) {
       this.message = '请先登录并绑定 UID';
       this.loaded = true;
@@ -46,6 +57,9 @@ export class RoleCombatViewModel {
       const challenge: string = RiskUiHelper.consumePendingChallenge();
       const root: RoleCombatRoot = await RoleCombatService.getInstance().fetch(uid,
         challenge.length > 0 ? challenge : undefined);
+      if (requestVersion !== this.requestVersion || uid !== this.requestedUid) {
+        return;
+      }
       this.isUnlock = root.isUnlock;
       this.dataItems = root.data.filter((d: RoleCombatDataItem) => d.hasData);
       if (this.dataItems.length > 0 && this.currentIndex >= this.dataItems.length) {
@@ -60,11 +74,17 @@ export class RoleCombatViewModel {
           continue;
         }
         const raw: string = i < root.itemRawJson.length ? root.itemRawJson[i] : '';
-        await RoleCombatRepo.saveHistory(item.schedule.scheduleId, item.schedule.startTime * 1000,
+        await RoleCombatRepo.saveHistory(uid, RegionUtil.regionOfUid(uid), item.schedule.scheduleId, item.schedule.startTime * 1000,
           item.schedule.endTime * 1000, raw);
       }
-      this.history = await RoleCombatRepo.listHistory();
+      const history: RoleCombatHistoryEntry[] = await RoleCombatRepo.listHistory(uid, RegionUtil.regionOfUid(uid));
+      if (uid === this.requestedUid) {
+        this.history = history;
+      }
     } catch (e) {
+      if (requestVersion !== this.requestVersion || uid !== this.requestedUid) {
+        return;
+      }
       if (e instanceof RiskControlError) {
         this.needRiskVerify = true;
         this.riskGt = e.gt;
@@ -75,8 +95,10 @@ export class RoleCombatViewModel {
         this.message = (e as Error).message;
       }
     } finally {
-      this.loading = false;
-      this.loaded = true;
+      if (requestVersion === this.requestVersion && uid === this.requestedUid) {
+        this.loading = false;
+        this.loaded = true;
+      }
     }
   }
 
@@ -85,14 +107,20 @@ export class RoleCombatViewModel {
   }
 
   /** 刷新本地期数历史列表（进页时） */
-  async loadHistoryList(): Promise<void> {
-    this.history = await RoleCombatRepo.listHistory();
+  async loadHistoryList(uid: string): Promise<void> {
+    const history: RoleCombatHistoryEntry[] = await RoleCombatRepo.listHistory(uid, RegionUtil.regionOfUid(uid));
+      if (uid === this.requestedUid) {
+        this.history = history;
+      }
   }
 
   /** 回看历史期数（本地存档重建，不发网络请求） */
-  async loadFromHistory(scheduleId: number): Promise<void> {
-    const raw: string = await RoleCombatRepo.getRawJson(scheduleId);
-    if (raw.length === 0) {
+  async loadFromHistory(uid: string, scheduleId: number): Promise<void> {
+    const requestVersion: number = ++this.requestVersion;
+    this.requestedUid = uid;
+    this.loading = false;
+    const raw: string = await RoleCombatRepo.getRawJson(uid, RegionUtil.regionOfUid(uid), scheduleId);
+    if (raw.length === 0 || requestVersion !== this.requestVersion || uid !== this.requestedUid) {
       return;
     }
     const item: RoleCombatDataItem = RoleCombatRoot.dataItemFromJson(JSON.parse(raw));
@@ -120,6 +148,12 @@ export class RoleCombatViewModel {
       return [];
     }
     return cur.detail.roundsData;
+  }
+
+  private clearData(): void {
+    this.dataItems = [];
+    this.currentIndex = 0;
+    this.isUnlock = false;
   }
 
   /** 极验完成后由 UI 调用：清除标记并重新加载 */

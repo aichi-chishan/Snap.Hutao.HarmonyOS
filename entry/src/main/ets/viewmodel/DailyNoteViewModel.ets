@@ -5,6 +5,7 @@
 import { DailyNote } from '../model/DailyNote';
 import { DailyNoteService, NotifyFlags, NeedGeetestError } from '../service/DailyNoteService';
 import { DailyNoteRepo, DailyNoteRecord } from '../data/repo/DailyNoteRepo';
+import { DailyNoteReminderService } from '../service/DailyNoteReminderService';
 import { UserService } from '../service/UserService';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { Logger } from '../common/Logger';
@@ -59,6 +60,10 @@ export class DailyNoteViewModel {
 
   /** 从本地缓存装载 */
   async load(uid: string): Promise<void> {
+    if (this.currentUid !== uid) {
+      this.note = undefined;
+      this.lastRefreshAt = 0;
+    }
     this.currentUid = uid;
     const user = UserService.getInstance().getCurrentUser();
     this.nickname = user !== undefined ? user.displayName : '';
@@ -80,7 +85,7 @@ export class DailyNoteViewModel {
 
   /** DB 表未持久化魔神任务（archon_json 列恒空）：从 prefs 补齐，避免重启后该行误显示「全部完成」 */
   private attachArchonFromPrefs(userId: number, uid: string, note: DailyNote): void {
-    if (note.archonQuests.length > 0) {
+    if (note.rawJson.length > 0 || note.archonQuests.length > 0) {
       return;
     }
     const raw: string = PreferencesStore.getString(archonKey(userId, uid), '');
@@ -135,6 +140,11 @@ export class DailyNoteViewModel {
     const next: string[] = uids.filter((v: string): boolean => v !== uid);
     PreferencesStore.setTrackedUids(user.id, next);
     await this.loadTracked();
+    try {
+      await DailyNoteReminderService.cancelUid(user.id, uid);
+    } catch (e) {
+      AppStorage.setOrCreate<string>(DailyNoteReminderService.ERROR_KEY, (e as Error).message);
+    }
   }
 
   /** 刷新追踪列表（顺序联网拉取全部被追踪 UID） */
@@ -210,11 +220,22 @@ export class DailyNoteViewModel {
     }
     await DailyNoteRepo.updateThresholds(user.id, this.settingsUid,
       this.settingsResinThreshold, this.settingsHomeThreshold, this.settingsNotifyFlags);
+    await this.rescheduleReminders(user.id, this.settingsUid);
     // 编辑的是当前 UID 时同步内存态，保持页面引用一致
     if (this.settingsUid === this.currentUid) {
       this.resinThreshold = this.settingsResinThreshold;
       this.homeThreshold = this.settingsHomeThreshold;
       this.notifyFlags = this.settingsNotifyFlags;
+    }
+  }
+
+  private async rescheduleReminders(userId: number, uid: string): Promise<void> {
+    const record: DailyNoteRecord | undefined = await DailyNoteRepo.get(userId, uid);
+    if (record === undefined) { return; }
+    try {
+      await DailyNoteReminderService.sync(userId, uid, record.note, record);
+    } catch (e) {
+      AppStorage.setOrCreate<string>(DailyNoteReminderService.ERROR_KEY, (e as Error).message);
     }
   }
 

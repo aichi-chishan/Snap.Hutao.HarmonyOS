@@ -16,6 +16,7 @@
  *      面板/WebView 由窗口尺寸自适应（本文件），页面内再按实际验证码尺寸等比缩放到视口
  *      （HTML 里的 fit()，通过 onFrame 桥回传测量结果）。
  */
+import { GuardedMaterialModifier } from '../common/GuardedMaterialModifier';
 import { webview } from '@kit.ArkWeb';
 import { curves, uiMaterial } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
@@ -464,7 +465,7 @@ export struct RiskVerifyModal {
         .padding({ left: 18, right: 12, top: 16, bottom: 14 })
         .borderRadius(24)
         // API 26+ 沉浸光感材质；API 23/24 用 backgroundEffect 实时磨砂玻璃（材质观感一致）
-        .systemMaterial(this.material)
+        .attributeModifier(new GuardedMaterialModifier(this.material))
         .backgroundColor(this.material !== undefined ? Color.Transparent : (this.isDark ? '#B31E1E22' : '#B3F2F0EC'))
         .backgroundEffect(this.material !== undefined ? undefined : {
           radius: 48,

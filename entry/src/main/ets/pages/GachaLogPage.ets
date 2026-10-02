@@ -56,6 +56,7 @@ class FiveStarPull {
   time: string = '';
   lastPull: number = 0;
   isUp: boolean = false;
+  upKnown: boolean = false;
   /** 角色/武器（决定图标分类 AvatarIcon/EquipIcon） */
   itemType: string = '';
   /** 大保底命中（时间上更早的一金非 UP → 本次必 UP；自 fiveDetails 推导，精度受简化 UP 判定限制） */
@@ -362,7 +363,7 @@ export struct GachaLogPage {
       for (let j = 0; j < pool.fiveDetails.length; j++) {
         const src: FiveStarDetail = pool.fiveDetails[j];
         if (src.isUp && src.lastPull > 0) {
-          upSum += src.lastPull;
+          upSum += src.totalCyclePull;
           upCount++;
         }
       }
@@ -383,9 +384,11 @@ export struct GachaLogPage {
         pull.time = src.time;
         pull.lastPull = src.lastPull;
         pull.isUp = src.isUp;
+        pull.upKnown = src.upKnown;
         pull.itemType = src.itemType;
         // 大保底推导：时间上更早的一金（fiveDetails 倒序，故为 j+1）非 UP → 本次必为 UP
-        pull.isGuarantee = j + 1 < pool.fiveDetails.length && !pool.fiveDetails[j + 1].isUp;
+        pull.isGuarantee = src.upKnown && src.isUp && pool.gachaType === GachaType.AVATAR_EVENT
+          && j + 1 < pool.fiveDetails.length && pool.fiveDetails[j + 1].upKnown && !pool.fiveDetails[j + 1].isUp;
         card.fivePulls.push(pull);
       }
       card.key = GachaLogPage.cardKey(card);
@@ -1057,7 +1060,7 @@ export struct GachaLogPage {
         .width(48)
         .padding({ top: 4, bottom: 4 })
         .borderRadius(4)
-        .backgroundColor(!pull.isUp && card.hasUpMark ? $r('app.color.danger_bg') : $r('app.color.card_inner_tint'))
+        .backgroundColor(pull.upKnown && !pull.isUp && card.hasUpMark ? $r('app.color.danger_bg') : $r('app.color.card_inner_tint'))
         .border({ width: 1, color: $r('app.color.card_stroke') })
         .alignItems(HorizontalAlign.Center)
       }, (pull: FiveStarPull) => `${pull.name}_${pull.time}_${pull.lastPull}_grid`)
@@ -1571,6 +1574,8 @@ export struct GachaLogPage {
           .fontSize(13)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
+        Button('取消').fontSize(11).height(28).hoverEffect(HoverEffect.Highlight)
+          .onClick(() => this.vm.cancelRefresh())
         Text(this.showProgressDetail ? '收起 ‹' : '详情 ›')
           .fontSize(11)
           .fontColor($r('app.color.app_primary'))
@@ -1808,6 +1813,9 @@ export struct GachaLogPage {
               .fontColor($r('app.color.app_primary'))
               .margin({ right: 10 })
           }
+          Button(this.vm.fullRefresh ? '全量' : '增量')
+            .fontSize(11).height(28).hoverEffect(HoverEffect.Highlight)
+            .onClick(() => this.vm.fullRefresh = !this.vm.fullRefresh)
           Button('刷新')
             .fontSize(13)
             .height(32)

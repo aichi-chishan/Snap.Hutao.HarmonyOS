@@ -3,9 +3,10 @@
  * 祈愿「历史记录」期次汇总（对齐 Windows HistoryWishBuilder + PivotHistory）：
  * 用本地 GachaEvent 期次元数据（版本/池名/UP 列表/起止时间）按 From<=time<=To 归桶用户抽卡，
  * 统计各期总抽数与 UP 五星/四星获取数。
- * 说明：UIGF v4.x 导入会把 400（角色活动祈愿-2）归并为 301，该部分数据按时间落入 301 期次，
- * 期次归属可能与卡池名有偏差（总量正确）；服务端直拉的数据保留 400 原型，归属准确。
+ * UIGF导入和在线拉取均保留原始400池号；统计查询合并301/400，历史期次按原始池号匹配。
  */
+import { UigfService } from './UigfService';
+import { GachaArchive } from '../model/GachaArchive';
 import { GachaRepo } from '../data/repo/GachaRepo';
 import { GachaItem } from '../model/GachaItem';
 import { GachaType } from '../model/GachaType';
@@ -83,6 +84,9 @@ export class GachaHistoryService {
     if (events.length === 0) {
       return [];
     }
+    const archive: GachaArchive | undefined = (await GachaRepo.getAllArchives())
+      .find((entry: GachaArchive): boolean => entry.id === archiveId);
+    const timezone: number = UigfService.timezoneOfUid(archive?.uid ?? '');
     const items: GachaItem[] = await GachaRepo.getItemsByArchive(archiveId);
     if (items.length === 0) {
       return [];
@@ -137,7 +141,7 @@ export class GachaHistoryService {
         registerUp(id, view.purpleUps);
       }
       for (const it of bucket) {
-        const t: number = GachaHistoryService.itemTimeMs(it.time);
+        const t: number = GachaHistoryService.itemTimeMs(it.time, timezone);
         if (t < ev.from || t > ev.to) {
           continue;
         }
@@ -161,11 +165,15 @@ export class GachaHistoryService {
   }
 
   /** "yyyy-MM-dd HH:mm:ss" → epoch ms（按东八区，与服务器口径一致） */
-  private static itemTimeMs(time: string): number {
+  private static itemTimeMs(time: string, timezone: number): number {
     if (time.length < 19) {
       return 0;
     }
     // Date.parse("yyyy-MM-ddTHH:mm:ss+08:00")
-    return Date.parse(`${time.substring(0, 10)}T${time.substring(11, 19)}+08:00`);
+    try {
+      return Date.parse(UigfService.normalizeTime(time, timezone, 0).replace(' ', 'T') + 'Z');
+    } catch (e) {
+      return 0;
+    }
   }
 }

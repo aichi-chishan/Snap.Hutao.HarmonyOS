@@ -217,7 +217,8 @@ export class ResinStatisticsService {
    * 聚合当前项目全部未完成材料并折算树脂需求。
    * entries：当前项目的全部培养条目（含材料清单）。
    */
-  static async compute(entries: CultivateEntry[], dist: ResinDropDistribution): Promise<ResinStatisticsResult> {
+  static async compute(entries: CultivateEntry[], dist: ResinDropDistribution,
+    inventory: Map<number, number> = new Map<number, number>()): Promise<ResinStatisticsResult> {
     // id → 未完成需求合计；Boss 材料品质取自 material_meta（r==5 橙=周常）
     const aggs: Map<number, MaterialAgg> = new Map();
     for (const entry of entries) {
@@ -234,6 +235,32 @@ export class ResinStatisticsService {
           aggs.set(item.itemId, agg);
         }
         agg.count += item.count;
+      }
+    }
+    // 同材料先扣库存；仅同系列低阶余量按3:1向上合成，不跨系列抵扣。
+    const remaining: Map<number, number> = new Map<number, number>();
+    inventory.forEach((count: number, id: number) => {
+      const need: MaterialAgg | undefined = aggs.get(id);
+      const used: number = Math.min(need?.count ?? 0, count);
+      if (need !== undefined) {
+        need.count -= used;
+      }
+      remaining.set(id, count - used);
+    });
+    const families: number[] = ResinStatisticsService.TALENT_BASES
+      .concat(ResinStatisticsService.TALENT_NEW_BASES).concat(ResinStatisticsService.WEAPON_BASES);
+    for (const base of families) {
+      const tiers: number = base >= 114000 ? 4 : 3;
+      for (let tier: number = 0; tier < tiers - 1; tier++) {
+        const lower: number = base + tier;
+        const higher: number = lower + 1;
+        const crafted: number = Math.floor((remaining.get(lower) ?? 0) / 3);
+        const need: MaterialAgg | undefined = aggs.get(higher);
+        const used: number = Math.min(crafted, need?.count ?? 0);
+        if (need !== undefined) {
+          need.count -= used;
+        }
+        remaining.set(higher, (remaining.get(higher) ?? 0) + crafted - used);
       }
     }
     // Boss 品质批量补齐

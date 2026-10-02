@@ -80,6 +80,8 @@ export class SignInService {
       if (infoResp.success && infoResp.data !== undefined) {
         const state: SignInInfo = SignInInfo.fromInfo(infoResp.data);
         info.signedDays = state.signedDays;
+        info.signedToday = state.signedToday;
+        info.serverDate = state.serverDate;
       } else if (info.message.length === 0) {
         info.message = infoResp.userFriendlyMessage();
       }
@@ -100,13 +102,18 @@ export class SignInService {
       return r;
     }
     const region: string = RegionUtil.regionOfUid(uid);
-    const cookie: string = user.gameRecordCookie();
     // 缺 cookie_token/ltoken 时先补齐
     if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
       await UserService.getInstance().completeTokenChainPublic(user);
     }
+    const cookie: string = user.gameRecordCookie();
     let resp: ApiResponse = await HoyolabClient.signIn(uid, region, cookie);
-    resp = await SignInService.resolveSignRisk(uid, region, cookie, resp,
+    if (!resp.success && UserService.isCookieAuthError(resp)) {
+      resp = await UserService.retryWithRefreshedCookie(user, (): Promise<ApiResponse> => {
+        return HoyolabClient.signIn(uid, region, user.gameRecordCookie());
+      });
+    }
+    resp = await SignInService.resolveSignRisk(uid, region, user.gameRecordCookie(), resp,
       (u: string, reg: string, ck: string, extra?: Record<string, string>): Promise<ApiResponse> => {
         return HoyolabClient.signIn(u, reg, ck, extra);
       });
@@ -115,6 +122,10 @@ export class SignInService {
       result.ok = false;
       result.alreadySigned = true;
       result.message = '今日已签到';
+      return result;
+    }
+    if (resp.success && SignInService.hasPendingCaptcha(resp)) {
+      result.message = '人机验证尚未通过，请重试';
       return result;
     }
     if (resp.success) {
@@ -169,16 +180,25 @@ export class SignInService {
       return r;
     }
     const region: string = RegionUtil.regionOfUid(uid);
-    const cookie: string = user.gameRecordCookie();
     if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
       await UserService.getInstance().completeTokenChainPublic(user);
     }
+    const cookie: string = user.gameRecordCookie();
     let resp: ApiResponse = await HoyolabClient.resignSign(uid, region, cookie);
-    resp = await SignInService.resolveSignRisk(uid, region, cookie, resp,
+    if (!resp.success && UserService.isCookieAuthError(resp)) {
+      resp = await UserService.retryWithRefreshedCookie(user, (): Promise<ApiResponse> => {
+        return HoyolabClient.resignSign(uid, region, user.gameRecordCookie());
+      });
+    }
+    resp = await SignInService.resolveSignRisk(uid, region, user.gameRecordCookie(), resp,
       (u: string, reg: string, ck: string, extra?: Record<string, string>): Promise<ApiResponse> => {
         return HoyolabClient.resignSign(u, reg, ck, extra);
       });
     const result: SignInResult = new SignInResult();
+    if (resp.success && SignInService.hasPendingCaptcha(resp)) {
+      result.message = '人机验证尚未通过，请重试';
+      return result;
+    }
     if (resp.success) {
       result.ok = true;
       result.message = '补签成功';
@@ -214,6 +234,14 @@ export class SignInService {
     result.message = resp.userFriendlyMessage();
     Logger.warn(TAG, `resign fail retcode=${resp.retcode} msg=${resp.message}`);
     return result;
+  }
+
+  private static hasPendingCaptcha(resp: ApiResponse): boolean {
+    if (resp.data === undefined) {
+      return false;
+    }
+    const data: Record<string, Object> = resp.data as Record<string, Object>;
+    return String(data['gt'] ?? '').length > 0 && String(data['challenge'] ?? '').length > 0;
   }
 
   /** 最新已签那天的奖励文案（对齐 Windows InfoBar「获得 xx ×n」；取不到返回空串） */

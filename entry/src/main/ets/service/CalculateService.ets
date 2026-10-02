@@ -10,7 +10,7 @@ import { DsSigner } from '../data/network/DsSigner';
 import { CalBatchResult, CalAvatarConsume } from '../model/Calculate';
 import { UserService } from './UserService';
 import { RiskVerifier } from '../data/network/RiskVerifier';
-import { AppConstants } from '../common/Constants';
+import { AppConstants, RegionUtil } from '../common/Constants';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'CalculateService';
@@ -89,6 +89,103 @@ export class CalculateService {
     const result: CalBatchResult = CalBatchResult.fromJson(resp.data);
     Logger.info(TAG, `batchCompute items=${result.items.length} overall=${result.overallConsume.length}`);
     return result;
+  }
+
+  /** 计算器补充战绩接口缺失的准确突破等级，绝不把未知突破当0。 */
+  async fetchPromoteLevels(uid: string): Promise<Map<number, number>> {
+    const levels: Map<number, number> = new Map<number, number>();
+    for (let page: number = 1; page <= 50; page++) {
+      const body: Record<string, Object> = {
+        'uid': uid, 'region': RegionUtil.regionOfUid(uid), 'page': page, 'size': 20,
+        'element_attr_ids': [], 'weapon_cat_ids': []
+      };
+      const data: Record<string, Object> = await this.requestCalculator('/v1/sync/avatar/list', JSON.stringify(body));
+      const list: Record<string, Object>[] = (data['list'] as Record<string, Object>[]) ?? [];
+      for (const item of list) {
+        const promote: number = Number(item['promote_level']);
+        const id: number = Number(item['id']);
+        if (Number.isSafeInteger(id) && id > 0 && Number.isInteger(promote) && promote >= 0 && promote <= 6) {
+          levels.set(id, promote);
+        }
+      }
+      if (list.length < 20) {
+        return levels;
+      }
+    }
+    throw new Error('计算器角色分页超出限制');
+  }
+
+  /** 使用计算器技能ID及不含命座加成的等级，避免按数组位置猜测天赋。 */
+  async fillSyncedDetails(uid: string, delta: CalAvatarDelta, skillTarget: number,
+    weaponTarget: number = 0): Promise<void> {
+    const path: string = `/v1/sync/avatar/detail?avatar_id=${delta.avatarId}&uid=${uid}&region=${RegionUtil.regionOfUid(uid)}`;
+    const data: Record<string, Object> = await this.requestCalculator(path);
+    const raw: Record<string, Object>[] = (data['skill_list'] as Record<string, Object>[]) ?? [];
+    delta.skills = [];
+    for (const item of raw) {
+      const current: number = Number(item['level_current']);
+      if (!Number.isInteger(current) || current < 1 || current > 10) {
+        continue;
+      }
+      const skill: CalSkillDelta = new CalSkillDelta();
+      skill.id = Number(item['id']);
+      skill.levelCurrent = current;
+      skill.levelTarget = Math.max(current, skillTarget);
+      delta.skills.push(skill);
+    }
+    if (skillTarget > 0 && delta.skills.length === 0) {
+      throw new Error('未能取得准确天赋等级，未计算不完整的养成材料');
+    }
+    if (weaponTarget > 0) {
+      const weapon: Record<string, Object> = data['weapon'] as Record<string, Object>;
+      if (weapon !== undefined && weapon !== null) {
+        const item: CalWeaponDelta = new CalWeaponDelta();
+        item.id = Number(weapon['id']);
+        item.levelCurrent = Number(weapon['level_current']);
+        const maxLevel: number = Number(weapon['max_level'] ?? 90);
+        item.levelTarget = Math.max(item.levelCurrent, Math.min(weaponTarget, maxLevel));
+        // 同等级卡在突破关口时，API无promote_level则要求上游详情提供，不臆造已突破。
+        const rawPromote: Object | undefined = weapon['promote_level'];
+        if (rawPromote !== undefined) {
+          item.weaponPromoteLevel = Number(rawPromote);
+        } else if ([20, 40, 50, 60, 70, 80].indexOf(item.levelCurrent) >= 0) {
+          throw new Error('武器正处于突破等级，但接口未提供突破状态；请在图鉴单独计算该武器');
+        } else {
+          item.weaponPromoteLevel = [20, 40, 50, 60, 70, 80]
+            .filter((level: number): boolean => level < item.levelCurrent).length;
+        }
+        delta.weapon = item;
+      }
+    }
+  }
+
+  private async requestCalculator(path: string, body?: string): Promise<Record<string, Object>> {
+    const user = UserService.getInstance().getCurrentUser();
+    if (user === undefined || !user.hasCookie()) {
+      throw new Error('同步养成等级需要登录');
+    }
+    const host: string = user.isOversea ? 'https://sg-public-api.hoyolab.com/event/e20200928calculate'
+      : 'https://api-takumi.mihoyo.com/event/e20200928calculate';
+    const url: string = host + path;
+    const headers: Record<string, string> = HoyolabClient.merge(HoyolabClient.getBaseHeaders(), {
+      'Cookie': user.gameRecordCookie(),
+      'Referer': user.isOversea ? 'https://act.hoyolab.com/' : 'https://webstatic.mihoyo.com/'
+    });
+    let response: ApiResponse = body === undefined ? await ApiClient.getInstance().get(url, headers)
+      : await ApiClient.getInstance().postJson(url, body, headers);
+    if (response.isRiskControl()) {
+      const challenge: string = await RiskVerifier.tryResolveRisk(response, user.gameRecordCookie(), url);
+      if (challenge.length === 0) {
+        throw new Error('人机验证未完成');
+      }
+      headers['x-rpc-challenge'] = challenge;
+      response = body === undefined ? await ApiClient.getInstance().get(url, headers)
+        : await ApiClient.getInstance().postJson(url, body, headers);
+    }
+    if (!response.success || response.data === undefined) {
+      throw new Error(response.userFriendlyMessage());
+    }
+    return response.data as Record<string, Object>;
   }
 
   /** 构建 batch_compute 请求体 JSON */

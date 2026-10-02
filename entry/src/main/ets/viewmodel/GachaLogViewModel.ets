@@ -9,6 +9,8 @@ import { GachaArchive } from '../model/GachaArchive';
 import { GachaItem } from '../model/GachaItem';
 import { GachaStatistics, PoolStatistics, FiveStarDetail } from '../model/GachaStatistics';
 import { RefreshProgress } from '../model/RefreshProgress';
+import { WikiMetaService, GachaEventMeta } from '../service/WikiMetaService';
+import { UigfService } from '../service/UigfService';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'GachaLogViewModel';
@@ -25,6 +27,11 @@ export class GachaLogViewModel {
   items: GachaItem[] = [];
   progress: RefreshProgress = new RefreshProgress();
   isRefreshing: boolean = false;
+  fullRefresh: boolean = false;
+
+  cancelRefresh(): void {
+    GachaLogService.getInstance().cancelRefresh();
+  }
   message: string = '';
   loaded: boolean = false;
   /** 进度更新回调（页面注入，用于强制刷新 UI） */
@@ -142,6 +149,10 @@ export class GachaLogViewModel {
     const fiveNames: string[] = [];
     const fiveTimes: string[] = [];
     const fiveItemTypes: string[] = [];
+    const fiveItems: GachaItem[] = [];
+    const events: GachaEventMeta[] = await WikiMetaService.getGachaEvents();
+    const archive = this.archives.find((item: GachaArchive): boolean => item.id === archiveId);
+    const timezone: number = UigfService.timezoneOfUid(archive?.uid ?? this.currentUid);
     // 五星出金之间的抽数序列（升序遍历）
     const fiveSpans: number[] = [];
     let spanSinceLastFive: number = 0;
@@ -149,6 +160,7 @@ export class GachaLogViewModel {
       if (items[i].rankType === 5) {
         fiveStar++;
         fiveNames.push(items[i].name);
+        fiveItems.push(items[i]);
         fiveTimes.push(items[i].time);
         fiveItemTypes.push(items[i].itemType);
         fiveSpans.push(spanSinceLastFive + 1);
@@ -182,7 +194,7 @@ export class GachaLogViewModel {
     pool.endDate = GachaLogViewModel.formatPoolDate(items[items.length - 1].time);
     // 五星平均抽数 / 最非 / 最欧
     if (fiveStar > 0) {
-      pool.averageOrangePull = Math.round(items.length / fiveStar);
+      pool.averageOrangePull = Math.round(fiveSpans.reduce((sum: number, span: number): number => sum + span, 0) / fiveStar);
       pool.maxOrangePull = 0;
       pool.minOrangePull = 0;
       for (let i = 0; i < fiveSpans.length; i++) {
@@ -196,11 +208,21 @@ export class GachaLogViewModel {
     }
     // 四星平均抽数
     if (fourStar > 0) {
-      pool.averagePurplePull = Math.round(items.length / fourStar);
+      pool.averagePurplePull = Math.round((items.length - sinceLastFour) / fourStar);
     }
     if (fiveNames.length > 0) {
       pool.lastFiveName = fiveNames[fiveNames.length - 1];
       pool.lastFiveTime = fiveTimes[fiveTimes.length - 1];
+    }
+    const cycles: number[] = [];
+    let cycle: number = 0;
+    for (let i: number = 0; i < fiveItems.length; i++) {
+      cycle += fiveSpans[i];
+      const up: boolean | undefined = GachaLogViewModel.isEventUp(fiveItems[i], events, timezone);
+      cycles.push(up === true ? cycle : 0);
+      if (up === true) {
+        cycle = 0;
+      }
     }
     // 出金历史（倒序）+ 每角色用抽数明细（itemType 优先用服务端实际记录）
     for (let i = fiveNames.length - 1; i >= 0; i--) {
@@ -213,7 +235,10 @@ export class GachaLogViewModel {
       detail.name = fiveNames[i];
       detail.time = fiveTimes[i];
       detail.lastPull = fiveSpans.length > i ? fiveSpans[i] : 0;
-      detail.isUp = GachaLogViewModel.isLikelyUp(gachaType, i, fiveNames.length);
+      const up: boolean | undefined = GachaLogViewModel.isEventUp(fiveItems[i], events, timezone);
+      detail.isUp = up === true;
+      detail.upKnown = up !== undefined;
+      detail.totalCyclePull = cycles[i];
       detail.itemType = fiveItemTypes.length > i && fiveItemTypes[i].length > 0
         ? fiveItemTypes[i]
         : (gachaType === GachaType.WEAPON_EVENT ? '武器' : '角色');
@@ -231,13 +256,20 @@ export class GachaLogViewModel {
     return `${time.substring(0, 4)}.${time.substring(5, 7)}.${time.substring(8, 10)}`;
   }
 
-  /** 简化 UP 判定：角色事件池(301)每期第一个五星视为 UP 角色（需当期池元数据，此处近似） */
-  private static isLikelyUp(gachaType: number, indexFromLatest: number, totalFive: number): boolean {
-    if (gachaType === GachaType.AVATAR_EVENT) {
-      // 角色池：最近一个五星 50% 是 UP（按 half 周期假设），简化标记最近一个为 UP
-      return indexFromLatest === 0;
+  /** 只按当期池元数据判定UP；缺失元数据时保留未知，不推测中奖。 */
+  private static isEventUp(item: GachaItem, events: GachaEventMeta[], timezone: number): boolean | undefined {
+    let timestamp: number = 0;
+    try {
+      timestamp = Date.parse(UigfService.normalizeTime(item.time, timezone, 0).replace(' ', 'T') + 'Z');
+    } catch (e) {
+      return undefined;
     }
-    return false;
+    for (const event of events) {
+      if (event.type === item.gachaType && timestamp >= event.from && timestamp <= event.to) {
+        return event.upOrange.indexOf(item.itemId) >= 0;
+      }
+    }
+    return undefined;
   }
 
   /** 重载当前池历史（全部，倒序；UI 用 List LazyForEach 虚拟滚动） */
@@ -265,8 +297,11 @@ export class GachaLogViewModel {
         .refreshByStoken(this.currentUid, (p: RefreshProgress) => {
           this.progress = p;
           this.onProgressChanged();
-        });
+        }, this.fullRefresh);
       this.message = result.message;
+      if (result.uid.length > 0) {
+        await this.load(result.uid);
+      }
       await this.reloadStats();
       await this.reloadItems();
       // 通知主页祈愿卡重新读库（AppStorage 版本戳 + @Watch）
@@ -295,8 +330,11 @@ export class GachaLogViewModel {
         .importByUrl(url, this.currentUid, (p: RefreshProgress) => {
           this.progress = p;
           this.onProgressChanged();
-        });
+        }, this.fullRefresh);
       this.message = result.message;
+      if (result.uid.length > 0) {
+        await this.load(result.uid);
+      }
       await this.reloadStats();
       await this.reloadItems();
       // 通知主页祈愿卡重新读库（AppStorage 版本戳 + @Watch）

@@ -5,6 +5,7 @@
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
 import { Logger } from '../../common/Logger';
+import { BackupSnapshotValidator } from '../../model/BackupSnapshot';
 
 const TAG: string = 'Prefs';
 
@@ -110,6 +111,46 @@ export class PreferencesStore {
   }
 
   // ---- 业务便捷方法 ----
+  /** Portable application preferences only; exclude device identity and secrets. */
+  static exportPortable(): Record<string, string | number | boolean> {
+    const all: Record<string, Object> = PreferencesStore.getStore().getAllSync() as Record<string, Object>;
+    const result: Record<string, string | number | boolean> = {};
+    for (const key of Object.keys(all)) {
+      const value: Object = all[key];
+      if (BackupSnapshotValidator.portableKey(key) &&
+        (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')) {
+        result[key] = value as string | number | boolean;
+      }
+    }
+    return result;
+  }
+
+  static async replacePortable(values: Record<string, string | number | boolean>): Promise<void> {
+    const store: preferences.Preferences = PreferencesStore.getStore();
+    const previous: Record<string, string | number | boolean> = PreferencesStore.exportPortable();
+    for (const key of Object.keys(previous)) {
+      store.deleteSync(key);
+    }
+    for (const key of Object.keys(values)) {
+      if (!BackupSnapshotValidator.portableKey(key)) {
+        throw new Error('不允许还原设备身份或凭据设置');
+      }
+      store.putSync(key, values[key]);
+    }
+    await store.flush();
+  }
+
+  static getBackupJournal(): string {
+    return PreferencesStore.getString('backup.restore_journal_v1', '');
+  }
+
+  static async saveBackupJournal(text: string): Promise<void> {
+    const store: preferences.Preferences = PreferencesStore.getStore();
+    if (text.length > 0) { store.putSync('backup.restore_journal_v1', text); }
+    else { store.deleteSync('backup.restore_journal_v1'); }
+    await store.flush();
+  }
+
   static getCurrentUserId(): number {
     return PreferencesStore.getNumber(PreferencesStore.KEY_CURRENT_USER_ID, 0);
   }
@@ -193,8 +234,7 @@ export class PreferencesStore {
   static getBackgroundImageType(): string {
     const saved: string = PreferencesStore.getString(PreferencesStore.KEY_BG_IMAGE_TYPE, '');
     if (saved.length > 0) {
-      // 必应每日一图已下线（直连图源不稳定），旧值迁移为 none
-      return saved === 'bing' ? 'none' : saved;
+      return saved;
     }
     // 默认 none：主题渐变（最稳妥，避免本地/内置图与浅色主题叠加产生偏色）
     return 'none';

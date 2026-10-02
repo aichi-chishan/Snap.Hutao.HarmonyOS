@@ -36,7 +36,12 @@ export class CharacterExportService {
       lines.push('');
       lines.push('// ---------------------');
       // Windows: // {武器名} [{Level}, ☆{Quality}, ❖{精炼阶数}]（+第二行武器主/副词条，此处无词条数据省略）
-      lines.push(`// ${WikiMetaService.nameOfWeapon(d.weapon.id)} [Lv.${d.weapon.level}, ☆${d.weapon.rarity}, ❖${d.weapon.affixLevel}]`);
+      lines.push(`// ${d.weapon.name || WikiMetaService.nameOfWeapon(d.weapon.id)} [Lv.${d.weapon.level}, ☆${d.weapon.rarity}, ❖${d.weapon.affixLevel}]`);
+      for (const property of [d.weapon.mainProperty, d.weapon.subProperty]) {
+        if (property.propertyType.length > 0) {
+          lines.push(`// [${propLabelFn(property.propertyType)}: ${property.value}]`);
+        }
+      }
     }
     if (d.selectedProperties.length > 0) {
       lines.push('');
@@ -54,7 +59,7 @@ export class CharacterExportService {
       //           // [副词条: 值 ❶][...]（❶ = '\u2775' + 强化次数）
       for (const r of d.reliquaries) {
         lines.push('');
-        lines.push(`// ${CharacterExportService.posEmoji(r.pos)} ${propLabelFn(r.mainProperty.propertyType)}: ${r.mainProperty.value} [☆${r.rarity} +${r.level} ${r.name}] 评分: ${CharacterExportService.relicScore(r, d)}`);
+        lines.push(`// ${CharacterExportService.posEmoji(r.pos)} ${propLabelFn(r.mainProperty.propertyType)}: ${r.mainProperty.value} [☆${r.rarity} +${r.level} ${r.setName || r.name}] 评分: ${CharacterExportService.relicScore(r, d)}`);
         lines.push(`// ${CharacterExportService.formatSubProperties(r, propLabelFn)}`);
       }
     }
@@ -95,14 +100,7 @@ export class CharacterExportService {
 
   /** 圣遗物评分（对齐页面 CharacterPage.relicScore：推荐词条加权，无推荐回退双爆分） */
   private static relicScore(r: Reliquary, d: CharacterDetail): number {
-    if (d.recommend.subProperties.length > 0) {
-      const effective: boolean = ReliquaryScore.isCritEffective(d.id);
-      const full: number = ReliquaryScore.calculate(r.subProperties, d.recommend.subProperties,
-        d.recommend.energyType, effective);
-      if (full > 0) {
-        return Math.round(full * 10) / 10;
-      }
-    }
-    return ReliquaryScore.doubleCritScore(r, ReliquaryScore.isCritEffective(d.id));
+    return Math.round(ReliquaryScore.calculate(r.subProperties, d.recommend.subProperties,
+      d.recommend.energyType, ReliquaryScore.isCritEffective(d.id)) * 10) / 10;
   }
 }

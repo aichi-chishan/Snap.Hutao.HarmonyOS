@@ -26,10 +26,16 @@ export class RefreshResult {
   ok: boolean = false;
   message: string = '';
   fetchedCount: number = 0;
+  uid: string = '';
 }
 
 export class GachaLogService {
   private static instance: GachaLogService = new GachaLogService();
+  private cancelRequested: boolean = false;
+
+  cancelRefresh(): void {
+    this.cancelRequested = true;
+  }
 
   static getInstance(): GachaLogService {
     return GachaLogService.instance;
@@ -39,13 +45,19 @@ export class GachaLogService {
    * SToken 自动鉴权刷新。
    * @param uid 拉取 UID（默认当前 UID）
    */
-  async refreshByStoken(uid: string, onProgress: (p: RefreshProgress) => void): Promise<RefreshResult> {
+  async refreshByStoken(uid: string, onProgress: (p: RefreshProgress) => void, full: boolean = false): Promise<RefreshResult> {
+    this.cancelRequested = false;
     const user: User | undefined = UserService.getInstance().getCurrentUser();
     if (user === undefined || user.stoken.length === 0) {
       const r: RefreshResult = new RefreshResult();
       r.ok = false;
       r.message = '请先登录并确保 Cookie 含 SToken';
       return r;
+    }
+    if (user.isOversea || RegionUtil.regionOfUid(uid).startsWith('os_')) {
+      const result: RefreshResult = new RefreshResult();
+      result.message = '上游不支持海外 SToken 祈愿鉴权，请使用游戏祈愿记录 URL 导入';
+      return result;
     }
     const region: string = RegionUtil.regionOfUid(uid);
     const progress: RefreshProgress = new RefreshProgress();
@@ -74,13 +86,14 @@ export class GachaLogService {
       r.message = progress.error;
       return r;
     }
-    return this.fetchAll(uid, authInfo, onProgress, progress);
+    return this.fetchAll(uid, authInfo, onProgress, progress, full);
   }
 
   /**
    * 手动 URL 兜底导入。
    */
-  async importByUrl(url: string, uid: string, onProgress: (p: RefreshProgress) => void): Promise<RefreshResult> {
+  async importByUrl(url: string, uid: string, onProgress: (p: RefreshProgress) => void, full: boolean = false): Promise<RefreshResult> {
+    this.cancelRequested = false;
     const authInfo: GachaAuthInfo | undefined = GachaAuthApi.parseAuthFromUrl(url);
     if (authInfo === undefined) {
       const r: RefreshResult = new RefreshResult();
@@ -91,196 +104,127 @@ export class GachaLogService {
     const progress: RefreshProgress = new RefreshProgress();
     progress.running = true;
     onProgress(progress);
-    return this.fetchAll(uid, authInfo, onProgress, progress);
+    return this.fetchAll('', authInfo, onProgress, progress, full);
   }
 
-  private async fetchAll(uid: string, authInfo: GachaAuthInfo,
-    onProgress: (p: RefreshProgress) => void, progress: RefreshProgress): Promise<RefreshResult> {
-    // 归档
-    const archive: GachaArchive = await GachaRepo.getOrCreateArchive(uid);
-    await GachaRepo.selectArchive(archive.id);
-
-    let totalFetched: number = 0;
-    let aborted: boolean = false;
-    let abortMsg: string = '';
-
-    for (let i = 0; i < GachaType.QUERY_ORDER.length; i++) {
-      const gachaType: number = GachaType.QUERY_ORDER[i];
+  private async fetchAll(expectedUid: string, authInfo: GachaAuthInfo,
+    onProgress: (p: RefreshProgress) => void, progress: RefreshProgress, full: boolean): Promise<RefreshResult> {
+    let archive: GachaArchive | undefined = undefined;
+    let actualUid: string = '';
+    let totalInserted: number = 0;
+    let failure: string = '';
+    const allTypes: number[] = GachaType.QUERY_ORDER.concat(GachaType.BEYOND_ORDER);
+    for (const gachaType of allTypes) {
+      const isBeyond: boolean = GachaType.isBeyond(gachaType);
       const poolName: string = GachaType.nameOf(gachaType);
-      progress.currentPoolName = poolName;
-      progress.reportText = `正在拉取：${poolName}`;
-      onProgress(progress);
-
-      // 已有游标集合（Lazy 去重）
       const existingIds: Set<string> = new Set<string>();
-      const ids: string[] = await GachaRepo.getAllGachaIds(archive.id, gachaType);
-      for (let j = 0; j < ids.length; j++) {
-        existingIds.add(ids[j]);
+      if (archive !== undefined) {
+        for (const id of await GachaRepo.getAllGachaIds(archive.id, gachaType)) {
+          existingIds.add(id);
+        }
       }
-
+      const fresh: GachaItem[] = [];
+      const fetchedIds: Set<string> = new Set<string>();
       let endId: string = '';
-      const newItems: GachaItem[] = [];
-      let pageGuard: number = 0;
-      while (true) {
-        pageGuard++;
-        if (pageGuard > 999) {
-          break; // 安全上限
+      progress.currentPoolName = poolName;
+      for (let page: number = 0; page < 999; page++) {
+        if (this.cancelRequested) {
+          failure = '已取消刷新';
+          break;
         }
-        const resp: ApiResponse = await this.fetchPage(authInfo, gachaType, endId);
+        progress.reportText = `正在拉取：${poolName}`;
+        onProgress(progress);
+        const resp: ApiResponse = await this.fetchPage(authInfo, gachaType, endId, isBeyond);
         if (!resp.success) {
-          // authkey 失效/风控：中止
-          aborted = true;
-          abortMsg = GachaAuthApiError(resp);
-          progress.error = abortMsg;
-          progress.reportText = `拉取中止：${abortMsg}`;
-          onProgress(progress);
+          failure = `${poolName}：${GachaAuthApiError(resp)}`;
           break;
         }
-        const list: GachaItem[] = this.parseList(resp.data);
-        if (list.length === 0) {
+        const items: GachaItem[] = this.parseList(resp.data, isBeyond);
+        if (items.length === 0) {
           break;
         }
-        for (let k = 0; k < list.length; k++) {
-          const item: GachaItem = list[k];
-          item.archiveId = archive.id;
-          if (!existingIds.has(item.gachaId)) {
-            newItems.push(item);
-            existingIds.add(item.gachaId);
-            // 收集新拉记录（最近 40 条，供 UI 头像流展示）
-            if (progress.recentItems.length < 40) {
-              const ri: RecentGachaItem = new RecentGachaItem();
-              ri.name = item.name;
-              ri.itemType = item.itemType;
-              ri.rank = item.rankType;
-              ri.count = item.count;
-              progress.recentItems.push(ri);
-            }
+        // 响应UID是唯一归档依据。手工URL不借用已登录账号UID。
+        const pageUid: string = items[0].uid;
+        if (!/^[1-9][0-9]{8,9}$/.test(pageUid)
+          || (expectedUid.length > 0 && pageUid !== expectedUid)
+          || (actualUid.length > 0 && pageUid !== actualUid)
+          || items.some((item: GachaItem): boolean => item.uid !== pageUid)) {
+          failure = `${poolName}：接口 UID 与归档不一致，未保存本页`;
+          break;
+        }
+        if (archive === undefined) {
+          actualUid = pageUid;
+          archive = await GachaRepo.getOrCreateArchive(actualUid);
+          for (const id of await GachaRepo.getAllGachaIds(archive.id, gachaType)) {
+            existingIds.add(id);
           }
         }
-        totalFetched += list.length;
-        progress.fetchedCount = totalFetched;
-        progress.reportText = `${poolName}：已拉取 ${totalFetched} 条`;
+        let reachedExisting: boolean = false;
+        for (const item of items) {
+          if (existingIds.has(item.gachaId)) {
+            reachedExisting = true;
+            if (!full) {
+              continue;
+            }
+          }
+          if (fetchedIds.has(item.gachaId)) {
+            continue;
+          }
+          fetchedIds.add(item.gachaId);
+          item.archiveId = archive.id;
+          fresh.push(item);
+          existingIds.add(item.gachaId);
+          if (progress.recentItems.length < 40) {
+            const recent: RecentGachaItem = new RecentGachaItem();
+            recent.name = item.name;
+            recent.itemType = item.itemType;
+            recent.rank = item.rankType;
+            recent.count = item.count;
+            progress.recentItems.push(recent);
+          }
+        }
+        progress.fetchedCount = totalInserted + fresh.length;
         onProgress(progress);
-
-        // 翻页
-        if (list.length < AppConstants.GACHA_PAGE_SIZE) {
+        const next: string = items[items.length - 1].gachaId;
+        if ((!full && reachedExisting) || items.length < (isBeyond ? BEYOND_PAGE_SIZE : AppConstants.GACHA_PAGE_SIZE)) {
           break;
         }
-        endId = list[list.length - 1].gachaId;
-        if (endId.length === 0) {
+        if (next.length === 0 || next === endId) {
+          failure = `${poolName}：分页游标没有前进，已停止`;
           break;
         }
-        // 防封延时
+        endId = next;
         await this.delay();
       }
-
-      // 写入本池新增
-      if (newItems.length > 0) {
-        await GachaRepo.insertItems(newItems);
-        Logger.info(TAG, `pool ${gachaType} inserted ${newItems.length} new`);
-      }
-      if (aborted) {
+      // 全量失败/取消也只覆盖已验证返回的窗口，窗口外旧历史不受影响。
+      totalInserted += full ? await GachaRepo.replaceFetchedWindow(fresh, gachaType) : await GachaRepo.insertItems(fresh);
+      if (failure.length > 0) {
         break;
       }
-      // 池间也延时
       await this.delay();
     }
-
-    // 千星奇域（颂愿）：独立端点 + size=5，同样 end_id 游标去重合并
-    if (!aborted) {
-      for (let i = 0; i < GachaType.BEYOND_ORDER.length; i++) {
-        const gachaType: number = GachaType.BEYOND_ORDER[i];
-        const poolName: string = GachaType.nameOf(gachaType);
-        progress.currentPoolName = poolName;
-        progress.reportText = `正在拉取：${poolName}（千星奇域）`;
-        onProgress(progress);
-
-        const existingIds: Set<string> = new Set<string>();
-        const ids: string[] = await GachaRepo.getAllGachaIds(archive.id, gachaType);
-        for (let j = 0; j < ids.length; j++) {
-          existingIds.add(ids[j]);
-        }
-
-        let endId: string = '';
-        const newItems: GachaItem[] = [];
-        let pageGuard: number = 0;
-        while (true) {
-          pageGuard++;
-          if (pageGuard > 999) {
-            break;
-          }
-          const resp: ApiResponse = await this.fetchPage(authInfo, gachaType, endId, true);
-          if (!resp.success) {
-            // 颂愿池失败不中止整体刷新（老客户端/未开放时可能不可用），仅记录
-            Logger.warn(TAG, `beyond pool ${gachaType} fail retcode=${resp.retcode}`);
-            progress.reportText = `${poolName}：拉取失败，已跳过`;
-            onProgress(progress);
-            break;
-          }
-          const list: GachaItem[] = this.parseList(resp.data, true);
-          if (list.length === 0) {
-            break;
-          }
-          for (let k = 0; k < list.length; k++) {
-            const item: GachaItem = list[k];
-            item.archiveId = archive.id;
-            if (!existingIds.has(item.gachaId)) {
-              newItems.push(item);
-              existingIds.add(item.gachaId);
-              if (progress.recentItems.length < 40) {
-                const ri: RecentGachaItem = new RecentGachaItem();
-                ri.name = item.name;
-                ri.itemType = item.itemType;
-                ri.rank = item.rankType;
-                ri.count = item.count;
-                progress.recentItems.push(ri);
-              }
-            }
-          }
-          totalFetched += list.length;
-          progress.fetchedCount = totalFetched;
-          progress.reportText = `${poolName}：已拉取 ${totalFetched} 条`;
-          onProgress(progress);
-          if (list.length < BEYOND_PAGE_SIZE) {
-            break;
-          }
-          endId = list[list.length - 1].gachaId;
-          if (endId.length === 0) {
-            break;
-          }
-          await this.delay();
-        }
-
-        if (newItems.length > 0) {
-          await GachaRepo.insertItems(newItems);
-          Logger.info(TAG, `beyond pool ${gachaType} inserted ${newItems.length} new`);
-        }
-        await this.delay();
-      }
+    if (archive !== undefined) {
+      await GachaRepo.selectArchive(archive.id);
     }
-
-    progress.done = true;
+    const result: RefreshResult = new RefreshResult();
+    result.uid = actualUid;
+    result.ok = failure.length === 0;
+    result.fetchedCount = totalInserted;
+    result.message = failure.length > 0 ? `已保存 ${totalInserted} 条记录；${failure}`
+      : `刷新完成：写入 ${totalInserted} 条记录`;
     progress.running = false;
-    if (aborted) {
-      progress.reportText = `已保存部分数据（${totalFetched} 条），${abortMsg}`;
-      onProgress(progress);
-      const r: RefreshResult = new RefreshResult();
-      r.ok = false;
-      r.message = progress.reportText;
-      r.fetchedCount = totalFetched;
-      return r;
-    }
-    progress.reportText = `刷新完成：共拉取 ${totalFetched} 条，已去重合并`;
+    progress.done = result.ok;
+    progress.error = failure;
+    progress.fetchedCount = totalInserted;
+    progress.reportText = result.message;
     onProgress(progress);
-    const r: RefreshResult = new RefreshResult();
-    r.ok = true;
-    r.message = progress.reportText;
-    r.fetchedCount = totalFetched;
-    return r;
+    return result;
   }
 
   private async fetchPage(authInfo: GachaAuthInfo, gachaType: number, endId: string, isBeyond: boolean = false): Promise<ApiResponse> {
-    const host: string = isBeyond ? BEYOND_HOST : GACHA_HOST;
+    const cnHost: string = isBeyond ? BEYOND_HOST : GACHA_HOST;
+    const host: string = authInfo.isOversea
+      ? cnHost.replace('public-operation-hk4e.mihoyo.com', 'public-operation-hk4e-sg.hoyoverse.com') : cnHost;
     const size: number = isBeyond ? BEYOND_PAGE_SIZE : AppConstants.GACHA_PAGE_SIZE;
     let url: string = `${host}?lang=${authInfo.lang}&auth_appid=${AppConstants.GACHA_AUTH_APPID}` +
       `&authkey=${encodeURIComponent(authInfo.authkey)}&authkey_ver=${authInfo.authkeyVer}` +

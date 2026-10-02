@@ -20,7 +20,7 @@ export class UserRepo {
     const values: relationalStore.ValuesBucket = {
       'mid': user.mid,
       'aid': user.aid,
-      'is_oversea': 0,
+      'is_oversea': user.isOversea ? 1 : 0,
       // Token 密文走 TokenVault，表内仅存占位（不明文落库）
       'cookie_account_token': '',
       'cookie_ltoken_ltuid': '',
@@ -39,6 +39,7 @@ export class UserRepo {
   static async updateUser(user: User): Promise<void> {
     const values: relationalStore.ValuesBucket = {
       'mid': user.mid,
+      'is_oversea': user.isOversea ? 1 : 0,
       'aid': user.aid,
       'display_nickname': user.displayName,
       'avatar': user.avatar,
@@ -71,6 +72,7 @@ export class UserRepo {
     u.id = rs.getLong(rs.getColumnIndex('id'));
     u.mid = rs.getString(rs.getColumnIndex('mid'));
     u.aid = rs.getString(rs.getColumnIndex('aid'));
+    u.isOversea = rs.getLong(rs.getColumnIndex('is_oversea')) === 1;
     u.displayName = rs.getString(rs.getColumnIndex('display_nickname'));
     u.avatar = rs.getString(rs.getColumnIndex('avatar'));
     u.isSelected = rs.getLong(rs.getColumnIndex('is_selected')) === 1;

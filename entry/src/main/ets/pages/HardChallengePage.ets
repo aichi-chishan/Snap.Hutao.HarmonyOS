@@ -25,7 +25,7 @@ export struct HardChallengePage {
   /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
-  @StorageLink('currentUid') currentUid: string = '';
+  @StorageLink('currentUid') @Watch('onUidChanged') currentUid: string = '';
   @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
   @State vm: HardChallengeViewModel = new HardChallengeViewModel();
   /** 风控验证弹窗开关（needRiskVerify 时自动弹出，对齐 Windows 验证小窗） */
@@ -34,6 +34,12 @@ export struct HardChallengePage {
   @State modeIndex: number = 0;
   /** 当前档位 DataEntry 快照（页面 @State：档位切换/加载完成后显式同步，避免 @Observed 深层不刷新） */
   @State currentEntry: HardChallengeDataEntry = new HardChallengeDataEntry();
+
+  onUidChanged(): void {
+    this.vm = new HardChallengeViewModel();
+    this.syncEntry();
+    this.loadData();
+  }
 
   aboutToAppear(): void {
     this.loadData();
@@ -53,7 +59,7 @@ export struct HardChallengePage {
   loadData(): void {
     if (this.isLoggedIn && this.currentUid.length > 0) {
       // 先装载本地期数历史（实时拉取失败也可回看往期），再拉实时
-      this.vm.loadHistoryList().then(() => {
+      this.vm.loadHistoryList(this.currentUid).then(() => {
       });
       this.vm.load(this.currentUid).then(() => {
         this.syncEntry();
@@ -350,6 +356,39 @@ export struct HardChallengePage {
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
+  @Builder
+  popularityCard() {
+    Column({ space: 8 }) {
+      Row() {
+        Text('人气角色')
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+        Blank()
+        Button(this.vm.popularityLoading ? '加载中' : '刷新')
+          .fontSize(12)
+          .enabled(!this.vm.popularityLoading)
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => { this.vm.loadPopularity(this.currentUid); })
+      }.width('100%')
+      if (this.vm.popularityError.length > 0) {
+        Text(this.vm.popularityError).fontSize(12).fontColor($r('app.color.text_secondary'))
+      } else if (!this.vm.popularityLoading && this.vm.popularity.length === 0) {
+        Text('暂无人气角色数据').fontSize(12).fontColor($r('app.color.text_secondary'))
+      }
+      Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+        ForEach(this.vm.popularity, (avatar: HardChallengeSimpleAvatar) => {
+          this.avatarCircle(avatar)
+        }, (avatar: HardChallengeSimpleAvatar) => `hc_pop_${avatar.avatarId}_${avatar.image}`)
+      }.width('100%')
+    }
+    .width('100%')
+    .padding(12)
+    .borderRadius(10)
+    .backgroundColor($r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
+  }
+
   build() {
     Stack() {
       PageBackdrop({ embedMode: this.embedMode })
@@ -406,7 +445,7 @@ export struct HardChallengePage {
                       })
                       .hoverEffect(HoverEffect.Highlight)
                       .onClick(() => {
-                        this.vm.loadFromHistory(h.scheduleId).then(() => {
+                        this.vm.loadFromHistory(this.currentUid, h.scheduleId).then(() => {
                           this.syncEntry();
                         });
                       })
@@ -418,6 +457,8 @@ export struct HardChallengePage {
               .edgeEffect(EdgeEffect.Spring)
               .width('100%')
             }
+
+            this.popularityCard()
 
             if (!this.vm.isUnlock && !this.vm.single.hasData && !this.vm.mp.hasData) {
               Text(this.vm.message.length > 0 ? this.vm.message : '本账号暂无幽境危战数据')

@@ -11,6 +11,7 @@ export class GachaAuthInfo {
   authkeyVer: string = '1';
   signType: string = '2';
   lang: string = 'zh-cn';
+  isOversea: boolean = false;
 }
 
 export class GachaAuthApi {
@@ -70,6 +71,13 @@ export class GachaAuthApi {
 
   /** 从 URL 提取手动导入所需的 GachaAuthInfo（authkey 必须存在） */
   static parseAuthFromUrl(url: string): GachaAuthInfo | undefined {
+    const match: RegExpMatchArray | null = url.trim().match(/^https:\/\/([^/?#]+)(?:[/?#]|$)/);
+    if (match === null || [
+      'public-operation-hk4e.mihoyo.com', 'public-operation-hk4e-sg.hoyoverse.com',
+      'webstatic.mihoyo.com', 'webstatic-sea.hoyoverse.com', 'gs.hoyoverse.com'
+    ].indexOf(match[1].toLowerCase()) < 0) {
+      return undefined;
+    }
     const q: Record<string, string> = GachaAuthApi.parseUrlToQuery(url);
     const authkey: string = q['authkey'] ?? '';
     if (authkey.length === 0) {
@@ -80,6 +88,8 @@ export class GachaAuthApi {
     info.authkeyVer = q['authkey_ver'] ?? '1';
     info.signType = q['sign_type'] ?? '2';
     info.lang = q['lang'] ?? 'zh-cn';
+    info.isOversea = match[1].toLowerCase().indexOf('hoyoverse.com') >= 0
+      || (q['region'] ?? '').startsWith('os_');
     return info;
   }
 }

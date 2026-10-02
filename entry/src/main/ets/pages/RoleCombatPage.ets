@@ -25,7 +25,7 @@ export struct RoleCombatPage {
   /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
-  @StorageLink('currentUid') currentUid: string = '';
+  @StorageLink('currentUid') @Watch('onUidChanged') currentUid: string = '';
   @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
   @State vm: RoleCombatViewModel = new RoleCombatViewModel();
   /** 风控验证弹窗开关（needRiskVerify 时自动弹出，对齐 Windows 验证小窗） */
@@ -37,6 +37,11 @@ export struct RoleCombatPage {
   /** 月谕统计网格：最小列宽 / 列间距（对齐 Windows UniformPanel，MinItemWidth 按手机可读性下调） */
   private static readonly MOON_MIN_ITEM: number = 260;
   private static readonly MOON_COL_GAP: number = 8;
+
+  onUidChanged(): void {
+    this.vm = new RoleCombatViewModel();
+    this.loadData();
+  }
 
   aboutToAppear(): void {
     this.loadData();
@@ -56,7 +61,7 @@ export struct RoleCombatPage {
   loadData(): void {
     if (this.isLoggedIn && this.currentUid.length > 0) {
       // 先装载本地期数历史（实时拉取失败也可回看往期），再拉实时
-      this.vm.loadHistoryList().then(() => {
+      this.vm.loadHistoryList(this.currentUid).then(() => {
       });
       this.vm.load(this.currentUid).then(() => {
         this.syncScheduleMeta();
@@ -650,7 +655,7 @@ export struct RoleCombatPage {
                       })
                       .hoverEffect(HoverEffect.Highlight)
                       .onClick(() => {
-                        this.vm.loadFromHistory(h.scheduleId).then(() => {
+                        this.vm.loadFromHistory(this.currentUid, h.scheduleId).then(() => {
                           this.syncScheduleMeta();
                         });
                       })

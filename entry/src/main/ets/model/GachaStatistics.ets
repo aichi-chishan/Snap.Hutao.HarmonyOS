@@ -10,8 +10,10 @@ export class FiveStarDetail {
   time: string = '';
   /** 本次出金用了多少抽（自上次五星以来） */
   lastPull: number = 0;
-  /** 是否为 UP 角色（占位：角色事件池前 N 名视为 UP，简化处理） */
+  /** 按当期卡池元数据判断；未命中元数据时upKnown=false。 */
   isUp: boolean = false;
+  upKnown: boolean = false;
+  totalCyclePull: number = 0;
   /** 角色/武器（图标分类用） */
   itemType: string = '';
 }

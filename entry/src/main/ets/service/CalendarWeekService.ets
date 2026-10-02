@@ -7,6 +7,9 @@
  * - 本地养成计划联动高亮（对齐 Windows InitializeHighlightItems：当前计划命中的系列/角色全高亮）
  */
 import { WikiMetaService, MetaMaterial, WikiAvatarMeta, WikiWeaponMeta } from './WikiMetaService';
+import { GameCalendarRules } from './GameCalendarRules';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
+import { RegionUtil } from '../common/Constants';
 import { CultivationRepo, CultivateProject, CultivateEntry } from '../data/repo/CultivationRepo';
 
 /** 轮换材料系列（dayPair：1=周一四 2=周二五 3=周三六） */
@@ -98,6 +101,7 @@ export class CalendarWeekDay {
   /** M/D 文案 */
   monthDay: string = '';
   isToday: boolean = false;
+  allMaterialsOpen: boolean = false;
   /** 当日生日角色 */
   birthdays: CalendarBirthday[] = [];
   /** 当日可刷天赋书 */
@@ -241,7 +245,11 @@ export class CalendarWeekService {
     const result: CultivateHighlight = new CultivateHighlight();
     try {
       const projects: CultivateProject[] = await CultivationRepo.getProjects();
+      const selectedId: number = PreferencesStore.getNumber('cultivation.current_project_id', 0);
+      const currentId: number = projects.some((p: CultivateProject) => p.id === selectedId)
+        ? selectedId : (projects.length > 0 ? projects[0].id : 0);
       for (const p of projects) {
+        if (p.id !== currentId) { continue; }
         const entries: CultivateEntry[] = await CultivationRepo.getEntries(p.id);
         for (const e of entries) {
           if (e.avatarId > 0) {
@@ -303,28 +311,33 @@ export class CalendarWeekService {
   }
 
   /** 构建包含今日的周视图（周一起始，7 天；材料/生日/本地养成高亮不依赖登录） */
-  static async loadWeek(): Promise<CalendarWeekData> {
+  static async loadWeek(nowMs: number = Date.now()): Promise<CalendarWeekData> {
     await CalendarWeekService.ensureLoaded();
     // 养成计划每次进入都重新聚合（本地库查询代价小，新增计划后回日历即时生效）
     await CalendarWeekService.loadHighlight();
     const data: CalendarWeekData = new CalendarWeekData();
-    const dayNames: string[] = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    // 本周周一零点（本地时区）
-    const now: Date = new Date();
-    const todayZero: number = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const dow: number = now.getDay() === 0 ? 7 : now.getDay();
-    const monday: number = todayZero - (dow - 1) * 86400000;
+    const dayNames: string[] = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    const uid: string = PreferencesStore.getCurrentUid();
+    const offset: number = GameCalendarRules.serverOffset(RegionUtil.regionOfUid(uid));
+    const events = await WikiMetaService.getGachaEvents();
+    const firstDay: number = PreferencesStore.getNumber('calendar.first_day_of_week', 1);
+    const first: number = firstDay >= 0 && firstDay <= 6 ? Math.floor(firstDay) : 1;
+    const today: number = GameCalendarRules.serverDay(nowMs, offset);
+    const dow: number = new Date(today * GameCalendarRules.DAY_MS).getUTCDay();
+    const start: number = today - (dow - first + 7) % 7;
     for (let i = 0; i < 7; i++) {
-      const dateMs: number = monday + i * 86400000;
-      const d: Date = new Date(dateMs);
+      const ordinal: number = start + i;
+      const dateMs: number = ordinal * GameCalendarRules.DAY_MS - offset * 3600000;
+      const d: Date = new Date(ordinal * GameCalendarRules.DAY_MS);
       const day: CalendarWeekDay = new CalendarWeekDay();
       day.dateMs = dateMs;
-      day.dayName = dayNames[i];
-      day.monthDay = `${d.getMonth() + 1}/${d.getDate()}`;
-      day.isToday = dateMs === todayZero;
+      day.dayName = dayNames[d.getUTCDay()];
+      day.monthDay = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+      day.isToday = ordinal === today;
+      day.allMaterialsOpen = d.getUTCDay() === 0 || GameCalendarRules.allMaterialsOpen(dateMs, events, offset);
       // 星期几（1=周一..7=周日）→ dayPair；周日(7)无材料（对齐 Windows）
-      const weekday: number = i + 1;
-      if (weekday <= 6) {
+      const weekday: number = d.getUTCDay();
+      if (!day.allMaterialsOpen) {
         const pair: number = weekday <= 3 ? weekday : weekday - 3;
         for (const s of ROTATIONAL_SERIES) {
           if (s.dayPair !== pair) {
@@ -338,7 +351,7 @@ export class CalendarWeekService {
           }
         }
       }
-      const key: string = `${d.getMonth() + 1}-${d.getDate()}`;
+      const key: string = `${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
       day.birthdays = CalendarWeekService.birthdays.get(key) ?? [];
       data.days.push(day);
       data.birthdayFlags.push(day.birthdays.length > 0);

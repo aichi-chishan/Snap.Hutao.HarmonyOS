@@ -3,6 +3,7 @@
  * 怪物资料（对齐 Windows WikiMonsterPage）：列表/详情双栏（宽屏）/ 单栏切换（窄屏）。
  * 数据：rawfile/metadata/monster_meta.json（Snap.Metadata 提取）；图标：rawfile/icons/MonsterIcon（离线）。
  */
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { WikiMetaService, WikiMonsterMeta, MetaMaterial } from '../service/WikiMetaService';
 import { AppBackButton } from '../components/AppBackButton';
 import { MetaIcon } from '../components/MetaIcon';
@@ -22,12 +23,14 @@ export struct WikiMonsterPage {
   /** 当前详情对象（页面 @State 显式赋值驱动刷新） */
   @State current: WikiMonsterMeta | undefined = undefined;
   @State keyword: string = '';
+  @State gridMode: boolean = false;
   @State isWide: boolean = false;
   /** 基础属性滑条状态（对齐 Windows 数值曲线，1-110 级） */
   @State curLevel: number = 1;
   @State curHp: number = 0;
   @State curAtk: number = 0;
   @State curDef: number = 0;
+  private valueSequence: number = 0;
   /** 列表懒加载数据源 */
   private listSource: SimpleDataSource<WikiMonsterMeta> = new SimpleDataSource([]);
 
@@ -38,6 +41,7 @@ export struct WikiMonsterPage {
   ];
 
   aboutToAppear(): void {
+    this.gridMode = PreferencesStore.getBool('wiki.monster.grid', false);
     this.load();
   }
 
@@ -60,9 +64,9 @@ export struct WikiMonsterPage {
 
   /** 点击列表行：显式赋值页面 @State */
   select(m: WikiMonsterMeta): void {
-    this.onMonsterSelected();
-    this.selectedId = m.id;
+    this.selectedId = m.describeId;
     this.current = m;
+    this.onMonsterSelected();
   }
 
   /** 重置滑条并重算基础属性（切换怪物时） */
@@ -73,6 +77,7 @@ export struct WikiMonsterPage {
 
   /** 依据当前怪物+等级重算 生命/攻击/防御（无突破，曲线最高 110 级取数值区间） */
   calcMonsterBase(): void {
+    const sequence: number = ++this.valueSequence;
     const cur: WikiMonsterMeta | undefined = this.current;
     if (cur === undefined || cur.growCurves.length === 0) {
       this.curHp = 0;
@@ -85,7 +90,7 @@ export struct WikiMonsterPage {
     }
     BaseValueService.monsterBaseValues(cur.growCurves, cur.hpBase, cur.attackBase, cur.defenseBase,
       this.curLevel).then((v: MonsterBaseValues) => {
-      if (this.current !== undefined && this.current.id === cur.id) {
+      if (sequence === this.valueSequence && this.current !== undefined && this.current.id === cur.id) {
         this.curHp = v.hp;
         this.curAtk = v.atk;
         this.curDef = v.def;
@@ -275,6 +280,28 @@ export struct WikiMonsterPage {
           this.keyword = v;
           this.applyFilter();
         })
+      Button(this.gridMode ? '切换列表视图' : '切换网格视图')
+        .fontSize(12).height(30).hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          this.gridMode = !this.gridMode;
+          PreferencesStore.setBool('wiki.monster.grid', this.gridMode);
+        })
+      if (this.gridMode) {
+        Grid() {
+          LazyForEach(this.listSource, (m: WikiMonsterMeta) => {
+            GridItem() {
+              Column({ space: 6 }) {
+                MetaIcon({ category: 'MonsterIcon', name: m.icon, iconSize: 56 })
+                Text(m.name).fontSize(12).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .fontColor($r('app.color.text_primary'))
+              }.width('100%').height(98).padding(8).borderRadius(10)
+                .backgroundColor(this.selectedId === m.describeId ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
+                .hoverEffect(HoverEffect.Highlight).onClick(() => { this.select(m); })
+            }
+          }, (m: WikiMonsterMeta) => `grid_${m.describeId}_${this.selectedId}`)
+        }.columnsTemplate(this.isWide ? '1fr 1fr' : '1fr 1fr 1fr')
+          .columnsGap(8).rowsGap(8).cachedCount(4).width('100%').layoutWeight(1)
+      } else {
       List({ space: 4 }) {
         LazyForEach(this.listSource, (m: WikiMonsterMeta) => {
           ListItem() {
@@ -314,6 +341,7 @@ export struct WikiMonsterPage {
       .width('100%')
       .layoutWeight(1)
       .scrollBar(BarState.Auto)
+      }
     }
     .width(this.isWide ? 300 : '100%')
     .height('100%')

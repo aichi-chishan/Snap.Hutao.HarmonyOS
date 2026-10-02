@@ -13,6 +13,8 @@ export class CalItem {
   num: number = 0;
   level: number = 0;
   lackNum: number = 0;
+  /** 原始响应明确提供有效 id/num/lack_num 才可用于库存差额，避免未知值默认为 0。 */
+  hasInventoryData: boolean = false;
 }
 
 /** 技能消耗 */
@@ -87,6 +89,10 @@ export class CalBatchResult {
       item.num = CalBatchResult.num(o['num']);
       item.level = CalBatchResult.num(o['level']);
       item.lackNum = CalBatchResult.num(o['lack_num']);
+      item.hasInventoryData = CalBatchResult.hasInteger(o['id'])
+        && CalBatchResult.hasInteger(o['num']) && CalBatchResult.hasInteger(o['lack_num'])
+        && item.id > 0 && item.id <= 4294967295
+        && item.num >= 0 && item.num <= 4294967295;
       list.push(item);
     }
     return list;
@@ -98,6 +104,16 @@ export class CalBatchResult {
     }
     const n: number = Number(v);
     return Number.isNaN(n) ? def : n;
+  }
+
+  private static hasInteger(v: Object): boolean {
+    if (typeof v !== 'number' && typeof v !== 'string') {
+      return false;
+    }
+    if (typeof v === 'string' && !/^-?\d+$/.test(v as string)) {
+      return false;
+    }
+    return Number.isSafeInteger(Number(v));
   }
 
   private static str(v: Object): string {

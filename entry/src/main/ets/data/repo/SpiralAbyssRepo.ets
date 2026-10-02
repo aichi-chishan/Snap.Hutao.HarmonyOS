@@ -1,6 +1,6 @@
 /**
  * SpiralAbyssRepo.ets
- * 深渊期数历史本地库（对齐 Windows SpiralAbyssEntry：按 schedule_id 累积，可回看往期）。
+ * 深渊期数历史本地库（对齐 Windows SpiralAbyssEntry：按 UID/区服/schedule_id 累积，可回看往期）。
  * 明细以 API 原始 JSON 存档（raw_json），回看时 SpiralAbyssData.fromJson 完整重建。
  */
 import { relationalStore } from '@kit.ArkData';
@@ -11,6 +11,8 @@ const TAG: string = 'SpiralAbyssRepo';
 
 /** 期数历史条目（列表摘要） */
 export class AbyssHistoryEntry {
+  uid: string = '';
+  region: string = '';
   scheduleId: number = 0;
   startTime: number = 0;
   endTime: number = 0;
@@ -20,12 +22,15 @@ export class AbyssHistoryEntry {
 
 export class SpiralAbyssRepo {
   /** 保存/刷新某期存档（UPSERT） */
-  static async saveHistory(scheduleId: number, startTime: number, endTime: number,
+  static async saveHistory(uid: string, region: string, scheduleId: number, startTime: number, endTime: number,
     totalStar: number, rawJson: string): Promise<void> {
-    if (scheduleId <= 0 || rawJson.length === 0) {
+    if (uid.length === 0 || region.length === 0 || scheduleId <= 0 || rawJson.length === 0) {
       return;
     }
     const values: relationalStore.ValuesBucket = {
+      'kind': 'abyss',
+      'uid': uid,
+      'region': region,
       'schedule_id': scheduleId,
       'start_time': startTime,
       'end_time': endTime,
@@ -33,7 +38,10 @@ export class SpiralAbyssRepo {
       'raw_json': rawJson,
       'record_time': Date.now(),
     };
-    const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('abyss_history');
+    const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('challenge_records');
+    pred.equalTo('kind', 'abyss');
+    pred.equalTo('uid', uid);
+    pred.equalTo('region', region);
     pred.equalTo('schedule_id', scheduleId);
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(pred);
     let exists: boolean = false;
@@ -43,22 +51,29 @@ export class SpiralAbyssRepo {
       rs.close();
     }
     if (exists) {
-      await RelationalStoreHelper.update('abyss_history', values, pred);
+      await RelationalStoreHelper.update('challenge_records', values, pred);
     } else {
-      await RelationalStoreHelper.insert('abyss_history', values);
+      const inserted: Promise<number> = RelationalStoreHelper.getStore().insert('challenge_records', values,
+        relationalStore.ConflictResolution.ON_CONFLICT_REPLACE);
+      await inserted;
     }
     Logger.info(TAG, `history saved schedule=${scheduleId} star=${totalStar}`);
   }
 
   /** 期数列表（新期在前） */
-  static async listHistory(): Promise<AbyssHistoryEntry[]> {
-    const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('abyss_history');
+  static async listHistory(uid: string, region: string): Promise<AbyssHistoryEntry[]> {
+    const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('challenge_records');
+    pred.equalTo('kind', 'abyss');
+    pred.equalTo('uid', uid);
+    pred.equalTo('region', region);
     pred.orderByDesc('schedule_id');
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(pred);
     const out: AbyssHistoryEntry[] = [];
     try {
       while (rs.goToNextRow()) {
         const e: AbyssHistoryEntry = new AbyssHistoryEntry();
+        e.uid = rs.getString(rs.getColumnIndex('uid'));
+        e.region = rs.getString(rs.getColumnIndex('region'));
         e.scheduleId = rs.getLong(rs.getColumnIndex('schedule_id'));
         e.startTime = rs.getLong(rs.getColumnIndex('start_time'));
         e.endTime = rs.getLong(rs.getColumnIndex('end_time'));
@@ -73,8 +88,11 @@ export class SpiralAbyssRepo {
   }
 
   /** 取某期原始 JSON（无则返回空串） */
-  static async getRawJson(scheduleId: number): Promise<string> {
-    const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('abyss_history');
+  static async getRawJson(uid: string, region: string, scheduleId: number): Promise<string> {
+    const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('challenge_records');
+    pred.equalTo('kind', 'abyss');
+    pred.equalTo('uid', uid);
+    pred.equalTo('region', region);
     pred.equalTo('schedule_id', scheduleId);
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(pred);
     let raw: string = '';

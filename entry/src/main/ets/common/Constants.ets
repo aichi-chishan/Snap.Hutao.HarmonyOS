@@ -32,6 +32,9 @@ export class AppConstants {
   static readonly PASSPORT_SDK_VERSION: string = '2.16.0';
 
   /** DS Gen2 盐值（便笺/日历等战绩接口） */
+  static readonly OS_APP_VERSION: string = '2.54.0';
+  static readonly DS_SALT_OS_X4: string = 'h4c1d6ywfq5bsbnbhm1bzq7bxzzv6srt';
+  static readonly DS_SALT_OS_LK2: string = 'rk4xg2hakoi26nljpr099fv9fck1ah10';
   static readonly DS_SALT_X4: string = 'xV8v4Qu54lUKrEYFZkJhB8cuOh9Asafs';
   /** DS Gen1 盐值（genAuthKey/actionTicket 等接口） */
   static readonly DS_SALT_K2: string = 'sfYPEgpxkOe1I3XVMLdwp1Lyt9ORgZsq';
@@ -113,22 +116,31 @@ export class RetCodes {
   static readonly NOTE_BANNED: number = 10103;
 }
 
-/** 服务器区域工具：仅国服 */
+/** Region mapping follows upstream Region / HoyolabRegex, including new 10-digit UIDs. */
 export class RegionUtil {
-  /** 根据 UID 首位推断服务器：5 开头为 bilibili(cn_qd01)，其余为官方(cn_gf01) */
+  static isValidUid(uid: string): boolean {
+    return /^(?:1)?[1-9][0-9]{8}$/.test(uid);
+  }
+
   static regionOfUid(uid: string): string {
-    if (uid.length > 0 && uid.charAt(0) === '5') {
-      return 'cn_qd01';
+    if (!RegionUtil.isValidUid(uid)) {
+      return '';
     }
+    const prefix: string = uid.charAt(uid.length - 9);
+    if (prefix === '5') { return 'cn_qd01'; }
+    if (prefix === '6') { return 'os_usa'; }
+    if (prefix === '7') { return 'os_euro'; }
+    if (prefix === '8') { return 'os_asia'; }
+    if (prefix === '9') { return 'os_cht'; }
     return 'cn_gf01';
   }
 
-  /** 判断是否国服 UID（仅允许 1-9 开头，简单校验） */
+  static isOverseaRegion(region: string): boolean {
+    return ['os_usa', 'os_euro', 'os_asia', 'os_cht'].indexOf(region) >= 0;
+  }
+
   static isCnUid(uid: string): boolean {
-    if (uid.length === 0) {
-      return false;
-    }
-    const first: string = uid.charAt(0);
-    return first >= '1' && first <= '9';
+    const region: string = RegionUtil.regionOfUid(uid);
+    return region === 'cn_gf01' || region === 'cn_qd01';
   }
 }

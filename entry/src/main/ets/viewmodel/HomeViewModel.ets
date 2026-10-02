@@ -106,18 +106,32 @@ export class HomeViewModel {
 
   /** 是否加载中（任一数据源） */
   loading: boolean = false;
+  private loadGeneration: number = 0;
 
   /**
    * 页面可见/登录态变化时调用：聚合加载全部数据源。
    */
   async load(uid: string): Promise<void> {
+    const generation: number = ++this.loadGeneration;
+    // Remove account-owned state immediately, including on logout or an unbound account.
     this.currentUid = uid;
+    this.gachaPools = [];
+    this.gachaTotal = 0;
+    this.note = undefined;
+    this.noteRefreshTime = '';
+    this.signInfo = undefined;
+    this.acts = [];
+    this.challenge = new HomeChallengeSummary();
+    this.gachaLoaded = false;
+    this.noteLoaded = false;
+    this.signLoaded = false;
+    this.actsLoaded = false;
     this.loading = true;
     const tasks: Promise<void>[] = [
-      this.loadGacha(uid),
-      this.loadNote(uid),
-      this.loadSignIn(uid),
-      this.loadActs(uid),
+      this.loadGacha(uid, generation),
+      this.loadNote(uid, generation),
+      this.loadSignIn(uid, generation),
+      this.loadActs(uid, generation),
       this.loadAnnouncements(),
       this.loadChallenges(uid),
     ];
@@ -126,7 +140,9 @@ export class HomeViewModel {
     } catch (e) {
       Logger.warn(TAG, `aggregate load fail: ${(e as Error).message}`);
     }
-    this.loading = false;
+    if (generation === this.loadGeneration) {
+      this.loading = false;
+    }
   }
 
   /** 刷新全部（下拉/手动） */
@@ -136,11 +152,11 @@ export class HomeViewModel {
 
   /** 祈愿刷新后回主页：仅重读祈愿统计（轻量，不触发网络） */
   async reloadGacha(uid: string): Promise<void> {
-    await this.loadGacha(uid);
+    await this.loadGacha(uid, this.loadGeneration);
   }
 
   /** 祈愿统计：本地缓存直接算（不触发网络拉取，主页展示缓存） */
-  private async loadGacha(uid: string): Promise<void> {
+  private async loadGacha(uid: string, generation: number): Promise<void> {
     if (uid.length === 0) {
       // 未登录/未绑定：不创建空归档
       this.gachaLoaded = true;
@@ -172,10 +188,12 @@ export class HomeViewModel {
         total += pool.totalCount;
         stats.push(summary);
       }
+      if (generation !== this.loadGeneration) { return; }
       this.gachaPools = stats;
       this.gachaTotal = total;
       this.gachaLoaded = true;
     } catch (e) {
+      if (generation !== this.loadGeneration) { return; }
       Logger.warn(TAG, `loadGacha fail: ${(e as Error).message}`);
       this.gachaLoaded = true;
     }
@@ -183,15 +201,16 @@ export class HomeViewModel {
 
   /** 便笺刷新后重读本地缓存（服务层自动刷新/桌面卡片刷新触发，不重复拉网络） */
   async reloadNote(uid: string): Promise<void> {
-    await this.loadNote(uid);
+    await this.loadNote(uid, this.loadGeneration);
   }
 
   /** 便笺：本地缓存 */
-  private async loadNote(uid: string): Promise<void> {
+  private async loadNote(uid: string, generation: number): Promise<void> {
     try {
       const user = UserService.getInstance().getCurrentUser();
       if (user !== undefined && uid.length > 0) {
         const rec: DailyNoteRecord | undefined = await DailyNoteRepo.get(user.id, uid);
+        if (generation !== this.loadGeneration) { return; }
         if (rec !== undefined) {
           this.note = rec.note;
           this.noteRefreshTime = HomeViewModel.formatRefreshTime(rec.note.refreshTime);
@@ -199,29 +218,34 @@ export class HomeViewModel {
       }
       this.noteLoaded = true;
     } catch (e) {
+      if (generation !== this.loadGeneration) { return; }
       Logger.warn(TAG, `loadNote fail: ${(e as Error).message}`);
       this.noteLoaded = true;
     }
   }
 
   /** 签到：网络（luna） */
-  private async loadSignIn(uid: string): Promise<void> {
+  private async loadSignIn(uid: string, generation: number): Promise<void> {
     try {
       if (uid.length > 0) {
-        this.signInfo = await SignInService.getInstance().fetchInfo(uid);
+        const info: SignInInfo = await SignInService.getInstance().fetchInfo(uid);
+        if (generation !== this.loadGeneration) { return; }
+        this.signInfo = info;
       }
       this.signLoaded = true;
     } catch (e) {
+      if (generation !== this.loadGeneration) { return; }
       Logger.warn(TAG, `loadSignIn fail: ${(e as Error).message}`);
       this.signLoaded = true;
     }
   }
 
   /** 活动日历：网络（act_calendar），取进行中/开始中前 6 条 */
-  private async loadActs(uid: string): Promise<void> {
+  private async loadActs(uid: string, generation: number): Promise<void> {
     try {
       if (uid.length > 0) {
         const all: ActCalendarEntry[] = await CalendarService.getInstance().fetchCalendar(uid);
+        if (generation !== this.loadGeneration) { return; }
         const now: number = Date.now();
         const sorted: ActCalendarEntry[] = all
           .filter((a: ActCalendarEntry) => a.endTime > now)
@@ -230,6 +254,7 @@ export class HomeViewModel {
       }
       this.actsLoaded = true;
     } catch (e) {
+      if (generation !== this.loadGeneration) { return; }
       Logger.warn(TAG, `loadActs fail: ${(e as Error).message}`);
       this.actsLoaded = true;
     }

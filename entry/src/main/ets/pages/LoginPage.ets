@@ -1,6 +1,6 @@
 /**
  * LoginPage.ets（@Entry）
- * 米游社登录（仅国服）：内置 WebView 网页登录 / 扫码登录 / 手机验证码登录 / 手动粘贴 Cookie。
+ * 米游社 / HoYoLAB 登录：内置 WebView 网页登录 / 扫码登录 / 手机验证码登录 / 手动粘贴 Cookie。
  */
 import { router } from '@kit.ArkUI';
 import { webview } from '@kit.ArkWeb';
@@ -29,6 +29,7 @@ struct LoginPage {
   private controller: webview.WebviewController = new webview.WebviewController();
   @State mode: LoginMode = LoginMode.Qr;
   @State busy: boolean = false;
+  @State isOversea: boolean = false;
   @State statusText: string = '';
 
   // 扫码登录状态
@@ -217,7 +218,10 @@ struct LoginPage {
   /** 从 WebView 读取域 Cookie 并合并 */
   collectWebCookies(): string {
     let parts: string[] = [];
-    const domains: string[] = [
+    const domains: string[] = this.isOversea ? [
+      'https://www.hoyolab.com/', 'https://hoyolab.com/',
+      'https://account.hoyoverse.com/', 'https://api-account-os.hoyoverse.com/',
+    ] : [
       'https://mihoyo.com/',
       'https://www.mihoyo.com/',
       'https://api-takumi.mihoyo.com/',
@@ -265,7 +269,7 @@ struct LoginPage {
     this.busy = true;
     this.statusText = '校验 Cookie 中...';
     try {
-      const u: User = UserService.getInstance().parseCookie(rawCookie);
+      const u: User = UserService.getInstance().parseCookie(rawCookie, this.isOversea);
       if (!UserService.validateCookie(u)) {
         this.statusText = 'Cookie 不完整，请重新登录或检查复制的 Cookie';
         this.toast('Cookie 缺少关键字段（stoken/stuid/account_id）');
@@ -273,7 +277,7 @@ struct LoginPage {
         return;
       }
       this.statusText = '登录中：补齐 Token 并同步角色...';
-      const user: User = await UserService.getInstance().loginWithCookie(rawCookie, '', '');
+      const user: User = await UserService.getInstance().loginWithCookie(rawCookie, '', '', this.isOversea);
       this.statusText = `登录成功：${user.displayName.length > 0 ? user.displayName : '账号'}`;
       Logger.info(TAG, `login success user=${user.id}`);
       this.toast('登录成功');
@@ -305,7 +309,7 @@ struct LoginPage {
           router.back();
         })
       Blank()
-      Text('米游社登录')
+      Text(this.isOversea ? 'HoYoLAB 登录' : '米游社登录')
         .fontSize($r('app.float.subtitle_font_size'))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
@@ -327,8 +331,10 @@ struct LoginPage {
   modeTabs() {
     Row() {
       this.modeTab('网页', LoginMode.Web)
-      this.modeTab('扫码', LoginMode.Qr)
-      this.modeTab('验证码', LoginMode.MobileCaptcha)
+      if (!this.isOversea) {
+        this.modeTab('扫码', LoginMode.Qr)
+        this.modeTab('验证码', LoginMode.MobileCaptcha)
+      }
       this.modeTab('手动', LoginMode.Manual)
     }
     .width('100%')
@@ -487,18 +493,37 @@ struct LoginPage {
   @Builder
   webPanel(contentHeight: string) {
     Column() {
-      Web({ src: AppConstants.LOGIN_URL, controller: this.controller })
+      Web({ src: this.isOversea ? 'https://www.hoyolab.com/' : AppConstants.LOGIN_URL, controller: this.controller })
         .javaScriptAccess(true)
         .domStorageAccess(true)
-        .fileAccess(true)
+        .fileAccess(false)
         .width('100%')
         .height(contentHeight)
+      QTapButton({ label: '已完成网页登录，读取登录状态', primary: true, disabled: this.busy, onTap: () => {
+        this.doLogin(this.collectWebCookies());
+      } })
     }
   }
 
   build() {
     Column() {
       this.headerBar()
+      Row({ space: 12 }) {
+        Text('账号地区').fontColor($r('app.color.text_secondary')).fontSize(13)
+        Button(this.isOversea ? '国际服 HoYoLAB' : '国服 米游社')
+          .fontColor($r('app.color.app_primary'))
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .enabled(!this.busy)
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.shouldStopQr = true;
+            this.qrRunning = false;
+            this.isOversea = !this.isOversea;
+            this.cookieInput = '';
+            this.statusText = '';
+            this.mode = LoginMode.Manual;
+          })
+      }.width('100%').padding({ left: 16, right: 16, bottom: 8 })
       this.modeTabs()
       Scroll() {
         Column() {

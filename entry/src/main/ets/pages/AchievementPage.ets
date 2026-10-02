@@ -7,14 +7,17 @@ import { router, ShowDialogSuccessResponse } from '@kit.ArkUI';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { fileIo, picker } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { common } from '@kit.AbilityKit';
 import { AchievementService, UiafImportResult } from '../service/AchievementService';
 import { AchievementRepo } from '../data/repo/AchievementRepo';
 import {
   AchievementArchive,
   AchievementCategory,
+  AchievementEntry,
   AchievementRecord,
   AchievementStats,
   CategoryStats,
+  UiafImportStrategy,
 } from '../model/AchievementData';
 import { AppBackButton } from '../components/AppBackButton';
 import { SimpleDataSource } from '../components/SimpleDataSource';
@@ -33,6 +36,9 @@ class DisplayGroup {
   achieved: number = 0;
   /** 组内最近完成时间戳（秒；0=未完成） */
   latestTime: number = 0;
+  /** 下一未完成阶段的实际进度（-1=没有导入记录） */
+  progressCurrent: number = -1;
+  isDailyQuest: boolean = false;
 }
 
 @Entry
@@ -61,6 +67,10 @@ export struct AchievementPage {
   @State showCreate: boolean = false;
   @State newName: string = '';
   @State busy: boolean = false;
+  @State importStrategy: UiafImportStrategy = UiafImportStrategy.Lazy;
+  @State dailyQuestOnly: boolean = false;
+  @State dailyQuestCount: number = 0;
+  private records: Map<number, AchievementRecord> = new Map();
   /** 完成时间表（id -> 完成秒级时间戳，未完成优先排序用；非渲染状态） */
   private doneTime: Map<number, number> = new Map();
   /** 搜索防抖定时器（每键击全量重建列表会卡死 UI） */
@@ -101,12 +111,25 @@ export struct AchievementPage {
     const doneMap: Map<number, boolean> = new Map<number, boolean>();
     const doneTime: Map<number, number> = new Map<number, number>();
     records.forEach((rec: AchievementRecord, id: number) => {
-      doneMap.set(id, true);
-      doneTime.set(id, rec.timestamp);
+      if (AchievementRecord.isDone(rec)) {
+        doneMap.set(id, true);
+        if (rec.timestamp > 0 && rec.timestamp < 253402271999) {
+          doneTime.set(id, rec.timestamp);
+        }
+      }
     });
+    this.records = records;
     this.doneMap = doneMap;
     this.doneTime = doneTime;
     this.catStats = await AchievementService.getCategoryStats(this.currentArchiveId);
+    let dailyQuestCount: number = 0;
+    for (const cs of this.catStats) {
+      dailyQuestCount += cs.category.entries.filter((entry: AchievementEntry) => entry.isDailyQuest).length;
+    }
+    this.dailyQuestCount = dailyQuestCount;
+    if (dailyQuestCount === 0) {
+      this.dailyQuestOnly = false;
+    }
     const stats: AchievementStats = new AchievementStats();
     for (const cs of this.catStats) {
       stats.total += cs.stats.total;
@@ -130,6 +153,9 @@ export struct AchievementPage {
       const grouped: Map<string, DisplayGroup> = new Map();
       const descByEntry: Map<number, string> = new Map();
       for (const e of cat.entries) {
+        if (this.dailyQuestOnly && !e.isDailyQuest) {
+          continue;
+        }
         let g: DisplayGroup | undefined = grouped.get(e.groupKey);
         if (g === undefined) {
           g = new DisplayGroup();
@@ -140,6 +166,7 @@ export struct AchievementPage {
           grouped.set(e.groupKey, g);
         }
         g.ids.push(e.id);
+        g.isDailyQuest = g.isDailyQuest || e.isDailyQuest;
         g.reward += e.reward;
         descByEntry.set(e.id, e.desc);
       }
@@ -153,7 +180,12 @@ export struct AchievementPage {
         }
         g.achieved = achieved;
         // 描述取"下一阶段"（全完成时取最后一阶段）
-        const nextIdx: number = Math.min(achieved, g.ids.length - 1);
+        const incompleteIdx: number = g.ids.findIndex((id: number) => !this.doneMap.has(id));
+        const nextIdx: number = incompleteIdx >= 0 ? incompleteIdx : g.ids.length - 1;
+        const record: AchievementRecord | undefined = this.records.get(g.ids[nextIdx]);
+        if (incompleteIdx >= 0 && record !== undefined) {
+          g.progressCurrent = record.current;
+        }
         const desc: string | undefined = descByEntry.get(g.ids[nextIdx]);
         g.desc = desc !== undefined ? desc : '';
         // 组内最近完成时间（排序与展示共用）
@@ -161,7 +193,7 @@ export struct AchievementPage {
         if (this.statusFilter === 1 && achieved === 0) {
           return;
         }
-        if (this.statusFilter === 2 && achieved > 0) {
+        if (this.statusFilter === 2 && achieved >= g.total) {
           return;
         }
         // 搜索三态（对齐 Windows UpdateAchievementsFilterBySearch）：
@@ -230,6 +262,25 @@ export struct AchievementPage {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 2000 });
   }
 
+  private async copyAchievementIds(g: DisplayGroup): Promise<void> {
+    try {
+      const data: pasteboard.PasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, g.ids.join(', '));
+      await pasteboard.getSystemPasteboard().setData(data);
+      this.toast(g.ids.length > 1 ? '已复制各阶段成就 ID' : '已复制成就 ID');
+    } catch (e) {
+      this.toast(`复制失败：${(e as Error).message}`);
+    }
+  }
+
+  private async openAchievementGuide(g: DisplayGroup, hoyolab: boolean): Promise<void> {
+    try {
+      const context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      await context.openLink(AchievementService.guideUrl(g.name, hoyolab));
+    } catch (e) {
+      this.toast(`打开失败：${(e as Error).message}`);
+    }
+  }
+
   /** 点击分组：未完成→完成下一阶段；全完成→清空整组 */
   async tapGroup(g: DisplayGroup): Promise<void> {
     if (this.busy || this.currentArchiveId < 0) {
@@ -242,7 +293,7 @@ export struct AchievementPage {
           await AchievementRepo.setRecord(this.currentArchiveId, id, false, 0);
         }
       } else {
-        const nextId: number = g.ids[g.achieved];
+        const nextId: number = g.ids.find((id: number) => !this.doneMap.has(id)) ?? g.ids[0];
         await AchievementRepo.setRecord(this.currentArchiveId, nextId, true, Math.floor(Date.now() / 1000));
       }
       await this.refreshData();
@@ -252,7 +303,7 @@ export struct AchievementPage {
   }
 
   async switchArchive(id: number): Promise<void> {
-    if (id === this.currentArchiveId) {
+    if (this.busy || id === this.currentArchiveId) {
       return;
     }
     await AchievementRepo.selectArchive(id);
@@ -304,6 +355,11 @@ export struct AchievementPage {
 
   /** 剪贴板导入 UIAF（对齐 Windows ImportUIAFFromClipboardCommand：剪贴板 JSON 直接解析） */
   async importUiafFromClipboard(): Promise<void> {
+    if (this.busy || this.currentArchiveId < 0) {
+      return;
+    }
+    const archiveId: number = this.currentArchiveId;
+    this.busy = true;
     try {
       const pd: pasteboard.PasteData = await pasteboard.getSystemPasteboard().getData();
       const text: string = pd.getPrimaryText();
@@ -311,18 +367,21 @@ export struct AchievementPage {
         this.toast('剪贴板中没有 UIAF 数据');
         return;
       }
-      const result: UiafImportResult = await AchievementService.importUiaf(this.currentArchiveId, text);
-      this.toast(result.ok ? result.message : `导入失败：${result.message}`);
-      if (result.ok) {
-        await this.refreshData();
-      }
+      await this.applyUiaf(text, archiveId);
     } catch (e) {
       this.toast(`导入失败：${(e as Error).message}`);
+    } finally {
+      this.busy = false;
     }
   }
 
   /** 选择文件导入 UIAF */
   async importUiaf(): Promise<void> {
+    if (this.busy || this.currentArchiveId < 0) {
+      return;
+    }
+    const archiveId: number = this.currentArchiveId;
+    this.busy = true;
     try {
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker();
       const opts: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
@@ -338,17 +397,47 @@ export struct AchievementPage {
         const buf: ArrayBuffer = new ArrayBuffer(stat.size);
         fileIo.readSync(file.fd, buf);
         const text: string = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
-        const result: UiafImportResult = await AchievementService.importUiaf(this.currentArchiveId, text);
-        this.toast(result.ok ? result.message : `导入失败：${result.message}`);
-        if (result.ok) {
-          await this.refreshData();
-        }
+        await this.applyUiaf(text, archiveId);
       } finally {
         fileIo.closeSync(file);
       }
     } catch (e) {
       this.toast(`导入失败：${(e as Error).message}`);
+    } finally {
+      this.busy = false;
     }
+  }
+
+  private async applyUiaf(text: string, archiveId: number): Promise<void> {
+    const strategy: UiafImportStrategy = this.importStrategy;
+    if (strategy === UiafImportStrategy.Overwrite) {
+      const dialog: ShowDialogSuccessResponse = await this.getUIContext().getPromptAction().showDialog({
+        title: '覆盖成就档案',
+        message: `文件将替换「${this.currentName()}」的全部记录；文件中没有的成就记录会被移除。是否继续？`,
+        buttons: [
+          { text: '取消', color: $r('app.color.text_secondary') },
+          { text: '覆盖导入', color: $r('app.color.danger') },
+        ],
+      });
+      if (dialog.index !== 1) {
+        return;
+      }
+    }
+    const result: UiafImportResult = await AchievementService.importUiaf(archiveId, text, strategy);
+    this.toast(result.ok ? result.message : `导入失败：${result.message}`);
+    if (result.ok && this.currentArchiveId === archiveId) {
+      await this.refreshData();
+    }
+  }
+
+  private importStrategyLabel(): string {
+    if (this.importStrategy === UiafImportStrategy.Aggressive) {
+      return '积极合并：更新同 ID 的记录，保留其他记录';
+    }
+    if (this.importStrategy === UiafImportStrategy.Overwrite) {
+      return '覆盖：档案完全以导入文件为准';
+    }
+    return '惰性合并：仅添加新成就，保留已有记录';
   }
 
   /** 导出 UIAF 到用户选择的文件 */
@@ -415,7 +504,7 @@ export struct AchievementPage {
                 this.groupRow(g)
               }
               .margin({ bottom: 8 })
-            }, (g: DisplayGroup) => `g_${g.ids[0]}_${g.achieved}`)
+            }, (g: DisplayGroup) => `g_${g.ids[0]}_${g.achieved}_${g.latestTime}_${g.progressCurrent}_${g.isDailyQuest}`)
           }
         }
         .width('100%')
@@ -475,6 +564,24 @@ export struct AchievementPage {
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
+
+      Row({ space: 8 }) {
+        Select([{ value: '惰性合并' }, { value: '积极合并' }, { value: '覆盖档案' }])
+          .selected(this.importStrategy)
+          .value(this.importStrategy === UiafImportStrategy.Lazy ? '惰性合并' :
+            (this.importStrategy === UiafImportStrategy.Aggressive ? '积极合并' : '覆盖档案'))
+          .font({ size: 12 })
+          .enabled(!this.busy)
+          .hoverEffect(HoverEffect.Highlight)
+          .onSelect((index: number) => {
+            this.importStrategy = index as UiafImportStrategy;
+          })
+        Text(this.importStrategyLabel())
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+          .layoutWeight(1)
+      }
+      .width('100%')
 
       // 档案切换 + 档案管理
       Scroll() {
@@ -659,6 +766,24 @@ export struct AchievementPage {
       }
       .width('100%')
       // 分类筛选（横向滚动 chips）
+      Row({ space: 8 }) {
+        Button(this.dailyQuestCount > 0 ? '只看每日委托' : '每日委托（暂无标记）')
+          .fontSize(12)
+          .height(30)
+          .enabled(this.dailyQuestCount > 0)
+          .backgroundColor(this.dailyQuestOnly ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
+          .fontColor(this.dailyQuestOnly ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+          .hoverEffect(HoverEffect.Highlight)
+          .onClick(() => {
+            this.dailyQuestOnly = !this.dailyQuestOnly;
+            this.rebuildGroups();
+          })
+        Text(this.dailyQuestOnly ? `仅显示元数据明确标记的 ${this.dailyQuestCount} 项` : '按元数据委托标记筛选')
+          .fontSize(10)
+          .fontColor($r('app.color.text_secondary'))
+          .layoutWeight(1)
+      }
+      .width('100%')
       Scroll() {
         Row({ space: 8 }) {
           Text('全部分类')
@@ -708,6 +833,8 @@ export struct AchievementPage {
       .borderRadius(13)
       .backgroundColor(g.achieved >= g.total ? $r('app.color.success') : Color.Transparent)
       .border({ width: 1.5, color: g.achieved >= g.total ? $r('app.color.success') : $r('app.color.divider') })
+      .hoverEffect(HoverEffect.Highlight)
+      .onClick(() => this.tapGroup(g))
 
       Column({ space: 3 }) {
         Row({ space: 6 }) {
@@ -715,6 +842,8 @@ export struct AchievementPage {
             .fontSize(14)
             .fontWeight(FontWeight.Medium)
             .fontColor(g.achieved >= g.total ? $r('app.color.text_secondary') : $r('app.color.text_primary'))
+            .hoverEffect(HoverEffect.Highlight)
+            .onClick(() => this.tapGroup(g))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
@@ -731,6 +860,11 @@ export struct AchievementPage {
               .fontSize(10)
               .fontColor($r('app.color.text_secondary'))
           }
+          if (g.isDailyQuest) {
+            Text('委托')
+              .fontSize(10)
+              .fontColor($r('app.color.app_primary'))
+          }
         }
         .width('100%')
         Text(g.desc)
@@ -743,12 +877,47 @@ export struct AchievementPage {
           .fontSize(10)
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
+        if (g.progressCurrent >= 0) {
+          Text(`当前进度 ${g.progressCurrent}`)
+            .fontSize(10)
+            .fontColor($r('app.color.app_primary'))
+            .width('100%')
+        }
         // 最近完成时间（对齐 Windows AchievementView.Time：yyyy.MM.dd HH:mm:ss）
         if (g.latestTime > 0) {
           Text(`完成于 ${AchievementPage.formatStamp(g.latestTime)}`)
             .fontSize(10)
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
+        }
+        Row({ space: 8 }) {
+          Button('复制 ID')
+            .fontSize(10)
+            .height(26)
+            .backgroundColor($r('app.color.card_surface'))
+            .fontColor($r('app.color.app_primary'))
+            .hoverEffect(HoverEffect.Highlight)
+            .onClick(() => {
+              this.copyAchievementIds(g);
+            })
+          Button('米游社攻略')
+            .fontSize(10)
+            .height(26)
+            .backgroundColor($r('app.color.card_surface'))
+            .fontColor($r('app.color.app_primary'))
+            .hoverEffect(HoverEffect.Highlight)
+            .onClick(() => {
+              this.openAchievementGuide(g, false);
+            })
+          Button('HoYoLAB')
+            .fontSize(10)
+            .height(26)
+            .backgroundColor($r('app.color.card_surface'))
+            .fontColor($r('app.color.app_primary'))
+            .hoverEffect(HoverEffect.Highlight)
+            .onClick(() => {
+              this.openAchievementGuide(g, true);
+            })
         }
       }
       .alignItems(HorizontalAlign.Start)
@@ -759,8 +928,7 @@ export struct AchievementPage {
     .borderRadius(12)
     .backgroundColor($r('app.color.card_surface'))
     .opacity(g.achieved >= g.total ? 0.75 : 1)
-    .onClick(() => {
-      this.tapGroup(g);
-    })
+    .hoverEffect(HoverEffect.Highlight)
+    // 仅勾选圈和标题改变完成状态，攻略/复制按钮不会触发父卡片切换。
   }
 }

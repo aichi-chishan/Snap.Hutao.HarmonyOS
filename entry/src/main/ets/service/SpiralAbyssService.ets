@@ -11,10 +11,11 @@ import { RiskVerifier } from '../data/network/RiskVerifier';
 import { SpiralAbyssData } from '../model/SpiralAbyss';
 import { UserService } from './UserService';
 import { RegionUtil, AppConstants } from '../common/Constants';
+import { HoyolabEndpoints } from '../common/HoyolabEndpoints';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'SpiralAbyssService';
-const URL: string = 'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api/spiralAbyss';
+const API_PATH: string = 'spiralAbyss';
 
 export class SpiralAbyssService {
   private static instance: SpiralAbyssService = new SpiralAbyssService();
@@ -46,16 +47,19 @@ export class SpiralAbyssService {
     const sorted: string = DsSigner.sortQuery(query);
     const t: number = DsSigner.nowTimestamp();
     const r: string = DsSigner.randomNumber();
-    const ds: string = await DsSigner.signGen2(AppConstants.DS_SALT_X4, t, r, '', sorted);
-    const url: string = `${URL}?${sorted}`;
+    const ds: string = await DsSigner.signGen2(HoyolabEndpoints.gameRecordSalt(region), t, r, '', sorted);
+    const url: string = `${HoyolabEndpoints.gameRecordUrl(API_PATH, region)}?${sorted}`;
     const headers: Record<string, string> = { 'DS': ds, 'Cookie': cookie };
     if (challenge !== undefined && challenge.length > 0) {
       headers['x-rpc-challenge'] = challenge;
     }
     const resp0: ApiResponse = await ApiClient.getInstance().get(url,
-      HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
+      HoyolabClient.merge(HoyolabClient.getBaseHeaders(region), headers));
     let resp: ApiResponse = resp0;
     if (resp0.isRiskControl()) {
+      if (HoyolabEndpoints.isOverseaRegion(region)) {
+        throw new Error('HoYoLAB 需要完成验证，请在官方应用验证后重试');
+      }
       // 1034：自动弹统一验证窗，成功后带 challenge 服务内重放一次
       const replayChallenge: string = await RiskVerifier.tryResolveRisk(resp0, cookie, url);
       if (replayChallenge.length === 0) {
@@ -63,7 +67,7 @@ export class SpiralAbyssService {
       }
       headers['x-rpc-challenge'] = replayChallenge;
       resp = await ApiClient.getInstance().get(url,
-        HoyolabClient.merge(HoyolabClient.getBaseHeaders(), headers));
+        HoyolabClient.merge(HoyolabClient.getBaseHeaders(region), headers));
     }
     // Cookie 鉴权失效（-100/10001）：强制换新凭证后重试一次（对齐 Windows CookieToken 刷新）
     if (!resp.success && UserService.isCookieAuthError(resp)) {
@@ -74,14 +78,14 @@ export class SpiralAbyssService {
         }
         retryHeaders['DS'] = headers['DS'];
         return ApiClient.getInstance().get(url,
-          HoyolabClient.merge(HoyolabClient.getBaseHeaders(), retryHeaders));
+          HoyolabClient.merge(HoyolabClient.getBaseHeaders(region), retryHeaders));
       });
     }
     if (!resp.success || resp.data === undefined) {
       throw new Error(resp.userFriendlyMessage());
     }
     const data: SpiralAbyssData = SpiralAbyssData.fromJson(resp.data);
-    data.rawJson = resp.raw;
+    data.rawJson = JSON.stringify(resp.data);
     Logger.info(TAG, `abyss schedule=${scheduleType} star=${data.totalStar} floor=${data.maxFloor}`);
     return data;
   }

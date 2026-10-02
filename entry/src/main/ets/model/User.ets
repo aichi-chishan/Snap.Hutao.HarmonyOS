@@ -7,6 +7,7 @@ import { UserGameRole } from './UserGameRole';
 
 export class User {
   id: number = 0;
+  isOversea: boolean = false;
   /** 米游社 mid（用户唯一标识） */
   mid: string = '';
   /** account_id（较短 ID） */
@@ -15,6 +16,12 @@ export class User {
   /* ---- Cookie 五件套原始字段（内存态明文） ---- */
   accountId: string = '';
   cookieToken: string = '';
+  accountMidV2: string = '';
+  accountIdV2: string = '';
+  cookieTokenV2: string = '';
+  ltuidV2: string = '';
+  ltmidV2: string = '';
+  ltokenV2: string = '';
   ltuid: string = '';
   ltoken: string = '';
   stuid: string = '';
@@ -31,7 +38,7 @@ export class User {
 
   /** 是否已具备有效 Cookie 态 */
   hasCookie(): boolean {
-    return this.accountId.length > 0 || this.stuid.length > 0;
+    return this.accountId.length > 0 || this.accountMidV2.length > 0 || this.stuid.length > 0 || this.ltuid.length > 0;
   }
 
   /** 战绩类接口所需 Cookie：对齐 Windows CookieType.Cookie = CookieToken | LToken = account_id+cookie_token+ltuid+ltoken。
@@ -53,6 +60,7 @@ export class User {
     if (pairs.length === 0) {
       return '';
     }
+    this.appendV2Cookies(pairs);
     return pairs.join('; ');
   }
 
@@ -106,6 +114,7 @@ export class User {
     if (this.stokenV2.length > 0) {
       pairs.push(`stoken_v2=${this.stokenV2}`);
     }
+    this.appendV2Cookies(pairs);
     return pairs.join('; ');
   }
 
@@ -128,22 +137,39 @@ export class User {
       return v === undefined ? '' : v;
     };
     // 优先 v2，其次 v1
-    this.accountId = get('account_id').length > 0 ? get('account_id') : get('account_mid_v2');
+    this.accountId = get('account_id').length > 0 ? get('account_id') : get('account_id_v2');
+    this.accountMidV2 = get('account_mid_v2');
+    this.accountIdV2 = get('account_id_v2');
+    this.cookieTokenV2 = get('cookie_token_v2');
+    this.ltuidV2 = get('ltuid_v2');
+    this.ltmidV2 = get('ltmid_v2');
+    this.ltokenV2 = get('ltoken_v2');
     this.cookieToken = get('cookie_token').length > 0 ? get('cookie_token') : get('cookie_token_v2');
-    this.ltuid = get('ltuid').length > 0 ? get('ltuid') : get('ltmid_v2');
+    this.ltuid = get('ltuid').length > 0 ? get('ltuid') : get('ltuid_v2');
     this.ltoken = get('ltoken').length > 0 ? get('ltoken') : get('ltoken_v2');
     this.stuid = get('stuid').length > 0 ? get('stuid') : get('stuid_v2');
     this.stoken = get('stoken').length > 0 ? get('stoken') : get('stoken_v2');
     // v2 原始键值单独保存（交换接口/某些域可能需要原键名）
     this.stuidV2 = get('stuid_v2');
     this.stokenV2 = get('stoken_v2');
-    this.mid = get('mid').length > 0 ? get('mid') : get('mid');
+    this.mid = get('mid').length > 0 ? get('mid')
+      : (this.accountMidV2.length > 0 ? this.accountMidV2 : this.ltmidV2);
     const stuidRaw: string = get('stuid_v2');
     if (this.stuid.length === 0 && stuidRaw.length > 0) {
       this.stuid = stuidRaw;
     }
-    const has: boolean = (this.accountId.length > 0 || this.stuid.length > 0) && this.stoken.length > 0;
+    const has: boolean = this.hasCookie() &&
+      (this.stoken.length > 0 || this.cookieToken.length > 0 || this.ltoken.length > 0);
     return has;
+  }
+
+  private appendV2Cookies(pairs: string[]): void {
+    if (this.accountIdV2.length > 0) { pairs.push(`account_id_v2=${this.accountIdV2}`); }
+    if (this.accountMidV2.length > 0) { pairs.push(`account_mid_v2=${this.accountMidV2}`); }
+    if (this.cookieTokenV2.length > 0) { pairs.push(`cookie_token_v2=${this.cookieTokenV2}`); }
+    if (this.ltuidV2.length > 0) { pairs.push(`ltuid_v2=${this.ltuidV2}`); }
+    if (this.ltmidV2.length > 0) { pairs.push(`ltmid_v2=${this.ltmidV2}`); }
+    if (this.ltokenV2.length > 0) { pairs.push(`ltoken_v2=${this.ltokenV2}`); }
   }
 
   /** 由 Cookie 字符串构造 User（用于 WebView/manual 登录） */
@@ -161,6 +187,8 @@ export class User {
   clone(): User {
     const u: User = new User();
     u.id = this.id;
+    u.isOversea = this.isOversea;
+    u.applyCookie(this.fullCookie());
     u.mid = this.mid;
     u.aid = this.aid;
     u.accountId = this.accountId;

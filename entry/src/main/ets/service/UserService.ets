@@ -4,6 +4,7 @@
  * 角色绑定拉取；全局 AppStorage 状态同步。仅国服。
  * 注：AppStorage 为 ArkUI 全局对象，无需 import。
  */
+import { DailyNoteReminderService } from './DailyNoteReminderService';
 import { UserRepo } from '../data/repo/UserRepo';
 import { ApiClient } from '../data/network/ApiClient';
 import { HoyolabClient } from '../data/network/HoyolabClient';
@@ -11,7 +12,7 @@ import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { DsSigner } from '../data/network/DsSigner';
 import { DeviceFpApi } from '../data/network/DeviceFpApi';
 import { ApiResponse } from '../model/ApiResponse';
-import { AppConstants } from '../common/Constants';
+import { AppConstants, RegionUtil } from '../common/Constants';
 import { User } from '../model/User';
 import { UserGameRole } from '../model/UserGameRole';
 import { Logger } from '../common/Logger';
@@ -44,7 +45,7 @@ export class UserService {
         // 设备指纹必须先就绪：passport 接口（token 交换）需带 x-rpc-device_fp，缺指纹会被米哈游拒绝，
         // 导致 cookie_token/ltoken 补不上 → 战绩接口全部「重新登录」（成功不阻塞）。
         try {
-          await this.ensureDeviceFingerprint();
+          if (!user.isOversea) { await this.ensureDeviceFingerprint(); }
         } catch (e) {
           Logger.warn(TAG, `ensure fingerprint fail ${(e as Error).message}`);
         }
@@ -67,6 +68,23 @@ export class UserService {
       Logger.warn(TAG, `restoreSession fail: ${JSON.stringify(e)}`);
       this.clearSessionState();
     }
+  }
+
+  /** Reload after a successful local restore; never contacts a remote account service. */
+  async reloadLocalSession(): Promise<void> {
+    const user: User | undefined = await UserRepo.getCurrentUser();
+    this.currentUser = user;
+    if (user === undefined || !user.hasCookie()) {
+      this.currentUser = undefined;
+      this.clearSessionState();
+      return;
+    }
+    let uid: string = '';
+    for (const role of user.roles) {
+      if (role.isDefault) { uid = role.gameUid; break; }
+    }
+    if (uid.length === 0 && user.roles.length > 0) { uid = user.roles[0].gameUid; }
+    this.applySessionState(user, uid);
   }
 
   private async resolveDefaultUid(user: User): Promise<string> {
@@ -102,7 +120,7 @@ export class UserService {
     AppStorage.setOrCreate<string>('currentUserName', user.displayName);
     AppStorage.setOrCreate<string>('currentUserAvatar', user.avatar);
     // 会话级 Cookie 注入
-    ApiClient.getInstance().setCookie(user.fullCookie());
+    ApiClient.getInstance().setCookie(user.fullCookie(), user.isOversea);
   }
 
   private clearSessionState(): void {
@@ -120,14 +138,18 @@ export class UserService {
   // ================= Cookie 解析 / 登录 =================
 
   /** 解析 Cookie 字符串并构造用户（仅解析不落库） */
-  parseCookie(raw: string): User {
+  parseCookie(raw: string, isOversea: boolean = false): User {
     const u: User = new User();
+    u.isOversea = isOversea;
     u.applyCookie(raw);
     return u;
   }
 
   /** 校验 Cookie 基本有效（含 stoken 或 account_id+cookie_token 且存在 stuid/uid） */
   static validateCookie(user: User): boolean {
+    if (user.isOversea && user.hasCookie() && (user.cookieToken.length > 0 || user.ltoken.length > 0)) {
+      return true;
+    }
     if (user.stoken.length > 0 && (user.stuid.length > 0 || user.accountId.length > 0)) {
       return true;
     }
@@ -143,10 +165,11 @@ export class UserService {
    * @param displayName 可选昵称
    * @param avatar 可选头像
    */
-  async loginWithCookie(rawCookie: string, displayName: string, avatar: string): Promise<User> {
+  async loginWithCookie(rawCookie: string, displayName: string, avatar: string, isOversea: boolean = false): Promise<User> {
     const parsed: User = new User();
+    parsed.isOversea = isOversea;
     const hasCookie: boolean = parsed.applyCookie(rawCookie);
-    if (!hasCookie) {
+    if (!hasCookie || !UserService.validateCookie(parsed)) {
       throw new Error('Cookie 中未解析到有效 token，请确认已复制完整 Cookie');
     }
     parsed.displayName = displayName;
@@ -181,7 +204,7 @@ export class UserService {
     // 设备指纹必须先就绪：passport 接口（token 交换）需带 x-rpc-device_fp，
     // 缺指纹会被米哈游拒绝 → cookie_token/ltoken 补不上 → 战绩接口全部报「重新登录」
     try {
-      await this.ensureDeviceFingerprint();
+      if (!saved.isOversea) { await this.ensureDeviceFingerprint(); }
     } catch (e) {
       Logger.warn(TAG, `ensure fingerprint fail ${e.message}`);
     }
@@ -234,7 +257,7 @@ export class UserService {
     const all: User[] = await UserRepo.getAllUsers();
     for (let i = 0; i < all.length; i++) {
       const u: User = all[i];
-      if (u.id === 0) {
+      if (u.id === 0 || u.isOversea !== candidate.isOversea) {
         continue;
       }
       if (candidate.mid.length > 0 && u.mid === candidate.mid) {
@@ -265,12 +288,19 @@ export class UserService {
     }
     await this.completeTokenChainInner(user, true);
     await UserRepo.saveCookieFor(user.id, user.fullCookie());
-    ApiClient.getInstance().setCookie(user.fullCookie());
+    if (this.currentUser !== undefined && this.currentUser.id === user.id) {
+      this.currentUser = user;
+      ApiClient.getInstance().setCookie(user.fullCookie(), user.isOversea);
+    }
     return user.cookieToken.length > 0;
   }
 
   private async completeTokenChainInner(user: User, forceRefresh: boolean): Promise<void> {
     if (user.stoken.length === 0 && user.stokenV2.length === 0) {
+      return;
+    }
+    if (user.isOversea) {
+      await this.completeOverseaTokenChain(user, forceRefresh);
       return;
     }
     // 兜底：fp 缺失时先取（passport 交换需 x-rpc-device_fp，缺则被拒 → cookie_token 补不上）
@@ -345,6 +375,43 @@ export class UserService {
     await UserRepo.saveCookieFor(user.id, user.fullCookie());
   }
 
+  /** HoYoLAB token exchange is POST with STokenWrapper (upstream PassportClientOversea). */
+  private async completeOverseaTokenChain(user: User, forceRefresh: boolean): Promise<void> {
+    const aid: string = user.aid || user.stuid || user.accountId;
+    const body: Record<string, string> = { 'stoken': user.stokenV2 || user.stoken, 'uid': aid };
+    const headers: Record<string, string> = HoyolabClient.getBaseHeaders('os_asia');
+    headers['Cookie'] = user.stokenCookie();
+    const paths: string[] = ['getCookieAccountInfoBySToken', 'getLTokenBySToken'];
+    for (const path of paths) {
+      if (!forceRefresh && ((path === paths[0] && user.cookieToken.length > 0) ||
+        (path === paths[1] && user.ltoken.length > 0))) {
+        continue;
+      }
+      const response: ApiResponse = await ApiClient.getInstance().postJson(
+        `https://api-account-os.hoyoverse.com/account/auth/api/${path}`, JSON.stringify(body), headers);
+      if (!response.success || response.data === undefined) {
+        Logger.warn(TAG, `oversea token exchange failed code=${response.retcode}`);
+        continue;
+      }
+      const data: Record<string, Object> = response.data as Record<string, Object>;
+      if (path === paths[0]) {
+        const token: string = String(data['cookie_token'] ?? '');
+        if (token.length > 0) {
+          user.cookieToken = token;
+          user.accountId = String(data['uid'] ?? aid);
+          user.aid = user.accountId;
+        }
+      } else {
+        const token: string = String(data['ltoken'] ?? '');
+        if (token.length > 0) {
+          user.ltoken = token;
+          user.ltuid = aid;
+        }
+      }
+    }
+    await UserRepo.saveCookieFor(user.id, user.fullCookie());
+  }
+
   /** 生成 passport 接口所需 DS Gen2/PROD 头（对齐 Windows PassportClient SignDataAsync(Gen2, PROD, true)：
    *  includeChars=true → r 为 6 位字母+数字；PROD 默认 body='{}'；GET 无 query → q 为空 */
   private async buildProdDsHeader(): Promise<Record<string, string>> {
@@ -376,7 +443,7 @@ export class UserService {
   async completeTokenChainPublic(user: User): Promise<void> {
     await this.completeTokenChain(user);
     // 同步全局会话 Cookie（含新补的 ltoken/ltoken）
-    ApiClient.getInstance().setCookie(user.fullCookie());
+    ApiClient.getInstance().setCookie(user.fullCookie(), user.isOversea);
   }
 
   /** 公开封装：确保设备指纹就绪（供各 Service 请求前调用，降风控/保住 token 交换） */
@@ -412,10 +479,12 @@ export class UserService {
       return;
     }
     try {
-      const url: string = `https://bbs-api.mihoyo.com/user/wapi/getUserFullInfo?uid=${id}&gids=2`;
+      const url: string = user.isOversea
+        ? 'https://bbs-api-os.hoyolab.com/community/user/wapi/getUserFullInfo?gid=2'
+        : `https://bbs-api.mihoyo.com/user/wapi/getUserFullInfo?uid=${id}&gids=2`;
       const resp: ApiResponse = await ApiClient.getInstance().get(url, {
-        'Cookie': user.stokenCookie(),
-        'Referer': 'https://bbs.mihoyo.com/',
+        'Cookie': user.isOversea ? user.gameRecordCookie() : user.stokenCookie(),
+        'Referer': user.isOversea ? 'https://www.hoyolab.com/' : 'https://bbs.mihoyo.com/',
       });
       if (resp.success && resp.data !== undefined) {
         const data = resp.data as Record<string, Object>;
@@ -424,7 +493,7 @@ export class UserService {
           const nickname: string = String(info['nickname'] ?? '');
           let avatarUrl: string = String(info['avatar_url'] ?? '');
           // 头像 URL 若为相对/数字形式，回退拼默认头像地址（参考项目 AvatarUri 逻辑）
-          if (avatarUrl.length === 0 || !avatarUrl.startsWith('http')) {
+          if (!user.isOversea && (avatarUrl.length === 0 || !avatarUrl.startsWith('http'))) {
             const avatarId: string = String(info['avatar'] ?? '');
             const base: string = avatarUrl.length > 0 ? avatarUrl : avatarId;
             avatarUrl = base.length > 0
@@ -451,30 +520,19 @@ export class UserService {
 
   /** 通过 SToken → actionTicket → getUserGameRoles 拉取并持久化角色 */
   async fetchAndStoreRoles(user: User): Promise<UserGameRole[]> {
-    if (user.stoken.length === 0) {
-      Logger.warn(TAG, 'no stoken, skip role fetch');
-      return [];
-    }
-    const stuid: string = user.stuid.length > 0 ? user.stuid : user.aid;
-    const ticketResp: ApiResponse = await HoyolabClient.getActionTicket(user.stokenCookie(), user.stoken, stuid);
-    if (!ticketResp.success || ticketResp.data === undefined) {
-      Logger.warn(TAG, `getActionTicket fail retcode=${ticketResp.retcode} msg=${ticketResp.message}`);
-      if (ticketResp.retcode === RetCodes.RISK_CONTROL) {
-        throw new Error('获取角色被风控拦截，请稍后重试');
-      }
-      return [];
-    }
-    const ticketData = ticketResp.data as Record<string, Object>;
-    const ticket: string = String(ticketData['ticket'] ?? '');
-    if (ticket.length === 0) {
-      Logger.warn(TAG, 'action ticket empty');
-      return [];
-    }
-    const rolesResp: ApiResponse = await HoyolabClient.getUserGameRoles(ticket);
+    const rolesResp: ApiResponse = user.isOversea
+      ? await ApiClient.getInstance().get(
+        'https://api-os-takumi.hoyoverse.com/binding/api/getUserGameRolesByCookie?game_biz=hk4e_global',
+        HoyolabClient.merge(HoyolabClient.getBaseHeaders('os_asia'), { 'Cookie': user.gameRecordCookie() }))
+      : await this.fetchChineseRoles(user);
     if (rolesResp.success && rolesResp.data !== undefined) {
       const rolesData = rolesResp.data as Record<string, Object>;
       const list = rolesData['list'] as Array<Object>;
       const roles: UserGameRole[] = [];
+      let previousDefault: string = '';
+      for (const previous of user.roles) {
+        if (previous.isDefault) { previousDefault = previous.gameUid; break; }
+      }
       if (list !== undefined && list !== null) {
         for (let i = 0; i < list.length; i++) {
           const item = list[i] as Record<string, Object>;
@@ -482,10 +540,15 @@ export class UserService {
           if (gameUid.length === 0) {
             continue;
           }
-          const region: string = String(item['region'] ?? 'cn_gf01');
+          const region: string = String(item['region'] ?? RegionUtil.regionOfUid(gameUid));
+          if (RegionUtil.isOverseaRegion(region) !== user.isOversea) {
+            continue;
+          }
           const nickname: string = String(item['nickname'] ?? '');
           const level: number = Number(item['level'] ?? 0);
           const role: UserGameRole = UserGameRole.of(gameUid, region, nickname, level);
+          role.isDefault = gameUid === previousDefault;
+          role.isChosen = role.isDefault;
           roles.push(role);
         }
       }
@@ -513,7 +576,30 @@ export class UserService {
     if (rolesResp.retcode === RetCodes.RISK_CONTROL) {
       throw new Error('获取角色被风控拦截，请稍后重试');
     }
-    return [];
+    return user.roles;
+  }
+
+  private async fetchChineseRoles(user: User): Promise<ApiResponse> {
+    if (user.stoken.length === 0) {
+      Logger.warn(TAG, 'no stoken, skip role fetch');
+      return ApiResponse.fail(-1, '无法获取角色凭证');
+    }
+    const stuid: string = user.stuid.length > 0 ? user.stuid : user.aid;
+    const ticketResp: ApiResponse = await HoyolabClient.getActionTicket(user.stokenCookie(), user.stoken, stuid);
+    if (!ticketResp.success || ticketResp.data === undefined) {
+      Logger.warn(TAG, `getActionTicket fail retcode=${ticketResp.retcode} msg=${ticketResp.message}`);
+      if (ticketResp.retcode === RetCodes.RISK_CONTROL) {
+        throw new Error('获取角色被风控拦截，请稍后重试');
+      }
+      return ApiResponse.fail(-1, '无法获取角色凭证');
+    }
+    const ticketData = ticketResp.data as Record<string, Object>;
+    const ticket: string = String(ticketData['ticket'] ?? '');
+    if (ticket.length === 0) {
+      Logger.warn(TAG, 'action ticket empty');
+      return ApiResponse.fail(-1, '无法获取角色凭证');
+    }
+    return HoyolabClient.getUserGameRoles(ticket);
   }
 
   // ================= 账号管理 =================
@@ -533,6 +619,7 @@ export class UserService {
 
   /** 删除账号 */
   async deleteUser(userId: number): Promise<void> {
+    await DailyNoteReminderService.cancelUser(userId);
     await UserRepo.deleteUser(userId);
     if (this.currentUser !== undefined && this.currentUser.id === userId) {
       this.currentUser = undefined;

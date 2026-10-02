@@ -69,9 +69,9 @@ export default function logicUnitTest() {
       expect(ReliquaryScore.doubleCritScore(r, false) === 0).assertTrue();
     });
     it('isCritEffectiveOnlyKokomi', 0, () => {
-      // Windows AvatarIds.IsCritEffective：仅心海（10000002）双爆无效
-      expect(ReliquaryScore.isCritEffective(10000002) === false).assertTrue();
-      expect(ReliquaryScore.isCritEffective(10000042) === true).assertTrue();
+      // Windows AvatarIds.IsCritEffective：仅心海（10000054）双爆无效
+      expect(ReliquaryScore.isCritEffective(10000054) === false).assertTrue();
+      expect(ReliquaryScore.isCritEffective(10000002) === true).assertTrue();
     });
   });
 

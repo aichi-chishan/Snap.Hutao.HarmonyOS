@@ -78,9 +78,7 @@ export default class DailyNoteFormExtensionAbility extends FormExtensionAbility 
   onUpdateForm(formId: string, wantParams?: Record<string, Object>): void {
     AppContextProvider.init(this.context);
     Logger.info(TAG, `onUpdateForm formId=${formId}`);
-    formProvider.updateForm(formId, this.buildCardData()).catch((e: Error) => {
-      Logger.warn(TAG, `onUpdateForm updateForm fail ${e.message}`);
-    });
+    this.refreshCard(formId);
   }
 
   /** 卡片交互事件（postCardAction action='message'）：当前仅支持手动刷新 */

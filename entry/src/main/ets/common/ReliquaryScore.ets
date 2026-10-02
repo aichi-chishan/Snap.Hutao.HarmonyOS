@@ -12,7 +12,7 @@
 import { Reliquary, RelicProperty } from '../model/CharacterData';
 
 /** 珊瑚宫心海（双爆无效特例） */
-const KOKOMI_ID: number = 10000002;
+const KOKOMI_ID: number = 10000054;
 
 export class ReliquaryScore {
   /** 完整评分（Windows Calculate 等价物，分值 ×10 取 1 位小数为展示惯例由调用方处理） */

@@ -65,6 +65,7 @@ export class WikiWeaponMeta {
   icon: string = '';
   awakenIcon: string = '';
   weaponType: number = 0;
+  secondaryProperty: number = 0;
   rankLevel: number = 0;
   sort: number = 0;
   description: string = '';
@@ -323,6 +324,11 @@ export class WikiMetaService {
         w.icon = String(o['icon'] ?? '');
         w.awakenIcon = String(o['awakenIcon'] ?? '');
         w.weaponType = Number(o['weaponType'] ?? 0);
+        const curves: Object[] = (o['growCurves'] as Object[]) ?? [];
+        if (curves.length > 1) {
+          const secondary: Record<string, Object> = curves[1] as Record<string, Object>;
+          w.secondaryProperty = Number(secondary['t'] ?? 0);
+        }
         w.rankLevel = Number(o['rankLevel'] ?? 0);
         w.sort = Number(o['sort'] ?? 0);
         w.description = WikiMetaService.cleanText(String(o['description'] ?? ''));
@@ -439,10 +445,10 @@ export class WikiMetaService {
   static weaponTypeName(t: number): string {
     switch (t) {
       case 1: return '单手剑';
-      case 2: return '双手剑';
-      case 3: return '长柄武器';
-      case 4: return '法器';
-      case 5: return '弓';
+      case 11: return '双手剑';
+      case 13: return '长柄武器';
+      case 10: return '法器';
+      case 12: return '弓';
       default: return `类型${t}`;
     }
   }
