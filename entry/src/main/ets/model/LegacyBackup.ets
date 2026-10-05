@@ -43,9 +43,10 @@ export class LegacyBackup {
       throw new Error('不支持的备份版本');
     }
     const out: BackupSnapshot = new BackupSnapshot();
-    out.schemaVersion = schemaVersion;
+    // v1 predates Backpack. Never synthesize an empty v7 section that could erase it.
+    out.schemaVersion = Math.min(schemaVersion, 6);
     const tables: Map<string, BackupTable> = new Map<string, BackupTable>();
-    for (const name of BackupSnapshotValidator.TABLES) {
+    for (const name of BackupSnapshotValidator.tablesForSchema(out.schemaVersion)) {
       const table: BackupTable = new BackupTable();
       table.name = name;
       tables.set(name, table);

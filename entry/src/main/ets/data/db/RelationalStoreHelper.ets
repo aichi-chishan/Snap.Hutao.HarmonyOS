@@ -173,11 +173,11 @@ export class RelationalStoreHelper {
   }
 
   /** 当前数据库结构版本（每次结构变更 +1，并在 MIGRATIONS 末尾追加对应迁移） */
-  private static readonly DB_VERSION: number = 6;
+  private static readonly DB_VERSION: number = 7;
 
   /**
    * 有序迁移列表：MIGRATIONS[i] 把版本 i+1 升到 i+2。
-   * 语句幂等容错（重复加列/重复清理直接放行）；已应用版本记入 user_version，只执行未应用部分。
+   * 仅允许已存在列的 ALTER 重试；其他错误回滚，版本与 DDL 在同一事务提交。
    */
   private static readonly MIGRATIONS: string[][] = [
     [
@@ -260,6 +260,29 @@ export class RelationalStoreHelper {
       )`,
       'ALTER TABLE achievement_entries ADD COLUMN status INTEGER NOT NULL DEFAULT 3',
       'ALTER TABLE daily_notes ADD COLUMN raw_json TEXT NOT NULL DEFAULT \'\'',
+    ],
+    [
+      // v6 → v7：本地背包存档/UIIF 导入；不读取游戏进程或账户凭据。
+      `CREATE TABLE IF NOT EXISTS backpack_archives (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        uid TEXT NOT NULL,
+        is_selected INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        source TEXT NOT NULL DEFAULT '',
+        document_json TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS backpack_items (
+        archive_id INTEGER NOT NULL,
+        instance_id TEXT NOT NULL,
+        item_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        category INTEGER NOT NULL DEFAULT 9,
+        raw_json TEXT NOT NULL,
+        PRIMARY KEY (archive_id, instance_id),
+        FOREIGN KEY (archive_id) REFERENCES backpack_archives(id) ON DELETE CASCADE
+      )`,
     ],
   ];
 

@@ -52,7 +52,7 @@ export class BackupService {
     snapshot.preferences = PreferencesStore.exportPortable();
     const transaction: relationalStore.Transaction = await store.createTransaction();
     try {
-      for (const name of BackupSnapshotValidator.TABLES) {
+      for (const name of BackupSnapshotValidator.tablesForSchema(snapshot.schemaVersion)) {
         snapshot.tables.push(this.readTable(name, await transaction.querySql(`SELECT * FROM ${name}`)));
       }
       await transaction.commit();
@@ -101,6 +101,9 @@ export class BackupService {
     this.checkReference(snapshot, 'cultivate_entries', 'project_id', 'cultivate_projects');
     this.checkReference(snapshot, 'cultivate_items', 'entry_id', 'cultivate_entries');
     this.checkReference(snapshot, 'cultivate_inventory', 'project_id', 'cultivate_projects');
+    if (snapshot.schemaVersion >= 7) {
+      this.checkReference(snapshot, 'backpack_items', 'archive_id', 'backpack_archives');
+    }
     for (const row of this.table(snapshot, 'challenge_records').rows) {
       if (!/^\d{9,10}$/.test(String(row['uid'])) ||
         ['cn_gf01', 'cn_qd01', 'os_usa', 'os_euro', 'os_asia', 'os_cht'].indexOf(String(row['region'])) < 0 ||
@@ -219,8 +222,14 @@ export class BackupService {
         staged.push(credential.userId);
         if (credential.cookie.length > 0) { await TokenVault.saveCookie(credential.userId, credential.cookie); }
       }
-      for (const table of snapshot.tables) {
-        await transaction.delete(new relationalStore.RdbPredicates(table.name));
+      // Child-first deletion and parent-first insertion also work when SQLite foreign keys
+      // are enabled. A pre-v7 payload intentionally never touches the Backpack tables.
+      const names: string[] = BackupSnapshotValidator.tablesForSchema(snapshot.schemaVersion);
+      for (let i: number = names.length - 1; i >= 0; i--) {
+        await transaction.delete(new relationalStore.RdbPredicates(names[i]));
+      }
+      for (const name of names) {
+        const table: BackupTable = this.table(snapshot, name);
         for (const row of table.rows) {
           const values: relationalStore.ValuesBucket = {};
           for (const key of Object.keys(row)) { values[key] = row[key]; }
@@ -240,7 +249,8 @@ export class BackupService {
       await UserService.getInstance().reloadLocalSession();
       AppStorage.setOrCreate<number>('dailyNoteVersion', Date.now());
       result.ok = true;
-      result.message = legacy ? '旧版备份已还原；已有养成和挑战历史保留，请重启应用' : '全部本地数据已还原，请重启应用';
+      result.message = legacy ? '旧版备份已还原；已有养成、挑战历史和背包存档保留，请重启应用' :
+        (snapshot.schemaVersion < 7 ? '备份已还原；已有背包存档保留，请重启应用' : '全部本地数据已还原，请重启应用');
     } catch (e) {
       let recovered: boolean = true;
       if (transaction !== undefined) {

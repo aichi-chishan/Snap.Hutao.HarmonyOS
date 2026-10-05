@@ -17,7 +17,9 @@ const columns = {
   cultivate_inventory:['project_id','item_id','count'],
   daily_notes:['id','user_id','uid','raw_json'], sign_in_info:['id','user_id'], act_calendar_entries:['id'], announcements:['id'],
   abyss_history:['schedule_id','raw_json'], role_combat_history:['schedule_id','raw_json'], hard_challenge_history:['schedule_id','raw_json'],
-  challenge_records:['kind','uid','region','schedule_id','start_time','end_time','total_star','raw_json','record_time']
+  challenge_records:['kind','uid','region','schedule_id','start_time','end_time','total_star','raw_json','record_time'],
+  backpack_archives:['id','name','uid','is_selected','created_at','updated_at','source','document_json'],
+  backpack_items:['archive_id','instance_id','item_id','kind','category','raw_json']
 };
 function rs(rows, names) { let index = -1; return { columnNames: names, goToNextRow:()=>++index < rows.length, goToFirstRow:()=>{index=0;return rows.length>0}, getValue:i=>rows[index][names[i]]??null, getLong:i=>Number(rows[index][names[i]]), getString:i=>String(rows[index][names[i]]), close(){} }; }
 function query(data, sql) {
@@ -26,7 +28,7 @@ function query(data, sql) {
   const name = sql.match(/SELECT \* FROM (\w+)/)[1];
   return rs(sql.includes('LIMIT 0')?[]:clone(data[name]), columns[name]);
 }
-const store = { version:6, querySql:async sql=>query(db,sql), createTransaction: async()=> {
+const store = { version:7, querySql:async sql=>query(db,sql), createTransaction: async()=> {
   const staged = clone(db);
   return { querySql:async sql=>query(staged,sql), delete:async pred=>{writes++;staged[pred.table]=[]}, insert:async(name,row)=>{writes++;if(name===failTable)throw Error('injected write failure'); staged[name].push(clone(row)); return row.id??0;}, commit:async()=>{db=staged;if(commitError)throw Error('commit status uncertain')}, rollback:async()=>{if(commitError)throw Error('transaction already closed')} };
 }};

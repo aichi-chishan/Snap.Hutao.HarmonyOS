@@ -1,4 +1,7 @@
 /** Portable, explicitly versioned database snapshot. No device identity or signing material. */
+import { BackpackItem } from './BackpackData';
+import { UIIFCodec } from './UIIFCodec';
+
 export type BackupCell = string | number | null;
 
 export class BackupTable {
@@ -37,7 +40,89 @@ export class BackupSnapshotValidator {
     'cultivate_entries', 'cultivate_items', 'cultivate_inventory', 'daily_notes', 'sign_in_info',
     'act_calendar_entries', 'announcements', 'abyss_history',
     'role_combat_history', 'hard_challenge_history', 'challenge_records',
+    'backpack_archives', 'backpack_items',
   ];
+
+  /** Old snapshots have no Backpack section and must never replace the local archives. */
+  static tablesForSchema(schemaVersion: number): string[] {
+    return BackupSnapshotValidator.TABLES.filter((name: string): boolean =>
+      schemaVersion >= 7 || (name !== 'backpack_archives' && name !== 'backpack_items'));
+  }
+
+  private static integer(value: BackupCell, min: number, max: number = Number.MAX_SAFE_INTEGER): boolean {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value >= min && value <= max;
+  }
+
+  private static text(value: BackupCell, max: number, required: boolean = true): boolean {
+    return typeof value === 'string' && value.length <= max && (!required || value.trim().length > 0);
+  }
+
+  private static jsonObject(value: BackupCell): boolean {
+    if (!BackupSnapshotValidator.text(value, 16 * 1024 * 1024)) { return false; }
+    try {
+      const parsed: Object = JSON.parse(value as string) as Object;
+      return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed);
+    } catch (e) { return false; }
+  }
+
+  private static validateBackpack(snapshot: BackupSnapshot): void {
+    const archives: Set<number> = new Set<number>();
+    const archiveItems: Map<number, BackpackItem[]> = new Map<number, BackpackItem[]>();
+    const instances: Set<string> = new Set<string>();
+    let selected: number = 0;
+    for (const table of snapshot.tables) {
+      if (table.name !== 'backpack_archives') { continue; }
+      for (const row of table.rows) {
+        if (!BackupSnapshotValidator.integer(row['id'], 1) || archives.has(row['id'] as number) ||
+          !BackupSnapshotValidator.text(row['name'], 80) ||
+          typeof row['uid'] !== 'string' || !/^[1-9]\d{8,9}$/.test(row['uid'] as string) ||
+          !BackupSnapshotValidator.integer(row['is_selected'], 0, 1) ||
+          !BackupSnapshotValidator.integer(row['created_at'], 0) ||
+          !BackupSnapshotValidator.integer(row['updated_at'], 0) ||
+          !BackupSnapshotValidator.text(row['source'], 200, false) ||
+          !BackupSnapshotValidator.jsonObject(row['document_json'])) {
+          throw new Error('背包存档字段无效或标识重复');
+        }
+        archives.add(row['id'] as number);
+        archiveItems.set(row['id'] as number, []);
+        selected += row['is_selected'] as number;
+      }
+    }
+    if (selected > 1) { throw new Error('背包存档只能选择一个'); }
+    for (const table of snapshot.tables) {
+      if (table.name !== 'backpack_items') { continue; }
+      for (const row of table.rows) {
+        if (!BackupSnapshotValidator.integer(row['archive_id'], 1) || !archives.has(row['archive_id'] as number) ||
+          !BackupSnapshotValidator.text(row['instance_id'], 160) ||
+          !BackupSnapshotValidator.integer(row['item_id'], 1, 4294967295) ||
+          typeof row['kind'] !== 'string' || ['weapon', 'reliquary', 'material', 'furniture'].indexOf(row['kind'] as string) < 0 ||
+          !BackupSnapshotValidator.integer(row['category'], 0, 9) ||
+          !BackupSnapshotValidator.jsonObject(row['raw_json'])) {
+          throw new Error('背包条目字段或存档归属无效');
+        }
+        const key: string = `${row['archive_id']}:${row['instance_id']}`;
+        if (instances.has(key)) { throw new Error('背包条目标识重复'); }
+        instances.add(key);
+        const item: BackpackItem = new BackpackItem();
+        item.archiveId = row['archive_id'] as number;
+        item.instanceId = row['instance_id'] as string;
+        item.itemId = row['item_id'] as number;
+        item.kind = row['kind'] as string;
+        item.category = row['category'] as number;
+        item.rawJson = row['raw_json'] as string;
+        archiveItems.get(item.archiveId)!.push(item);
+      }
+    }
+    for (const table of snapshot.tables) {
+      if (table.name !== 'backpack_archives') { continue; }
+      for (const row of table.rows) {
+        // The same lossless codec is used by repository writes: validates the document
+        // UID, raw payloads, categories, duplicate GUIDs and duplicate stackable IDs.
+        UIIFCodec.validateSnapshot(row['uid'] as string, row['document_json'] as string,
+          archiveItems.get(row['id'] as number)!);
+      }
+    }
+  }
 
   static portableKey(key: string): boolean {
     if (/device|cookie|token|secret|password|authkey|formId|form_id/i.test(key)) {
@@ -51,15 +136,16 @@ export class BackupSnapshotValidator {
       snapshot.app !== 'snaphutao-harmonyos-backup' || snapshot.version !== 2) {
       throw new Error('不支持的备份格式或版本');
     }
-    if (!Number.isInteger(snapshot.schemaVersion) || snapshot.schemaVersion < 1 ||
+    if (!Number.isSafeInteger(snapshot.schemaVersion) || snapshot.schemaVersion < 1 ||
       !Array.isArray(snapshot.tables) || !Array.isArray(snapshot.credentials) ||
       snapshot.preferences === null || typeof snapshot.preferences !== 'object' || Array.isArray(snapshot.preferences)) {
       throw new Error('备份结构不完整');
     }
+    const allowed: string[] = BackupSnapshotValidator.tablesForSchema(snapshot.schemaVersion);
     const seen: Set<string> = new Set<string>();
     const users: Set<number> = new Set<number>();
     for (const table of snapshot.tables) {
-      if (table === null || BackupSnapshotValidator.TABLES.indexOf(table.name) < 0 ||
+      if (table === null || allowed.indexOf(table.name) < 0 ||
         seen.has(table.name) || !Array.isArray(table.rows)) {
         throw new Error('备份含未知、重复或损坏的数据表');
       }
@@ -85,11 +171,12 @@ export class BackupSnapshotValidator {
         }
       }
     }
-    for (const required of BackupSnapshotValidator.TABLES) {
+    for (const required of allowed) {
       if (!seen.has(required)) {
         throw new Error(`备份缺少数据表 ${required}`);
       }
     }
+    if (snapshot.schemaVersion >= 7) { BackupSnapshotValidator.validateBackpack(snapshot); }
     const credentials: Set<number> = new Set<number>();
     for (const credential of snapshot.credentials) {
       if (credential === null || !users.has(credential.userId) || credentials.has(credential.userId) ||
