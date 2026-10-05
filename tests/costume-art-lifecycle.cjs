@@ -22,7 +22,7 @@ const uri = value => `native-file-uri:${encodeURIComponent(value)}`;
 const fullPath = name => `/sandbox/cache/rawicons/GachaAvatarImg/UI_Gacha_AvatarImg_${name}.png`;
 function harness() {
   const local = [], remote = [], writes = [], mkdirs = [], uriCalls = [];
-  const state = { cacheDir: '/sandbox/cache' };
+  const state = { cacheDir: '/sandbox/cache', shortWrite: false };
   const files = new Map(), handles = new Map(), dirs = new Set(['/', '/sandbox', '/sandbox/cache']);
   let nextFd = 1;
   const fileIo = {
@@ -38,8 +38,11 @@ function harness() {
       assert.ok(dirs.has(path.posix.dirname(file)), `missing cache directory: ${file}`);
       const fd = nextFd++; handles.set(fd, file); return { fd };
     },
-    writeSync: (fd, bytes) => { const file = handles.get(fd); assert.ok(file); files.set(file, new Uint8Array(bytes)); writes.push(file); return bytes.byteLength; },
+    writeSync: (fd, bytes) => { const file = handles.get(fd); assert.ok(file); files.set(file, new Uint8Array(bytes)); writes.push(file); return state.shortWrite ? 1 : bytes.byteLength; },
     closeSync: file => handles.delete(file.fd),
+    mkdtempSync: prefix => { const dir=prefix.replace('XXXXXX',String(nextFd++));dirs.add(dir);return dir; },
+    renameSync: (from,to) => { assert.ok(files.has(from));files.set(to,files.get(from));files.delete(from); },
+    rmdirSync: dir => { for(const file of files.keys())if(file.startsWith(dir+'/'))files.delete(file);dirs.delete(dir); },
   };
   const mocks = {
     '@kit.CoreFileKit': { fileIo, fileUri: { getUriFromPath: value => { uriCalls.push(value); return uri(value); } } },
@@ -61,6 +64,12 @@ function harness() {
 (async () => {
   assert.match(splash, /@Prop @Watch\('onIconChanged'\) icon/);
   assert.doesNotMatch(splash, /Logger\.info/, 'do not log individual image names for every recycled component');
+  // A short write never replaces a previously complete image and cleans its owned staging directory.
+  {
+    const h=harness();const dest=fullPath('Existing');h.files.set(dest,raw());h.state.shortWrite=true;
+    assert.throws(()=>h.art.constructor.writeCache(dest,new Uint8Array([1,2,3])),/Incomplete/);
+    assert.deepEqual(h.files.get(dest),raw());assert.ok([...h.files.keys()].every(p=>!p.includes('.stage-')));assert.equal(h.handles.size,0);
+  }
   // Cached content needs no raw resource read or network request.
   {
     const h = harness(); h.art.icon = 'UI_AvatarIcon_Cached'; h.files.set(fullPath('Cached'), raw());
@@ -73,7 +82,7 @@ function harness() {
     const h = harness(); h.art.icon = 'UI_AvatarIcon_Offline'; h.art.aboutToAppear();
     assert.equal(h.local[0].name, 'icons/GachaAvatarImg/UI_Gacha_AvatarImg_Offline.png');
     h.local[0].resolve(raw()); await flush();
-    assert.equal(h.art.src, uri(fullPath('Offline'))); assert.deepEqual(h.writes, [fullPath('Offline')]);
+    assert.equal(h.art.src, uri(fullPath('Offline'))); assert.equal(h.writes.length,1);assert.ok(h.writes[0].includes('.stage-'));assert.ok(h.files.has(fullPath('Offline')));
     assert.ok(h.mkdirs.length > 1); assert.ok(h.mkdirs.every(dir => dir.startsWith('/')), 'directory fallback preserves leading slash');
     assert.equal(h.handles.size, 0); assert.equal(h.remote.length, 0);
   }

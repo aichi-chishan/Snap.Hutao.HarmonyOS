@@ -8,6 +8,7 @@ import { Motion } from '../common/Motion';
 @Component
 export struct PageContainer {
   @BuilderParam content: () => void = emptyContent;
+  @StorageProp('reduceMotion') reduceMotion: boolean = false;
 
   build() {
     Column() {
@@ -15,7 +16,7 @@ export struct PageContainer {
     }
     .width('100%')
     .height('100%')
-    .transition(Motion.pageSwitch())
+    .transition(Motion.pageSwitch(this.reduceMotion))
   }
 }
 

@@ -1,9 +1,6 @@
 /**
- * StandardIconService.ets
- * 标准游戏图标静态 CDN 兜底（对齐 Windows Uri.xaml / AvatarIconConverter 的
- * https://api.snaphutaorp.org/static/raw/{Category}/{Name}.png 规则）：
- * 用于本地 rawfile 缺失的标准图标（UI_ItemIcon_106 树脂、UI_MarkTower、UI_MarkQuest_* 等），
- * 下载后落盘 cacheDir/remote/{category}/{name}.png，与 ResourcePackService 共用目录。
+ * Public PNG icon fallback. Returns an absolute sandbox path (callers use fileUri).
+ * In-flight requests are coalesced; missing/transient failures are never cached forever.
  */
 import { fileIo } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
@@ -11,74 +8,130 @@ import { AppContextProvider } from '../../common/AppContext';
 import { Logger } from '../../common/Logger';
 
 const TAG: string = 'StandardIconService';
-/** 静态图标基址（Windows 版胡桃启动器同源映射规则） */
 const STATIC_BASE: string = 'https://api.snaphutaorp.org/static/raw/';
 
 export class StandardIconService {
-  private static cache: Map<string, string> = new Map();
+  static readonly MAX_BYTES: number = 8 * 1024 * 1024;
+  private static readonly MIN_BYTES: number = 45;
+  private static readonly PNG_SIGNATURE: number[] = [137, 80, 78, 71, 13, 10, 26, 10];
+  private static pending: Map<string, Promise<string>> = new Map<string, Promise<string>>();
 
-  /** 本地是否已缓存 */
+  private static validSegment(value: string): boolean {
+    return value.length > 0 && value.length <= 251 && /^[A-Za-z0-9_-]+$/.test(value);
+  }
+
   static localPath(category: string, name: string): string {
-    if (category.length === 0 || name.length === 0) {
-      return '';
-    }
+    if (!StandardIconService.validSegment(category) || !StandardIconService.validSegment(name)) { return ''; }
     return `${AppContextProvider.getCacheDir()}/remote/${category}/${name}.png`;
   }
 
-  /** 确保标准图标存在（已缓存则直接返回文件路径，否则按静态 CDN 规则下载，失败返回 ''） */
+  /** One active request per destination, released on both success and failure. */
   static async ensure(category: string, name: string): Promise<string> {
-    if (category.length === 0 || name.length === 0) {
+    if (!StandardIconService.validSegment(category) || !StandardIconService.validSegment(name)) { return ''; }
+    let destination: string = '';
+    try { destination = StandardIconService.localPath(category, name); }
+    catch (_) { return ''; }
+    const existing: Promise<string> | undefined = StandardIconService.pending.get(destination);
+    if (existing !== undefined) { return existing; }
+    const task: Promise<string> = StandardIconService.materialize(category, name, destination).catch((): string => {
+      Logger.warn(TAG, 'icon unavailable; a later request can retry');
       return '';
+    });
+    StandardIconService.pending.set(destination, task);
+    try { return await task; }
+    finally {
+      if (StandardIconService.pending.get(destination) === task) { StandardIconService.pending.delete(destination); }
     }
-    const key: string = `${category}/${name}`;
-    const hit: string | undefined = StandardIconService.cache.get(key);
-    if (hit !== undefined) {
-      return hit;
+  }
+
+  private static requireDirectory(directory: string): void {
+    const stat: fileIo.Stat = fileIo.lstatSync(directory);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) { throw new Error('Unsafe icon cache directory'); }
+  }
+
+  private static ensureDirectory(directory: string): void {
+    try { fileIo.mkdirSync(directory); }
+    catch (_) { StandardIconService.requireDirectory(directory); }
+    StandardIconService.requireDirectory(directory);
+  }
+
+  private static prepareDirectory(category: string): string {
+    const root: string = AppContextProvider.getCacheDir();
+    StandardIconService.requireDirectory(root);
+    StandardIconService.ensureDirectory(`${root}/remote`);
+    const directory: string = `${root}/remote/${category}`;
+    StandardIconService.ensureDirectory(directory);
+    return directory;
+  }
+
+  private static hasPngSignature(bytes: Uint8Array): boolean {
+    if (bytes.byteLength < StandardIconService.PNG_SIGNATURE.length) { return false; }
+    for (let index: number = 0; index < StandardIconService.PNG_SIGNATURE.length; index++) {
+      if (bytes[index] !== StandardIconService.PNG_SIGNATURE[index]) { return false; }
     }
-    const dest: string = StandardIconService.localPath(category, name);
+    return true;
+  }
+
+  /** Revalidate even previously successful paths: the OS can evict files in cacheDir. */
+  private static cached(destination: string): boolean {
     try {
-      if (fileIo.accessSync(dest)) {
-        StandardIconService.cache.set(key, dest);
-        return dest;
-      }
-    } catch (e) {
-      // 未缓存，继续
-    }
-    const dir: string = `${AppContextProvider.getCacheDir()}/remote/${category}`;
+      const stat: fileIo.Stat = fileIo.lstatSync(destination);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size < StandardIconService.MIN_BYTES ||
+        stat.size > StandardIconService.MAX_BYTES) { return false; }
+      const file: fileIo.File = fileIo.openSync(destination, fileIo.OpenMode.READ_ONLY | fileIo.OpenMode.NOFOLLOW);
+      try {
+        const header: ArrayBuffer = new ArrayBuffer(StandardIconService.PNG_SIGNATURE.length);
+        return fileIo.readSync(file.fd, header) === header.byteLength &&
+          StandardIconService.hasPngSignature(new Uint8Array(header));
+      } finally { fileIo.closeSync(file); }
+    } catch (_) { return false; }
+  }
+
+  private static async materialize(category: string, name: string, destination: string): Promise<string> {
+    StandardIconService.prepareDirectory(category);
+    if (StandardIconService.cached(destination)) { return destination; }
+    const request: http.HttpRequest = http.createHttp();
     try {
-      try {
-        fileIo.mkdirSync(dir);
-      } catch (e) {
-        // 已存在
+      const response: http.HttpResponse = await request.request(`${STATIC_BASE}${category}/${name}.png`, {
+        method: http.RequestMethod.GET,
+        expectDataType: http.HttpDataType.ARRAY_BUFFER,
+        connectTimeout: 10000,
+        readTimeout: 20000,
+        maxLimit: StandardIconService.MAX_BYTES,
+        maxRedirects: 0,
+        usingCache: false,
+      });
+      if (response.responseCode !== http.ResponseCode.OK || !(response.result instanceof ArrayBuffer)) {
+        throw new Error('Invalid icon response');
       }
-      const req = http.createHttp();
+      const bytes: Uint8Array = new Uint8Array(response.result as ArrayBuffer);
+      // This is a bounded signature/size guard, not a full PNG decoder.
+      if (bytes.byteLength < StandardIconService.MIN_BYTES || bytes.byteLength > StandardIconService.MAX_BYTES ||
+        !StandardIconService.hasPngSignature(bytes)) { throw new Error('Invalid PNG icon'); }
+      // Recheck directories after the asynchronous request before creating any temporary output.
+      const directory: string = StandardIconService.prepareDirectory(category);
+      if (!StandardIconService.cached(destination)) { StandardIconService.publish(directory, destination, bytes); }
+      return destination;
+    } finally { request.destroy(); }
+  }
+
+  /** API9 mkdtemp/rename/write: only this invocation's unique staging directory is ever removed. */
+  private static publish(directory: string, destination: string, bytes: Uint8Array): void {
+    const temporary: string = fileIo.mkdtempSync(`${directory}/.standard-icon-XXXXXX`);
+    try {
+      const staged: string = `${temporary}/image.png`;
+      const file: fileIo.File = fileIo.openSync(staged,
+        fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.NOFOLLOW);
       try {
-        const resp = await req.request(`${STATIC_BASE}${category}/${name}.png`, {
-          method: http.RequestMethod.GET,
-          expectDataType: http.HttpDataType.ARRAY_BUFFER,
-          connectTimeout: 10000,
-        });
-        if (resp.responseCode !== http.ResponseCode.OK) {
-          Logger.warn(TAG, `http ${resp.responseCode} for ${key}`);
-          StandardIconService.cache.set(key, '');
-          return '';
-        }
-        const file = fileIo.openSync(dest, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
-        try {
-          fileIo.writeSync(file.fd, resp.result as ArrayBuffer);
-        } finally {
-          fileIo.closeSync(file);
-        }
-        Logger.info(TAG, `downloaded ${key}`);
-        StandardIconService.cache.set(key, dest);
-        return dest;
-      } finally {
-        req.destroy();
-      }
-    } catch (e) {
-      Logger.warn(TAG, `ensure ${key} fail: ${(e as Error).message}`);
-      StandardIconService.cache.set(key, '');
-      return '';
+        const payload: ArrayBuffer = new Uint8Array(bytes).buffer as ArrayBuffer;
+        if (fileIo.writeSync(file.fd, payload) !== payload.byteLength) { throw new Error('Incomplete icon write'); }
+        fileIo.fsyncSync(file.fd);
+      } finally { fileIo.closeSync(file); }
+      // Same-filesystem rename publishes only a fully written file, never a partially truncated target.
+      fileIo.renameSync(staged, destination);
+    } finally {
+      try { fileIo.rmdirSync(temporary); }
+      catch (_) { Logger.warn(TAG, 'owned icon staging cleanup deferred'); }
     }
   }
 }

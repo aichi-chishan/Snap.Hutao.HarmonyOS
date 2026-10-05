@@ -138,12 +138,7 @@ export struct MetaIcon {
       if (!this.attached || token !== this.resolveToken) { return; }
       await MetaIcon.ensureDirChain(dir);
       if (!this.attached || token !== this.resolveToken) { return; }
-      const file = fileIo.openSync(dest, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
-      try {
-        fileIo.writeSync(file.fd, new Uint8Array(raw).buffer as ArrayBuffer);
-      } finally {
-        fileIo.closeSync(file);
-      }
+      MetaIcon.writeCache(dest, raw);
       const src: string = fileUri.getUriFromPath(dest);
       RAW_CACHE.set(key, dest);
       if (this.attached && token === this.resolveToken) {
@@ -178,6 +173,23 @@ export struct MetaIcon {
       if (this.attached && token === this.resolveToken) {
         this.src = src;
       }
+    }
+  }
+
+  /** Publish only a complete, closed write from an OS-unique staging directory. */
+  private static writeCache(dest: string, raw: Uint8Array): void {
+    const staging: string = fileIo.mkdtempSync(`${dest}.stage-XXXXXX`);
+    const temporary: string = `${staging}/image.png`;
+    try {
+      const file = fileIo.openSync(temporary, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
+      try {
+        const buffer: ArrayBuffer = new Uint8Array(raw).buffer as ArrayBuffer;
+        if (fileIo.writeSync(file.fd, buffer) !== buffer.byteLength) { throw new Error('Incomplete icon cache write'); }
+      } finally { fileIo.closeSync(file); }
+      fileIo.renameSync(temporary, dest);
+    } finally {
+      // The OS returned this directory to this operation; never remove the shared cache parent.
+      try { fileIo.rmdirSync(staging); } catch (_) { /* Cache cleanup is best effort. */ }
     }
   }
 

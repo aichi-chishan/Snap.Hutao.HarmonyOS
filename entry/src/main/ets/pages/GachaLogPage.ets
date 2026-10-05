@@ -21,6 +21,7 @@ import { util } from '@kit.ArkTS';
 import { GachaLogViewModel } from '../viewmodel/GachaLogViewModel';
 import { GachaType } from '../model/GachaType';
 import { GachaItem } from '../model/GachaItem';
+import { GachaArchive } from '../model/GachaArchive';
 import { RecentGachaItem } from '../model/RefreshProgress';
 import { PoolStatistics, FiveStarDetail } from '../model/GachaStatistics';
 import { SimpleDataSource } from '../components/SimpleDataSource';
@@ -36,6 +37,7 @@ import { Logger } from '../common/Logger';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 
 const GACHA_TAG: string = 'GachaLogPage';
+const UIGF_MAX_BYTES: number = 32 * 1024 * 1024;
 
 const ORANGE_GUARANTEE: number = 90;
 const PURPLE_GUARANTEE: number = 10;
@@ -142,6 +144,9 @@ class GachaBannerPath {
 export struct GachaLogPage {
   @StorageLink('isLoggedIn') @Watch('onLoginStateChanged') isLoggedIn: boolean = false;
   @StorageLink('currentUid') @Watch('onUidChanged') currentUid: string = '';
+  private pageActive: boolean = false;
+  private pageEpoch: number = 0;
+  private historyGeneration: number = 0;
   @State vm: GachaLogViewModel = new GachaLogViewModel();
   @State showUrlInput: boolean = false;
   @State urlInput: string = '';
@@ -186,46 +191,119 @@ export struct GachaLogPage {
   historySource: SimpleDataSource<GachaItem> = new SimpleDataSource<GachaItem>([]);
 
   aboutToAppear(): void {
-    // 装载各池记录视图记忆（列表/方块，每池独立）
+    this.pageActive = true;
     this.loadPoolViewModes();
     this.vm.onProgressChanged = () => {
-      this.syncProgress();
+      if (this.pageActive) { this.syncProgress(); }
     };
-    // 预载角色/武器图标名映射（统计网格真图标）
     WikiMetaService.ensureIconMaps().then(() => {
-      this.syncAll();
+      if (this.pageActive) { this.syncAll(); }
     });
     this.reloadData();
   }
 
   aboutToDisappear(): void {
+    this.pageActive = false;
+    this.pageEpoch++;
+    this.historyGeneration++;
+    this.vm.invalidateRequests();
+    this.vm.onProgressChanged = () => {};
   }
 
-  /** 登录态变化时重新装载（登录成功后自动绑定 UID → 拉取统计） */
+  /** 登录只影响自动鉴权刷新，不关闭本地归档。 */
   onLoginStateChanged(): void {
-    if (this.isLoggedIn) {
-      this.reloadData();
-    }
+    this.urlInput = '';
+    this.showUrlInput = false;
+    if (this.pageActive) { this.reloadData(); }
   }
 
-  /** UID 变化（自动绑定/切换角色）时重新装载 */
   onUidChanged(): void {
-    if (this.currentUid.length > 0) {
-      this.reloadData();
-    }
+    this.urlInput = '';
+    this.showUrlInput = false;
+    if (this.pageActive) { this.reloadData(); }
   }
 
-  /** 装载数据并同步统计/历史 */
-  reloadData(): void {
-    // 归档可能变化（重登录/切换 UID/刷新入库），期次汇总缓存失效，切到历史页签时重建
+  private resetLocalView(): void {
+    this.historyGeneration++;
+    this.historyLoading = false;
     this.historyLoadedFor = -1;
     this.historyWishes = [];
-    this.vm.load(this.currentUid).then(() => {
+    this.poolCards = [];
+    this.poolRows = [];
+    this.charCounts = [];
+    this.weaponCounts = [];
+    this.historySource.notifyDataReload([]);
+  }
+
+  /** 无论是否登录都装载本地；退出登录不能把旧的存储 UID 当作刷新凭据。 */
+  reloadData(): void {
+    const epoch: number = ++this.pageEpoch;
+    this.resetLocalView();
+    this.vm.load(this.isLoggedIn ? this.currentUid : '').then(() => {
+      if (!this.pageActive || epoch !== this.pageEpoch) { return; }
       this.initialized = true;
       this.syncAll();
+      if (this.pivotIndex === 1) { this.loadHistoryWishes(); }
     }).catch((e: Error) => {
-      this.toast(`加载失败：${e.message}`);
+      if (this.pageActive && epoch === this.pageEpoch) { this.toast(`加载失败：${e.message}`); }
     });
+  }
+
+  private archiveOptions(): SelectOption[] {
+    const options: SelectOption[] = [];
+    for (const archive of this.vm.archives) {
+      const option: SelectOption = { value: archive.uid };
+      options.push(option);
+    }
+    return options;
+  }
+
+  private currentArchiveIndex(): number {
+    return this.vm.archives.findIndex((archive: GachaArchive): boolean => archive.id === this.vm.currentArchiveId);
+  }
+
+  private async chooseLocalArchive(id: number): Promise<void> {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
+    const epoch: number = ++this.pageEpoch;
+    this.resetLocalView();
+    try {
+      await this.vm.selectArchive(id);
+      if (!this.pageActive || epoch !== this.pageEpoch) { return; }
+      this.syncAll();
+      if (this.pivotIndex === 1) { this.loadHistoryWishes(); }
+    } catch (e) {
+      if (this.pageActive && epoch === this.pageEpoch) {
+        this.syncAll();
+        this.toast((e as Error).message);
+      }
+    }
+  }
+
+  private async refreshAccount(): Promise<void> {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
+    if (!this.isLoggedIn || this.vm.gameAccountUid.length === 0) {
+      this.toast('请先登录并在「账号与数据」选择默认 UID');
+      return;
+    }
+    const epoch: number = this.pageEpoch;
+    await this.vm.refresh();
+    if (!this.pageActive || epoch !== this.pageEpoch) { return; }
+    this.resetLocalView();
+    this.syncAll();
+    this.toast(this.vm.message);
+    if (this.pivotIndex === 1) { this.loadHistoryWishes(); }
+  }
+
+  private async submitUrlImport(): Promise<void> {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
+    const epoch: number = this.pageEpoch;
+    const ok: boolean = await this.vm.importByUrl(this.urlInput);
+    if (!this.pageActive || epoch !== this.pageEpoch) { return; }
+    this.resetLocalView();
+    this.syncAll();
+    this.toast(ok ? `导入完成：${this.vm.message}` : `导入失败：${this.vm.message}`);
+    if (ok) { this.showUrlInput = false; this.urlInput = ''; }
+    if (this.pivotIndex === 1) { this.loadHistoryWishes(); }
   }
 
   /** 同步历史列表数据源 */
@@ -732,29 +810,6 @@ export struct GachaLogPage {
     }
     s = s.trim();
     return s;
-  }
-
-  @Builder
-  loginGuide() {
-    Column({ space: 14 }) {
-      NavIcon({ name: 'GachaLog', iconSize: 60 })
-      Text('需登录后查看祈愿记录')
-        .fontSize(17)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary'))
-      Text('登录并绑定 UID 后，可一键拉取全量抽卡历史')
-        .fontSize(13)
-        .fontColor($r('app.color.text_secondary'))
-      Button('去登录')
-        .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
-        .onClick(() => {
-          router.pushUrl({ url: 'pages/LoginPage' });
-        })
-    }
-    .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
   }
 
   @Builder
@@ -1492,6 +1547,8 @@ export struct GachaLogPage {
           .fontColor($r('app.color.text_primary'))
         Blank()
         Button('剪贴板')
+          .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
+          .hoverEffect(HoverEffect.Highlight)
           .fontSize(11)
           .height(26)
           .margin({ right: 4 })
@@ -1501,6 +1558,8 @@ export struct GachaLogPage {
             this.importFromClipboard();
           })
         Button('UIGF')
+          .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
+          .hoverEffect(HoverEffect.Highlight)
           .fontSize(11)
           .height(26)
           .margin({ right: 4 })
@@ -1510,6 +1569,8 @@ export struct GachaLogPage {
             this.uigfImport();
           })
         Button('导出')
+          .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
+          .hoverEffect(HoverEffect.Highlight)
           .fontSize(11)
           .height(26)
           .margin({ right: 4 })
@@ -1519,6 +1580,8 @@ export struct GachaLogPage {
             this.uigfExport();
           })
         Button('手动 URL')
+          .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
+          .hoverEffect(HoverEffect.Highlight)
           .fontSize(11)
           .height(26)
           .backgroundColor($r('app.color.app_primary_bg'))
@@ -1529,7 +1592,7 @@ export struct GachaLogPage {
       }
       .width('100%')
       if (this.vm.items.length === 0) {
-        Text('暂无记录，点击「刷新」拉取')
+        Text('暂无记录，可导入 UIGF，或登录后刷新')
           .fontSize(13)
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
@@ -1674,10 +1737,13 @@ export struct GachaLogPage {
 
   /** 从系统剪贴板读取祈愿 URL（含 authkey）并导入 */
   async importFromClipboard(): Promise<void> {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
+    const epoch: number = this.pageEpoch;
     try {
       const data: string = await pasteboard.getSystemPasteboard().getData().then((pd: pasteboard.PasteData) => {
         return pd.getPrimaryText();
       });
+      if (!this.pageActive || epoch !== this.pageEpoch) { return; }
       if (data.length === 0 || !data.includes('authkey=')) {
         this.toast('剪贴板中没有检测到祈愿链接（需包含 authkey）');
         return;
@@ -1686,65 +1752,115 @@ export struct GachaLogPage {
       this.showUrlInput = true;
       this.toast('已从剪贴板读取链接，点击「导入」开始拉取');
     } catch (e) {
-      this.toast(`读取剪贴板失败：${(e as Error).message}`);
+      if (this.pageActive && epoch === this.pageEpoch) { this.toast(`读取剪贴板失败：${(e as Error).message}`); }
     }
   }
 
   /** 选择文件导入 UIGF（v4.2 / v4.0 / v3.x） */
   async uigfImport(): Promise<void> {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
+    const epoch: number = this.pageEpoch;
+    this.vm.isTransferring = true;
     try {
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker();
       const opts: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
       opts.maxSelectNumber = 1;
       opts.fileSuffixFilters = ['.json'];
       const uris: string[] = await docPicker.select(opts);
-      if (uris.length === 0) {
+      if (!this.pageActive || epoch !== this.pageEpoch || uris.length === 0) {
         return;
       }
       const file: fileIo.File = fileIo.openSync(uris[0], fileIo.OpenMode.READ_ONLY);
       try {
         const stat: fileIo.Stat = fileIo.statSync(file.fd);
+        if (!Number.isSafeInteger(stat.size) || stat.size <= 0 || stat.size > UIGF_MAX_BYTES) {
+          throw new Error('UIGF 文件为空或超过 32 MiB 限制');
+        }
         const buf: ArrayBuffer = new ArrayBuffer(stat.size);
-        fileIo.readSync(file.fd, buf);
+        const read: number = fileIo.readSync(file.fd, buf);
+        if (read !== stat.size) { throw new Error('UIGF 文件读取不完整，请重新选择文件'); }
+        if (fileIo.statSync(file.fd).size !== stat.size) { throw new Error('读取期间 UIGF 文件大小发生变化'); }
         const text: string = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
         const result = await UigfService.getInstance().importFromText(text);
+        if (result.ok) { AppStorage.setOrCreate<number>('gachaDataVersion', Date.now()); }
+        if (!this.pageActive || epoch !== this.pageEpoch) { return; }
         this.toast(result.ok ? result.message : `导入失败：${result.message}`);
-        if (result.ok && result.inserted > 0) {
-          await this.vm.load(this.vm.currentUid.length > 0 ? this.vm.currentUid : result.uid);
-          // 新数据入库，期次汇总缓存失效
-          this.historyLoadedFor = -1;
-          this.historyWishes = [];
+        if (result.ok) {
+          this.resetLocalView();
+          await this.vm.load(this.vm.gameAccountUid, result.uid);
+          if (!this.pageActive || epoch !== this.pageEpoch) { return; }
           this.syncAll();
+          if (this.pivotIndex === 1) { this.loadHistoryWishes(); }
         }
       } finally {
         fileIo.closeSync(file);
       }
     } catch (e) {
-      this.toast(`导入失败：${(e as Error).message}`);
-    }
+      if (this.pageActive && epoch === this.pageEpoch) { this.toast(`导入失败：${(e as Error).message}`); }
+    } finally { this.vm.isTransferring = false; }
   }
 
   /** 导出全部祈愿数据为 UIGF v4.2 文件（含千星奇域） */
   async uigfExport(): Promise<void> {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring || this.vm.archives.length === 0) { return; }
+    const epoch: number = this.pageEpoch;
+    this.vm.isTransferring = true;
     try {
       const json: string = await UigfService.getInstance().buildExportJson();
+      if (!this.pageActive || epoch !== this.pageEpoch) { return; }
+      if (json.length > UIGF_MAX_BYTES) { throw new Error('UIGF 导出超过 32 MiB 限制'); }
+      const bytes: Uint8Array = util.TextEncoder.create().encodeInto(json);
+      if (bytes.byteLength > UIGF_MAX_BYTES) { throw new Error('UIGF 导出超过 32 MiB 限制'); }
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker();
       const opts: picker.DocumentSaveOptions = new picker.DocumentSaveOptions();
       opts.newFileNames = ['uigf_gacha_export.json'];
       const uris: string[] = await docPicker.save(opts);
-      if (uris.length === 0) {
+      if (!this.pageActive || epoch !== this.pageEpoch || uris.length === 0) {
         return;
       }
       const file: fileIo.File = fileIo.openSync(uris[0], fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
       try {
-        fileIo.writeSync(file.fd, json);
+        const written: number = fileIo.writeSync(file.fd, bytes);
+        if (written !== bytes.byteLength) { throw new Error('UIGF 文件写入不完整，请重新导出'); }
       } finally {
         fileIo.closeSync(file);
       }
       this.toast('导出成功（UIGF v4.2）');
     } catch (e) {
-      this.toast(`导出失败：${(e as Error).message}`);
-    }
+      if (this.pageActive && epoch === this.pageEpoch) { this.toast(`导出失败：${(e as Error).message}`); }
+    } finally { this.vm.isTransferring = false; }
+  }
+
+  @Builder
+  localArchiveControls() {
+    Column({ space: 8 }) {
+      if (this.vm.archives.length > 0) {
+        Row({ space: 8 }) {
+          Text('本地归档').fontSize(13).fontColor($r('app.color.text_secondary'))
+          Select(this.archiveOptions()).selected(this.currentArchiveIndex()).value(this.vm.currentUid)
+            .layoutWeight(1).enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
+            .onSelect((index: number) => {
+              if (index >= 0 && index < this.vm.archives.length) { this.chooseLocalArchive(this.vm.archives[index].id); }
+            })
+        }.width('100%')
+      } else {
+        Text('暂无本地归档，可直接导入 UIGF 文件').fontSize(13).fontColor($r('app.color.text_secondary'))
+      }
+      Flex({ wrap: FlexWrap.Wrap }) {
+        Button('导入 UIGF').fontSize(12).height(32).margin({ right: 8, bottom: 4 }).hoverEffect(HoverEffect.Highlight)
+          .enabled(!this.vm.isRefreshing && !this.vm.isTransferring).onClick(() => this.uigfImport())
+        Button('导出全部归档').fontSize(12).height(32).margin({ right: 8, bottom: 4 }).hoverEffect(HoverEffect.Highlight)
+          .enabled(this.vm.archives.length > 0 && !this.vm.isRefreshing && !this.vm.isTransferring).onClick(() => this.uigfExport())
+        Button('手动 URL').fontSize(12).height(32).margin({ right: 8, bottom: 4 }).hoverEffect(HoverEffect.Highlight)
+          .enabled(!this.vm.isRefreshing && !this.vm.isTransferring).onClick(() => { this.showUrlInput = !this.showUrlInput; })
+        if (!this.isLoggedIn) {
+          Button('登录以在线刷新').fontSize(12).height(32).hoverEffect(HoverEffect.Highlight)
+            .onClick(() => router.pushUrl({ url: 'pages/LoginPage' }))
+        }
+      }.width('100%')
+      Text(this.vm.gameAccountUid.length > 0 ? `自动刷新账号 UID：${this.vm.gameAccountUid}` : '离线查看、导入和导出不需要登录；手动 URL 使用链接中的鉴权')
+        .fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
+    }.width('100%').padding(12).borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
   }
 
   @Builder
@@ -1776,13 +1892,7 @@ export struct GachaLogPage {
           .fontColor(Color.White)
           .fontSize(14)
           .onClick(() => {
-            this.vm.importByUrl(this.urlInput).then((ok: boolean) => {
-              this.syncAll();
-              this.toast(ok ? `导入完成：${this.vm.message}` : `导入失败：${this.vm.message}`);
-              if (ok) {
-                this.showUrlInput = false;
-              }
-            });
+            this.submitUrlImport();
           })
       }
       .width('100%')
@@ -1798,9 +1908,6 @@ export struct GachaLogPage {
       // 壁纸衬底：本页恒为 Index 壳层内嵌（壳层已铺壁纸），PageBackdrop 渲染为空仅透传
       PageBackdrop({ embedMode: true })
       Column() {
-      if (!this.isLoggedIn) {
-        this.loginGuide()
-      } else {
         Row() {
           Text('祈愿记录')
             .fontSize($r('app.float.page_title_font_size'))
@@ -1814,25 +1921,18 @@ export struct GachaLogPage {
               .margin({ right: 10 })
           }
           Button(this.vm.fullRefresh ? '全量' : '增量')
+            .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
             .fontSize(11).height(28).hoverEffect(HoverEffect.Highlight)
             .onClick(() => this.vm.fullRefresh = !this.vm.fullRefresh)
           Button('刷新')
+            .enabled(this.isLoggedIn && this.vm.gameAccountUid.length > 0 && !this.vm.isRefreshing && !this.vm.isTransferring)
+            .hoverEffect(HoverEffect.Highlight)
             .fontSize(13)
             .height(32)
             .backgroundColor($r('app.color.app_primary'))
             .fontColor(Color.White)
             .onClick(() => {
-              if (this.vm.currentUid.length === 0) {
-                this.toast('请先在「账号与数据」选择默认 UID');
-                return;
-              }
-              this.vm.refresh().then((ok: boolean) => {
-                // 新数据入库，期次汇总缓存失效（历史页签重建）
-                this.historyLoadedFor = -1;
-                this.historyWishes = [];
-                this.syncAll();
-                this.toast(ok ? this.vm.message : this.vm.message);
-              });
+              this.refreshAccount();
             })
         }
         .width('100%')
@@ -1861,6 +1961,7 @@ export struct GachaLogPage {
 
         Scroll() {
           Column({ space: 10 }) {
+            this.localArchiveControls()
             if (this.vm.isRefreshing) {
               this.progressPanel()
             }
@@ -1893,7 +1994,6 @@ export struct GachaLogPage {
         .width('100%')
         .layoutWeight(1)
         .align(Alignment.Top)
-      }
     }
     .width('100%')
     .height('100%')
@@ -1929,23 +2029,27 @@ export struct GachaLogPage {
 
   /** 期次汇总（对齐 Windows PivotHistory：版本+池名+UP 五星/四星获取数+时间跨度） */
   async loadHistoryWishes(): Promise<void> {
-    if (this.vm.currentArchiveId <= 0 || this.historyLoading) {
+    if (!this.pageActive || this.vm.currentArchiveId <= 0 || this.historyLoading) {
       return;
     }
     if (this.historyLoadedFor === this.vm.currentArchiveId && this.historyWishes.length > 0) {
       return;
     }
     this.historyLoading = true;
+    const epoch: number = this.pageEpoch;
+    const generation: number = ++this.historyGeneration;
+    const archiveId: number = this.vm.currentArchiveId;
     try {
       const views: HistoryWishView[] = await GachaHistoryService.getInstance()
-        .buildHistory(this.vm.currentArchiveId);
+        .buildHistory(archiveId);
+      if (!this.pageActive || epoch !== this.pageEpoch || generation !== this.historyGeneration || archiveId !== this.vm.currentArchiveId) { return; }
       this.historyWishes = views;
-      this.historyLoadedFor = this.vm.currentArchiveId;
+      this.historyLoadedFor = archiveId;
       this.preloadHistoryBanners(views);
     } catch (e) {
       Logger.warn(GACHA_TAG, `history wishes fail: ${(e as Error).message}`);
     } finally {
-      this.historyLoading = false;
+      if (generation === this.historyGeneration) { this.historyLoading = false; }
     }
   }
 
@@ -1954,6 +2058,8 @@ export struct GachaLogPage {
    * 下载完成整体替换 @State 数组触发卡片补绘横幅；失败留空，卡片不渲染横幅。
    */
   private preloadHistoryBanners(views: HistoryWishView[]): void {
+    const epoch: number = this.pageEpoch;
+    const archiveId: number = this.vm.currentArchiveId;
     // 循环外快照已命中的 URL（避免循环内反复读 @State）
     const known: Set<string> = new Set<string>();
     for (const k of this.bannerPaths) {
@@ -1967,7 +2073,7 @@ export struct GachaLogPage {
       known.add(v.banner);
       const url: string = v.banner;
       jobs.push(CachedImageService.fetchToCache(url).then((p: string) => {
-        if (p.length === 0) {
+        if (!this.pageActive || epoch !== this.pageEpoch || archiveId !== this.vm.currentArchiveId || p.length === 0) {
           return;
         }
         const hit: GachaBannerPath = new GachaBannerPath();

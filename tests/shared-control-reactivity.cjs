@@ -87,6 +87,24 @@ assert.equal(button.pressed, false);
 button.handleTouch(0);
 button.resetPress();
 assert.equal(button.pressScale, 1, 'focus loss resets the same press state');
+button.handleTouch(0);
+button.appReduceMotion = true;
+button.onMotionChanged();
+assert.equal(button.pressScale, 1, 'an app preference change resets a held press');
+const beforeAppReduction = animations.length;
+button.handleTouch(0);
+button.handleTouch(1);
+assert.equal(animations.length, beforeAppReduction, 'app reduction applies without an explicit caller prop');
+button.reduceMotion = true;
+button.appReduceMotion = false;
+button.onMotionChanged();
+button.handleTouch(0);
+assert.equal(animations.length, beforeAppReduction, 'turning off the app setting preserves local reduction');
+button.reduceMotion = false;
+button.onMotionChanged();
+button.handleTouch(0);
+assert.equal(button.pressScale, .98, 'motion is restored when both reduction flags are false');
+button.resetPress();
 
 const BackButton = component('AppBackButton');
 const backButton = new BackButton();
@@ -125,6 +143,7 @@ assert.match(tapSource, /Button\(\{ type: ButtonType.Normal, stateEffect: false 
 assert.match(tapSource, /\.enabled\(!this.disabled\)/);
 assert.match(tapSource, /@Watch\('onEnabledChanged'\) disabled/);
 assert.match(tapSource, /@Watch\('onMotionChanged'\) reduceMotion/);
+assert.match(tapSource, /@StorageProp\('reduceMotion'\) @Watch\('onMotionChanged'\) appReduceMotion/);
 assert.match(tapSource, /\.onBlur\(\(\) => \{\s*this.resetPress\(\)/);
 assert.doesNotMatch(tapSource, /aboutToDisappear\(/, 'do not mutate decorated state during component teardown');
 assert.match(tapSource, /Text\(this.label\)[\s\S]*?\.flexShrink\(1\)/,

@@ -20,8 +20,9 @@ export struct QTapButton {
   @Prop @Watch('onEnabledChanged') disabled: boolean = false;
   /** 主题色按钮（默认主色背景白字） */
   @Prop primary: boolean = true;
-  /** 调用方可关闭按压缩放与点光源；本组件不自行读取系统设置。 */
+  /** 调用方可额外关闭按压缩放与点光源；不能覆盖应用的减少动态效果设置。 */
   @Prop @Watch('onMotionChanged') reduceMotion: boolean = false;
+  @StorageProp('reduceMotion') @Watch('onMotionChanged') appReduceMotion: boolean = false;
   /** 点击回调 */
   onTap: () => void = () => {
   };
@@ -43,7 +44,7 @@ export struct QTapButton {
   }
 
   onMotionChanged(): void {
-    if (this.reduceMotion) {
+    if (this.reduceMotion || this.appReduceMotion) {
       this.resetPress();
     }
   }
@@ -60,7 +61,7 @@ export struct QTapButton {
 
   /** 处理按压状态：光源与缩放在同一 animateTo 闭包内切换（避免动画间隙更新状态） */
   private handleTouch(type: TouchType): void {
-    if (this.disabled || this.reduceMotion) {
+    if (this.disabled || this.reduceMotion || this.appReduceMotion) {
       this.resetPress();
       return;
     }
@@ -112,11 +113,11 @@ export struct QTapButton {
     .accessibilityText(this.label.length > 0 ? this.label : this.icon)
     .opacity(this.disabled ? 0.5 : 1)
     .hoverEffect(this.disabled ? HoverEffect.None : HoverEffect.Highlight)
-    .scale({ x: this.disabled || this.reduceMotion ? 1 : this.pressScale,
-      y: this.disabled || this.reduceMotion ? 1 : this.pressScale })
+    .scale({ x: this.disabled || this.reduceMotion || this.appReduceMotion ? 1 : this.pressScale,
+      y: this.disabled || this.reduceMotion || this.appReduceMotion ? 1 : this.pressScale })
     .visualEffect(new hdsEffect.HdsEffectBuilder()
       .pointLight({
-        sourceType: this.pressed && !this.disabled && !this.reduceMotion ?
+        sourceType: this.pressed && !this.disabled && !this.reduceMotion && !this.appReduceMotion ?
           hdsEffect.PointLightSourceType.BRIGHT : hdsEffect.PointLightSourceType.NONE,
         illuminatedType: hdsEffect.PointLightIlluminatedType.BORDER,
       })

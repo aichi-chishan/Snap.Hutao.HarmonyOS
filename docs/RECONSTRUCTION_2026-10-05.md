@@ -36,3 +36,23 @@ The separate shared-control and splash-art changes are still being developed and
 Fresh validation after the final edits: 12 host suites passed with pinned TypeScript5.9.3 and NODE_PATH cleared; `git diff --check` passed. The SVG was parsed and its rendered preview inspected. The new tests execute real component methods under native doubles and cover request replacement/detach, byte views, invalid names, failure races and cache eviction. Official SDK/lint/HAP/device, keyboard and screen-reader checks remain unrun.
 
 Additional official references: [Button](https://github.com/openharmony/docs/blob/master/en/application-dev/reference/apis-arkui/arkui-ts/ts-basic-components-button.md), [accessibility](https://github.com/openharmony/docs/blob/master/en/application-dev/reference/apis-arkui/arkui-ts/ts-universal-attributes-accessibility.md), [Prop synchronization](https://github.com/openharmony/docs/blob/master/en/application-dev/ui/state-management/arkts-prop.md).
+
+## Checkpoint 3: offline archives, safer caches and persisted reduced motion
+
+### Offline gacha
+
+The local archive view and UIGF import/export are accessible without login. Explicit archive selection persists independently of the authenticated refresh UID; ordinary loads do not create empty or logged-in archives. Page/account/archive generations fence stale progress, history and picker callbacks. Import/export have a 32MiB bound and exact I/O byte-count checks; UTF-8 output is checked before reporting success. The real existing UIGF service is exercised under repository/native doubles, including long string IDs. This does not restore selective/versioned UIGF workflows, atomic multi-archive transactions or background parsing; the baseline synchronous codec remains.
+
+### Cache reliability
+
+StandardIconService now validates path segments, checks directory/file types, coalesces in-flight requests, retries transient failures and revalidates evictable cache files. HTTP responses are bounded at 8MiB with PNG signature/size checks (not full image decoding). OS-unique staging directories, checked writes, fsync and same-filesystem rename avoid publishing partial downloads. Raw metadata/splash writes also stage checked, closed files before publication; a failing second write cannot truncate an existing image. Only each operation's own staging directory is cleaned.
+
+### App-level reduced motion
+
+A persisted app.reduce_motion switch is restored after backup recovery and before Index loads. Central Motion transitions/delays/spring interpolation, PageContainer and QTapButton honor it. This is an app preference, not OS-setting integration. Direct effects in PressCard, portions of Index/HomeGachaCard, RiskVerifyModal and WallpaperLayer still need reactive integration; the setting is accurately worded as reducing effects rather than disabling every animation.
+
+### Verification
+
+Fresh aggregate: 15 host suites passed with TypeScript5.9.3 and NODE_PATH cleared. Focused coverage includes 17 offline-gacha tests and 22 StandardIconService cases, plus production preference/startup/settings and raw-cache short-write regressions. New cache tests use actual host filesystem operations with HTTP doubles. App-resource references in changed ArkTS files resolve; diff whitespace checks pass. Official native compiler/lint/HAP/device/account checks remain unrun.
+
+Additional API evidence: [file I/O](https://github.com/openharmony/docs/blob/master/en/application-dev/reference/apis-core-file-kit/js-apis-file-fs.md), [HTTP](https://github.com/openharmony/docs/blob/master/en/application-dev/reference/apis-network-kit/js-apis-http.md), [curves](https://github.com/openharmony/docs/blob/master/en/application-dev/reference/apis-arkui/js-apis-curve.md). Used additions remain below minimum API24; maxRedirects is API23 and stepsCurve is API9.
