@@ -96,15 +96,25 @@ export class HarmonySnapshotIo implements GameDataSnapshotIo {
   /** Includes abandoned staging and previous snapshots. No data is deleted to make room. */
   usedBytes(): number {
     this.mkdir(this.root);
-    const names: string[] = fileIo.listFileSync(this.root, { recursion: true, listNum: 100001 });
-    if (names.length > 100000) { throw new Error('游戏数据文件数量超过工作区限制'); }
+    const pending: string[] = [this.root];
+    let entries: number = 0;
     let bytes: number = 0;
-    for (const name of names) {
-      const relative: string = name.startsWith('/') ? name.substring(1) : name;
-      const path: string = `${this.root}/${relative}`; this.guard(path);
-      const stat: fileIo.Stat = fileIo.lstatSync(path);
-      if (stat.isSymbolicLink() || (!stat.isFile() && !stat.isDirectory())) { throw new Error('工作区包含不安全路径'); }
-      if (stat.isFile()) { bytes += stat.size; }
+    while (pending.length > 0) {
+      const directory: string = pending[pending.length - 1]; pending.pop();
+      // Never ask a recursive enumerator to traverse an entry before its type is checked.
+      this.directories(directory, false);
+      const names: string[] = fileIo.listFileSync(directory, { recursion: false, listNum: 100001 - entries });
+      entries += names.length;
+      if (entries > 100000) { throw new Error('游戏数据文件数量超过工作区限制'); }
+      for (const name of names) {
+        const relative: string = name.startsWith('/') ? name.substring(1) : name;
+        if (relative.length === 0 || relative.includes('/')) { throw new Error('工作区包含不安全路径'); }
+        const path: string = `${directory}/${relative}`; this.guard(path);
+        const stat: fileIo.Stat = fileIo.lstatSync(path);
+        if (stat.isSymbolicLink() || (!stat.isFile() && !stat.isDirectory())) { throw new Error('工作区包含不安全路径'); }
+        if (stat.isFile()) { bytes += stat.size; }
+        else { pending.push(path); }
+      }
     }
     return bytes;
   }

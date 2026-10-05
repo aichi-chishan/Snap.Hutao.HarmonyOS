@@ -4,6 +4,10 @@
  * 计算结果可保存为持久化培养条目（多项目 + 材料勾选，对齐 Windows CultivationPage）。
  * 数据源：character/list（角色）+ batch_compute（材料）+ 本地计划库。
  */
+import { CultivationDraftViewModel } from '../viewmodel/CultivationDraftViewModel';
+import { CultivationDraftEditor } from '../components/CultivationDraftEditor';
+import { CultivationService } from '../service/CultivationService';
+import { CultivationDraft } from '../model/CultivationDraft';
 import { common } from '@kit.AbilityKit';
 import { fileIo, picker } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
@@ -26,16 +30,41 @@ export struct CultivationPage {
   /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
-  @StorageLink('currentUid') currentUid: string = '';
-  @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
+  @StorageLink('currentUid') @Watch('accountChanged') currentUid: string = '';
+  @StorageLink('isLoggedIn') @Watch('accountChanged') isLoggedIn: boolean = false;
   @State vm: CultivationViewModel = new CultivationViewModel();
   /** 目标等级输入（临时） */
+  @State showDraft: boolean = false;
+  @State draftVm: CultivationDraftViewModel = new CultivationDraftViewModel();
   @State levelTmp: string = '';
   @State showInventory: boolean = false;
   @State inventoryIdText: string = '';
   @State inventoryCountText: string = '';
   /** 内容区宽 >=840 双栏（对齐 WikiAvatarPage 断点写法） */
   @State isWide: boolean = false;
+
+  accountChanged(): void { this.showDraft = false; this.draftVm.cancel(); this.loadData(); }
+  aboutToDisappear(): void { this.draftVm.cancel(); this.vm.invalidate(); }
+
+  @Builder
+  draftSheet() {
+    CultivationDraftEditor({ vm: this.draftVm, uid: this.isLoggedIn ? this.currentUid : '',
+      onClose: (): void => { this.showDraft = false; this.draftVm.cancel(); },
+      onSaved: (): void => { this.vm.loadPlan().then(() => {}); } })
+  }
+
+  private async editSelected(): Promise<void> {
+    if (this.draftVm.busy) { return; }
+    this.showDraft = true;
+    const selected: CultivateTarget[] = this.vm.targets.filter((target: CultivateTarget): boolean => target.selected);
+    if (selected.length === 0) { this.draftVm.message = '请先选择角色'; return; }
+    const uid: string = this.isLoggedIn ? this.currentUid : '';
+    await this.draftVm.selectedTargets(uid, selected.map((target: CultivateTarget): number => target.avatarId));
+  }
+
+  private editEntry(entry: CultivateEntry): void {
+    this.showDraft = true; this.draftVm.edit(entry).then(() => {});
+  }
 
   aboutToAppear(): void {
     this.loadData();
@@ -89,7 +118,7 @@ export struct CultivationPage {
     PageHeader({ title: '养成计划', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
       Button('刷新')
         .fontSize(13)
-        .height(32)
+        .height(44)
         .backgroundColor($r('app.color.app_primary_bg'))
         .fontColor($r('app.color.app_primary'))
         .onClick(() => {
@@ -242,7 +271,7 @@ export struct CultivationPage {
       Text(item.name.length > 0 ? item.name.substring(0, 1) : '◇')
         .fontSize(13)
         .width(30)
-        .height(30)
+        .height(44)
         .textAlign(TextAlign.Center)
         .borderRadius(8)
         .backgroundColor($r('app.color.app_primary_bg'))
@@ -267,7 +296,7 @@ export struct CultivationPage {
     if (this.vm.result !== undefined && this.vm.result.overallConsume.length > 0) {
       Button(this.vm.planBusy ? '保存中...' : '保存计算结果到养成计划')
         .width('100%')
-        .height(40)
+        .height(44)
         .fontSize(14)
         .backgroundColor($r('app.color.app_primary'))
         .fontColor(Color.White)
@@ -312,7 +341,7 @@ export struct CultivationPage {
         .fontSize(16)
         .fontColor($r('app.color.app_primary'))
         .width(30)
-        .height(30)
+        .height(44)
         .textAlign(TextAlign.Center)
         .borderRadius(15)
         .backgroundColor($r('app.color.app_primary_bg'))
@@ -328,7 +357,7 @@ export struct CultivationPage {
           .fontSize(14)
           .fontColor($r('app.color.danger'))
           .width(30)
-          .height(30)
+          .height(44)
           .textAlign(TextAlign.Center)
           .borderRadius(15)
           .backgroundColor($r('app.color.card_inner_tint'))
@@ -372,7 +401,7 @@ export struct CultivationPage {
       Text(item.name.length > 0 ? item.name.substring(0, 1) : '◇')
         .fontSize(13)
         .width(30)
-        .height(30)
+        .height(44)
         .textAlign(TextAlign.Center)
         .borderRadius(8)
         .backgroundColor($r('app.color.app_primary_bg'))
@@ -450,6 +479,8 @@ export struct CultivationPage {
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
+        Button('编辑').height(44).fontSize(12).hoverEffect(HoverEffect.Highlight)
+          .onClick(() => this.editEntry(entry))
         Text('删除')
           .fontSize(12)
           .fontColor($r('app.color.danger'))
@@ -465,6 +496,8 @@ export struct CultivationPage {
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
+      Text(entry.inputJson.length > 0 ? '完整目标已保存，可编辑或重新同步当前进度' : '旧计划：需重新确认完整输入')
+        .fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
       Divider()
         .color($r('app.color.divider'))
       ForEach(entry.items, (item: CultivateEntryItem) => {
@@ -652,7 +685,7 @@ export struct CultivationPage {
   inventorySection() {
     Column({ space: 8 }) {
       Button(this.showInventory ? '收起项目库存' : '管理项目库存')
-        .fontSize(12).height(30).hoverEffect(HoverEffect.Highlight)
+        .fontSize(12).height(44).hoverEffect(HoverEffect.Highlight)
         .onClick(() => this.showInventory = !this.showInventory)
       if (this.showInventory) {
         Text('库存按计划保存；材料缺口和树脂估算会扣除库存，并考虑同系列低阶合成。')
@@ -704,8 +737,11 @@ export struct CultivationPage {
       // 树脂换算统计（当前项目聚合，展示在项目详情顶部；对齐 Windows 统计区）
       this.resinSection()
       this.inventorySection()
+      if (this.vm.message.length > 0) {
+        Text(this.vm.message).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+      }
       if (this.vm.planEntries.length === 0) {
-        Text('暂无培养目标：勾选角色并计算材料后，点「保存计算结果到养成计划」')
+        Text('暂无培养目标：勾选角色后编辑目标，预览材料并保存')
           .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
@@ -714,7 +750,7 @@ export struct CultivationPage {
       } else {
         ForEach(this.vm.planEntries, (entry: CultivateEntry) => {
           this.planEntryCard(entry)
-        }, (entry: CultivateEntry) => `plan_${entry.id}_${entry.finishedCount()}`)
+        }, (entry: CultivateEntry) => `plan_${entry.id}_${entry.finishedCount()}_${entry.inputJson}_${entry.items.length}`)
       }
     }
     .width('100%')
@@ -765,54 +801,14 @@ export struct CultivationPage {
   /** 右栏（窄屏下半区）：计算操作 + 结果 + 候选角色 */
   @Builder
   computeColumn() {
-    // 操作区
     Column({ space: 8 }) {
-      this.quickLevelBar()
-      Row({ space: 6 }) {
-        Text('天赋目标').fontSize(11).fontColor($r('app.color.text_secondary'))
-        ForEach([6, 8, 9, 10], (lv: number) => {
-          Button(`${lv}`).fontSize(11).height(28).hoverEffect(HoverEffect.Highlight)
-            .onClick(() => this.vm.setSkillTarget(lv))
-        })
-      }
-      Row({ space: 6 }) {
-        Text('武器目标').fontSize(11).fontColor($r('app.color.text_secondary'))
-        ForEach([60, 70, 80, 90], (lv: number) => {
-          Button(`${lv}`).fontSize(11).height(28).hoverEffect(HoverEffect.Highlight)
-            .onClick(() => this.vm.setWeaponTarget(lv))
-        })
-      }
-      Row({ space: 8 }) {
-        Button(`已选 ${this.vm.selectedCount} 个角色`)
-          .fontSize(12)
-          .height(30)
-          .layoutWeight(1)
-          .backgroundColor($r('app.color.card_background'))
-          .fontColor($r('app.color.text_primary'))
-        Button(this.vm.computing ? '计算中...' : '计算材料')
-          .fontSize(12)
-          .height(30)
-          .layoutWeight(1)
-          .backgroundColor($r('app.color.app_primary'))
-          .fontColor(Color.White)
-          .hoverEffect(HoverEffect.Highlight)
-          .onClick(() => {
-            this.vm.compute(this.currentUid).then(() => {
-              this.toast(this.vm.message.length > 0 ? this.vm.message : '计算完成');
-            });
-          })
-      }
-      .width('100%')
-    }
-    .width('100%')
-    .padding(14)
-    .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
-    .border({ width: 1, color: $r('app.color.card_stroke') })
-
-    // 结果区
-    this.resultSection()
-    this.savePlanBar()
+      Text(this.isLoggedIn ? '勾选角色后编辑各自的等级、突破与三项天赋目标' : '离线规划：默认从 1 级开始，可手动修改当前进度')
+        .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+      Button(`编辑目标并预览 · 已选 ${this.vm.selectedCount}`).height(44).width('100%')
+        .enabled(this.vm.selectedCount > 0 && !this.draftVm.busy).hoverEffect(HoverEffect.Highlight)
+        .backgroundColor($r('app.color.app_primary')).fontColor(Color.White)
+        .onClick(() => this.editSelected())
+    }.width('100%').padding(14).borderRadius(12).backgroundColor($r('app.color.card_surface'))
 
     // 候选角色网格
     Row() {
@@ -828,6 +824,11 @@ export struct CultivationPage {
     .width('100%')
 
     Column({ space: 8 }) {
+      if (this.vm.loading) {
+        Text('正在刷新角色列表，已有计划保持不变').fontSize(12).fontColor($r('app.color.text_secondary'))
+      } else if (this.vm.targets.length === 0) {
+        Text('暂无可用角色；仍可查看和编辑已保存计划').fontSize(12).fontColor($r('app.color.text_secondary'))
+      }
       ForEach(this.vm.targets, (target: CultivateTarget, idx: number) => {
         this.targetRow(target, idx)
         // 键必须包含会变的字段（AGENTS @Builder 规则）：仅 avatarId 时 toggle 重赋值 targets 后
@@ -842,9 +843,7 @@ export struct CultivationPage {
       PageBackdrop({ embedMode: this.embedMode })
       Column() {
       this.header()
-      if (!this.isLoggedIn) {
-        this.loginGuide()
-      } else if (this.vm.loading) {
+      if (this.vm.loading && this.vm.targets.length === 0 && this.vm.projects.length === 0) {
         Column({ space: 10 }) {
           LoadingProgress()
             .width(36)
@@ -858,14 +857,7 @@ export struct CultivationPage {
         .padding({ top: 80, bottom: 80 })
       } else {
         Scroll() {
-          if (this.vm.targets.length === 0) {
-            Text(this.vm.message.length > 0 ? this.vm.message : '暂无角色数据')
-              .fontSize(13)
-              .fontColor($r('app.color.text_secondary'))
-              .width('100%')
-              .padding({ top: 30, bottom: 30 })
-              .textAlign(TextAlign.Center)
-          } else if (this.isWide) {
+          if (this.isWide) {
             // 宽屏双栏：左计划 / 右计算（内容区宽 >=840，对齐页面断点规范）
             Row({ space: 10 }) {
               Column() {
@@ -896,6 +888,8 @@ export struct CultivationPage {
     }
     .width('100%')
     .height('100%')
+    .bindSheet($$this.showDraft, this.draftSheet(), { height: '90%', showClose: true, dragBar: true,
+      onDisappear: (): void => { this.draftVm.cancel(); }, backgroundColor: $r('app.color.sheet_material_tint') })
     .backgroundColor(Color.Transparent)
     .onAreaChange((oldValue: Area, newValue: Area) => {
       this.isWide = (newValue.width as number) >= 840;

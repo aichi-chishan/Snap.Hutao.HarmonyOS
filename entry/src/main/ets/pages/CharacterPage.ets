@@ -19,7 +19,10 @@ import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
 import { MetaIcon } from '../components/MetaIcon';
 import { WikiMetaService, MetaSkill } from '../service/WikiMetaService';
 import { CharacterExportService } from '../service/CharacterExportService';
-import { SkillLevelService } from '../service/SkillLevelService';
+import { CultivationDraftViewModel } from '../viewmodel/CultivationDraftViewModel';
+import { CultivationDraftEditor } from '../components/CultivationDraftEditor';
+import { PromoteState } from '../model/PromoteState';
+import { SkillLevelService, ResolvedAvatarSkill } from '../service/SkillLevelService';
 import { CultivationRepo, CultivateProject } from '../data/repo/CultivationRepo';
 import { Logger } from '../common/Logger';
 
@@ -30,7 +33,7 @@ const TAG: string = 'CharacterPage';
 export struct CharacterPage {
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
-  @StorageLink('currentUid') currentUid: string = '';
+  @StorageLink('currentUid') @Watch('accountChanged') currentUid: string = '';
   @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
   @State vm: CharacterViewModel = new CharacterViewModel();
   @State isWide: boolean = false;
@@ -48,12 +51,20 @@ export struct CharacterPage {
   @State charElement: string = '';
   /** 养成计划选择半窗（多项目时让用户选，对齐 Windows 当前养成计划口径） */
   @State showPlanSheet: boolean = false;
+  @State draftVm: CultivationDraftViewModel = new CultivationDraftViewModel();
+  @State planSelectedIds: number[] = [];
   /** 待选养成计划列表（bindSheet 数据源） */
   @State pendingProjects: CultivateProject[] = [];
   /** 待加入计划的角色详情快照（选项目期间固定） */
   @State pendingDetail: CharacterDetail | undefined = undefined;
   /** 加入计划进行中（防重复点击） */
   @State addingPlan: boolean = false;
+
+  accountChanged(): void {
+    this.showPlanSheet = false; this.draftVm.cancel(); this.planSelectedIds = []; this.reload();
+  }
+
+  aboutToDisappear(): void { this.draftVm.cancel(); }
 
   aboutToAppear(): void {
     this.isWide = CharacterPage.detectWide();
@@ -103,7 +114,7 @@ export struct CharacterPage {
     try {
       const d: display.Display = display.getDefaultDisplaySync();
       const widthVp: number = d.densityPixels > 0 ? d.width / d.densityPixels : d.width;
-      return widthVp >= 720;
+      return widthVp >= 840;
     } catch (e) {
       return false;
     }
@@ -278,6 +289,12 @@ export struct CharacterPage {
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
+      Button(this.planSelectedIds.indexOf(c.id) >= 0 ? '✓' : '＋').width(44).height(44)
+        .fontSize(16).hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          this.planSelectedIds = this.planSelectedIds.indexOf(c.id) >= 0
+            ? this.planSelectedIds.filter((id: number): boolean => id !== c.id) : this.planSelectedIds.concat(c.id);
+        })
       if (this.selectedId === c.id) {
         Text('▣')
           .fontSize(12)
@@ -336,7 +353,7 @@ export struct CharacterPage {
         Row({ space: 10 }) {
           Button('米游社攻略')
             .fontSize(13)
-            .height(34)
+            .height(44)
             .layoutWeight(1)
             .backgroundColor($r('app.color.app_primary_bg'))
             .fontColor($r('app.color.app_primary'))
@@ -345,7 +362,7 @@ export struct CharacterPage {
             })
           Button('B站攻略')
             .fontSize(13)
-            .height(34)
+            .height(44)
             .layoutWeight(1)
             .backgroundColor($r('app.color.app_primary_bg'))
             .fontColor($r('app.color.app_primary'))
@@ -383,7 +400,7 @@ export struct CharacterPage {
                       .fontColor($r('app.color.text_primary'))
                     Row({ space: 4 }) {
                       if (sk.k.length > 0) {
-                        Text(CharacterPage.kindLabel(sk.k))
+                        Text(CharacterPage.kindLabel(SkillLevelService.kindOfMetaSkill(this.currentDetail!, sk)))
                           .fontSize(10)
                           .fontColor($r('app.color.app_primary'))
                       }
@@ -423,7 +440,7 @@ export struct CharacterPage {
             } else {
               NavIcon({ name: 'AvatarProperty', iconSize: 22 })
             }
-            Text(`${WikiMetaService.nameOfWeapon(this.currentDetail.weapon.id)} · Lv.${this.currentDetail.weapon.level} ★${this.currentDetail.weapon.rarity} · 精炼${this.currentDetail.weapon.affixLevel}`)
+            Text(`${WikiMetaService.nameOfWeapon(this.currentDetail.weapon.id)} · Lv.${this.currentDetail.weapon.level} ★${this.currentDetail.weapon.rarity} · 精炼${this.currentDetail.weapon.affixLevel} · ${PromoteState.label(this.currentDetail.weapon.promoteLevel)}`)
               .fontSize(14)
               .fontColor($r('app.color.text_primary'))
               .layoutWeight(1)
@@ -552,7 +569,7 @@ export struct CharacterPage {
                 .fontWeight(FontWeight.Medium)
                 .fontColor($r('app.color.text_primary'))
                 .layoutWeight(1)
-              Text(`已激活 ${this.currentDetail.activedConstellationNum}/${this.currentDetail.constellations.length}`)
+              Text(`已激活 ${this.currentDetail.activedConstellationNum < 0 ? '?' : this.currentDetail.activedConstellationNum}/${this.currentDetail.constellations.length}`)
                 .fontSize(11)
                 .fontColor($r('app.color.text_secondary'))
             }
@@ -633,7 +650,7 @@ export struct CharacterPage {
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.text_primary'))
-          Text(`Lv.${this.currentDetail.level} · ★${this.currentDetail.rarity} · 好感 ${this.currentDetail.fetter} · 命座 ${this.currentDetail.activedConstellationNum}`)
+          Text(`Lv.${this.currentDetail.level} · ★${this.currentDetail.rarity} · 好感 ${this.currentDetail.fetter} · 命座 ${this.currentDetail.activedConstellationNum < 0 ? '?' : this.currentDetail.activedConstellationNum}`)
             .fontSize(12)
             .fontColor($r('app.color.text_secondary'))
         }
@@ -658,7 +675,7 @@ export struct CharacterPage {
     Row({ space: 10 }) {
       Button('导出文本')
         .fontSize(this.isWide ? 13 : 12)
-        .height(34)
+        .height(44)
         .layoutWeight(1)
         .backgroundColor($r('app.color.app_primary_bg'))
         .fontColor($r('app.color.app_primary'))
@@ -667,12 +684,12 @@ export struct CharacterPage {
           this.exportDetailText();
         })
       Button('全部导出')
-        .fontSize(12).height(34).layoutWeight(1)
+        .fontSize(12).height(44).layoutWeight(1)
         .backgroundColor($r('app.color.app_primary_bg')).fontColor($r('app.color.app_primary'))
         .hoverEffect(HoverEffect.Highlight).onClick(() => this.exportAllText())
-      Button(this.addingPlan ? '加入中...' : '加入养成计划')
+      Button('规划角色')
         .fontSize(this.isWide ? 13 : 12)
-        .height(34)
+        .height(44)
         .layoutWeight(1)
         .backgroundColor($r('app.color.app_primary_bg'))
         .fontColor($r('app.color.app_primary'))
@@ -682,50 +699,25 @@ export struct CharacterPage {
         })
     }
     .width('100%')
+    Button('规划当前装备武器').height(44).width('100%').hoverEffect(HoverEffect.Highlight)
+      .onClick(() => this.addCurrentToPlan(true))
   }
 
-  /** 养成计划选择半窗内容（多项目时列出项目供选择） */
   @Builder
   planPickerSheet() {
-    Column({ space: 10 }) {
-      Text('选择要加入的养成计划')
-        .fontSize(15)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'))
-        .width('100%')
-      Scroll() {
-        Column({ space: 8 }) {
-          ForEach(this.pendingProjects, (p: CultivateProject) => {
-            Row({ space: 10 }) {
-              NavIcon({ name: 'Cultivation', iconSize: 20 })
-              Text(p.name)
-                .fontSize(14)
-                .fontColor($r('app.color.text_primary'))
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .layoutWeight(1)
-              Text('加入')
-                .fontSize(12)
-                .fontColor($r('app.color.app_primary'))
-            }
-            .width('100%')
-            .padding(12)
-            .borderRadius(10)
-            .backgroundColor($r('app.color.card_inner_tint'))
-            .border({ width: 1, color: $r('app.color.divider') })
-            .hoverEffect(HoverEffect.Highlight)
-            .onClick(() => {
-              this.pickPlanProject(p);
-            })
-          }, (p: CultivateProject) => `plan_${p.id}`)
-        }
-        .width('100%')
-      }
-      .layoutWeight(1)
-      .scrollBar(BarState.Off)
-    }
-    .width('100%')
-    .padding(16)
+    CultivationDraftEditor({ vm: this.draftVm, uid: this.currentUid,
+      onClose: (): void => { this.showPlanSheet = false; this.draftVm.cancel(); } })
+  }
+
+  @Builder
+  batchPlanActions() {
+    Row({ space: 6 }) {
+      Button(`规划所选 ${this.planSelectedIds.length}`).fontSize(12).height(44).layoutWeight(1)
+        .enabled(this.planSelectedIds.length > 0 && !this.draftVm.busy).hoverEffect(HoverEffect.Highlight)
+        .onClick(() => this.openCharacterDraft(this.vm.items.filter((item: CharacterListItem): boolean => this.planSelectedIds.indexOf(item.id) >= 0)))
+      Button('全部规划').fontSize(12).height(44).layoutWeight(1).enabled(!this.draftVm.busy)
+        .hoverEffect(HoverEffect.Highlight).onClick(() => this.openCharacterDraft(this.vm.items))
+    }.width('100%')
   }
 
   /** 导出当前角色文本到剪贴板（对齐 Windows ExportToTextCommand，默认模板固定拼装） */
@@ -761,53 +753,15 @@ export struct CharacterPage {
     }
   }
 
-  /** 加入养成计划入口：0 项目自动建默认 → 1 项目直接加入 → 多项目弹半窗选择 */
-  private async addCurrentToPlan(): Promise<void> {
-    const d: CharacterDetail | undefined = this.currentDetail;
-    if (d === undefined || d.id <= 0 || this.addingPlan) {
-      return;
-    }
-    try {
-      const projects: CultivateProject[] = await CultivationRepo.getProjects();
-      if (projects.length === 0) {
-        const p: CultivateProject = await CultivationRepo.createProject('默认养成计划');
-        await this.addToProject(d, p);
-      } else if (projects.length === 1) {
-        await this.addToProject(d, projects[0]);
-      } else {
-        this.pendingDetail = d;
-        this.pendingProjects = projects;
-        this.showPlanSheet = true;
-      }
-    } catch (e) {
-      this.toast(`加入失败：${(e as Error).message}`);
-    }
+  private addCurrentToPlan(weaponOnly: boolean = false): void {
+    const character: CharacterListItem | undefined = this.vm.items.find((item: CharacterListItem): boolean => item.id === this.selectedId);
+    if (character !== undefined) { this.openCharacterDraft([character], weaponOnly); }
   }
 
-  /** 半窗内选中项目：关闭半窗并加入 */
-  private pickPlanProject(p: CultivateProject): void {
-    const d: CharacterDetail | undefined = this.pendingDetail;
-    this.showPlanSheet = false;
-    if (d === undefined) {
-      return;
-    }
-    this.addToProject(d, p);
-  }
-
-  /** 加入指定项目并 toast 结果（对齐 Windows：成功/已存在提示） */
-  private async addToProject(d: CharacterDetail, p: CultivateProject): Promise<void> {
-    if (this.addingPlan) {
-      return;
-    }
-    this.addingPlan = true;
-    try {
-      const r: AddPlanResult = await this.vm.addAvatarToPlan(d, p);
-      this.toast(r.message);
-    } catch (e) {
-      this.toast(`加入失败：${(e as Error).message}`);
-    } finally {
-      this.addingPlan = false;
-    }
+  private openCharacterDraft(items: CharacterListItem[], weaponOnly: boolean = false): void {
+    if (this.draftVm.busy || items.length === 0) { return; }
+    this.showPlanSheet = true;
+    this.draftVm.characters(this.currentUid, items.slice(), weaponOnly).then(() => {});
   }
 
   static kindLabel(k: string): string {
@@ -820,21 +774,21 @@ export struct CharacterPage {
     }
   }
 
-  /** 元数据第 idx 项天赋对应的 API 等级（SkillLevelService 按接口顺序对齐；0=无数据不显示） */
-  private skillLevelAt(name: string, idx: number): number {
-    const d: CharacterDetail | undefined = this.currentDetail;
-    if (d === undefined) {
-      return 0;
-    }
-    const levels: number[] = SkillLevelService.matchLevels(WikiMetaService.skillsOfAvatar(name), d.skills);
-    return idx >= 0 && idx < levels.length ? levels[idx] : 0;
+  /** Skill IDs join verified metadata; unknown mapping is displayed explicitly. */
+  private skillLevelAt(name: string, idx: number): string {
+    const detail: CharacterDetail | undefined = this.currentDetail;
+    const meta: MetaSkill | undefined = WikiMetaService.skillsOfAvatar(name)[idx];
+    if (detail === undefined || meta === undefined) { return ''; }
+    const skill: ResolvedAvatarSkill | undefined = SkillLevelService.forMetaSkill(detail, meta);
+    return skill !== undefined ? SkillLevelService.formatSkill(skill)
+      : ['A', 'E', 'Q'].indexOf(SkillLevelService.kindOfMetaSkill(detail, meta)) >= 0 ? '等级未知' : '';
   }
 
   /** 战斗天赋等级徽章（无参读取组件状态；参数 name/idx 为常量槽位，满足 @Builder 刷新规则） */
   @Builder
   skillLevelBadge(name: string, idx: number) {
-    if (this.skillLevelAt(name, idx) > 0) {
-      Text(`Lv.${this.skillLevelAt(name, idx)}`)
+    if (this.skillLevelAt(name, idx).length > 0) {
+      Text(this.skillLevelAt(name, idx))
         .fontSize(10)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.app_primary'))
@@ -976,7 +930,7 @@ export struct CharacterPage {
       if (!this.isLoggedIn) {
         this.loginGuide()
       } else {
-        Row({ space: 12 }) {
+        Flex({ direction: this.isWide ? FlexDirection.Row : FlexDirection.Column, alignItems: ItemAlign.Start }) {
           // 左侧角色列表
           Scroll() {
             Column({ space: 8 }) {
@@ -993,15 +947,17 @@ export struct CharacterPage {
                 Text('暂无角色数据').fontSize(13).fontColor($r('app.color.text_secondary'))
               } else {
                 this.charFilterBar()
+                this.batchPlanActions()
                 ForEach(this.filteredItems(), (c: CharacterListItem) => {
                   this.characterRow(c)
-                }, (c: CharacterListItem) => `${c.id}`)
+                }, (c: CharacterListItem) => `${c.id}_${this.planSelectedIds.indexOf(c.id) >= 0}_${this.selectedId}`)
               }
             }
             .width('100%')
             .padding({ left: 16, right: 8, bottom: 16 })
           }
-          .width(this.isWide ? 260 : '100%')
+          .width(this.isWide ? 300 : '100%')
+          .height(this.isWide ? '100%' : '45%')
           .scrollBar(BarState.Off)
 
           // 右侧详情（宽屏显示；窄屏也顺序显示）
@@ -1040,12 +996,12 @@ export struct CharacterPage {
         }
         .width('100%')
         .layoutWeight(1)
-        .alignItems(VerticalAlign.Top)
       }
     }
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
+    .onAreaChange((_old: Area, area: Area) => { this.isWide = Number(area.width) >= 840; })
     .bindSheet(this.showVerify, () => {
       RiskVerifyDialog({
         isShow: this.showVerify,
@@ -1064,7 +1020,8 @@ export struct CharacterPage {
       title: { title: '加入养成计划' },
       showClose: true,
       dragBar: true,
-      height: 360,
+      height: '90%',
+      onDisappear: (): void => { this.draftVm.cancel(); },
       blurStyle: BlurStyle.Regular,
       backgroundColor: $r('app.color.sheet_material_tint'),
     })

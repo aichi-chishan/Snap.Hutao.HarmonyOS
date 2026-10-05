@@ -12,6 +12,12 @@ import { UserService } from './UserService';
 import { RiskVerifier } from '../data/network/RiskVerifier';
 import { AppConstants, RegionUtil } from '../common/Constants';
 import { Logger } from '../common/Logger';
+import { PromoteState } from '../model/PromoteState';
+import { CharacterDetail } from '../model/CharacterData';
+import { CharacterService } from './CharacterService';
+import { SkillLevelService } from './SkillLevelService';
+import { AvatarSkillReference } from '../model/AvatarSkillReference';
+import { WikiMetaService, WikiWeaponMeta } from './WikiMetaService';
 
 const TAG: string = 'CalculateService';
 const URL_BATCH: string = 'https://api-takumi.mihoyo.com/event/e20200928calculate/v3/batch_compute';
@@ -30,9 +36,11 @@ export class CalAvatarDelta {
   weapon: CalWeaponDelta | undefined = undefined;
   /** 当前突破等级 */
   avatarPromoteLevel: number = 0;
+  /** Optional explicit target ascension; legacy callers retain existing cap semantics. */
+  avatarTargetPromoteLevel: number = -1;
 }
 
-/** 单个技能升级请求 */
+/** 单个技能升级请求：id 是计算器 group_id，不是战绩 skill_id。 */
 export class CalSkillDelta {
   id: number = 0;
   levelCurrent: number = 0;
@@ -46,6 +54,7 @@ export class CalWeaponDelta {
   levelTarget: number = 1;
   /** 武器突破等级 */
   weaponPromoteLevel: number = 0;
+  weaponTargetPromoteLevel: number = -1;
 }
 
 export class CalculateService {
@@ -102,7 +111,7 @@ export class CalculateService {
       const data: Record<string, Object> = await this.requestCalculator('/v1/sync/avatar/list', JSON.stringify(body));
       const list: Record<string, Object>[] = (data['list'] as Record<string, Object>[]) ?? [];
       for (const item of list) {
-        const promote: number = Number(item['promote_level']);
+        const promote: number = PromoteState.parse(item['promote_level']);
         const id: number = Number(item['id']);
         if (Number.isSafeInteger(id) && id > 0 && Number.isInteger(promote) && promote >= 0 && promote <= 6) {
           levels.set(id, promote);
@@ -115,48 +124,71 @@ export class CalculateService {
     throw new Error('计算器角色分页超出限制');
   }
 
-  /** 使用计算器技能ID及不含命座加成的等级，避免按数组位置猜测天赋。 */
+  /** Calculator talents are base levels. Missing ascension requires a fresh, matching equipped weapon. */
   async fillSyncedDetails(uid: string, delta: CalAvatarDelta, skillTarget: number,
     weaponTarget: number = 0): Promise<void> {
+    if (!/^\d+$/.test(uid) || !Number.isSafeInteger(delta.avatarId) || delta.avatarId <= 0) {
+      throw new Error('同步角色标识无效');
+    }
     const path: string = `/v1/sync/avatar/detail?avatar_id=${delta.avatarId}&uid=${uid}&region=${RegionUtil.regionOfUid(uid)}`;
     const data: Record<string, Object> = await this.requestCalculator(path);
     const raw: Record<string, Object>[] = (data['skill_list'] as Record<string, Object>[]) ?? [];
-    delta.skills = [];
+    const skills: CalSkillDelta[] = [];
+    const seen: Set<number> = new Set<number>();
     for (const item of raw) {
       const current: number = Number(item['level_current']);
-      if (!Number.isInteger(current) || current < 1 || current > 10) {
-        continue;
+      const id: number = Number(item['group_id']);
+      if (!Number.isInteger(current) || current < 1 || current > 10 || !Number.isSafeInteger(id) || id <= 0 || seen.has(id)) {
+        throw new Error('同步天赋等级或技能标识不完整，未修改养成输入');
       }
+      seen.add(id);
       const skill: CalSkillDelta = new CalSkillDelta();
-      skill.id = Number(item['id']);
+      skill.id = id;
       skill.levelCurrent = current;
       skill.levelTarget = Math.max(current, skillTarget);
-      delta.skills.push(skill);
+      skills.push(skill);
     }
-    if (skillTarget > 0 && delta.skills.length === 0) {
+    const references: AvatarSkillReference[] = SkillLevelService.referenceSkills(delta.avatarId);
+    if (skillTarget > 0 && (skills.length === 0 || references.some((reference: AvatarSkillReference): boolean => !seen.has(reference.groupId)))) {
       throw new Error('未能取得准确天赋等级，未计算不完整的养成材料');
     }
+    let syncedWeapon: CalWeaponDelta | undefined = undefined;
     if (weaponTarget > 0) {
       const weapon: Record<string, Object> = data['weapon'] as Record<string, Object>;
-      if (weapon !== undefined && weapon !== null) {
-        const item: CalWeaponDelta = new CalWeaponDelta();
-        item.id = Number(weapon['id']);
-        item.levelCurrent = Number(weapon['level_current']);
-        const maxLevel: number = Number(weapon['max_level'] ?? 90);
-        item.levelTarget = Math.max(item.levelCurrent, Math.min(weaponTarget, maxLevel));
-        // 同等级卡在突破关口时，API无promote_level则要求上游详情提供，不臆造已突破。
-        const rawPromote: Object | undefined = weapon['promote_level'];
-        if (rawPromote !== undefined) {
-          item.weaponPromoteLevel = Number(rawPromote);
-        } else if ([20, 40, 50, 60, 70, 80].indexOf(item.levelCurrent) >= 0) {
-          throw new Error('武器正处于突破等级，但接口未提供突破状态；请在图鉴单独计算该武器');
-        } else {
-          item.weaponPromoteLevel = [20, 40, 50, 60, 70, 80]
-            .filter((level: number): boolean => level < item.levelCurrent).length;
-        }
-        delta.weapon = item;
+      if (weapon === undefined || weapon === null) {
+        throw new Error('未能取得当前装备武器，未修改养成输入');
       }
+      const item: CalWeaponDelta = new CalWeaponDelta();
+      item.id = Number(weapon['id']);
+      item.levelCurrent = Number(weapon['level_current']);
+      if (!Number.isSafeInteger(item.id) || item.id <= 0 || !Number.isInteger(item.levelCurrent) || item.levelCurrent < 1) {
+        throw new Error('当前武器标识或等级无效');
+      }
+      const weapons: WikiWeaponMeta[] = await WikiMetaService.getWeapons();
+      const meta: WikiWeaponMeta | undefined = weapons.find((entry: WikiWeaponMeta): boolean => entry.id === item.id);
+      const rarity: number = meta?.rankLevel ?? 0;
+      const maxLevel: number = rarity > 0 ? (rarity <= 2 ? 70 : 90) : Number(weapon['max_level']);
+      if ((maxLevel !== 70 && maxLevel !== 90) || item.levelCurrent > maxLevel) {
+        throw new Error('当前武器等级上限未知或不一致');
+      }
+      item.levelTarget = Math.max(item.levelCurrent, Math.min(weaponTarget, maxLevel));
+      item.weaponPromoteLevel = PromoteState.parse(weapon['promote_level']);
+      const effectiveRarity: number = maxLevel === 70 ? 2 : rarity;
+      if (!PromoteState.validWeapon(item.levelCurrent, item.weaponPromoteLevel, effectiveRarity)) {
+        // No cached fallback: a level/weapon change or stale cache must not lend another item's ascension.
+        const details: CharacterDetail[] = await CharacterService.getInstance().fetchDetail(uid, [delta.avatarId]);
+        const matching: CharacterDetail[] = details.filter((detail: CharacterDetail): boolean =>
+          detail.id === delta.avatarId && detail.weapon.id === item.id && detail.weapon.level === item.levelCurrent);
+        if (matching.length !== 1 || !PromoteState.validWeapon(item.levelCurrent, matching[0].weapon.promoteLevel, effectiveRarity)) {
+          throw new Error('武器突破状态未知或装备已变化；请在养成草稿中手动确认本次突破状态');
+        }
+        item.weaponPromoteLevel = matching[0].weapon.promoteLevel;
+      }
+      syncedWeapon = item;
     }
+    // Commit only after the entire response and optional fresh detail have been validated.
+    delta.skills = skills;
+    delta.weapon = syncedWeapon;
   }
 
   private async requestCalculator(path: string, body?: string): Promise<Record<string, Object>> {

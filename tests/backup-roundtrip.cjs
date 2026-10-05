@@ -13,7 +13,7 @@ const columns = {
   user_game_roles: ['id','user_id','game_uid','region','nickname','level','is_default','is_chosen'],
   gacha_archives: ['id','uid','is_selected','timezone'], gacha_items:['id','archive_id','gacha_id','gacha_type','item_id','count','time','name','item_type','rank_type','schedule_id'],
   achievement_archives:['id','name','created_at','is_selected'], achievement_entries:['id','archive_id','ach_id','current','timestamp','status'],
-  cultivate_projects:['id','name','created_at'], cultivate_entries:['id','project_id','avatar_id','name','icon','level','target_level','created_at'], cultivate_items:['id','entry_id','item_id','name','icon','count','finished'],
+  cultivate_projects:['id','name','created_at'], cultivate_entries:['id','project_id','avatar_id','name','icon','level','target_level','created_at','input_json'], cultivate_items:['id','entry_id','item_id','name','icon','count','finished'],
   cultivate_inventory:['project_id','item_id','count'],
   daily_notes:['id','user_id','uid','raw_json'], sign_in_info:['id','user_id'], act_calendar_entries:['id'], announcements:['id'],
   abyss_history:['schedule_id','raw_json'], role_combat_history:['schedule_id','raw_json'], hard_challenge_history:['schedule_id','raw_json'],
@@ -28,7 +28,7 @@ function query(data, sql) {
   const name = sql.match(/SELECT \* FROM (\w+)/)[1];
   return rs(sql.includes('LIMIT 0')?[]:clone(data[name]), columns[name]);
 }
-const store = { version:7, querySql:async sql=>query(db,sql), createTransaction: async()=> {
+const store = { version:8, querySql:async sql=>query(db,sql), createTransaction: async()=> {
   const staged = clone(db);
   return { querySql:async sql=>query(staged,sql), delete:async pred=>{writes++;staged[pred.table]=[]}, insert:async(name,row)=>{writes++;if(name===failTable)throw Error('injected write failure'); staged[name].push(clone(row)); return row.id??0;}, commit:async()=>{db=staged;if(commitError)throw Error('commit status uncertain')}, rollback:async()=>{if(commitError)throw Error('transaction already closed')} };
 }};
@@ -58,6 +58,7 @@ function reset(){
   db.user_accounts=[{id:1,mid:'old-mid',aid:'old-aid',is_oversea:0,display_nickname:'fixture',avatar:'',created_at:1,is_selected:1,cookie_account_token:'',cookie_ltoken_ltuid:'',cookie_stoken_stuid:''}];
   db.user_game_roles=[{id:1,user_id:1,game_uid:'100000001',region:'cn_gf01',nickname:'fixture',level:1,is_default:1,is_chosen:1}];
   db.cultivate_projects=[{id:1,name:'fixture project',created_at:1}];
+  db.cultivate_entries=[{id:1,project_id:1,avatar_id:10000046,name:'fixture draft',icon:'',level:20,target_level:90,created_at:1,input_json:' {"version":99,"exact":18446744073709551615} '}];
   db.challenge_records=[{kind:'abyss',uid:'100000001',region:'cn_gf01',schedule_id:1,start_time:1,end_time:2,total_star:36,raw_json:'{}',record_time:1}];
   prefs={'app.current_user_id':1,'app.current_uid':'100000001','theme.mode':'dark','dailynote.tracked_1':'["100000001"]'};
   vault={1:'fixture-old-cookie'};failTable='';failVault=false;writes=0;prefsFail=false;sessionReloads=0;commitError=false;
@@ -65,7 +66,7 @@ function reset(){
 (async()=>{
  const service=BackupService.getInstance();reset();
  const text=await service.buildBackupJson(); const snapshot=JSON.parse(text);
- assert.equal(snapshot.version,2);assert.equal(snapshot.tables.length,Object.keys(columns).length);
+ assert.equal(snapshot.version,2);assert.equal(snapshot.schemaVersion,8);assert.equal(snapshot.tables.length,Object.keys(columns).length);
  for(const key of ['app.device_id','app.device_fp','app.cookie','authkey','theme.password'])assert.equal(BackupSnapshotValidator.portableKey(key),false);
  for(const mutate of [s=>delete s.tables,s=>s.version=99,s=>s.schemaVersion=99,s=>s.tables.pop(),s=>s.credentials=[],s=>s.preferences['app.device_id']='forbidden',s=>s.tables[0].rows[0].unexpected='field',s=>s.tables.find(t=>t.name==='user_game_roles').rows[0].user_id=999]){
   reset();const bad=clone(snapshot);mutate(bad);const before=clone(db);const result=await service.restoreFromText(JSON.stringify(bad));assert.equal(result.ok,false);assert.equal(writes,0);assert.deepEqual(db,before);assert.equal(vault[1],'fixture-old-cookie');
@@ -73,9 +74,9 @@ function reset(){
  reset();failVault=true;assert.equal((await service.restoreFromText(text)).ok,false);assert.equal(writes,0);assert.equal(vault[1],'fixture-old-cookie');
  reset();const old=clone(db);failTable='user_game_roles';assert.equal((await service.restoreFromText(text)).ok,false);assert.deepEqual(db,old);assert.deepEqual(vault,{1:'fixture-old-cookie'});
  reset();const oldPrefs=clone(prefs);prefsFail=true;assert.equal((await service.restoreFromText(text)).ok,false);assert.deepEqual(prefs,oldPrefs);assert.equal(db.user_accounts[0].id,1);assert.deepEqual(vault,{1:'fixture-old-cookie'});
- reset();assert.equal((await service.restoreFromText(text)).ok,true);assert.equal(db.user_accounts[0].id,11);assert.equal(db.user_game_roles[0].user_id,11);assert.equal(vault[11],'fixture-old-cookie');assert.equal(vault[1],undefined);assert.equal(prefs['app.current_user_id'],11);assert.equal(prefs['dailynote.tracked_11'],'["100000001"]');assert.equal(prefs['dailynote.tracked_1'],undefined);assert.equal(db.challenge_records[0].total_star,36);assert.equal(db.cultivate_projects[0].name,'fixture project');assert.equal(sessionReloads,1);
+ reset();assert.equal((await service.restoreFromText(text)).ok,true);assert.equal(db.user_accounts[0].id,11);assert.equal(db.user_game_roles[0].user_id,11);assert.equal(vault[11],'fixture-old-cookie');assert.equal(vault[1],undefined);assert.equal(prefs['app.current_user_id'],11);assert.equal(prefs['dailynote.tracked_11'],'["100000001"]');assert.equal(prefs['dailynote.tracked_1'],undefined);assert.equal(db.challenge_records[0].total_star,36);assert.equal(db.cultivate_projects[0].name,'fixture project');assert.equal(db.cultivate_entries[0].input_json,snapshot.tables.find(t=>t.name==='cultivate_entries').rows[0].input_json);assert.equal(sessionReloads,1);
  reset();const legacy={app:'snaphutao-harmonyos-backup',version:1,users:[],gacha:[],achievements:[],prefs:{themeMode:'system',refreshInterval:30,autoRefresh:true,ambientStrength:0.25,dailyBgEnabled:true,bgImageType:'none',bgFolderPath:'',geetestUrl:'',currentUid:''}};
- assert.equal((await service.restoreFromText(JSON.stringify(legacy))).ok,true);assert.equal(db.user_accounts.length,0);assert.equal(db.cultivate_projects.length,1);assert.equal(db.challenge_records.length,1);assert.equal(prefs['app.current_uid'],'');
+ assert.equal((await service.restoreFromText(JSON.stringify(legacy))).ok,true);assert.equal(db.user_accounts.length,0);assert.equal(db.cultivate_projects.length,1);assert.equal(db.cultivate_entries[0].input_json,snapshot.tables.find(t=>t.name==='cultivate_entries').rows[0].input_json);assert.equal(db.challenge_records.length,1);assert.equal(prefs['app.current_uid'],'');
  reset();delete legacy.gacha;assert.equal((await service.restoreFromText(JSON.stringify(legacy))).ok,false);assert.equal(writes,0);
  reset();commitError=true;const uncertain=await service.restoreFromText(text);
  assert.equal(uncertain.ok,false);assert.equal(db.user_accounts[0].id,11);assert.equal(vault[11],'fixture-old-cookie');assert.equal(vault[1],'fixture-old-cookie');assert.notEqual(journal,'');

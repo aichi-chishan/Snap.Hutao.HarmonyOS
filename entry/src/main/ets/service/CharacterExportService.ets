@@ -1,20 +1,9 @@
-/**
- * CharacterExportService.ets
- * 我的角色导出文本：按 Windows AvatarViewTextTemplating 默认模板的信息结构固定拼装
- * （Windows 原版即固定 C# 字符串插值，非 Scriban 模板引擎；鸿蒙版等价固定拼装，不引模板引擎），
- * 供剪贴板复制（对齐 Windows AvatarPropertyPage「导出文本到剪贴板 → 导出当前角色」）。
- * 与 Windows 的字段差异（详情模型无对应数据，相应内容省略）：
- *  - 技能等级列表（Windows FormatSkills）：character/detail 的 skills 数组（skill_id/skill_type/level）
- *    无名称/图标，本地元数据技能无 id，按接口顺序（普攻→战技→爆发）对齐元数据 A/E/Q 条目展示，
- *    数量不齐或缺数据时省略；未含命座 C3/C5 的 +3 加成（Windows LevelFormat 附加段）
- *  - 武器主/副词条：CharacterDetail 无武器词条字段
- *  - 圣遗物套装名（SetName）：以圣遗物名代替；评分复用 ReliquaryScore（推荐词条加权/双爆兜底）
- *  - 首行补充好感度（任务要求）
- */
+/** Character text export shares exact identity/base+extra semantics with the character page. */
 import { CharacterDetail, Reliquary } from '../model/CharacterData';
 import { WikiMetaService } from './WikiMetaService';
 import { SkillLevelService } from './SkillLevelService';
 import { ReliquaryScore } from '../common/ReliquaryScore';
+import { PromoteState } from '../model/PromoteState';
 
 export class CharacterExportService {
   /**
@@ -25,9 +14,8 @@ export class CharacterExportService {
     const lines: string[] = [];
     lines.push('// =====================');
     // Windows: // {Name} [{Level}, ☆{Quality}, C{已激活命座数}] [{技能等级, ...}]
-    let head: string = `// ${d.name} [Lv.${d.level}, ☆${d.rarity}, C${d.activedConstellationNum}, 好感${d.fetter}]`;
-    const skillText: string = SkillLevelService.formatLevels(
-      SkillLevelService.matchLevels(WikiMetaService.skillsOfAvatar(d.name), d.skills));
+    let head: string = `// ${d.name} [Lv.${d.level}, ☆${d.rarity}, C${d.activedConstellationNum >= 0 ? d.activedConstellationNum : '?'}, 好感${d.fetter}]`;
+    const skillText: string = SkillLevelService.formatDetail(d);
     if (skillText.length > 0) {
       head += ` [${skillText}]`;
     }
@@ -35,13 +23,16 @@ export class CharacterExportService {
     if (d.weapon.id > 0) {
       lines.push('');
       lines.push('// ---------------------');
-      // Windows: // {武器名} [{Level}, ☆{Quality}, ❖{精炼阶数}]（+第二行武器主/副词条，此处无词条数据省略）
-      lines.push(`// ${d.weapon.name || WikiMetaService.nameOfWeapon(d.weapon.id)} [Lv.${d.weapon.level}, ☆${d.weapon.rarity}, ❖${d.weapon.affixLevel}]`);
+      // Weapon properties are exported only when supplied; unknown promotion is explicit.
+      lines.push(`// ${d.weapon.name || WikiMetaService.nameOfWeapon(d.weapon.id)} [Lv.${d.weapon.level}, ☆${d.weapon.rarity}, ❖${d.weapon.affixLevel}, ${PromoteState.label(d.weapon.promoteLevel)}]`);
       for (const property of [d.weapon.mainProperty, d.weapon.subProperty]) {
         if (property.propertyType.length > 0) {
           lines.push(`// [${propLabelFn(property.propertyType)}: ${property.value}]`);
         }
       }
+    }
+    if (d.weapon.id <= 0) {
+      lines.push(`// 武器：${d.weapon.equipmentState === 'unequipped' ? '未装备' : '装备信息未知'}`);
     }
     if (d.selectedProperties.length > 0) {
       lines.push('');

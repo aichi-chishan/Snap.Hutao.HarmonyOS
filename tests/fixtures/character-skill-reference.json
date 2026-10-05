@@ -1,0 +1,7324 @@
+{
+  "schema": 1,
+  "repository": "SnapHutaoRemasteringProject/Snap.Metadata",
+  "commit": "b3aef3dbe0299e512654bb296930b3b6571fc87f",
+  "windowsCommit": "3f0d1f363a8226cccd76f0f66f599e729b0f214c",
+  "avatars": [
+    {
+      "id": 10000002,
+      "sha": "d26cb47902b462b40a8a0339746dbdf1b78ff833",
+      "name": "神里绫华",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10024,
+          "group": 231,
+          "kind": "A",
+          "name": "神里流·倾",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10018,
+          "group": 232,
+          "kind": "E",
+          "name": "神里流·冰华",
+          "icon": "Skill_S_Ayaka_01"
+        },
+        {
+          "id": 10019,
+          "group": 239,
+          "kind": "Q",
+          "name": "神里流·霜灭",
+          "icon": "Skill_E_Ayaka"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 21,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 22,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 23,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 24,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 25,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 26,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000003,
+      "sha": "331ad7688d48c9d6dee10e76a228c50004ab23c9",
+      "name": "琴",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10031,
+          "group": 331,
+          "kind": "A",
+          "name": "西风剑术",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10033,
+          "group": 332,
+          "kind": "E",
+          "name": "风压剑",
+          "icon": "Skill_S_Qin_02"
+        },
+        {
+          "id": 10034,
+          "group": 339,
+          "kind": "Q",
+          "name": "蒲公英之风",
+          "icon": "Skill_E_Qin_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 31,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 32,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 33,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 34,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 35,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 36,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000006,
+      "sha": "19dc44556fe6e8e12b8bea262731c4997fd203b9",
+      "name": "丽莎",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10060,
+          "group": 431,
+          "kind": "A",
+          "name": "指尖雷暴",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10061,
+          "group": 432,
+          "kind": "E",
+          "name": "苍雷",
+          "icon": "Skill_S_Lisa_01"
+        },
+        {
+          "id": 10062,
+          "group": 439,
+          "kind": "Q",
+          "name": "蔷薇的雷光",
+          "icon": "Skill_E_Lisa_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 41,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 42,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 43,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 44,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 45,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 46,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000014,
+      "sha": "d0d453d29c74cf6ed615e63b49b157a93aa36524",
+      "name": "芭芭拉",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10070,
+          "group": 1431,
+          "kind": "A",
+          "name": "水之浅唱",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10071,
+          "group": 1432,
+          "kind": "E",
+          "name": "演唱，开始♪",
+          "icon": "Skill_S_Barbara_01"
+        },
+        {
+          "id": 10072,
+          "group": 1439,
+          "kind": "Q",
+          "name": "闪耀奇迹♪",
+          "icon": "Skill_E_Barbara_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 141,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 142,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 143,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 144,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 145,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 146,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000015,
+      "sha": "f94f400b94ccd1fc0bf443688b5298e7fb161efc",
+      "name": "凯亚",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10073,
+          "group": 1531,
+          "kind": "A",
+          "name": "仪典剑术",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10074,
+          "group": 1532,
+          "kind": "E",
+          "name": "霜袭",
+          "icon": "Skill_S_Kaeya_01"
+        },
+        {
+          "id": 10075,
+          "group": 1539,
+          "kind": "Q",
+          "name": "凛冽轮舞",
+          "icon": "Skill_E_Kaeya_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 151,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 152,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 153,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 154,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 155,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 156,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000016,
+      "sha": "c43bf85e08d20a0eb93e4d07ad32bdb5aac18f0a",
+      "name": "迪卢克",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10160,
+          "group": 1631,
+          "kind": "A",
+          "name": "淬炼之剑",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10161,
+          "group": 1632,
+          "kind": "E",
+          "name": "逆焰之刃",
+          "icon": "Skill_S_Diluc_01_01"
+        },
+        {
+          "id": 10165,
+          "group": 1639,
+          "kind": "Q",
+          "name": "黎明",
+          "icon": "Skill_E_Diluc_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 161,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 162,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 163,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 164,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 165,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 166,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000020,
+      "sha": "a8d7d75b7c603e1e3a50474a0ca43e836db72b70",
+      "name": "雷泽",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10201,
+          "group": 2031,
+          "kind": "A",
+          "name": "钢脊",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10202,
+          "group": 2032,
+          "kind": "E",
+          "name": "利爪与苍雷",
+          "icon": "Skill_S_Razor_01"
+        },
+        {
+          "id": 10203,
+          "group": 2039,
+          "kind": "Q",
+          "name": "雷牙",
+          "icon": "Skill_E_Razor_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 201,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 202,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 203,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 204,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 205,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 206,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000021,
+      "sha": "88a452087aae8936edb822a1147f8a2adeb51ad2",
+      "name": "安柏",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10041,
+          "group": 2131,
+          "kind": "A",
+          "name": "神射手",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10032,
+          "group": 2132,
+          "kind": "E",
+          "name": "爆弹玩偶",
+          "icon": "Skill_S_Ambor_01"
+        },
+        {
+          "id": 10017,
+          "group": 2139,
+          "kind": "Q",
+          "name": "箭雨",
+          "icon": "Skill_E_Ambor"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 211,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 212,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 213,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 214,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 215,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 216,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000022,
+      "sha": "b909d44e4cd80a50bc63ef2dc6f8f3e8c3db1b22",
+      "name": "温迪",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10221,
+          "group": 2231,
+          "kind": "A",
+          "name": "神代射术",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10224,
+          "group": 2232,
+          "kind": "E",
+          "name": "高天之歌",
+          "icon": "Skill_S_Venti_01"
+        },
+        {
+          "id": 10225,
+          "group": 2239,
+          "kind": "Q",
+          "name": "风神之诗",
+          "icon": "Skill_E_Venti_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 221,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 222,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 223,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 224,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 225,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 226,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000023,
+      "sha": "43f0b728565d4551acdadbd113ba86847c1caf7a",
+      "name": "香菱",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10231,
+          "group": 2331,
+          "kind": "A",
+          "name": "白案功夫",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10232,
+          "group": 2332,
+          "kind": "E",
+          "name": "锅巴出击",
+          "icon": "Skill_S_Xiangling_01"
+        },
+        {
+          "id": 10235,
+          "group": 2339,
+          "kind": "Q",
+          "name": "旋火轮",
+          "icon": "Skill_E_Xiangling_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 231,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 232,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 233,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 234,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 235,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 236,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000024,
+      "sha": "fad81596ef6313c37a77cd4dc0ea7b4c3dfa7a9a",
+      "name": "北斗",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10241,
+          "group": 2431,
+          "kind": "A",
+          "name": "征涛",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10242,
+          "group": 2432,
+          "kind": "E",
+          "name": "捉浪",
+          "icon": "Skill_S_Beidou_01"
+        },
+        {
+          "id": 10245,
+          "group": 2439,
+          "kind": "Q",
+          "name": "斫雷",
+          "icon": "Skill_E_Beidou_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 241,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 242,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 243,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 244,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 245,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 246,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000025,
+      "sha": "a21a1a87cf4a6202e76acf065cd984c6ca7bbb7a",
+      "name": "行秋",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10381,
+          "group": 2531,
+          "kind": "A",
+          "name": "古华剑法",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10382,
+          "group": 2532,
+          "kind": "E",
+          "name": "古华剑·画雨笼山",
+          "icon": "Skill_S_Xingqiu_01"
+        },
+        {
+          "id": 10385,
+          "group": 2539,
+          "kind": "Q",
+          "name": "古华剑·裁雨留虹",
+          "icon": "Skill_E_Xingqiu_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 251,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 252,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 253,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 254,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 255,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 256,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000026,
+      "sha": "41928528920fdab621d9e378651129f348857147",
+      "name": "魈",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10261,
+          "group": 2631,
+          "kind": "A",
+          "name": "卷积微尘",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10262,
+          "group": 2632,
+          "kind": "E",
+          "name": "风轮两立",
+          "icon": "Skill_S_Xiao_01"
+        },
+        {
+          "id": 10265,
+          "group": 2639,
+          "kind": "Q",
+          "name": "靖妖傩舞",
+          "icon": "Skill_E_Xiao_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 261,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 262,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 263,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 264,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 265,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 266,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000027,
+      "sha": "72b173e4860950c8a62137077a569f8130a5f06e",
+      "name": "凝光",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10271,
+          "group": 2731,
+          "kind": "A",
+          "name": "千金掷",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10272,
+          "group": 2732,
+          "kind": "E",
+          "name": "璇玑屏",
+          "icon": "Skill_S_Ningguang_01"
+        },
+        {
+          "id": 10274,
+          "group": 2739,
+          "kind": "Q",
+          "name": "天权崩玉",
+          "icon": "Skill_E_Ningguang_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 271,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 272,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 273,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 274,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 275,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 276,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000029,
+      "sha": "e9a12a106ed9fbeb815f5b13c2b9a83421d87f94",
+      "name": "可莉",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10291,
+          "group": 2931,
+          "kind": "A",
+          "name": "砰砰",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10292,
+          "group": 2932,
+          "kind": "E",
+          "name": "蹦蹦炸弹",
+          "icon": "Skill_S_Klee_01"
+        },
+        {
+          "id": 10295,
+          "group": 2939,
+          "kind": "Q",
+          "name": "轰轰火花",
+          "icon": "Skill_E_Klee_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 291,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 292,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 293,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 294,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 295,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 296,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000030,
+      "sha": "3b743cd3d9e97d0e45f192cce491cd51e0530fb9",
+      "name": "钟离",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10301,
+          "group": 3031,
+          "kind": "A",
+          "name": "岩雨",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10302,
+          "group": 3032,
+          "kind": "E",
+          "name": "地心",
+          "icon": "Skill_S_Zhongli_01"
+        },
+        {
+          "id": 10303,
+          "group": 3039,
+          "kind": "Q",
+          "name": "天星",
+          "icon": "Skill_E_Zhongli_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 301,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 302,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 303,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 304,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 305,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 306,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000031,
+      "sha": "0cab7d9c3c10f953067030336ec2c3f5f7aa869d",
+      "name": "菲谢尔",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10311,
+          "group": 3131,
+          "kind": "A",
+          "name": "罪灭之矢",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10312,
+          "group": 3132,
+          "kind": "E",
+          "name": "夜巡影翼",
+          "icon": "Skill_S_Fischl_01"
+        },
+        {
+          "id": 10313,
+          "group": 3139,
+          "kind": "Q",
+          "name": "至夜幻现",
+          "icon": "Skill_E_Fischl_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 311,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 312,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 313,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 314,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 315,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 316,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000032,
+      "sha": "d8407a4e7b81fc788c6a377bad334542fe26f1b9",
+      "name": "班尼特",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10321,
+          "group": 3231,
+          "kind": "A",
+          "name": "好运剑",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10322,
+          "group": 3232,
+          "kind": "E",
+          "name": "热情过载",
+          "icon": "Skill_S_Bennett_01"
+        },
+        {
+          "id": 10323,
+          "group": 3239,
+          "kind": "Q",
+          "name": "美妙旅程",
+          "icon": "Skill_E_Bennett_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 321,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 322,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 323,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 324,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 325,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 326,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000033,
+      "sha": "e2b2136e98424b0e652426ac8c8a76083a2ded69",
+      "name": "达达利亚",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10331,
+          "group": 3331,
+          "kind": "A",
+          "name": "断雨",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10332,
+          "group": 3332,
+          "kind": "E",
+          "name": "魔王武装·狂澜",
+          "icon": "Skill_S_Tartaglia_01"
+        },
+        {
+          "id": 10333,
+          "group": 3339,
+          "kind": "Q",
+          "name": "极恶技·尽灭闪",
+          "icon": "Skill_E_Tartaglia_01"
+        }
+      ],
+      "bonus": 1,
+      "talents": [
+        {
+          "id": 331,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 332,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 333,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 334,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 335,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 336,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000034,
+      "sha": "21ff7aaf493980f2622d3f39fab98194aa206925",
+      "name": "诺艾尔",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10341,
+          "group": 3431,
+          "kind": "A",
+          "name": "西风剑术·女仆",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10342,
+          "group": 3432,
+          "kind": "E",
+          "name": "护心铠",
+          "icon": "Skill_S_Noel_01"
+        },
+        {
+          "id": 10343,
+          "group": 3439,
+          "kind": "Q",
+          "name": "大扫除",
+          "icon": "Skill_E_Noel_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 341,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 342,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 343,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 344,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 345,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 346,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000035,
+      "sha": "fed69352f387a37bc19f3656d2152382b6f4f5f8",
+      "name": "七七",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10351,
+          "group": 3531,
+          "kind": "A",
+          "name": "云来古剑法",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10352,
+          "group": 3532,
+          "kind": "E",
+          "name": "仙法·寒病鬼差",
+          "icon": "Skill_S_Qiqi_01"
+        },
+        {
+          "id": 10353,
+          "group": 3539,
+          "kind": "Q",
+          "name": "仙法·救苦度厄",
+          "icon": "Skill_E_Qiqi_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 351,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 352,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 353,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 354,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 355,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 356,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000036,
+      "sha": "f9d87f1d613157e857d34c10e929fa58949c5db9",
+      "name": "重云",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10401,
+          "group": 3631,
+          "kind": "A",
+          "name": "灭邪四式",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10402,
+          "group": 3632,
+          "kind": "E",
+          "name": "灵刃·重华叠霜",
+          "icon": "Skill_S_Chongyun_01"
+        },
+        {
+          "id": 10403,
+          "group": 3639,
+          "kind": "Q",
+          "name": "灵刃·云开星落",
+          "icon": "Skill_E_Chongyun_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 361,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 362,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 363,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 364,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 365,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 366,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000037,
+      "sha": "df355fb71a2858d89334a205bfe38a6636d36d0e",
+      "name": "甘雨",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10371,
+          "group": 3731,
+          "kind": "A",
+          "name": "流天射术",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10372,
+          "group": 3732,
+          "kind": "E",
+          "name": "山泽麟迹",
+          "icon": "Skill_S_Ganyu_01"
+        },
+        {
+          "id": 10373,
+          "group": 3739,
+          "kind": "Q",
+          "name": "降众天华",
+          "icon": "Skill_E_Ganyu_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 371,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 372,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 373,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 374,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 375,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 376,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000038,
+      "sha": "4d8565152eea1487c12b946816f60b3770492214",
+      "name": "阿贝多",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10386,
+          "group": 3831,
+          "kind": "A",
+          "name": "西风剑术·白",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10387,
+          "group": 3832,
+          "kind": "E",
+          "name": "创生法·拟造阳华",
+          "icon": "Skill_S_Albedo_01"
+        },
+        {
+          "id": 10388,
+          "group": 3839,
+          "kind": "Q",
+          "name": "诞生式·大地之潮",
+          "icon": "Skill_E_Albedo_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 381,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 382,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 383,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 384,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 385,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 386,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000039,
+      "sha": "bcf11c8c9b76a17b2f2b5e68a851e596f2bc5320",
+      "name": "迪奥娜",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10391,
+          "group": 3931,
+          "kind": "A",
+          "name": "猎人射术",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10392,
+          "group": 3932,
+          "kind": "E",
+          "name": "猫爪冻冻",
+          "icon": "Skill_S_Diona_01"
+        },
+        {
+          "id": 10395,
+          "group": 3939,
+          "kind": "Q",
+          "name": "最烈特调",
+          "icon": "Skill_E_Diona_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 391,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 392,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 393,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 394,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 395,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 396,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000041,
+      "sha": "42dc176f4f13e5c026638c3c0657fc009bdc3f20",
+      "name": "莫娜",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10411,
+          "group": 4131,
+          "kind": "A",
+          "name": "因果点破",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10412,
+          "group": 4132,
+          "kind": "E",
+          "name": "水中幻愿",
+          "icon": "Skill_S_Mona_01"
+        },
+        {
+          "id": 10415,
+          "group": 4139,
+          "kind": "Q",
+          "name": "星命定轨",
+          "icon": "Skill_E_Mona_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 411,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 412,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 413,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 414,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 415,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 416,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000042,
+      "sha": "6dd34bf40e871a9b541a574fed2f377b576cd6d1",
+      "name": "刻晴",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10421,
+          "group": 4231,
+          "kind": "A",
+          "name": "云来剑法",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10422,
+          "group": 4232,
+          "kind": "E",
+          "name": "星斗归位",
+          "icon": "Skill_S_Keqing_01"
+        },
+        {
+          "id": 10425,
+          "group": 4239,
+          "kind": "Q",
+          "name": "天街巡游",
+          "icon": "Skill_E_Keqing_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 421,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 422,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 423,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 424,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 425,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 426,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000043,
+      "sha": "172dcc171e31d345ec88fa18c4c44cb6b6927a4d",
+      "name": "砂糖",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10431,
+          "group": 4331,
+          "kind": "A",
+          "name": "简式风灵作成",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10432,
+          "group": 4332,
+          "kind": "E",
+          "name": "风灵作成·陆叁零捌",
+          "icon": "Skill_S_Sucrose_01"
+        },
+        {
+          "id": 10435,
+          "group": 4339,
+          "kind": "Q",
+          "name": "禁·风灵作成·柒伍同构贰型",
+          "icon": "Skill_E_Sucrose_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 431,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 432,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 433,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 434,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 435,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 436,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000044,
+      "sha": "37aff458cb9d8216778b5538d1675e1fb8a63d2a",
+      "name": "辛焱",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10441,
+          "group": 4431,
+          "kind": "A",
+          "name": "炎舞",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10442,
+          "group": 4432,
+          "kind": "E",
+          "name": "热情拂扫",
+          "icon": "Skill_S_Xinyan_01"
+        },
+        {
+          "id": 10443,
+          "group": 4439,
+          "kind": "Q",
+          "name": "叛逆刮弦",
+          "icon": "Skill_E_Xinyan_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 441,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 442,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 443,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 444,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 445,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 446,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000045,
+      "sha": "bf9605c50d1169af8e73a49cc47cc9b5022142ef",
+      "name": "罗莎莉亚",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10451,
+          "group": 4531,
+          "kind": "A",
+          "name": "教会枪术",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10452,
+          "group": 4532,
+          "kind": "E",
+          "name": "噬罪的告解",
+          "icon": "Skill_S_Rosaria_01"
+        },
+        {
+          "id": 10453,
+          "group": 4539,
+          "kind": "Q",
+          "name": "终命的圣礼",
+          "icon": "Skill_E_Rosaria_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 451,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 452,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 453,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 454,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 455,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 456,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000046,
+      "sha": "3856f4e08daaf37abf6bd9f9144bea1e40de6b0c",
+      "name": "胡桃",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10461,
+          "group": 4631,
+          "kind": "A",
+          "name": "往生秘传枪法",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10462,
+          "group": 4632,
+          "kind": "E",
+          "name": "蝶引来生",
+          "icon": "Skill_S_Hutao_01"
+        },
+        {
+          "id": 10463,
+          "group": 4639,
+          "kind": "Q",
+          "name": "安神秘法",
+          "icon": "Skill_E_Hutao_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 461,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 462,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 463,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 464,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 465,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 466,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000047,
+      "sha": "a3b08bee9103266265de4216a3613493d7aae3f6",
+      "name": "枫原万叶",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10471,
+          "group": 4731,
+          "kind": "A",
+          "name": "我流剑术",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10472,
+          "group": 4732,
+          "kind": "E",
+          "name": "千早振",
+          "icon": "Skill_S_Kazuha_01"
+        },
+        {
+          "id": 10475,
+          "group": 4739,
+          "kind": "Q",
+          "name": "万叶之一刀",
+          "icon": "Skill_E_Kazuha_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 471,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 472,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 473,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 474,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 475,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 476,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000048,
+      "sha": "cf6c2be4c75ebbffde43a79519c0b72eecaaa574",
+      "name": "烟绯",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10481,
+          "group": 4831,
+          "kind": "A",
+          "name": "火漆制印",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10482,
+          "group": 4832,
+          "kind": "E",
+          "name": "丹书立约",
+          "icon": "Skill_S_Feiyan_01"
+        },
+        {
+          "id": 10485,
+          "group": 4839,
+          "kind": "Q",
+          "name": "凭此结契",
+          "icon": "Skill_E_Feiyan_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 481,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 482,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 483,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 484,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 485,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 486,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000049,
+      "sha": "d81c8aa76c485ffb8f7a310655a8122112210cff",
+      "name": "宵宫",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10491,
+          "group": 4931,
+          "kind": "A",
+          "name": "烟火打扬",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10492,
+          "group": 4932,
+          "kind": "E",
+          "name": "焰硝庭火舞",
+          "icon": "Skill_S_Yoimiya_01"
+        },
+        {
+          "id": 10495,
+          "group": 4939,
+          "kind": "Q",
+          "name": "琉金云间草",
+          "icon": "Skill_E_Yoimiya_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 491,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 492,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 493,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 494,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 495,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 496,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000050,
+      "sha": "2668f8e7709706fd08f64f2e0ddb054e2e884964",
+      "name": "托马",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10501,
+          "group": 5031,
+          "kind": "A",
+          "name": "迅破枪势",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10502,
+          "group": 5032,
+          "kind": "E",
+          "name": "烈烧佑命之侍护",
+          "icon": "Skill_S_Tohma_01"
+        },
+        {
+          "id": 10505,
+          "group": 5039,
+          "kind": "Q",
+          "name": "真红炽火之大铠",
+          "icon": "Skill_E_Tohma_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 501,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 502,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 503,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 504,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 505,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 506,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000051,
+      "sha": "84320bd9320e46dcb0454452063f2e430ef26d0c",
+      "name": "优菈",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10511,
+          "group": 5131,
+          "kind": "A",
+          "name": "西风剑术·宗室",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10512,
+          "group": 5132,
+          "kind": "E",
+          "name": "冰潮的涡旋",
+          "icon": "Skill_S_Eula_01"
+        },
+        {
+          "id": 10515,
+          "group": 5139,
+          "kind": "Q",
+          "name": "凝浪之光剑",
+          "icon": "Skill_E_Eula_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 511,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 512,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 513,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 514,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 515,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 516,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000052,
+      "sha": "f779e93cc0ec503bde290848464a86e6bf53a04e",
+      "name": "雷电将军",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10521,
+          "group": 5231,
+          "kind": "A",
+          "name": "源流",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10522,
+          "group": 5232,
+          "kind": "E",
+          "name": "神变·恶曜开眼",
+          "icon": "Skill_S_Shougun_01"
+        },
+        {
+          "id": 10525,
+          "group": 5239,
+          "kind": "Q",
+          "name": "奥义·梦想真说",
+          "icon": "Skill_E_Shougun_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 521,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 522,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 523,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 524,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 525,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 526,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000053,
+      "sha": "1c95c1ceae1b69772dc92df5292ad4375ea2d54b",
+      "name": "早柚",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10531,
+          "group": 5331,
+          "kind": "A",
+          "name": "忍刀·终末番",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10532,
+          "group": 5332,
+          "kind": "E",
+          "name": "呜呼流·风隐急进",
+          "icon": "Skill_S_Sayu_01"
+        },
+        {
+          "id": 10535,
+          "group": 5339,
+          "kind": "Q",
+          "name": "呜呼流·影貉缭乱",
+          "icon": "Skill_E_Sayu_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 531,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 532,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 533,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 534,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 535,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 536,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000054,
+      "sha": "703fb05596bc251c6d399d3aa02e943671d26841",
+      "name": "珊瑚宫心海",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10541,
+          "group": 5431,
+          "kind": "A",
+          "name": "水有常形",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10542,
+          "group": 5432,
+          "kind": "E",
+          "name": "海月之誓",
+          "icon": "Skill_S_Kokomi_01"
+        },
+        {
+          "id": 10545,
+          "group": 5439,
+          "kind": "Q",
+          "name": "海人化羽",
+          "icon": "Skill_E_Kokomi_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 541,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 542,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 543,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 544,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 545,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 546,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000055,
+      "sha": "9683dea96a4eea3aae860146eae9988149ae4546",
+      "name": "五郎",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10551,
+          "group": 5531,
+          "kind": "A",
+          "name": "呲牙裂扇箭",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10552,
+          "group": 5532,
+          "kind": "E",
+          "name": "犬坂吠吠方圆阵",
+          "icon": "Skill_S_Gorou_01"
+        },
+        {
+          "id": 10555,
+          "group": 5539,
+          "kind": "Q",
+          "name": "兽牙逐突形胜战法",
+          "icon": "Skill_E_Gorou_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 551,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 552,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 553,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 554,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 555,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 556,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000056,
+      "sha": "7b39a07246f1ae002134b7628c970fabc8c546d9",
+      "name": "九条裟罗",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10561,
+          "group": 5631,
+          "kind": "A",
+          "name": "天狗传弓术",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10562,
+          "group": 5632,
+          "kind": "E",
+          "name": "鸦羽天狗霆雷召咒",
+          "icon": "Skill_S_Sara_01"
+        },
+        {
+          "id": 10565,
+          "group": 5639,
+          "kind": "Q",
+          "name": "煌煌千道镇式",
+          "icon": "Skill_E_Sara_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 561,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 562,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 563,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 564,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 565,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 566,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000057,
+      "sha": "ec8e2b15152ae7d330ac8c00974977fa8d686ae6",
+      "name": "荒泷一斗",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10571,
+          "group": 5731,
+          "kind": "A",
+          "name": "喧哗屋传说",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10572,
+          "group": 5732,
+          "kind": "E",
+          "name": "魔杀绝技·赤牛发破！",
+          "icon": "Skill_S_Itto_01"
+        },
+        {
+          "id": 10575,
+          "group": 5739,
+          "kind": "Q",
+          "name": "最恶鬼王·一斗轰临！！",
+          "icon": "Skill_E_Itto_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 571,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 572,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 573,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 574,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 575,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 576,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000058,
+      "sha": "3c89c369f2d9652ac652290267f4f87449762b36",
+      "name": "八重神子",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10581,
+          "group": 5831,
+          "kind": "A",
+          "name": "狐灵食罪式",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10582,
+          "group": 5832,
+          "kind": "E",
+          "name": "野干役咒·杀生樱",
+          "icon": "Skill_S_Yae_01"
+        },
+        {
+          "id": 10585,
+          "group": 5839,
+          "kind": "Q",
+          "name": "大密法·天狐显真",
+          "icon": "Skill_E_Yae_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 581,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 582,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 583,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 584,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 585,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 586,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000059,
+      "sha": "819c20a36cb4b7f8b41d43403956376be8302014",
+      "name": "鹿野院平藏",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10591,
+          "group": 5931,
+          "kind": "A",
+          "name": "不动流格斗术",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10592,
+          "group": 5932,
+          "kind": "E",
+          "name": "勠心拳",
+          "icon": "Skill_S_Heizo_01"
+        },
+        {
+          "id": 10595,
+          "group": 5939,
+          "kind": "Q",
+          "name": "聚风蹴",
+          "icon": "Skill_E_Heizo_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 591,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 592,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 593,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 594,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 595,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 596,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000060,
+      "sha": "7f389e8c579e9bbc1771c880737ecff93d843582",
+      "name": "夜兰",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10606,
+          "group": 6031,
+          "kind": "A",
+          "name": "潜形隐曜弓",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10607,
+          "group": 6032,
+          "kind": "E",
+          "name": "萦络纵命索",
+          "icon": "Skill_S_Yelan_01"
+        },
+        {
+          "id": 10610,
+          "group": 6039,
+          "kind": "Q",
+          "name": "渊图玲珑骰",
+          "icon": "Skill_E_Yelan_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 601,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 602,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 603,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 604,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 605,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 606,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000061,
+      "sha": "75b7fd8bcaa77f47c5c6a22392ff5d288a8277d2",
+      "name": "绮良良",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10611,
+          "group": 6131,
+          "kind": "A",
+          "name": "箱纸切削术",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10612,
+          "group": 6132,
+          "kind": "E",
+          "name": "呜喵町飞足",
+          "icon": "Skill_S_Momoka_01"
+        },
+        {
+          "id": 10615,
+          "group": 6139,
+          "kind": "Q",
+          "name": "秘法·惊喜特派",
+          "icon": "Skill_E_Momoka_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 611,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 612,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 613,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 614,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 615,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 616,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000062,
+      "sha": "0cb3ecdf0890b0190a341863b0c49418b3901b67",
+      "name": "埃洛伊",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10621,
+          "group": 6231,
+          "kind": "A",
+          "name": "快速射击",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10622,
+          "group": 6232,
+          "kind": "E",
+          "name": "冰尘雪野",
+          "icon": "Skill_S_Aloy_01"
+        },
+        {
+          "id": 10625,
+          "group": 6239,
+          "kind": "Q",
+          "name": "曙光预言",
+          "icon": "Skill_E_Aloy_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 621,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 622,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 623,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 624,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 625,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 626,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000063,
+      "sha": "ea55578f9c0921472d9a4854f92d0469fa323fba",
+      "name": "申鹤",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10631,
+          "group": 6331,
+          "kind": "A",
+          "name": "踏辰摄斗",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10632,
+          "group": 6332,
+          "kind": "E",
+          "name": "仰灵威召将役咒",
+          "icon": "Skill_S_Shenhe_01"
+        },
+        {
+          "id": 10635,
+          "group": 6339,
+          "kind": "Q",
+          "name": "神女遣灵真诀",
+          "icon": "Skill_E_Shenhe_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 631,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 632,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 633,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 634,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 635,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 636,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000064,
+      "sha": "4ecba761674d9872e7bbaa6e44a5066a0f775a5b",
+      "name": "云堇",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10641,
+          "group": 6431,
+          "kind": "A",
+          "name": "拂云出手",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10642,
+          "group": 6432,
+          "kind": "E",
+          "name": "旋云开相",
+          "icon": "Skill_S_Yunjin_01"
+        },
+        {
+          "id": 10643,
+          "group": 6439,
+          "kind": "Q",
+          "name": "破嶂见旌仪",
+          "icon": "Skill_E_Yunjin_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 641,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 642,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 643,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 644,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 645,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 646,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000065,
+      "sha": "973262befac355c10c0363d00202377289be3f2f",
+      "name": "久岐忍",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10651,
+          "group": 6531,
+          "kind": "A",
+          "name": "忍流飞刃斩",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10652,
+          "group": 6532,
+          "kind": "E",
+          "name": "越祓雷草之轮",
+          "icon": "Skill_S_Shinobu_01"
+        },
+        {
+          "id": 10655,
+          "group": 6539,
+          "kind": "Q",
+          "name": "御咏鸣神刈山祭",
+          "icon": "Skill_E_Shinobu_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 651,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 652,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 653,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 654,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 655,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 656,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000066,
+      "sha": "766e641cc3af7e99b20b5894cc484f91508ddf38",
+      "name": "神里绫人",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10661,
+          "group": 6631,
+          "kind": "A",
+          "name": "神里流·转",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10662,
+          "group": 6632,
+          "kind": "E",
+          "name": "神里流·镜花",
+          "icon": "Skill_S_Ayato_01"
+        },
+        {
+          "id": 10665,
+          "group": 6639,
+          "kind": "Q",
+          "name": "神里流·水囿",
+          "icon": "Skill_E_Ayato_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 661,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 662,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 663,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 664,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 665,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 666,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000067,
+      "sha": "82673ea9344e9b28d32f1f456c8df1f9d5022228",
+      "name": "柯莱",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10671,
+          "group": 6731,
+          "kind": "A",
+          "name": "祈颂射艺",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10672,
+          "group": 6732,
+          "kind": "E",
+          "name": "拂花偈叶",
+          "icon": "Skill_S_Collei_01"
+        },
+        {
+          "id": 10675,
+          "group": 6739,
+          "kind": "Q",
+          "name": "猫猫秘宝",
+          "icon": "Skill_E_Collei_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 671,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 672,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 673,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 674,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 675,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 676,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000068,
+      "sha": "bace8181b8ccfce244f7437287ad50da4d23e472",
+      "name": "多莉",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10681,
+          "group": 6831,
+          "kind": "A",
+          "name": "妙显剑舞·改",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10682,
+          "group": 6832,
+          "kind": "E",
+          "name": "镇灵之灯·烦恼解决炮",
+          "icon": "Skill_S_Dori_01"
+        },
+        {
+          "id": 10685,
+          "group": 6839,
+          "kind": "Q",
+          "name": "卡萨扎莱宫的无微不至",
+          "icon": "Skill_E_Dori_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 681,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 682,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 683,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 684,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 685,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 686,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000069,
+      "sha": "35ce55d51a7b93d7ad1038d4a9f2801fcbcb4e42",
+      "name": "提纳里",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10691,
+          "group": 6931,
+          "kind": "A",
+          "name": "藏蕴破障",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10692,
+          "group": 6932,
+          "kind": "E",
+          "name": "识果种雷",
+          "icon": "Skill_S_Tighnari_01"
+        },
+        {
+          "id": 10695,
+          "group": 6939,
+          "kind": "Q",
+          "name": "造生缠藤箭",
+          "icon": "Skill_E_Tighnari_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 691,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 692,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 693,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 694,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 695,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 696,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000070,
+      "sha": "777de4783b54da89434ede561b297f768598af05",
+      "name": "妮露",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10701,
+          "group": 7031,
+          "kind": "A",
+          "name": "弦月舞步",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10702,
+          "group": 7032,
+          "kind": "E",
+          "name": "七域舞步",
+          "icon": "Skill_S_Nilou_01"
+        },
+        {
+          "id": 10705,
+          "group": 7039,
+          "kind": "Q",
+          "name": "浮莲舞步·远梦聆泉",
+          "icon": "Skill_E_Nilou_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 701,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 702,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 703,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 704,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 705,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 706,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000071,
+      "sha": "328c1527ae6c1954d3d45599b8237d49433b28d7",
+      "name": "赛诺",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10711,
+          "group": 7131,
+          "kind": "A",
+          "name": "七圣枪术",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10712,
+          "group": 7132,
+          "kind": "E",
+          "name": "秘仪·律渊渡魂",
+          "icon": "Skill_S_Cyno_01"
+        },
+        {
+          "id": 10715,
+          "group": 7139,
+          "kind": "Q",
+          "name": "圣仪·煟煌随狼行",
+          "icon": "Skill_E_Cyno_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 711,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 712,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 713,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 714,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 715,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 716,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000072,
+      "sha": "708bfae4de5d061560c9efcc6ca452a56c70139c",
+      "name": "坎蒂丝",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10721,
+          "group": 7231,
+          "kind": "A",
+          "name": "流耀枪术·守势",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10722,
+          "group": 7232,
+          "kind": "E",
+          "name": "圣仪·苍鹭庇卫",
+          "icon": "Skill_S_Candace_01"
+        },
+        {
+          "id": 10725,
+          "group": 7239,
+          "kind": "Q",
+          "name": "圣仪·灰鸰衒潮",
+          "icon": "Skill_E_Candace_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 721,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 722,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 723,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 724,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 725,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 726,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000073,
+      "sha": "1e013cdd0f5e3024e6f620270c9bc6dc5a0fdb48",
+      "name": "纳西妲",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10731,
+          "group": 7331,
+          "kind": "A",
+          "name": "行相",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10732,
+          "group": 7332,
+          "kind": "E",
+          "name": "所闻遍计",
+          "icon": "Skill_S_Nahida_01"
+        },
+        {
+          "id": 10735,
+          "group": 7339,
+          "kind": "Q",
+          "name": "心景幻成",
+          "icon": "Skill_E_Nahida_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 731,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 732,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 733,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 734,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 735,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 736,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000074,
+      "sha": "671c0f6aa0aac4a090b72237eacacf8a08cc8baf",
+      "name": "莱依拉",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10741,
+          "group": 7431,
+          "kind": "A",
+          "name": "熠辉轨度剑",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10742,
+          "group": 7432,
+          "kind": "E",
+          "name": "垂裳端凝之夜",
+          "icon": "Skill_S_Layla_01"
+        },
+        {
+          "id": 10745,
+          "group": 7439,
+          "kind": "Q",
+          "name": "星流摇床之梦",
+          "icon": "Skill_E_Layla_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 741,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 742,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 743,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 744,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 745,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 746,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000075,
+      "sha": "0ce221318962f9c76953150a4a720d0f305a651e",
+      "name": "流浪者",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10751,
+          "group": 7531,
+          "kind": "A",
+          "name": "行幡鸣弦",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10752,
+          "group": 7532,
+          "kind": "E",
+          "name": "羽画·风姿华歌",
+          "icon": "Skill_S_Wanderer_01"
+        },
+        {
+          "id": 10755,
+          "group": 7539,
+          "kind": "Q",
+          "name": "狂言·式乐五番",
+          "icon": "Skill_E_Wanderer_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 751,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 752,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 753,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 754,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 755,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 756,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000076,
+      "sha": "e6e8dd012879da2c090d70aa1195d1858063dee7",
+      "name": "珐露珊",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10761,
+          "group": 7631,
+          "kind": "A",
+          "name": "迴身箭术",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10762,
+          "group": 7632,
+          "kind": "E",
+          "name": "非想风天",
+          "icon": "Skill_S_Faruzan_01"
+        },
+        {
+          "id": 10765,
+          "group": 7639,
+          "kind": "Q",
+          "name": "抟风秘道",
+          "icon": "Skill_E_Faruzan_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 761,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 762,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 763,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 764,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 765,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 766,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000077,
+      "sha": "20d1aef31e184ada84b2e0b8a941fd40d84eb505",
+      "name": "瑶瑶",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10771,
+          "group": 7731,
+          "kind": "A",
+          "name": "颠扑连环枪",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10772,
+          "group": 7732,
+          "kind": "E",
+          "name": "云台团团降芦菔",
+          "icon": "Skill_S_Yaoyao_01"
+        },
+        {
+          "id": 10775,
+          "group": 7739,
+          "kind": "Q",
+          "name": "玉颗珊珊月中落",
+          "icon": "Skill_E_Yaoyao_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 771,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 772,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 773,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 774,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 775,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 776,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000078,
+      "sha": "4dc29133ba84dda475b78f10cf61e3b6bcfce85d",
+      "name": "艾尔海森",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10781,
+          "group": 7831,
+          "kind": "A",
+          "name": "溯因反绎法",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10782,
+          "group": 7832,
+          "kind": "E",
+          "name": "共相·理式摹写",
+          "icon": "Skill_S_Alhatham_01"
+        },
+        {
+          "id": 10785,
+          "group": 7839,
+          "kind": "Q",
+          "name": "殊境·显象缚结",
+          "icon": "Skill_E_Alhatham_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 781,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 782,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 783,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 784,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 785,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 786,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000079,
+      "sha": "a19094d2ffb345eb60bfe33bfc04733d2098e436",
+      "name": "迪希雅",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10791,
+          "group": 7931,
+          "kind": "A",
+          "name": "拂金剑斗术",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10792,
+          "group": 7932,
+          "kind": "E",
+          "name": "熔铁流狱",
+          "icon": "Skill_S_Dehya_01"
+        },
+        {
+          "id": 10795,
+          "group": 7939,
+          "kind": "Q",
+          "name": "炎啸狮子咬",
+          "icon": "Skill_E_Dehya_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 791,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 792,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 793,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 794,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 795,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 796,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000080,
+      "sha": "66e4d6491ccb539db2f776b0bcb751669364e176",
+      "name": "米卡",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10801,
+          "group": 8031,
+          "kind": "A",
+          "name": "西风枪术·镝传",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10802,
+          "group": 8032,
+          "kind": "E",
+          "name": "星霜的流旋",
+          "icon": "Skill_S_Mika_01"
+        },
+        {
+          "id": 10805,
+          "group": 8039,
+          "kind": "Q",
+          "name": "苍翎的颂愿",
+          "icon": "Skill_E_Mika_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 801,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 802,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 803,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 804,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 805,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 806,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000081,
+      "sha": "5627cd3a49ed53503104302aad4bb83192bdba30",
+      "name": "卡维",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10811,
+          "group": 8131,
+          "kind": "A",
+          "name": "旋规设矩",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10812,
+          "group": 8132,
+          "kind": "E",
+          "name": "画则巧施",
+          "icon": "Skill_S_Kaveh_01"
+        },
+        {
+          "id": 10815,
+          "group": 8139,
+          "kind": "Q",
+          "name": "繁绘隅穹",
+          "icon": "Skill_E_Kaveh_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 811,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 812,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 813,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 814,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 815,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 816,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000082,
+      "sha": "62bc48d51be06396311ea7fbab8c40d62f2140ec",
+      "name": "白术",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10821,
+          "group": 8231,
+          "kind": "A",
+          "name": "金匮针解",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10822,
+          "group": 8232,
+          "kind": "E",
+          "name": "太素诊要",
+          "icon": "Skill_S_Baizhuer_01"
+        },
+        {
+          "id": 10825,
+          "group": 8239,
+          "kind": "Q",
+          "name": "愈气全形论",
+          "icon": "Skill_E_Baizhuer_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 821,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 822,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 823,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 824,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 825,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 826,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000083,
+      "sha": "cd0f85a625e6d300d3cb2369d0917e72007103dc",
+      "name": "琳妮特",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10831,
+          "group": 8331,
+          "kind": "A",
+          "name": "迅捷礼刺剑",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10832,
+          "group": 8332,
+          "kind": "E",
+          "name": "谜影障身法",
+          "icon": "Skill_S_Linette_01"
+        },
+        {
+          "id": 10835,
+          "group": 8339,
+          "kind": "Q",
+          "name": "魔术·运变惊奇",
+          "icon": "Skill_E_Linette_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 831,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 832,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 833,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 834,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 835,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 836,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000084,
+      "sha": "8733002d4d0c4bd3861575e57ee8c3bb0539e49d",
+      "name": "林尼",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10841,
+          "group": 8431,
+          "kind": "A",
+          "name": "迫牌易位式",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10842,
+          "group": 8432,
+          "kind": "E",
+          "name": "眩惑光戏法",
+          "icon": "Skill_S_Liney_01"
+        },
+        {
+          "id": 10845,
+          "group": 8439,
+          "kind": "Q",
+          "name": "大魔术·灵迹巡游",
+          "icon": "Skill_E_Liney_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 841,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 842,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 843,
+          "index": 1,
+          "level": 3
+        },
+        {
+          "id": 844,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 845,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 846,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000085,
+      "sha": "1bb091930cff3ef1e6134e3679ebcb28116cf92d",
+      "name": "菲米尼",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10851,
+          "group": 8531,
+          "kind": "A",
+          "name": "洑流剑",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10852,
+          "group": 8532,
+          "kind": "E",
+          "name": "浮冰增压",
+          "icon": "Skill_S_Freminet_01"
+        },
+        {
+          "id": 10855,
+          "group": 8539,
+          "kind": "Q",
+          "name": "猎影潜袭",
+          "icon": "Skill_E_Freminet_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 851,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 852,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 853,
+          "index": 1,
+          "level": 3
+        },
+        {
+          "id": 854,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 855,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 856,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000086,
+      "sha": "c2d7f8972b477b2002ce8e94f4ca8a7f98c8477f",
+      "name": "莱欧斯利",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10861,
+          "group": 8631,
+          "kind": "A",
+          "name": "迅烈倾霜拳",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10862,
+          "group": 8632,
+          "kind": "E",
+          "name": "冰牙突驰",
+          "icon": "Skill_S_Wriothesley_01"
+        },
+        {
+          "id": 10865,
+          "group": 8639,
+          "kind": "Q",
+          "name": "黑金狼噬",
+          "icon": "Skill_E_Wriothesley_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 861,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 862,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 863,
+          "index": 1,
+          "level": 3
+        },
+        {
+          "id": 864,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 865,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 866,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000087,
+      "sha": "07f3de36e8e6525eea0724bb39995bfa39ae5733",
+      "name": "那维莱特",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10871,
+          "group": 8731,
+          "kind": "A",
+          "name": "如水从平",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10872,
+          "group": 8732,
+          "kind": "E",
+          "name": "泪水啊，我必偿还",
+          "icon": "Skill_S_Neuvillette_01"
+        },
+        {
+          "id": 10875,
+          "group": 8739,
+          "kind": "Q",
+          "name": "潮水啊，我已归来",
+          "icon": "Skill_E_Neuvillette_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 871,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 872,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 873,
+          "index": 1,
+          "level": 3
+        },
+        {
+          "id": 874,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 875,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 876,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000088,
+      "sha": "8368640e8b11bf5e2d3bf254d114dbe8b88ed32a",
+      "name": "夏洛蒂",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10881,
+          "group": 8831,
+          "kind": "A",
+          "name": "冷色摄影律",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10882,
+          "group": 8832,
+          "kind": "E",
+          "name": "取景·冰点构图法",
+          "icon": "Skill_S_Charlotte_01"
+        },
+        {
+          "id": 10885,
+          "group": 8839,
+          "kind": "Q",
+          "name": "定格·全方位确证",
+          "icon": "Skill_E_Charlotte_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 881,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 882,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 883,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 884,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 885,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 886,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000089,
+      "sha": "dea6d4e8f8d527487bba2d8975202397811a3cf6",
+      "name": "芙宁娜",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10891,
+          "group": 8931,
+          "kind": "A",
+          "name": "独舞之邀",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10892,
+          "group": 8932,
+          "kind": "E",
+          "name": "孤心沙龙",
+          "icon": "Skill_S_Furina_01"
+        },
+        {
+          "id": 10895,
+          "group": 8939,
+          "kind": "Q",
+          "name": "万众狂欢",
+          "icon": "Skill_E_Furina_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 891,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 892,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 893,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 894,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 895,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 896,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000090,
+      "sha": "193394c82f9d126b45a1bed9dfd4e46444e65a0b",
+      "name": "夏沃蕾",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10901,
+          "group": 9031,
+          "kind": "A",
+          "name": "线列枪刺·改",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10902,
+          "group": 9032,
+          "kind": "E",
+          "name": "近迫式急促拦射",
+          "icon": "Skill_S_Chevreuse_01"
+        },
+        {
+          "id": 10905,
+          "group": 9039,
+          "kind": "Q",
+          "name": "圆阵掷弹爆轰术",
+          "icon": "Skill_E_Chevreuse_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 901,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 902,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 903,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 904,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 905,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 906,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000091,
+      "sha": "75675b5cb62553f8b472f42895b79b9ccdaa8403",
+      "name": "娜维娅",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10911,
+          "group": 9131,
+          "kind": "A",
+          "name": "直率的辞绝",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10912,
+          "group": 9132,
+          "kind": "E",
+          "name": "典仪式晶火",
+          "icon": "Skill_S_Navia_01"
+        },
+        {
+          "id": 10915,
+          "group": 9139,
+          "kind": "Q",
+          "name": "如霰澄天的鸣礼",
+          "icon": "Skill_E_Navia_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 911,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 912,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 913,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 914,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 915,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 916,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000092,
+      "sha": "6c9c849ae3829f1c4489be065e0a8417fb561e6b",
+      "name": "嘉明",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10921,
+          "group": 9231,
+          "kind": "A",
+          "name": "刃爪悬星",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 10922,
+          "group": 9232,
+          "kind": "E",
+          "name": "瑞兽登高楼",
+          "icon": "Skill_S_Gaming_01"
+        },
+        {
+          "id": 10925,
+          "group": 9239,
+          "kind": "Q",
+          "name": "璨焰金猊舞",
+          "icon": "Skill_E_Gaming_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 921,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 922,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 923,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 924,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 925,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 926,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000093,
+      "sha": "7b0dec75ad9f2dd6cf0d9cef2d1038482ba33fb0",
+      "name": "闲云",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10931,
+          "group": 9331,
+          "kind": "A",
+          "name": "清风散花词",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 10932,
+          "group": 9332,
+          "kind": "E",
+          "name": "朝起鹤云",
+          "icon": "Skill_S_Liuyun_01"
+        },
+        {
+          "id": 10935,
+          "group": 9339,
+          "kind": "Q",
+          "name": "暮集竹星",
+          "icon": "Skill_E_Liuyun_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 931,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 932,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 933,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 934,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 935,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 936,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000094,
+      "sha": "04b5b317791c7cf920c3abb4e030a64124dc12ef",
+      "name": "千织",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10941,
+          "group": 9431,
+          "kind": "A",
+          "name": "心织刀流",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10942,
+          "group": 9432,
+          "kind": "E",
+          "name": "羽袖一触",
+          "icon": "Skill_S_Chiori_01"
+        },
+        {
+          "id": 10945,
+          "group": 9439,
+          "kind": "Q",
+          "name": "二刀之形·比翼",
+          "icon": "Skill_E_Chiori_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 941,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 942,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 943,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 944,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 945,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 946,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000095,
+      "sha": "215fc43175e20975466f848ac358a44905b464b5",
+      "name": "希格雯",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10951,
+          "group": 9531,
+          "kind": "A",
+          "name": "靶向治疗",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10952,
+          "group": 9532,
+          "kind": "E",
+          "name": "弹跳水疗法",
+          "icon": "Skill_S_Sigewinne_01"
+        },
+        {
+          "id": 10955,
+          "group": 9539,
+          "kind": "Q",
+          "name": "过饱和心意注射",
+          "icon": "Skill_E_Sigewinne_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 951,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 952,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 953,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 954,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 955,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 956,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000096,
+      "sha": "8059118f4b3556cb4f0ba76d700fc17ff8252a64",
+      "name": "阿蕾奇诺",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10961,
+          "group": 9631,
+          "kind": "A",
+          "name": "斩首之邀",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10962,
+          "group": 9632,
+          "kind": "E",
+          "name": "万相化灰",
+          "icon": "Skill_S_Arlecchino_01"
+        },
+        {
+          "id": 10965,
+          "group": 9639,
+          "kind": "Q",
+          "name": "厄月将升",
+          "icon": "Skill_E_Arlecchino_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 961,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 962,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 963,
+          "index": 1,
+          "level": 3
+        },
+        {
+          "id": 964,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 965,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 966,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000097,
+      "sha": "483e36504c95e12e79e8d4818ff1b49807561b71",
+      "name": "赛索斯",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10971,
+          "group": 9731,
+          "kind": "A",
+          "name": "王家苇箭术",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 10972,
+          "group": 9732,
+          "kind": "E",
+          "name": "古仪·鸣砂掣雷",
+          "icon": "Skill_S_Sethos_01"
+        },
+        {
+          "id": 10975,
+          "group": 9739,
+          "kind": "Q",
+          "name": "秘仪·瞑光贯影",
+          "icon": "Skill_E_Sethos_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 971,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 972,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 973,
+          "index": 1,
+          "level": 3
+        },
+        {
+          "id": 974,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 975,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 976,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000098,
+      "sha": "2f422e89a217e23131c36b98420c0470d487f6c7",
+      "name": "克洛琳德",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10981,
+          "group": 9831,
+          "kind": "A",
+          "name": "逐影之誓",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 10982,
+          "group": 9832,
+          "kind": "E",
+          "name": "狩夜之巡",
+          "icon": "Skill_S_Clorinde_01"
+        },
+        {
+          "id": 10985,
+          "group": 9839,
+          "kind": "Q",
+          "name": "残光将终",
+          "icon": "Skill_E_Clorinde_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 981,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 982,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 983,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 984,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 985,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 986,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000099,
+      "sha": "36ea00872b12e47ebc82f12be232dbd29eaab2a5",
+      "name": "艾梅莉埃",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 10991,
+          "group": 9931,
+          "kind": "A",
+          "name": "逐影枪术·改",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 10992,
+          "group": 9932,
+          "kind": "E",
+          "name": "撷萃调香",
+          "icon": "Skill_S_Emilie_01"
+        },
+        {
+          "id": 10995,
+          "group": 9939,
+          "kind": "Q",
+          "name": "香氛演绎",
+          "icon": "Skill_E_Emilie_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 991,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 992,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 993,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 994,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 995,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 996,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000100,
+      "sha": "6edd14db64cbff7ff05ad765980b6abf99aa9789",
+      "name": "卡齐娜",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11001,
+          "group": 10031,
+          "kind": "A",
+          "name": "嵴之啮咬",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 11002,
+          "group": 10032,
+          "kind": "E",
+          "name": "出击，冲天转转！",
+          "icon": "Skill_S_Kachina_01"
+        },
+        {
+          "id": 11005,
+          "group": 10039,
+          "kind": "Q",
+          "name": "现在，认真时间！",
+          "icon": "Skill_E_Kachina_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1001,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1002,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1003,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1004,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1005,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1006,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000101,
+      "sha": "870d7b026b60d4f6d6ddd7680305e3e52b224d0a",
+      "name": "基尼奇",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11011,
+          "group": 10131,
+          "kind": "A",
+          "name": "夜阳斗技",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 11012,
+          "group": 10132,
+          "kind": "E",
+          "name": "悬猎·游骋高狩",
+          "icon": "Skill_S_Kinich_01"
+        },
+        {
+          "id": 11015,
+          "group": 10139,
+          "kind": "Q",
+          "name": "向伟大圣龙致意",
+          "icon": "Skill_E_Kinich_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1011,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1012,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1013,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1014,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1015,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1016,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000102,
+      "sha": "fa16ccd26fa2274f2e54b826c55a4ea5227b98cc",
+      "name": "玛拉妮",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 30000,
+          "group": 10231,
+          "kind": "A",
+          "name": "降温处理",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 30002,
+          "group": 10232,
+          "kind": "E",
+          "name": "踏鲨破浪",
+          "icon": "Skill_S_Mualani_01"
+        },
+        {
+          "id": 30007,
+          "group": 10239,
+          "kind": "Q",
+          "name": "爆瀑飞弹",
+          "icon": "Skill_E_Mualani_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1021,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1022,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1023,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1024,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1025,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1026,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000103,
+      "sha": "797b0b298270f992c015fd40dfdc1a4bf2b1bd0d",
+      "name": "希诺宁",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11031,
+          "group": 10331,
+          "kind": "A",
+          "name": "锐锋攫猎",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 11032,
+          "group": 10332,
+          "kind": "E",
+          "name": "音火锻淬",
+          "icon": "Skill_S_Xilonen_01"
+        },
+        {
+          "id": 11035,
+          "group": 10339,
+          "kind": "Q",
+          "name": "豹烈律动！",
+          "icon": "Skill_E_Xilonen_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1031,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1032,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1033,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1034,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1035,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1036,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000104,
+      "sha": "819f1e6aecf790c227afd62330d486f9a6af9651",
+      "name": "恰斯卡",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11041,
+          "group": 10431,
+          "kind": "A",
+          "name": "迷羽流击",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 11042,
+          "group": 10432,
+          "kind": "E",
+          "name": "灵缰追影",
+          "icon": "Skill_S_Chasca_01"
+        },
+        {
+          "id": 11045,
+          "group": 10439,
+          "kind": "Q",
+          "name": "索魂命袭",
+          "icon": "Skill_E_Chasca_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1041,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1042,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1043,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1044,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1045,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1046,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000105,
+      "sha": "5b7fcf7781962b67128ddce459e823a4c8ce71c1",
+      "name": "欧洛伦",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 30501,
+          "group": 10531,
+          "kind": "A",
+          "name": "宿灵闪箭",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 30502,
+          "group": 10532,
+          "kind": "E",
+          "name": "暝色缒索",
+          "icon": "Skill_S_Olorun_01"
+        },
+        {
+          "id": 30505,
+          "group": 10539,
+          "kind": "Q",
+          "name": "黯声回响",
+          "icon": "Skill_E_Olorun_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1051,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1052,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1053,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1054,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1055,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1056,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000106,
+      "sha": "d38c714310b9e43f878519977731afab3feec340",
+      "name": "玛薇卡",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11061,
+          "group": 10631,
+          "kind": "A",
+          "name": "以火织命",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 11062,
+          "group": 10632,
+          "kind": "E",
+          "name": "称名之刻",
+          "icon": "Skill_S_Mavuika_01"
+        },
+        {
+          "id": 11065,
+          "group": 10639,
+          "kind": "Q",
+          "name": "燔天之时",
+          "icon": "Skill_E_Mavuika_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1061,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1062,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1063,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1064,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1065,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1066,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000107,
+      "sha": "e1951f534c36a118b68ea31980f6297df8466005",
+      "name": "茜特菈莉",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11071,
+          "group": 10731,
+          "kind": "A",
+          "name": "宿灵捕影",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 11072,
+          "group": 10732,
+          "kind": "E",
+          "name": "霜昼黑星",
+          "icon": "Skill_S_Citlali_01"
+        },
+        {
+          "id": 11075,
+          "group": 10739,
+          "kind": "Q",
+          "name": "诸曜饬令",
+          "icon": "Skill_E_Citlali_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1071,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1072,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1073,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1074,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1075,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1076,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000108,
+      "sha": "83b262007cc664ba235883ab18210b56fe040ba4",
+      "name": "蓝砚",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11081,
+          "group": 10831,
+          "kind": "A",
+          "name": "玄鸾画水",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 11082,
+          "group": 10832,
+          "kind": "E",
+          "name": "凤缕随翦舞",
+          "icon": "Skill_S_Lanyan_01"
+        },
+        {
+          "id": 11085,
+          "group": 10839,
+          "kind": "Q",
+          "name": "鹍弦踏月出",
+          "icon": "Skill_E_Lanyan_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1081,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1082,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1083,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1084,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1085,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1086,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000109,
+      "sha": "9079abb9634017e48e9918557bb0d19a7f6b6736",
+      "name": "梦见月瑞希",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11091,
+          "group": 10931,
+          "kind": "A",
+          "name": "梦我梦心",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 11092,
+          "group": 10932,
+          "kind": "E",
+          "name": "秋沙歌枕巡礼",
+          "icon": "Skill_S_Mizuki_01"
+        },
+        {
+          "id": 11095,
+          "group": 10939,
+          "kind": "Q",
+          "name": "安乐秘汤疗法",
+          "icon": "Skill_E_Mizuki_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1091,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1092,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1093,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1094,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1095,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1096,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000110,
+      "sha": "dd78f093b59f4824156818a35bdd3c6e9578e8f0",
+      "name": "伊安珊",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11101,
+          "group": 11031,
+          "kind": "A",
+          "name": "负重锥击",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 11102,
+          "group": 11032,
+          "kind": "E",
+          "name": "电掣雷驰",
+          "icon": "Skill_S_Iansan_01"
+        },
+        {
+          "id": 11105,
+          "group": 11039,
+          "kind": "Q",
+          "name": "力的三原理",
+          "icon": "Skill_E_Iansan_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1101,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1102,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1103,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1104,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1105,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1106,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000111,
+      "sha": "4c53137c5b4674c86d84a6906a03db81f5c926dd",
+      "name": "瓦雷莎",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11111,
+          "group": 11131,
+          "kind": "A",
+          "name": "角力搏摔",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 11112,
+          "group": 11132,
+          "kind": "E",
+          "name": "夜虹逐跃",
+          "icon": "Skill_S_Varesa_01"
+        },
+        {
+          "id": 11115,
+          "group": 11139,
+          "kind": "Q",
+          "name": "闪烈降临！",
+          "icon": "Skill_E_Varesa_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1111,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1112,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1113,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1114,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1115,
+          "index": 1,
+          "level": 3
+        },
+        {
+          "id": 1116,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000112,
+      "sha": "aaa44bd97be9288cd6c1034c9c9fb2bc945b718a",
+      "name": "爱可菲",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11121,
+          "group": 11231,
+          "kind": "A",
+          "name": "后厨手艺",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 11122,
+          "group": 11232,
+          "kind": "E",
+          "name": "低温烹饪",
+          "icon": "Skill_S_Escoffier_01"
+        },
+        {
+          "id": 11125,
+          "group": 11239,
+          "kind": "Q",
+          "name": "花刀技法",
+          "icon": "Skill_E_Escoffier_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1121,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1122,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1123,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1124,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1125,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1126,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000113,
+      "sha": "3a43012132f8dd72df00eb7fa0c49b50751e1660",
+      "name": "伊法",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11131,
+          "group": 11331,
+          "kind": "A",
+          "name": "祛风妙仪",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 11132,
+          "group": 11332,
+          "kind": "E",
+          "name": "空天疾护",
+          "icon": "Skill_S_Ifa_01"
+        },
+        {
+          "id": 11135,
+          "group": 11339,
+          "kind": "Q",
+          "name": "复合镇静域",
+          "icon": "Skill_E_Ifa_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1131,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1132,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1133,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1134,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1135,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1136,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000114,
+      "sha": "79d602de021b022226a819afb0ac7ae4dcc6cb4d",
+      "name": "丝柯克",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11141,
+          "group": 11431,
+          "kind": "A",
+          "name": "极恶技·断",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 11142,
+          "group": 11432,
+          "kind": "E",
+          "name": "极恶技·闪",
+          "icon": "Skill_S_SkirkNew_01"
+        },
+        {
+          "id": 11145,
+          "group": 11439,
+          "kind": "Q",
+          "name": "极恶技·灭",
+          "icon": "Skill_E_SkirkNew_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1141,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1142,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1143,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1144,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1145,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1146,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000115,
+      "sha": "05630cbb12498c39be50d0d9577ed21d9f39d52a",
+      "name": "塔利雅",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11151,
+          "group": 11531,
+          "kind": "A",
+          "name": "西风剑术·祭仪",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 11152,
+          "group": 11532,
+          "kind": "E",
+          "name": "圣浸的礼典",
+          "icon": "Skill_S_Dahlia_01"
+        },
+        {
+          "id": 11155,
+          "group": 11539,
+          "kind": "Q",
+          "name": "纯耀的祷咏",
+          "icon": "Skill_E_Dahlia_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1151,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1152,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1153,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1154,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1155,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1156,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000116,
+      "sha": "1317124ff33b3de722e56fd572f84aa6b1384b8a",
+      "name": "伊涅芙",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11161,
+          "group": 11631,
+          "kind": "A",
+          "name": "除尘旋刃",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 11162,
+          "group": 11632,
+          "kind": "E",
+          "name": "涤净模式·稳态载频",
+          "icon": "Skill_S_Ineffa_01"
+        },
+        {
+          "id": 11165,
+          "group": 11639,
+          "kind": "Q",
+          "name": "至高律令·全域扫灭",
+          "icon": "Skill_E_Ineffa_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1161,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1162,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1163,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1164,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1165,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1166,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000119,
+      "sha": "8349c61644c522c341cd9a4be6c982df1b9bea4f",
+      "name": "菈乌玛",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11191,
+          "group": 11931,
+          "kind": "A",
+          "name": "林麓旅踏",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 11192,
+          "group": 11932,
+          "kind": "E",
+          "name": "圣言述咏·终宵永眠",
+          "icon": "Skill_S_Lauma_01"
+        },
+        {
+          "id": 11195,
+          "group": 11939,
+          "kind": "Q",
+          "name": "圣言述咏·众心为月",
+          "icon": "Skill_E_Lauma_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1191,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1192,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1193,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1194,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1195,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1196,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000120,
+      "sha": "c773028f2e31cdc61235c1ff9de7d615c4322bf9",
+      "name": "菲林斯",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11201,
+          "group": 12031,
+          "kind": "A",
+          "name": "扈圣魔枪",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 11202,
+          "group": 12032,
+          "kind": "E",
+          "name": "古律·孤灯遗秘",
+          "icon": "Skill_S_Flins_01"
+        },
+        {
+          "id": 11205,
+          "group": 12039,
+          "kind": "Q",
+          "name": "旧仪·夜客致访",
+          "icon": "Skill_E_Flins_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1201,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1202,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1203,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1204,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1205,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1206,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000121,
+      "sha": "07fe59d9efd51b71d46eff5e163058009d5a6018",
+      "name": "爱诺",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11211,
+          "group": 12131,
+          "kind": "A",
+          "name": "敲打修理法",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 11212,
+          "group": 12132,
+          "kind": "E",
+          "name": "妙思捕手",
+          "icon": "Skill_S_Aino_01"
+        },
+        {
+          "id": 11215,
+          "group": 12139,
+          "kind": "Q",
+          "name": "精密水冷仪",
+          "icon": "Skill_E_Aino_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1211,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1212,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1213,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1214,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1215,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1216,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000122,
+      "sha": "2fdb42608a8dea4fc2e76acb0c5e27494cae9c4a",
+      "name": "奈芙尔",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11221,
+          "group": 12231,
+          "kind": "A",
+          "name": "游虵吐信",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 11222,
+          "group": 12232,
+          "kind": "E",
+          "name": "弈术·千夜一舞",
+          "icon": "Skill_S_Nefer_01"
+        },
+        {
+          "id": 11225,
+          "group": 12239,
+          "kind": "Q",
+          "name": "圣约·真眸幻戏",
+          "icon": "Skill_E_Nefer_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1221,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1222,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1223,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1224,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1225,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1226,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000123,
+      "sha": "cae291ef0e5cc7fef4ed144c8c38e437d646cfab",
+      "name": "杜林",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11231,
+          "group": 12331,
+          "kind": "A",
+          "name": "芒焰之翼斩",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 11232,
+          "group": 12332,
+          "kind": "E",
+          "name": "二元式·聚分熔炼",
+          "icon": "Skill_S_Durin_01"
+        },
+        {
+          "id": 11235,
+          "group": 12339,
+          "kind": "Q",
+          "name": "白化法·如光流变",
+          "icon": "Skill_E_Durin_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1231,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1232,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1233,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1234,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1235,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1236,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000124,
+      "sha": "86d0cc2a26aed1db50a777587bd554ceac7e4820",
+      "name": "雅珂达",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11241,
+          "group": 12431,
+          "kind": "A",
+          "name": "见机行矢",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 11242,
+          "group": 12432,
+          "kind": "E",
+          "name": "奇策·财富分配方案",
+          "icon": "Skill_S_Jahoda_01"
+        },
+        {
+          "id": 11245,
+          "group": 12439,
+          "kind": "Q",
+          "name": "秘器·猎人的七道具",
+          "icon": "Skill_E_Jahoda_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1241,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1242,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1243,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1244,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1245,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1246,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000125,
+      "sha": "069c9a0ece7176e5b2036976b1f1e8e482770d87",
+      "name": "哥伦比娅",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11251,
+          "group": 12531,
+          "kind": "A",
+          "name": "月露泼降",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 11252,
+          "group": 12532,
+          "kind": "E",
+          "name": "万古潮汐",
+          "icon": "Skill_S_Columbina_01"
+        },
+        {
+          "id": 11255,
+          "group": 12539,
+          "kind": "Q",
+          "name": "她的乡愁",
+          "icon": "Skill_E_Columbina_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1251,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1252,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1253,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1254,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1255,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1256,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000126,
+      "sha": "b9dad7d9ee66427793477adb8b9c0bc7c2b0eccb",
+      "name": "兹白",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11261,
+          "group": 12631,
+          "kind": "A",
+          "name": "金铗点桂",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 11262,
+          "group": 12632,
+          "kind": "E",
+          "name": "天地忽然身",
+          "icon": "Skill_S_Zibai_01"
+        },
+        {
+          "id": 11265,
+          "group": 12639,
+          "kind": "Q",
+          "name": "三垣威仪法",
+          "icon": "Skill_E_Zibai_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1261,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1262,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1263,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1264,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1265,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1266,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000127,
+      "sha": "678301ca51f7e6a18471ae9a8c713774e8c300c6",
+      "name": "叶洛亚",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11271,
+          "group": 12731,
+          "kind": "A",
+          "name": "守誓枪术",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 11272,
+          "group": 12732,
+          "kind": "E",
+          "name": "衔莺破晓",
+          "icon": "Skill_S_Illuga_01"
+        },
+        {
+          "id": 11275,
+          "group": 12739,
+          "kind": "Q",
+          "name": "鉴照无影",
+          "icon": "Skill_E_Illuga_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1271,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1272,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1273,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1274,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1275,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1276,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000128,
+      "sha": "a89e81544663917f12bd6c607f9970349417a91c",
+      "name": "法尔伽",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11281,
+          "group": 12831,
+          "kind": "A",
+          "name": "西风剑术·流光之舞",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 11282,
+          "group": 12832,
+          "kind": "E",
+          "name": "烈风终坠",
+          "icon": "Skill_S_Varka_01"
+        },
+        {
+          "id": 11285,
+          "group": 12839,
+          "kind": "Q",
+          "name": "我即朔风",
+          "icon": "Skill_E_Varka_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1281,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1282,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1283,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1284,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1285,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1286,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000129,
+      "sha": "e3e07b623edf50311cd1fe905376f14e2c8c30eb",
+      "name": "洛恩",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11291,
+          "group": 12931,
+          "kind": "A",
+          "name": "西风枪术·破誓",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 11292,
+          "group": 12932,
+          "kind": "E",
+          "name": "奇兵诡出",
+          "icon": "Skill_S_Lohen_01"
+        },
+        {
+          "id": 11295,
+          "group": 12939,
+          "kind": "Q",
+          "name": "裁罚遂成",
+          "icon": "Skill_E_Lohen_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1291,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1292,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1293,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1294,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1295,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1296,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000130,
+      "sha": "98ba9796784c3d4305543a9525c38a6a7afb14e7",
+      "name": "莉奈娅",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11301,
+          "group": 13031,
+          "kind": "A",
+          "name": "捕获方案",
+          "icon": "Skill_A_02"
+        },
+        {
+          "id": 11302,
+          "group": 13032,
+          "kind": "E",
+          "name": "对策·露米呀吼吼！",
+          "icon": "Skill_S_Linnea_01"
+        },
+        {
+          "id": 11305,
+          "group": 13039,
+          "kind": "Q",
+          "name": "备忘·绝境生存指南",
+          "icon": "Skill_E_Linnea_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1301,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1302,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1303,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1304,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1305,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1306,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000131,
+      "sha": "f79763d27b65edcd1e77dd1caba44d4ebfd26333",
+      "name": "尼可",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11311,
+          "group": 13131,
+          "kind": "A",
+          "name": "托喻",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 11312,
+          "group": 13132,
+          "kind": "E",
+          "name": "圣言默示·未现之光",
+          "icon": "Skill_S_Nicole_01"
+        },
+        {
+          "id": 11315,
+          "group": 13139,
+          "kind": "Q",
+          "name": "圣言默示·天路历程",
+          "icon": "Skill_E_Nicole_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1311,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1312,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1313,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1314,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1315,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1316,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000132,
+      "sha": "b4f8c046dfc90592f26f97a6b0add140aa957920",
+      "name": "布伦妮",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11321,
+          "group": 13231,
+          "kind": "A",
+          "name": "隆咚咚·破魔之锤",
+          "icon": "Skill_A_Catalyst_MD"
+        },
+        {
+          "id": 11322,
+          "group": 13232,
+          "kind": "E",
+          "name": "叮铃铃·猎魔之音",
+          "icon": "Skill_S_Prune_01"
+        },
+        {
+          "id": 11325,
+          "group": 13239,
+          "kind": "Q",
+          "name": "铃鸣·狩魔之刻",
+          "icon": "Skill_E_Prune_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1321,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1322,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1323,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1324,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1325,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1326,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000133,
+      "sha": "b1c949c87f2f37f6464c94e5c2aeee35c4867e80",
+      "name": "桑多涅",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11331,
+          "group": 13331,
+          "kind": "A",
+          "name": "事象数式·自明演绎",
+          "icon": "Skill_A_04"
+        },
+        {
+          "id": 11332,
+          "group": 13332,
+          "kind": "E",
+          "name": "事象数式·游衍解析",
+          "icon": "Skill_S_MarionetteNew_01"
+        },
+        {
+          "id": 11335,
+          "group": 13339,
+          "kind": "Q",
+          "name": "事象数式·万理证毕",
+          "icon": "Skill_E_MarionetteNew_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1331,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1332,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1333,
+          "index": 1,
+          "level": 3
+        },
+        {
+          "id": 1334,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1335,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1336,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000148,
+      "sha": "fc7083ae839450c421f2de26d352f2afc4af0584",
+      "name": "阿罗夏",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11481,
+          "group": 14831,
+          "kind": "A",
+          "name": "角枪驰弋",
+          "icon": "Skill_A_03"
+        },
+        {
+          "id": 11482,
+          "group": 14832,
+          "kind": "E",
+          "name": "伏袭霆击",
+          "icon": "Skill_S_Alyosha_01"
+        },
+        {
+          "id": 11485,
+          "group": 14839,
+          "kind": "Q",
+          "name": "守猎进踞",
+          "icon": "Skill_E_Alyosha_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1481,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1482,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1483,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1484,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1485,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1486,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    },
+    {
+      "id": 10000150,
+      "sha": "14881a16bc4440936a7df33a516e526c95dad331",
+      "name": "奥黛塔",
+      "skillDepotId": 0,
+      "skills": [
+        {
+          "id": 11501,
+          "group": 15031,
+          "kind": "A",
+          "name": "雪鹄变奏",
+          "icon": "Skill_A_01"
+        },
+        {
+          "id": 11502,
+          "group": 15032,
+          "kind": "E",
+          "name": "柔板·幻灵夜舞",
+          "icon": "Skill_S_Odette_01"
+        },
+        {
+          "id": 11505,
+          "group": 15039,
+          "kind": "Q",
+          "name": "疾板·苍羽一梦",
+          "icon": "Skill_E_Odette_01"
+        }
+      ],
+      "bonus": 0,
+      "talents": [
+        {
+          "id": 1501,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1502,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1503,
+          "index": 2,
+          "level": 3
+        },
+        {
+          "id": 1504,
+          "index": 0,
+          "level": 0
+        },
+        {
+          "id": 1505,
+          "index": 9,
+          "level": 3
+        },
+        {
+          "id": 1506,
+          "index": 0,
+          "level": 0
+        }
+      ]
+    }
+  ]
+}
