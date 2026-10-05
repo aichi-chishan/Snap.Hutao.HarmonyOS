@@ -35,6 +35,8 @@ class NoteRowData {
 /** 派遣条目渲染数据（shimmer 底衬行 + 头像 32 + 'X 时 Y 分'/'已完成'） */
 class ExpRowData {
   avatar: string = '';
+  /** 本地无图标时的远端回退 URL（接口 avatar_side_icon；哈希命名时用） */
+  avatarUrl: string = '';
   text: string = '';
   done: boolean = false;
   passed: number = 0;
@@ -420,6 +422,7 @@ export struct DailyNotePage {
   private makeExpRow(exp: Expedition): ExpRowData {
     const item: ExpRowData = new ExpRowData();
     item.avatar = exp.iconName();
+    item.avatarUrl = exp.iconUrl();
     item.done = exp.isFinished();
     item.text = exp.finishText();
     item.total = exp.totalSecond();
@@ -448,6 +451,9 @@ export struct DailyNotePage {
       Row({ space: 12 }) {
         if (item.avatar.length > 0) {
           MetaIcon({ category: 'AvatarIcon', name: item.avatar, iconSize: 32, remoteFallback: true })
+        } else if (item.avatarUrl.length > 0) {
+          // 接口返回哈希命名（本地/CDN 无此图标）：直接用接口 URL，加载失败落中性占位
+          MetaIcon({ category: 'AvatarIcon', name: item.avatarUrl, iconSize: 32 })
         } else {
           Text('✈')
             .fontSize(14)

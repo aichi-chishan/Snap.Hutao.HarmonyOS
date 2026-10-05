@@ -71,17 +71,54 @@ export class Expedition {
     return Math.max(0, this.totalSecond() - remainSec);
   }
 
-  /** side icon URL → AvatarIcon 图标名（UI_AvatarIcon_Side_Xxx → UI_AvatarIcon_Xxx） */
-  iconName(): string {
+  /** side icon 裸文件名：去掉 query/fragment 与 .png（哈希文件名保持原样） */
+  private sideIconBaseName(): string {
     if (this.avatarSideIcon.length === 0) {
       return '';
     }
-    const slash: number = this.avatarSideIcon.lastIndexOf('/');
-    let name: string = slash >= 0 ? this.avatarSideIcon.substring(slash + 1) : this.avatarSideIcon;
+    let raw: string = this.avatarSideIcon;
+    const query: number = raw.indexOf('?');
+    const fragment: number = raw.indexOf('#');
+    let cut: number = -1;
+    if (query >= 0) {
+      cut = query;
+    }
+    if (fragment >= 0 && (cut < 0 || fragment < cut)) {
+      cut = fragment;
+    }
+    if (cut >= 0) {
+      raw = raw.substring(0, cut);
+    }
+    const slash: number = raw.lastIndexOf('/');
+    let name: string = slash >= 0 ? raw.substring(slash + 1) : raw;
     if (name.endsWith('.png')) {
       name = name.substring(0, name.length - 4);
     }
-    return name.replace('UI_AvatarIcon_Side_', 'UI_AvatarIcon_');
+    return name;
+  }
+
+  /**
+   * side icon → 本地 AvatarIcon 图标名（UI_AvatarIcon_Side_Xxx → UI_AvatarIcon_Xxx）。
+   * 接口对部分角色返回不透明哈希文件名（如 8ae1c762...），本地 rawfile 与静态 CDN 都没有该图标，
+   * 此时返回 ''，由 iconUrl() 直接使用接口给的远端 URL（对齐 Windows 直接绑定 AvatarSideIcon）。
+   */
+  iconName(): string {
+    const name: string = this.sideIconBaseName();
+    if (name.startsWith('UI_AvatarIcon_Side_')) {
+      return name.replace('UI_AvatarIcon_Side_', 'UI_AvatarIcon_');
+    }
+    if (name.startsWith('UI_AvatarIcon_')) {
+      return name;
+    }
+    return '';
+  }
+
+  /** 本地无对应图标时的远端图标 URL（仅接受 http(s)，其余一律返回 '' 走占位） */
+  iconUrl(): string {
+    if (this.iconName().length > 0 || !/^https?:\/\//.test(this.avatarSideIcon)) {
+      return '';
+    }
+    return this.avatarSideIcon;
   }
 
   private static isShortAvatar(sideIcon: string): boolean {
