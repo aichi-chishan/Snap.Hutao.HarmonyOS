@@ -1,3 +1,7 @@
+import { CultivationDraft } from '../model/CultivationDraft';
+import { CultivationService } from '../service/CultivationService';
+import { CultivationPreparedEntry, CultivationSaveReport } from '../data/repo/CultivationRepo';
+import { UserService } from '../service/UserService';
 /**
  * CultivationViewModel.ets
  * 养成计划页状态容器：候选角色清单（来自角色接口）、目标等级输入、批量计算、结果展示；
@@ -71,6 +75,12 @@ export class CultivationViewModel {
   planBusy: boolean = false;
   inventoryRows: InventoryMaterialView[] = [];
   private computedDeltas: CalAvatarDelta[] = [];
+  private prepared: CultivationPreparedEntry[] = [];
+  private revision: number = 0;
+  private loadedUid: string = '';
+
+  invalidate(): void { this.revision++; this.loading = false; this.computing = false; this.result = undefined; this.prepared = []; }
+
   /** 树脂换算统计（当前项目聚合；对齐 Windows ResinStatistics） */
   resinStats: ResinStatisticsResult | undefined = undefined;
   /** 树脂统计世界等级（持久化，默认 9 对齐 Windows；偏好未就绪时回退默认） */
@@ -86,80 +96,53 @@ export class CultivationViewModel {
   }
 
   async load(uid: string): Promise<void> {
-    if (uid.length === 0) {
-      await this.loadOfflineTargets();
-      this.loaded = true;
-      return;
-    }
-    this.loading = true;
+    const changed: boolean = this.loadedUid !== uid;
+    const previous: CultivateTarget[] = changed ? [] : this.targets;
+    this.invalidate(); this.loadedUid = uid;
+    const revision: number = this.revision;
+    const account: number = UserService.getInstance().getCurrentUser()?.id ?? 0;
+    this.loading = true; this.message = '';
+    if (changed) { this.targets = []; this.selectedCount = 0; }
     try {
-      const details: CharacterListItem[] = await CharacterService.getInstance().fetchList(uid);
       const list: CultivateTarget[] = [];
-      for (let i = 0; i < details.length; i++) {
-        const d: CharacterListItem = details[i];
-        const t: CultivateTarget = new CultivateTarget();
-        t.avatarId = d.id;
-        t.name = d.name;
-        t.element = d.element;
-        t.rarity = d.rarity;
-        t.level = d.level;
-        t.promoteLevel = 0;
-        t.icon = d.icon;
-        t.weaponId = d.weapon.id;
-        t.weaponLevel = d.weapon.level;
-        t.weaponPromoteLevel = 0;
-        list.push(t);
-      }
-      // 恢复本地持久化的选择与目标等级（对齐 Windows 养成目标本地保存）
-      const saved: string = PreferencesStore.getString('cultivation_selected', '');
-      const savedLevels: string = PreferencesStore.getString('cultivation_levels', '');
-      if (saved.length > 0) {
-        const sel: Set<string> = new Set(JSON.parse(saved) as Array<string>);
-        let lvMap: Map<string, number> = new Map();
-        if (savedLevels.length > 0) {
-          const lvObj = JSON.parse(savedLevels) as Record<string, number>;
-          for (const k of Object.keys(lvObj)) {
-            lvMap.set(k, Number(lvObj[k]));
-          }
+      if (uid.length === 0) {
+        const avatars: WikiAvatarMeta[] = await WikiMetaService.getAvatars();
+        for (const avatar of avatars) {
+          if (avatar.cultivationItems.length < 6) { continue; }
+          const target: CultivateTarget = new CultivateTarget();
+          target.avatarId = avatar.id; target.name = avatar.name; target.icon = avatar.icon;
+          target.level = 1; target.offline = true; target.rarity = avatar.quality;
+          list.push(target);
         }
-        for (let i = 0; i < list.length; i++) {
-          const key: string = String(list[i].avatarId);
-          if (sel.has(key)) {
-            list[i].selected = true;
-            if (lvMap.has(key)) {
-              list[i].targetLevel = lvMap.get(key) as number;
-            }
-          }
+      } else {
+        const details: CharacterListItem[] = await CharacterService.getInstance().fetchList(uid);
+        if (details.some((detail: CharacterListItem): boolean => detail.id <= 0 || detail.level < 1)) { throw new Error('角色数据不完整，已保留上次列表'); }
+        for (const detail of details) {
+          const target: CultivateTarget = new CultivateTarget();
+          target.avatarId = detail.id; target.name = detail.name; target.icon = detail.icon;
+          target.level = detail.level; target.element = detail.element; target.rarity = detail.rarity;
+          target.weaponId = detail.weapon.id; target.weaponLevel = detail.weapon.level;
+          list.push(target);
         }
       }
-      this.targets = list;
-      this.updateSelected();
-    } catch (e) {
-      this.message = (e as Error).message;
-    } finally {
-      this.loading = false;
-      this.loaded = true;
-    }
-  }
-
-  private async loadOfflineTargets(): Promise<void> {
-    const avatars: WikiAvatarMeta[] = await WikiMetaService.getAvatars();
-    const targets: CultivateTarget[] = [];
-    for (const avatar of avatars) {
-      if (avatar.cultivationItems.length < 6) {
-        continue;
+      if (revision !== this.revision || account !== (UserService.getInstance().getCurrentUser()?.id ?? 0)) { return; }
+      const saved: string = PreferencesStore.getString(`cultivation.selection.${uid || 'offline'}`, '');
+      let savedTargets: CultivateTarget[] = [];
+      try { savedTargets = saved.length > 0 ? JSON.parse(saved) as CultivateTarget[] : []; } catch (e) { savedTargets = []; }
+      for (const target of list) {
+        const old: CultivateTarget | undefined = previous.find((value: CultivateTarget): boolean => value.avatarId === target.avatarId)
+          ?? savedTargets.find((value: CultivateTarget): boolean => value.avatarId === target.avatarId);
+        if (old !== undefined) {
+          target.selected = old.selected === true;
+          if (Number.isInteger(old.targetLevel) && old.targetLevel >= 1 && old.targetLevel <= 100) { target.targetLevel = old.targetLevel; }
+          if (Number.isInteger(old.targetSkillLevel) && old.targetSkillLevel >= 1 && old.targetSkillLevel <= 10) { target.targetSkillLevel = old.targetSkillLevel; }
+          if (Number.isInteger(old.targetWeaponLevel) && old.targetWeaponLevel >= 1 && old.targetWeaponLevel <= 90) { target.targetWeaponLevel = old.targetWeaponLevel; }
+        }
       }
-      const target: CultivateTarget = new CultivateTarget();
-      target.avatarId = avatar.id;
-      target.name = avatar.name;
-      target.icon = avatar.icon;
-      target.level = 1;
-      target.offline = true;
-      target.rarity = avatar.quality;
-      targets.push(target);
-    }
-    this.targets = targets;
-    this.message = '离线养成：以角色 1 级、天赋 1 级为起点；登录后可同步当前进度';
+      this.targets = list; this.updateSelected();
+      if (uid.length === 0) { this.message = '离线计划可正常使用；当前进度可手动编辑，登录后可重新同步'; }
+    } catch (e) { if (revision === this.revision) { this.message = (e as Error).message; } }
+    finally { if (revision === this.revision) { this.loading = false; this.loaded = true; } }
   }
 
   toggle(index: number): void {
@@ -175,16 +158,7 @@ export class CultivationViewModel {
 
   /** 选择与目标等级持久化（JSON 落偏好文件，进入页面恢复） */
   persistSelection(): void {
-    const sel: string[] = [];
-    const lvObj: Record<string, number> = {};
-    for (const t of this.targets) {
-      if (t.selected) {
-        sel.push(String(t.avatarId));
-        lvObj[String(t.avatarId)] = t.targetLevel;
-      }
-    }
-    PreferencesStore.setString('cultivation_selected', JSON.stringify(sel));
-    PreferencesStore.setString('cultivation_levels', JSON.stringify(lvObj));
+    PreferencesStore.setString(`cultivation.selection.${this.loadedUid || 'offline'}`, JSON.stringify(this.targets.filter((target: CultivateTarget): boolean => target.selected)));
   }
 
   setTargetLevel(index: number, level: number): void {
@@ -206,54 +180,36 @@ export class CultivationViewModel {
     this.selectedCount = count;
   }
 
-  /** 精确同步当前突破/技能后，使用与Windows同源的离线算法计算。 */
+  /** Compatibility calculation path; saved inputs are identical to the reviewed result snapshot. */
   async compute(uid: string): Promise<void> {
-    if (this.computing) {
-      return;
-    }
-    this.computing = true;
-    this.result = undefined;
+    if (this.computing) { return; }
+    const revision: number = this.revision;
+    this.computing = true; this.result = undefined; this.prepared = [];
     try {
       const selected: CultivateTarget[] = this.targets.filter((target: CultivateTarget): boolean => target.selected);
-      if (selected.length === 0) {
-        throw new Error('请先勾选要培养的角色');
+      if (selected.length === 0) { throw new Error('请先选择角色'); }
+      let drafts: CultivationDraft[] = [];
+      if (uid.length > 0) {
+        const characters: CharacterListItem[] = await CharacterService.getInstance().fetchList(uid);
+        const chosen: CharacterListItem[] = characters.filter((item: CharacterListItem): boolean => selected.some((target: CultivateTarget): boolean => target.avatarId === item.id));
+        if (chosen.length !== selected.length) { throw new Error('角色同步不完整'); }
+        drafts = await CultivationService.fromCharacters(uid, chosen);
+      } else {
+        for (const target of selected) { drafts.push(await CultivationService.offlineAvatar(target.avatarId)); }
       }
-      const levels: Map<number, number> = uid.length > 0
-        ? await CalculateService.getInstance().fetchPromoteLevels(uid) : new Map<number, number>();
-      const deltas: CalAvatarDelta[] = [];
-      for (const target of selected) {
-        const delta: CalAvatarDelta = new CalAvatarDelta();
-        delta.avatarId = target.avatarId;
-        delta.levelCurrent = target.level;
-        delta.levelTarget = Math.max(target.level, target.targetLevel);
-        delta.elementAttrId = CultivationViewModel.elementAttrIdOf(target.element);
-        if (target.offline) {
-          delta.avatarPromoteLevel = 0;
-          for (let index: number = 0; index < 3; index++) {
-            const skill: CalSkillDelta = new CalSkillDelta();
-            skill.id = index + 1;
-            skill.levelCurrent = 1;
-            skill.levelTarget = target.targetSkillLevel;
-            delta.skills.push(skill);
-          }
-        } else {
-          if (!levels.has(target.avatarId)) {
-            throw new Error(`${target.name} 的当前突破等级未同步`);
-          }
-          delta.avatarPromoteLevel = levels.get(target.avatarId) ?? 0;
-          await CalculateService.getInstance().fillSyncedDetails(uid, delta, target.targetSkillLevel,
-            target.weaponId > 0 ? target.targetWeaponLevel : 0);
+      for (const draft of drafts) {
+        const target: CultivateTarget | undefined = selected.find((item: CultivateTarget): boolean => item.avatarId === draft.itemId);
+        if (target !== undefined) {
+          draft.target = target.targetLevel; draft.targetPromote = CultivationDraft.promoteFor(draft.target);
+          for (const skill of draft.skills) { skill.target = target.targetSkillLevel; }
         }
-        deltas.push(delta);
       }
-      this.result = await OfflineCultivationService.batchCompute(deltas);
-      this.computedDeltas = deltas;
-      this.message = '已计算完整等级、突破与天赋材料；库存可在当前计划中维护';
-    } catch (e) {
-      this.message = (e as Error).message;
-    } finally {
-      this.computing = false;
-    }
+      const prepared: CultivationPreparedEntry[] = await CultivationService.calculate(drafts);
+      if (revision !== this.revision) { return; }
+      this.prepared = prepared;
+      this.message = '已完成计算，请在目标编辑器确认保存';
+    } catch (e) { if (revision === this.revision) { this.message = (e as Error).message; } }
+    finally { if (revision === this.revision) { this.computing = false; } }
   }
 
   setSkillTarget(level: number): void {
@@ -317,7 +273,8 @@ export class CultivationViewModel {
       PreferencesStore.setNumber('cultivation.current_project_id', current);
       await this.reloadEntries();
     } catch (e) {
-      Logger.warn(TAG, `loadPlan fail ${(e as Error).message}`);
+      this.message = `读取计划失败：${(e as Error).message}`;
+      Logger.warn(TAG, this.message);
     }
   }
 
@@ -337,7 +294,10 @@ export class CultivationViewModel {
       this.resinStats = undefined;
       return;
     }
-    this.planEntries = await CultivationRepo.getEntries(this.currentProjectId);
+    const projectId: number = this.currentProjectId;
+    const entries: CultivateEntry[] = await CultivationRepo.getEntries(projectId);
+    if (projectId !== this.currentProjectId) { return; }
+    this.planEntries = entries;
     await this.reloadInventory();
     await this.refreshResinStats();
   }
@@ -410,19 +370,25 @@ export class CultivationViewModel {
   }
 
   async syncInventory(): Promise<void> {
-    if (this.computedDeltas.length === 0) {
-      this.message = '请先选择角色并计算材料，再同步这些材料的库存';
-      return;
-    }
+    if (this.planBusy) { return; }
+    const projectId: number = this.currentProjectId;
+    const revision: number = this.revision;
+    const accountId: number = UserService.getInstance().getCurrentUser()?.id ?? 0;
+    const uid: string = this.loadedUid;
+    this.planBusy = true;
     try {
-      const result: CalBatchResult = await CalculateService.getInstance().batchCompute(this.computedDeltas);
-      const count: number = await InventoryService.syncFromCalculator(this.currentProjectId, result);
-      await this.reloadInventory();
-      await this.refreshResinStats();
-      this.message = `已同步 ${count} 种材料库存`;
-    } catch (e) {
-      this.message = (e as Error).message;
-    }
+      const drafts: CultivationDraft[] = this.planEntries.filter((entry: CultivateEntry): boolean => entry.inputJson.length > 0)
+        .map((entry: CultivateEntry): CultivationDraft => CultivationDraft.decode(entry.inputJson));
+      const deltas: CalAvatarDelta[] = CultivationService.calculatorInputs(drafts, uid);
+      const result: CalBatchResult = await CalculateService.getInstance().batchCompute(deltas);
+      if (revision !== this.revision || projectId !== this.currentProjectId
+        || accountId !== (UserService.getInstance().getCurrentUser()?.id ?? 0)) { return; }
+      const count: number = await InventoryService.syncFromCalculator(projectId, result);
+      if (projectId !== this.currentProjectId) { return; }
+      await this.reloadInventory(); await this.refreshResinStats();
+      this.message = `已同步 ${count} 种计划材料库存（并非完整背包）`;
+    } catch (e) { if (revision === this.revision) { this.message = (e as Error).message; } }
+    finally { this.planBusy = false; }
   }
 
   /** 切换树脂统计世界等级（持久化 + 重算，对齐 Windows SelectedDropDistribution） */
@@ -487,56 +453,16 @@ export class CultivationViewModel {
    * 结果不存在/未选角色时置 message 提示。
    */
   async saveResultToPlan(): Promise<boolean> {
-    if (this.planBusy) {
-      return false;
-    }
-    if (this.result === undefined) {
-      this.message = '请先计算材料';
-      return false;
-    }
-    if (this.currentProjectId <= 0) {
-      this.message = '无可用计划项目';
-      return false;
-    }
+    if (this.planBusy || this.prepared.length === 0) { this.message = '请先计算并确认目标'; return false; }
     this.planBusy = true;
     try {
-      const selected: CultivateTarget[] = [];
-      for (const t of this.targets) {
-        if (t.selected) {
-          selected.push(t);
-        }
-      }
-      if (selected.length === 0) {
-        this.message = '请先勾选要培养的角色';
-        return false;
-      }
-      let saved: number = 0;
-      for (let i = 0; i < selected.length && i < this.result.items.length; i++) {
-        const t: CultivateTarget = selected[i];
-        const c = this.result.items[i];
-        const items: CalItem[] = [];
-        for (const it of c.avatarConsume) {
-          items.push(it);
-        }
-        for (const it of c.avatarSkillConsume) {
-          items.push(it);
-        }
-        for (const it of c.weaponConsume) {
-          items.push(it);
-        }
-        await CultivationRepo.addEntry(this.currentProjectId, t.avatarId, t.name,
-          t.icon, t.level, Math.max(t.level, t.targetLevel), items);
-        saved++;
-      }
+      const report: CultivationSaveReport = await CultivationService.save(this.currentProjectId, this.prepared, false);
+      this.prepared = []; this.result = undefined;
       await this.reloadEntries();
-      this.message = `已保存 ${saved} 条培养目标到计划`;
+      this.message = `新增 ${report.added} · 更新 ${report.updated} · 跳过 ${report.skipped}`;
       return true;
-    } catch (e) {
-      this.message = `保存失败：${(e as Error).message}`;
-      return false;
-    } finally {
-      this.planBusy = false;
-    }
+    } catch (e) { this.message = `保存失败：${(e as Error).message}`; return false; }
+    finally { this.planBusy = false; }
   }
 
   /** 删除单个培养条目 */

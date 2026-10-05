@@ -1,62 +1,144 @@
-/**
- * SkillLevelService.ets
- * 角色技能等级对齐：character/detail 的 skills 数组只有 skill_id/skill_type/level（无名称/图标），
- * 本地元数据（avatar_meta.json）技能无 id（仅 n/d/i/k），无法按 id 匹配 —— 只能按接口顺序对齐：
- * skill_type=1（战斗天赋）在数组中依序为 [普攻, 元素战技, 元素爆发]，与元数据 k=A/E/Q 条目依序对应
- * （对齐 Windows SummaryAvatarFactory 以技能 id 关联的呈现结果：仅显示 A/E/Q 三项等级）。
- * 数量不一致（特殊角色/数据异常）时宁可缺省也不错配：返回全 0。
- */
-import { AvatarSkill } from '../model/CharacterData';
+/** Skill identity and base/display level semantics, independent of response array order. */
+import { CharacterDetail, AvatarSkill, Constellation } from '../model/CharacterData';
+import { AvatarSkillCatalog, AvatarSkillProfile, AvatarSkillReference, AvatarConstellationReference } from '../model/AvatarSkillReference';
 import { MetaSkill } from './WikiMetaService';
 
+export class ResolvedAvatarSkill {
+  skillId: number = 0;
+  groupId: number = 0;
+  kind: string = '';
+  name: string = '';
+  icon: string = '';
+  /** -1 means unavailable or inconsistent, never a zero-level talent. */
+  baseLevel: number = -1;
+  extraLevel: number = -1;
+  displayLevel: number = -1;
+}
+
 export class SkillLevelService {
-  /**
-   * API 技能等级 → 元数据技能对齐。
-   * @param metaSkills 元数据技能/天赋列表（WikiMetaService.skillsOfAvatar，含 A/E/X/Q/P… 项）
-   * @param apiSkills  detail 接口 skills 数组
-   * @returns 与 metaSkills 等长的等级数组：战斗天赋位为对应等级，其余/未对齐为 0（0 表示无数据，UI 不显示）
-   */
-  static matchLevels(metaSkills: MetaSkill[], apiSkills: AvatarSkill[]): number[] {
-    const out: number[] = [];
-    for (let i = 0; i < metaSkills.length; i++) {
-      out.push(0);
-    }
-    // 元数据侧 A/E/Q 位置（跳过 X 替换冲刺等非等级化技能）
-    const aeqIdx: number[] = [];
-    for (let i = 0; i < metaSkills.length; i++) {
-      const k: string = metaSkills[i].k;
-      if (k === 'A' || k === 'E' || k === 'Q') {
-        aeqIdx.push(i);
-      }
-    }
-    if (aeqIdx.length === 0) {
-      return out;
-    }
-    // API 侧战斗天赋（保持接口顺序：普攻→战技→爆发）
-    const fight: AvatarSkill[] = [];
-    for (const s of apiSkills) {
-      if (s.skillType === 1) {
-        fight.push(s);
-      }
-    }
-    // 数量不齐视为不可靠映射（如 API 返回替换冲刺等额外战斗技能），宁可缺省
-    if (fight.length !== aeqIdx.length) {
-      return out;
-    }
-    for (let i = 0; i < fight.length; i++) {
-      out[aeqIdx[i]] = fight[i].level;
-    }
-    return out;
+  /** The pinned source contains no depot IDs. Explicit unverified depots remain unknown. */
+  static referenceSkills(avatarId: number, skillDepotId: number = 0): AvatarSkillReference[] {
+    const profile: AvatarSkillProfile | undefined = SkillLevelService.profile(avatarId, skillDepotId);
+    return profile === undefined ? [] : profile.skills.slice();
   }
 
-  /** 导出文本技能段：仅取已对齐的战斗天赋等级（对齐 Windows FormatSkills：Lv. 6, Lv. 9, Lv. 11） */
-  static formatLevels(levels: number[]): string {
-    const parts: string[] = [];
-    for (const lv of levels) {
-      if (lv > 0) {
-        parts.push(`Lv.${lv}`);
+  static resolve(detail: CharacterDetail): ResolvedAvatarSkill[] {
+    const profile: AvatarSkillProfile | undefined = SkillLevelService.profile(detail.id, detail.skillDepotId);
+    if (profile === undefined) {
+      return [];
+    }
+    const result: ResolvedAvatarSkill[] = [];
+    for (const reference of profile.skills) {
+      const resolved: ResolvedAvatarSkill = new ResolvedAvatarSkill();
+      resolved.skillId = reference.skillId;
+      resolved.groupId = reference.groupId;
+      resolved.kind = reference.kind;
+      resolved.name = reference.name;
+      resolved.icon = reference.icon;
+      const matches: AvatarSkill[] = detail.skills.filter((skill: AvatarSkill): boolean => skill.skillId === reference.skillId);
+      if (matches.length === 1 && Number.isInteger(matches[0].level) && matches[0].level >= 1 && matches[0].level <= 15) {
+        // character/detail reports total displayed level, including known constellation/passive bonuses.
+        resolved.displayLevel = matches[0].level;
+      }
+      resolved.extraLevel = SkillLevelService.extraLevel(detail, profile, reference.kind);
+      if (resolved.displayLevel >= 1 && resolved.extraLevel >= 0) {
+        const base: number = resolved.displayLevel - resolved.extraLevel;
+        if (base >= 1 && base <= 10) {
+          resolved.baseLevel = base;
+        }
+      }
+      result.push(resolved);
+    }
+    return result;
+  }
+
+  /** Presentation metadata has no IDs: require exact name+icon within the verified avatar profile. */
+  static forMetaSkill(detail: CharacterDetail, meta: MetaSkill): ResolvedAvatarSkill | undefined {
+    return SkillLevelService.resolve(detail).find((skill: ResolvedAvatarSkill): boolean =>
+      skill.name === meta.n && skill.icon === meta.i);
+  }
+
+  /** Old compact metadata mislabels prefixed non-upgradable jump/sprint entries by position. */
+  static kindOfMetaSkill(detail: CharacterDetail, meta: MetaSkill): string {
+    const skill: ResolvedAvatarSkill | undefined = SkillLevelService.forMetaSkill(detail, meta);
+    if (skill !== undefined) {
+      return skill.kind;
+    }
+    return SkillLevelService.referenceSkills(detail.id, detail.skillDepotId).length > 0 && meta.k !== 'P' ? 'X' : meta.k;
+  }
+
+  static formatSkill(skill: ResolvedAvatarSkill): string {
+    if (skill.displayLevel < 1) {
+      return '等级未知';
+    }
+    if (skill.baseLevel < 1 || skill.extraLevel < 0) {
+      return `Lv.${skill.displayLevel}（基础/加成未知）`;
+    }
+    return skill.extraLevel > 0 ? `Lv.${skill.baseLevel}+${skill.extraLevel}` : `Lv.${skill.baseLevel}`;
+  }
+
+  static formatDetail(detail: CharacterDetail): string {
+    const skills: ResolvedAvatarSkill[] = SkillLevelService.resolve(detail);
+    if (skills.length === 0) {
+      return '天赋映射未知';
+    }
+    return skills.map((skill: ResolvedAvatarSkill): string =>
+      `${skill.kind} ${SkillLevelService.formatSkill(skill)}`).join(', ');
+  }
+
+  private static profile(avatarId: number, skillDepotId: number): AvatarSkillProfile | undefined {
+    if (skillDepotId !== 0) {
+      return undefined;
+    }
+    return AvatarSkillCatalog.profiles.find((profile: AvatarSkillProfile): boolean => profile.avatarId === avatarId);
+  }
+
+  private static extraLevel(detail: CharacterDetail, profile: AvatarSkillProfile, kind: string): number {
+    let extra: number = kind === 'A' ? profile.normalAttackExtra : 0;
+    for (let index: number = 0; index < profile.constellations.length; index++) {
+      const reference: AvatarConstellationReference = profile.constellations[index];
+      if (reference.kind !== kind || reference.extraLevel === 0) {
+        continue;
+      }
+      const state: number = SkillLevelService.constellationState(detail, profile, index);
+      if (state < 0) {
+        return -1;
+      }
+      if (state === 1) {
+        extra += reference.extraLevel;
       }
     }
-    return parts.join(', ');
+    return extra;
+  }
+
+  private static constellationState(detail: CharacterDetail, profile: AvatarSkillProfile, index: number): number {
+    const count: number = detail.activedConstellationNum;
+    const countKnown: boolean = Number.isInteger(count) && count >= 0 && count <= profile.constellations.length;
+    const seen: Set<number> = new Set<number>();
+    let firstInactive: number = profile.constellations.length;
+    let lastActive: number = -1;
+    for (const cell of detail.constellations) {
+      const rank: number = profile.constellations.findIndex((reference: AvatarConstellationReference): boolean => reference.id === cell.id);
+      if (rank < 0 || seen.has(cell.id) || (countKnown && cell.activationKnown && cell.isActived !== (rank < count))) {
+        return -1;
+      }
+      seen.add(cell.id);
+      if (cell.activationKnown) {
+        if (cell.isActived) {
+          lastActive = Math.max(lastActive, rank);
+        } else {
+          firstInactive = Math.min(firstInactive, rank);
+        }
+      }
+    }
+    if (lastActive > firstInactive) {
+      return -1;
+    }
+    if (countKnown) {
+      return index < count ? 1 : 0;
+    }
+    const cell: Constellation | undefined = detail.constellations.find((item: Constellation): boolean =>
+      item.id === profile.constellations[index].id);
+    return cell !== undefined && cell.activationKnown ? (cell.isActived ? 1 : 0) : -1;
   }
 }

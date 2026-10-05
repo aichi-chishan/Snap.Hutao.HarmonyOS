@@ -6,6 +6,7 @@
 import { relationalStore } from '@kit.ArkData';
 import { RelationalStoreHelper } from '../db/RelationalStoreHelper';
 import { CalItem } from '../../model/Calculate';
+import { CultivationDraft } from '../../model/CultivationDraft';
 import { Logger } from '../../common/Logger';
 
 const TAG: string = 'CultivationRepo';
@@ -37,6 +38,7 @@ export class CultivateEntry {
   level: number = 0;
   targetLevel: number = 0;
   items: CultivateEntryItem[] = [];
+  inputJson: string = '';
 
   /** 已备齐材料数 */
   finishedCount(): number {
@@ -48,6 +50,18 @@ export class CultivateEntry {
     }
     return n;
   }
+}
+
+export class CultivationPreparedEntry {
+  draft: CultivationDraft = new CultivationDraft();
+  items: CalItem[] = [];
+}
+
+export class CultivationSaveReport {
+  added: number = 0;
+  updated: number = 0;
+  skipped: number = 0;
+  details: string[] = [];
 }
 
 export class CultivationRepo {
@@ -119,6 +133,7 @@ export class CultivationRepo {
         e.icon = rs.getString(rs.getColumnIndex('icon'));
         e.level = rs.getLong(rs.getColumnIndex('level'));
         e.targetLevel = rs.getLong(rs.getColumnIndex('target_level'));
+        e.inputJson = rs.getString(rs.getColumnIndex('input_json'));
         entries.push(e);
       }
     } finally {
@@ -206,6 +221,7 @@ export class CultivationRepo {
     store.beginTransaction();
     try {
       const entryId: number = store.insertSync('cultivate_entries', entryValues);
+      if (entryId <= 0) { throw new Error('条目写入未完成，已撤销本次保存'); }
       const rows: relationalStore.ValuesBucket[] = [];
       for (const it of merged.values()) {
         const values: relationalStore.ValuesBucket = {
@@ -227,6 +243,109 @@ export class CultivationRepo {
     } catch (e) {
       store.rollBack();
       throw new Error(e instanceof Error ? e.message : '保存养成计划失败');
+    }
+  }
+
+  /** All input/result pairs commit together. Skip/overwrite is explicit; failed batches write nothing. */
+  static async saveDrafts(projectId: number, prepared: CultivationPreparedEntry[],
+    overwrite: boolean): Promise<CultivationSaveReport> {
+    if (prepared.length === 0) { throw new Error('没有可保存的培养目标'); }
+    const encoded: string[] = prepared.map((entry: CultivationPreparedEntry): string => CultivationDraft.encode(entry.draft));
+    const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
+    const report: CultivationSaveReport = new CultivationSaveReport();
+    store.beginTransaction();
+    try {
+      let targetProject: number = projectId;
+      if (targetProject === 0) {
+        targetProject = store.insertSync('cultivate_projects', { 'name': '默认养成计划', 'created_at': Date.now() });
+        if (targetProject <= 0) { throw new Error('项目写入未完成，已撤销本次保存'); }
+      }
+      const projectPred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('cultivate_projects');
+      projectPred.equalTo('id', targetProject);
+      const projectRows: relationalStore.ResultSet = store.querySync(projectPred);
+      let exists: boolean = false;
+      try { exists = projectRows.goToFirstRow(); } finally { projectRows.close(); }
+      if (!exists) { throw new Error('计划已被删除，请重新选择项目'); }
+      for (let index: number = 0; index < prepared.length; index++) {
+        const entry: CultivationPreparedEntry = prepared[index];
+        const draft: CultivationDraft = entry.draft;
+        const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('cultivate_entries');
+        pred.equalTo('project_id', targetProject);
+        if (draft.entryId > 0) { pred.equalTo('id', draft.entryId); }
+        else { pred.equalTo('avatar_id', draft.itemId); }
+        const existing: relationalStore.ResultSet = store.querySync(pred);
+        let entryId: number = 0;
+        let input: string = '';
+        try {
+          if (existing.goToFirstRow()) {
+            entryId = existing.getLong(existing.getColumnIndex('id'));
+            input = existing.getString(existing.getColumnIndex('input_json'));
+          }
+        } finally { existing.close(); }
+        if (draft.entryId > 0 && (entryId !== draft.entryId || input !== draft.expectedInput)) {
+          throw new Error(`${draft.name} 的计划已变更，请关闭编辑后重新打开`);
+        }
+        if (entryId > 0 && draft.entryId === 0 && !overwrite) {
+          report.skipped++; report.details.push(`${draft.name}：已存在，跳过`); continue;
+        }
+        const merged: Map<number, CalItem> = new Map<number, CalItem>();
+        for (const item of entry.items) {
+          if (!Number.isSafeInteger(item.id) || item.id <= 0 || !Number.isSafeInteger(item.num) || item.num < 0) {
+            throw new Error(`${draft.name} 的材料结果无效，已撤销本次保存`);
+          }
+          if (item.num === 0) { continue; }
+          const value: CalItem = merged.get(item.id) ?? new CalItem();
+          value.id = item.id; value.name = item.name; value.icon = item.icon; value.num += item.num;
+          if (!Number.isSafeInteger(value.num)) { throw new Error('材料数量超出安全范围，已撤销本次保存'); }
+          merged.set(item.id, value);
+        }
+        if (merged.size === 0 && entryId === 0) {
+          report.skipped++; report.details.push(`${draft.name}：已达目标，无新增材料`); continue;
+        }
+        const finished: Map<number, number> = new Map<number, number>();
+        if (entryId > 0) {
+          const itemPred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('cultivate_items');
+          itemPred.equalTo('entry_id', entryId);
+          const rows: relationalStore.ResultSet = store.querySync(itemPred);
+          let itemCount: number = 0;
+          try {
+            while (rows.goToNextRow()) {
+              itemCount++;
+              if (rows.getLong(rows.getColumnIndex('finished')) === 1) {
+                finished.set(rows.getLong(rows.getColumnIndex('item_id')), rows.getLong(rows.getColumnIndex('count')));
+              }
+            }
+          } finally { rows.close(); }
+          if (store.deleteSync(itemPred) !== itemCount) { throw new Error('旧材料更新未完成，已撤销本次保存'); }
+        }
+        const values: relationalStore.ValuesBucket = {
+          'project_id': targetProject, 'avatar_id': draft.itemId, 'name': draft.name, 'icon': draft.icon,
+          'level': draft.current, 'target_level': draft.target, 'input_json': encoded[index]
+        };
+        if (entryId > 0) {
+          const updatePred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('cultivate_entries');
+          updatePred.equalTo('id', entryId);
+          if (store.updateSync(values, updatePred) !== 1) { throw new Error('计划更新未完成'); }
+          report.updated++; report.details.push(`${draft.name}：已更新`);
+        } else {
+          values['created_at'] = Date.now();
+          entryId = store.insertSync('cultivate_entries', values);
+          if (entryId <= 0) { throw new Error('条目写入未完成，已撤销本次保存'); }
+          report.added++; report.details.push(`${draft.name}：已新增`);
+        }
+        for (const item of merged.values()) {
+          const itemRowId: number = store.insertSync('cultivate_items', {
+            'entry_id': entryId, 'item_id': item.id, 'name': item.name, 'icon': item.icon,
+            'count': item.num, 'finished': finished.get(item.id) === item.num ? 1 : 0
+          });
+          if (itemRowId <= 0) { throw new Error('材料写入未完成，已撤销本次保存'); }
+        }
+      }
+      store.commit();
+      return report;
+    } catch (e) {
+      store.rollBack();
+      throw new Error(e instanceof Error ? e.message : '保存失败，原计划保持不变');
     }
   }
 

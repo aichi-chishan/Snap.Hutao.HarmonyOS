@@ -173,7 +173,7 @@ export class RelationalStoreHelper {
   }
 
   /** 当前数据库结构版本（每次结构变更 +1，并在 MIGRATIONS 末尾追加对应迁移） */
-  private static readonly DB_VERSION: number = 7;
+  private static readonly DB_VERSION: number = 8;
 
   /**
    * 有序迁移列表：MIGRATIONS[i] 把版本 i+1 升到 i+2。
@@ -283,6 +283,10 @@ export class RelationalStoreHelper {
         PRIMARY KEY (archive_id, instance_id),
         FOREIGN KEY (archive_id) REFERENCES backpack_archives(id) ON DELETE CASCADE
       )`,
+    ],
+    [
+      // v7 → v8：保留养成编辑输入；旧计划为空，编辑时显式重新确认，不推断历史进度。
+      "ALTER TABLE cultivate_entries ADD COLUMN input_json TEXT NOT NULL DEFAULT ''",
     ],
   ];
 

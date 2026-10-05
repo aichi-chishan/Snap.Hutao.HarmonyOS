@@ -78,7 +78,7 @@ export class OfflineCultivationService {
     OfflineCultivationService.add(counts, 104003, books);
     OfflineCultivationService.add(counts, 202, books * 4000);
     const ascensions: number[] = OfflineCultivationService.requiredAscensions(delta.levelCurrent,
-      delta.levelTarget, delta.avatarPromoteLevel);
+      delta.levelTarget, delta.avatarPromoteLevel, delta.avatarTargetPromoteLevel);
     if ((ascensions.length > 0 || delta.skills.length > 0) && avatar.cultivationItems.length < 6) {
       throw new Error(`${avatar.name} 的突破/天赋材料元数据不完整`);
     }
@@ -124,7 +124,7 @@ export class OfflineCultivationService {
     OfflineCultivationService.add(counts, 104013, ore);
     OfflineCultivationService.add(counts, 202, ore * 1000);
     for (const index of OfflineCultivationService.requiredAscensions(delta.levelCurrent,
-      delta.levelTarget, delta.weaponPromoteLevel)) {
+      delta.levelTarget, delta.weaponPromoteLevel, delta.weaponTargetPromoteLevel)) {
       OfflineCultivationService.add(counts, 202, CultivationTables.WeaponAscensionMoraCosts[quality][index]);
       OfflineCultivationService.addOffset(counts, weapon.cultivationItems[0], CultivationTables.WeaponMaterialConsumption[quality][index]);
       OfflineCultivationService.addOffset(counts, weapon.cultivationItems[1], CultivationTables.WeaponMonsterMaterialAConsumption[quality][index]);
@@ -134,11 +134,11 @@ export class OfflineCultivationService {
   }
 
   /** Same lower/upper-bound semantics as Windows Ascension.cs, including cap-level promotion. */
-  static requiredAscensions(current: number, target: number, promote: number): number[] {
+  static requiredAscensions(current: number, target: number, promote: number, targetPromote: number = -1): number[] {
     const indices: number[] = [];
     for (let index: number = promote; index < CultivationTables.AscensionLevels.length; index++) {
       const level: number = CultivationTables.AscensionLevels[index];
-      if (level >= current && level <= target) {
+      if (level >= current && level <= target && (targetPromote < 0 || index < targetPromote)) {
         indices.push(index);
       }
     }

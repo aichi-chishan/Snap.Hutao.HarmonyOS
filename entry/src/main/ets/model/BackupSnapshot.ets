@@ -34,6 +34,9 @@ export class BackupRecovery {
 }
 
 export class BackupSnapshotValidator {
+  /** Transport bound only: draft versions/domain values are decoded when opened for editing. */
+  static readonly MAX_CULTIVATION_INPUT_LENGTH: number = 64 * 1024;
+
   static readonly TABLES: string[] = [
     'user_accounts', 'user_game_roles', 'gacha_archives', 'gacha_items',
     'achievement_archives', 'achievement_entries', 'cultivate_projects',
@@ -160,6 +163,18 @@ export class BackupSnapshotValidator {
             (value !== null && typeof value !== 'string' && typeof value !== 'number') ||
             (typeof value === 'number' && !Number.isFinite(value))) {
             throw new Error('备份含无效字段');
+          }
+        }
+        if (table.name === 'cultivate_entries') {
+          if (snapshot.schemaVersion >= 8) {
+            // Preserve opaque text including unknown versions; NUL is rejected before native string APIs.
+            if (!BackupSnapshotValidator.text(row['input_json'],
+              BackupSnapshotValidator.MAX_CULTIVATION_INPUT_LENGTH, false) ||
+              (row['input_json'] as string).indexOf('\u0000') >= 0) {
+              throw new Error('养成输入字段无效或过长');
+            }
+          } else if (Object.keys(row).indexOf('input_json') >= 0) {
+            throw new Error('旧版备份不支持养成输入字段');
           }
         }
         if (table.name === 'user_accounts') {

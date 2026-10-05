@@ -22,6 +22,7 @@ const {CharacterService}=await import(await ets('service/CharacterService.ets',{
   '../data/network/DsSigner':url('export const DsSigner={};'),
   '../data/network/RiskVerifier':url('export const RiskVerifier={};export class RiskControlError extends Error {}'),
   '../model/CharacterData':modelUrl,
+  '../model/PromoteState':await ets('model/PromoteState.ets'),
   './WikiMetaService':url("export const WikiMetaService={iconOfAvatar:id=>`UI_AvatarIcon_${id}`,cleanText:text=>text};"),
   './UserService':url('export const UserService={};'),
   '../common/Constants':url("export const RegionUtil={regionOfUid:uid=>'cn_gf01'};export const AppConstants={};"),

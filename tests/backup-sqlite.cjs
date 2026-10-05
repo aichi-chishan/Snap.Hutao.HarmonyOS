@@ -12,6 +12,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const uid = '100000001';
 const weapon = '{"itemId":11501,"guid":18446744073709551615,"equip":{"weapon":{"level":90,"promoteLevel":6,"affixMap":{"111501":4}},"isLocked":true},"extension":18446744073709551614}';
 const material = '{"itemId":104003,"material":{"count":12},"unknown":{"exact":18446744073709551613}}';
+const cultivationInput = ' \r\n{"version":99,"sourceUid":"100000001","unknown":18446744073709551615,"label":"养成🌱"}\n ';
 const document = '{"info":{"uiif_version":"v1.0","uid":"100000001","export_app":"fixture"},"list":[],"extension":18446744073709551612}';
 const legacy = { app:'snaphutao-harmonyos-backup', version:1, users:[], gacha:[], achievements:[], prefs:{
   themeMode:'system', refreshInterval:30, autoRefresh:true, ambientStrength:0.25, dailyBgEnabled:true,
@@ -22,8 +23,8 @@ class Predicates { constructor(table) { this.table = table; } }
 function harness() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys=ON');
-  const state = { writes:0, begins:0, commits:0, rollbacks:0, resultSets:0, closedSets:0,
-    failSql:'', failInsert:'', failDelete:'', failVersion:false, failCommit:false,
+  const state = { writes:0, begins:0, commits:0, rollbacks:0, resultSets:0, closedSets:0, vaultWrites:0, preferenceWrites:0, journalWrites:0,
+    failSql:'', failInsert:'', failDelete:'', failVersion:0, failCommit:false,
     failPrefs:false, failVault:false, journal:'', prefs:{'theme.mode':'dark'}, vault:{}, reloads:0 };
   function resultSet(sql) {
     const stmt = db.prepare(sql), rows = stmt.all(), names = stmt.columns().map(column => column.name);
@@ -37,8 +38,8 @@ function harness() {
   }
   const store = {
     get version() { return db.prepare('PRAGMA user_version').get().user_version; },
-    set version(value) { db.exec('PRAGMA user_version='+Number(value)); if(state.failVersion&&value===7)throw Error('injected version failure'); },
-    async executeSql(sql) { if(state.failSql&&sql.includes(state.failSql))throw Error('injected CREATE failure'); db.exec(sql); },
+    set version(value) { db.exec('PRAGMA user_version='+Number(value)); if(state.failVersion===value)throw Error('injected version failure'); },
+    async executeSql(sql) { if(state.failSql&&sql.includes(state.failSql))throw Error('injected SQL failure'); db.exec(sql); },
     beginTransaction() { state.begins++; db.exec('BEGIN'); },
     commit() { if(state.failCommit)throw Error('injected commit failure'); db.exec('COMMIT'); state.commits++; },
     rollBack() { db.exec('ROLLBACK'); state.rollbacks++; },
@@ -55,10 +56,10 @@ function harness() {
   const mocks = {
     '@kit.ArkData':{ relationalStore:{ getRdbStore:async()=>store, SecurityLevel:{S1:1}, TransactionType:{IMMEDIATE:1}, RdbPredicates:Predicates } },
     Logger:{ info(){}, warn(){} },
-    TokenVault:{ loadCookie:async id=>state.vault[id]??'', saveCookie:async(id,cookie)=>{ if(state.failVault)throw Error('injected vault failure'); state.vault[id]=cookie; }, removeCookie:async id=>{ delete state.vault[id]; } },
+    TokenVault:{ loadCookie:async id=>state.vault[id]??'', saveCookie:async(id,cookie)=>{ state.vaultWrites++; if(state.failVault)throw Error('injected vault failure'); state.vault[id]=cookie; }, removeCookie:async id=>{ delete state.vault[id]; } },
     PreferencesStore:{ KEY_CURRENT_USER_ID:'app.current_user_id', KEY_CURRENT_UID:'app.current_uid', exportPortable:()=>clone(state.prefs),
-      getBackupJournal:()=>state.journal, saveBackupJournal:async text=>{ state.journal=text; },
-      replacePortable:async value=>{ state.prefs=clone(value); if(state.failPrefs){ state.failPrefs=false; throw Error('injected preferences failure'); } }, getRefreshIntervalMinutes:()=>30 },
+      getBackupJournal:()=>state.journal, saveBackupJournal:async text=>{ state.journalWrites++; state.journal=text; },
+      replacePortable:async value=>{ state.preferenceWrites++; state.prefs=clone(value); if(state.failPrefs){ state.failPrefs=false; throw Error('injected preferences failure'); } }, getRefreshIntervalMinutes:()=>30 },
     DailyNoteService:{ getInstance:()=>({ isTimerRunning:()=>true, stopAutoRefresh(){}, startAutoRefresh(){} }) },
     UserService:{ getInstance:()=>({ reloadLocalSession:async()=>{state.reloads++;} }) }
   };
@@ -84,7 +85,11 @@ function harness() {
     db.exec(`INSERT INTO user_accounts(id,mid,is_selected,created_at) VALUES(1,'fixture',1,1);
       INSERT INTO user_game_roles(id,user_id,game_uid,region,is_default) VALUES(1,1,'${uid}','cn_gf01',1);
       INSERT INTO cultivate_projects(id,name,created_at) VALUES(1,'keep cultivation',1);
+      INSERT INTO cultivate_entries(id,project_id,avatar_id,name,level,target_level,created_at) VALUES(1,1,10000046,'keep draft',20,90,1);
+      INSERT INTO cultivate_items(id,entry_id,item_id,name,count,finished) VALUES(1,1,104003,'keep materials',12,1);
+      INSERT INTO cultivate_inventory(project_id,item_id,count) VALUES(1,104003,5);
       INSERT INTO challenge_records(kind,uid,region,schedule_id,raw_json,record_time) VALUES('abyss','${uid}','cn_gf01',7,'keep history',1);`);
+    db.prepare('UPDATE cultivate_entries SET input_json=? WHERE id=1').run(cultivationInput);
     const archive=db.prepare('INSERT INTO backpack_archives(id,name,uid,is_selected,created_at,updated_at,source,document_json) VALUES(?,?,?,?,?,?,?,?)');
     archive.run(1,'keep backpack',uid,1,1,2,'fixture',document);
     archive.run(2,'another UID','700000002',0,1,2,'manual','{"info":{"uiif_version":"v1.0"},"list":[]}');
@@ -119,8 +124,10 @@ function strictModelTypes() {
 }
 
 (async()=>{
-  await test('fresh production migration creates v7 tables and a real foreign key without orphans',async()=>{
-    const h=harness(); await h.init(); assert.equal(h.store.version,7);
+  await test('fresh production migration creates v8 tables and a real foreign key without orphans',async()=>{
+    const h=harness(); await h.init(); assert.equal(h.store.version,8);
+    const input=h.db.prepare('PRAGMA table_info(cultivate_entries)').all().find(column=>column.name==='input_json');
+    assert.equal(input.type,'TEXT'); assert.equal(input.notnull,1); assert.equal(input.dflt_value,"''");
     assert.equal(h.db.prepare('PRAGMA foreign_key_list(backpack_items)').all()[0].table,'backpack_archives');
     assert.throws(()=>h.db.exec(`INSERT INTO backpack_items VALUES(99,'local:1',1,'material',9,'{}')`),/FOREIGN KEY/);
     assert.equal(h.rows('backpack_items').length,0); h.close();
@@ -128,46 +135,109 @@ function strictModelTypes() {
   await test('v7 CREATE, version-stamp and commit failures roll back DDL and retry from v6',async()=>{
     for(const mode of ['create','version','commit']) {
       const h=harness(); await h.init(); h.seed();
-      h.db.exec('DROP TABLE backpack_items; DROP TABLE backpack_archives; PRAGMA user_version=6');
+      h.db.exec('DROP TABLE backpack_items; DROP TABLE backpack_archives; ALTER TABLE cultivate_entries DROP COLUMN input_json; PRAGMA user_version=6');
       h.helper.rdbStore=undefined;
       if(mode==='create')h.state.failSql='CREATE TABLE IF NOT EXISTS backpack_items';
-      if(mode==='version')h.state.failVersion=true;
+      if(mode==='version')h.state.failVersion=7;
       if(mode==='commit')h.state.failCommit=true;
       await assert.rejects(h.helper.init({}),/数据库升级 v6 失败/);
       assert.equal(h.store.version,6,mode); assert.equal(h.helper.isReady(),false);
       assert.equal(h.db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name IN ('backpack_archives','backpack_items')").get().n,0);
       assert.equal(h.rows('challenge_records')[0].raw_json,'keep history');
-      h.state.failSql=''; h.state.failVersion=false; h.state.failCommit=false;
-      await h.init(); assert.equal(h.store.version,7); assert.equal(h.helper.isReady(),true); h.close();
+      h.state.failSql=''; h.state.failVersion=0; h.state.failCommit=false;
+      await h.init(); assert.equal(h.store.version,8); assert.equal(h.helper.isReady(),true); h.close();
     }
   });
-  await test('v7 production capture/restore is lossless with reversed table order and foreign keys enabled',async()=>{
+  await test('v8 ALTER, version-stamp and commit failures roll back the new column and retry from v7',async()=>{
+    for(const mode of ['alter','version','commit']) {
+      const h=harness(); await h.init(); h.seed();
+      h.db.exec('ALTER TABLE cultivate_entries DROP COLUMN input_json; PRAGMA user_version=7');
+      const before=h.all(); h.helper.rdbStore=undefined;
+      if(mode==='alter')h.state.failSql='ALTER TABLE cultivate_entries ADD COLUMN input_json';
+      if(mode==='version')h.state.failVersion=8;
+      if(mode==='commit')h.state.failCommit=true;
+      const rollbacks=h.state.rollbacks;
+      await assert.rejects(h.helper.init({}),/数据库升级 v7 失败/);
+      assert.equal(h.store.version,7,mode); assert.equal(h.helper.isReady(),false);
+      assert.equal(h.state.rollbacks,rollbacks+1);
+      assert.equal(h.db.prepare('PRAGMA table_info(cultivate_entries)').all().some(column=>column.name==='input_json'),false);
+      assert.deepEqual(h.all(),before,mode);
+      h.state.failSql=''; h.state.failVersion=0; h.state.failCommit=false;
+      await h.init(); assert.equal(h.store.version,8); assert.equal(h.helper.isReady(),true);
+      const after=h.all(); assert.equal(after.cultivate_entries[0].input_json,'');
+      delete after.cultivate_entries[0].input_json; assert.deepEqual(after,before,mode); h.close();
+    }
+  });
+  await test('v8 retry tolerates an already existing input column without changing draft bytes',async()=>{
+    const h=harness(); await h.init(); h.seed(); const before=h.all();
+    h.db.exec('PRAGMA user_version=7'); h.helper.rdbStore=undefined;
+    await h.init(); assert.equal(h.store.version,8); assert.deepEqual(h.all(),before); h.close();
+  });
+  await test('v8 production capture/restore is lossless with reversed table order and foreign keys enabled',async()=>{
     const h=harness(); await h.init(); h.seed(); const before=h.backpack();
-    const snapshot=JSON.parse(await h.service.buildBackupJson()); assert.equal(snapshot.schemaVersion,7); assert.equal(snapshot.tables.length,20);
+    const snapshot=JSON.parse(await h.service.buildBackupJson()); assert.equal(snapshot.schemaVersion,8); assert.equal(snapshot.tables.length,20);
     snapshot.tables.reverse(); h.db.exec("UPDATE backpack_archives SET name='replace me'; DELETE FROM backpack_items WHERE archive_id=1");
     const result=await h.service.restoreFromText(JSON.stringify(snapshot)); assert.equal(result.ok,true,result.message);
     assert.deepEqual(h.backpack(),before); assert.equal(h.rows('challenge_records')[0].raw_json,'keep history');
+    assert.equal(h.rows('cultivate_entries')[0].input_json,cultivationInput);
     const exported=JSON.parse(await h.service.buildBackupJson());
+    assert.equal(table(exported,'cultivate_entries').rows[0].input_json,cultivationInput);
     assert.equal(table(exported,'backpack_archives').rows[0].document_json,document);
     assert.equal(table(exported,'backpack_items').rows.find(row=>row.kind==='weapon').raw_json,weapon);
     assert.equal(h.db.prepare('PRAGMA foreign_key_check').all().length,0); assert.equal(h.state.journal,''); h.close();
   });
-  await test('all schema1–6 snapshots preserve v7 backpack state and legacy conversion never stamps v7',async()=>{
-    for(let schemaVersion=1;schemaVersion<=6;schemaVersion++) {
+  await test('all schema1–7 snapshots default cultivation input and legacy conversion preserves existing drafts',async()=>{
+    for(let schemaVersion=1;schemaVersion<=7;schemaVersion++) {
       const h=harness(); await h.init(); h.seed(); const before=h.backpack();
       const old=JSON.parse(await h.service.buildBackupJson()); old.schemaVersion=schemaVersion;
-      old.tables=old.tables.filter(value=>!value.name.startsWith('backpack_'));
+      if(schemaVersion<7)old.tables=old.tables.filter(value=>!value.name.startsWith('backpack_'));
+      for(const row of table(old,'cultivate_entries').rows)delete row.input_json;
       const result=await h.service.restoreFromText(JSON.stringify(old)); assert.equal(result.ok,true,result.message);
-      assert.deepEqual(h.backpack(),before); assert.equal(h.rows('challenge_records')[0].raw_json,'keep history'); h.close();
+      assert.deepEqual(h.backpack(),before); assert.equal(h.rows('challenge_records')[0].raw_json,'keep history');
+      assert.equal(h.rows('cultivate_entries')[0].input_json,'',`schema${schemaVersion}`);
+      assert.equal(h.rows('cultivate_items')[0].count,12); assert.equal(h.rows('cultivate_inventory')[0].count,5); h.close();
     }
     const h=harness(); await h.init(); h.seed(); const before=h.backpack();
-    const converted=h.converter.convert(legacy,7); assert.equal(converted.schemaVersion,6);
+    const converted=h.converter.convert(legacy,8); assert.equal(converted.schemaVersion,6);
     assert.equal(converted.tables.some(value=>value.name.startsWith('backpack_')),false);
     const result=await h.service.restoreFromText(JSON.stringify(legacy)); assert.equal(result.ok,true,result.message);
     assert.deepEqual(h.backpack(),before); assert.equal(h.rows('challenge_records')[0].raw_json,'keep history');
-    assert.equal(h.rows('cultivate_projects')[0].name,'keep cultivation'); h.close();
+    assert.equal(h.rows('cultivate_projects')[0].name,'keep cultivation');
+    assert.equal(h.rows('cultivate_entries')[0].input_json,cultivationInput); h.close();
   });
-  await test('schema7 requires both tables and malformed rows fail before any SQL mutation or credential staging',async()=>{
+  await test('v8 input is opaque and roundtrips empty, malformed, future and maximum-size draft strings exactly',async()=>{
+    const h=harness(); await h.init(); h.seed();
+    for(const input of ['', '  not JSON\n养成🌱  ', cultivationInput, 'x'.repeat(64*1024)]) {
+      h.db.prepare('UPDATE cultivate_entries SET input_json=?').run(input);
+      const snapshot=JSON.parse(await h.service.buildBackupJson());
+      assert.equal(table(snapshot,'cultivate_entries').rows[0].input_json,input);
+      h.db.exec("UPDATE cultivate_entries SET input_json='replace me'");
+      const result=await h.service.restoreFromText(JSON.stringify(snapshot)); assert.equal(result.ok,true,result.message);
+      assert.equal(h.rows('cultivate_entries')[0].input_json,input);
+      assert.equal(table(JSON.parse(await h.service.buildBackupJson()),'cultivate_entries').rows[0].input_json,input);
+    }
+    h.close();
+  });
+  await test('malformed v8 draft fields and schema downgrades reject before writes, transaction or credential staging',async()=>{
+    const h=harness(); await h.init(); h.seed(); const snapshot=JSON.parse(await h.service.buildBackupJson());
+    const mutations=[
+      s=>delete table(s,'cultivate_entries').rows[0].input_json,
+      ...[null, 1, false, {}, [], 'invalid\u0000tail', 'x'.repeat(64*1024+1)].map(value=>s=>table(s,'cultivate_entries').rows[0].input_json=value),
+      s=>s.schemaVersion=7
+    ];
+    const before=h.all(), vault=clone(h.state.vault), prefs=clone(h.state.prefs);
+    const counts=[h.state.begins,h.state.vaultWrites,h.state.preferenceWrites,h.state.journalWrites];
+    for(let i=0;i<mutations.length;i++) {
+      const invalid=clone(snapshot); mutations[i](invalid);
+      const result=await h.service.restoreFromText(JSON.stringify(invalid)); assert.equal(result.ok,false,`case ${i}`);
+      assert.equal(h.state.writes,0,`case ${i}`); assert.deepEqual(h.all(),before,`case ${i}`);
+      assert.deepEqual(h.state.vault,vault); assert.deepEqual(h.state.prefs,prefs); assert.equal(h.state.journal,'');
+      assert.deepEqual([h.state.begins,h.state.vaultWrites,h.state.preferenceWrites,h.state.journalWrites],counts);
+    }
+    h.db.prepare('UPDATE cultivate_entries SET input_json=?').run('x'.repeat(64*1024+1));
+    await assert.rejects(h.service.buildBackupJson(),/养成输入字段/); h.close();
+  });
+  await test('schema7+ requires both backpack tables and malformed rows fail before any SQL mutation or credential staging',async()=>{
     const h=harness(); await h.init(); h.seed(); const baseline=JSON.parse(await h.service.buildBackupJson());
     const mutations=[
       s=>s.tables.splice(s.tables.findIndex(t=>t.name==='backpack_items'),1),
@@ -217,10 +287,11 @@ function strictModelTypes() {
     h.close();
   });
   await test('backpack insert/delete failures, preference failures and commit failures restore the full SQLite state',async()=>{
-    for(const mode of ['insert','delete','preferences','commit','vault']) {
+    for(const mode of ['insert','draft-insert','delete','preferences','commit','vault']) {
       const h=harness(); await h.init(); h.seed(); const text=await h.service.buildBackupJson();
       const before=h.all(), prefs=clone(h.state.prefs), vault=clone(h.state.vault);
       if(mode==='insert')h.state.failInsert='backpack_items';
+      if(mode==='draft-insert')h.state.failInsert='cultivate_entries';
       if(mode==='delete')h.state.failDelete='backpack_archives';
       if(mode==='preferences')h.state.failPrefs=true;
       if(mode==='commit')h.state.failCommit=true;
@@ -237,5 +308,5 @@ function strictModelTypes() {
     await assert.rejects(h.service.buildBackupJson(),/存档归属/); h.close();
   });
   await test('production backup/UIIF/legacy pure model graph passes strict host types',strictModelTypes);
-  console.log('backup-sqlite: PASS (production v7 migration/SQLite rollback, lossless UIIF roundtrip, schema1–6 + legacy preservation, validation and no orphan snapshots)');
+  console.log('backup-sqlite: PASS (production v7/v8 migration/SQLite rollback, lossless UIIF/draft roundtrip, schema1–7 + legacy preservation, validation and no orphan snapshots)');
 })().catch(error=>{console.error(error);process.exitCode=1;});

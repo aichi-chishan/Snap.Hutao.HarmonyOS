@@ -21,7 +21,7 @@ export class CharacterListItem {
   level: number = 0;
   rarity: number = 0;
   weaponType: number = 0;
-  activedConstellationNum: number = 0;
+  activedConstellationNum: number = -1;
   /** 官方头像 URL（character/list avatar_icon 字段，米哈游 CDN） */
   icon: string = '';
   weapon: ListWeapon = new ListWeapon();
@@ -55,6 +55,7 @@ export class Constellation {
   icon: string = '';
   effect: string = '';
   isActived: boolean = false;
+  activationKnown: boolean = false;
   pos: number = 0;
 }
 
@@ -84,13 +85,15 @@ export class AvatarSkill {
 
 /** 角色详情 */
 export class CharacterDetail {
+  /** 0 means the source has not provided a depot identity. */
+  skillDepotId: number = 0;
   id: number = 0;
   name: string = '';
   element: string = '';
   level: number = 0;
   rarity: number = 0;
   fetter: number = 0;
-  activedConstellationNum: number = 0;
+  activedConstellationNum: number = -1;
   /** 官方头像 URL（detail 接口 avatar_icon 字段） */
   icon: string = '';
   weapon: DetailedWeapon = new DetailedWeapon();
@@ -99,13 +102,15 @@ export class CharacterDetail {
   selectedProperties: BaseProperty[] = [];
   /** 技能等级（detail 接口 skills 数组；战斗天赋 A/E/Q 有等级，固有天赋恒 0） */
   skills: AvatarSkill[] = [];
-  promoteLevel: number = 0;
+  promoteLevel: number = -1;
   /** 推荐圣遗物词条（Window 评分权重依据） */
   recommend: RecommendRelic = new RecommendRelic();
 }
 
 /** 详情武器 */
 export class DetailedWeapon {
+  /** Missing weapon payload differs from explicitly unequipped. */
+  equipmentState: string = 'unknown';
   name: string = '';
   mainProperty: RelicProperty = new RelicProperty();
   subProperty: RelicProperty = new RelicProperty();
@@ -114,7 +119,7 @@ export class DetailedWeapon {
   rarity: number = 0;
   level: number = 0;
   affixLevel: number = 0;
-  promoteLevel: number = 0;
+  promoteLevel: number = -1;
 }
 
 /** 头像 URL（Enka 公开源，非胡桃云；规则 UI_AvatarIcon_{id}.png） */

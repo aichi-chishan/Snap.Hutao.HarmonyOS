@@ -150,7 +150,7 @@ test('search, stable sorting and known-lock filtering never assign missing lock 
 });
 
 test('database migration and local archive creation enforce explicit UID/name; selected archive is persisted',async()=>{
-  await helper.init({});assert.equal(store.version,7);
+  await helper.init({});assert.equal(store.version,8);
   await assert.rejects(Repo.createArchive('empty',''));await assert.rejects(Repo.createArchive('','100000001'));
   first=await Repo.createArchive('主号十月','100000001');second=await Repo.createArchive('另一档','700000002');
   let archives=await Repo.getArchives();assert.equal(archives.filter(archive=>archive.isSelected).length,1);assert.equal(archives[1].isSelected,true);

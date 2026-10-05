@@ -75,11 +75,13 @@ async function main() {
     if (oldVersion === 5) {
       sqlite.exec("CREATE TABLE abyss_history (schedule_id INTEGER PRIMARY KEY,start_time INTEGER,end_time INTEGER,total_star INTEGER,raw_json TEXT,record_time INTEGER)");
       sqlite.exec("INSERT INTO abyss_history VALUES(7,100,200,36,'unattributed',1)");
+      // A real v5 database already has cultivation tables from the v3→v4 migration.
+      for (const statement of RelationalStoreHelper.MIGRATIONS[2]) sqlite.exec(statement);
       sqlite.exec('PRAGMA user_version=5');
     }
     RelationalStoreHelper.rdbStore = undefined;
     await RelationalStoreHelper.init({});
-    assert.equal(sqlStore.version, 7);
+    assert.equal(sqlStore.version, 8);
     for (const table of ['challenge_records', 'cultivate_inventory', 'backup_recovery']) {
       assert.equal(sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name=?").get(table).n, 1);
     }

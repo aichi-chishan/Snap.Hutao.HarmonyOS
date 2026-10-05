@@ -15,6 +15,7 @@ import { RegionUtil, AppConstants } from '../common/Constants';
 import { HoyolabEndpoints } from '../common/HoyolabEndpoints';
 import { Logger } from '../common/Logger';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
+import { PromoteState } from '../model/PromoteState';
 
 const TAG: string = 'CharacterService';
 const LIST_URL: string = 'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api/character/list';
@@ -319,7 +320,8 @@ export class CharacterService {
       d.promoteLevel = CharacterService.promoteLevelOf(base);
       d.rarity = CharacterService.num(base['rarity']);
       d.fetter = CharacterService.num(base['fetter']);
-      d.activedConstellationNum = CharacterService.num(base['actived_constellation_num']);
+      d.activedConstellationNum = PromoteState.parse(base['actived_constellation_num']);
+      d.skillDepotId = CharacterService.depotIdOf(base['skill_depot_id'] ?? item['skill_depot_id']);
       const detailIcon: string = String(base['avatar_icon'] ?? '');
       d.icon = detailIcon.length > 0 ? CharacterService.iconNameOf(detailIcon)
         : WikiMetaService.iconOfAvatar(d.id);
@@ -331,15 +333,25 @@ export class CharacterService {
       d.level = CharacterService.num(item['level']);
       d.promoteLevel = CharacterService.promoteLevelOf(item);
       d.rarity = CharacterService.num(item['rarity']);
+      d.activedConstellationNum = PromoteState.parse(item['actived_constellation_num']);
+      d.skillDepotId = CharacterService.depotIdOf(item['skill_depot_id']);
+      d.fetter = CharacterService.num(item['fetter']);
     }
     const w = item['weapon'] as Record<string, Object>;
+    if (w === null) {
+      d.weapon.equipmentState = 'unequipped';
+    }
     if (w !== undefined && w !== null) {
       d.weapon.id = CharacterService.num(w['id']);
       d.weapon.type = CharacterService.num(w['type']);
       d.weapon.rarity = CharacterService.num(w['rarity']);
       d.weapon.level = CharacterService.num(w['level']);
       d.weapon.affixLevel = CharacterService.num(w['affix_level']);
-      d.weapon.promoteLevel = CharacterService.num(w['promote_level']);
+      d.weapon.promoteLevel = PromoteState.parse(w['promote_level']);
+      d.weapon.equipmentState = d.weapon.id > 0 ? 'equipped' : (w['id'] === 0 ? 'unequipped' : 'unknown');
+      if (!PromoteState.validWeapon(d.weapon.level, d.weapon.promoteLevel, d.weapon.rarity)) {
+        d.weapon.promoteLevel = -1;
+      }
       d.weapon.name = String(w['name'] ?? '');
       const main: Record<string, Object> = w['main_property'] as Record<string, Object>;
       const sub: Record<string, Object> = w['sub_property'] as Record<string, Object>;
@@ -368,6 +380,7 @@ export class CharacterService {
         cell.icon = String(c['icon'] ?? '');
         cell.effect = WikiMetaService.cleanText(String(c['effect'] ?? ''));
         cell.isActived = c['is_actived'] === true;
+        cell.activationKnown = typeof c['is_actived'] === 'boolean';
         cell.pos = CharacterService.num(c['pos']);
         d.constellations.push(cell);
       }
@@ -393,7 +406,9 @@ export class CharacterService {
         const sk: AvatarSkill = new AvatarSkill();
         sk.skillId = CharacterService.num(s['skill_id']);
         sk.skillType = CharacterService.num(s['skill_type']);
-        sk.level = CharacterService.num(s['level']);
+        const rawLevel: Object = s['level'];
+        sk.level = (typeof rawLevel === 'number' || typeof rawLevel === 'string') && String(rawLevel).trim().length > 0
+          ? CharacterService.num(rawLevel) : 0;
         d.skills.push(sk);
       }
     }
@@ -453,12 +468,19 @@ export class CharacterService {
     return Number.isNaN(n) ? 0 : n;
   }
 
-  private static promoteLevelOf(item: Record<string, Object>): number {
-    const raw: Object = item['promote_level'] ?? item['avatar_promote_level'];
+  private static depotIdOf(raw: Object | undefined | null): number {
+    if (raw === undefined || raw === null) {
+      return 0;
+    }
     if ((typeof raw !== 'number' && typeof raw !== 'string') || String(raw).trim().length === 0) {
       return -1;
     }
-    const value: number = Number(raw);
-    return Number.isSafeInteger(value) && value >= 0 ? value : -1;
+    const id: number = Number(raw);
+    return Number.isSafeInteger(id) && id >= 0 ? id : -1;
+  }
+
+  private static promoteLevelOf(item: Record<string, Object>): number {
+    const raw: Object = item['promote_level'] ?? item['avatar_promote_level'];
+    return PromoteState.parse(raw);
   }
 }

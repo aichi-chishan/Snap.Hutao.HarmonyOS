@@ -151,6 +151,7 @@ const {CultivationRepo}=await import(await ets('data/repo/CultivationRepo.ets',{
   '@kit.ArkData':url('export const relationalStore={};'),
   '../db/RelationalStoreHelper':url('export const RelationalStoreHelper={getStore:()=>globalThis.__dataPort.store};'),
   '../../model/Calculate':calculateUrl,'../../common/Logger':logger,
+  '../../model/CultivationDraft':await ets('model/CultivationDraft.ets'),
 }));
 const material=(id,num)=>Object.assign(new CalItem(),{id,num,name:`material ${id}`});
 await test('cultivation saving merges into new objects and leaves input unchanged across repeated saves',async()=>{
