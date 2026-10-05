@@ -193,16 +193,28 @@ export class GameDataSnapshotStore {
     this.io.write(`${this.root}/${name}.next`, this.io.encode(JSON.stringify(pointer)));
     this.io.rename(`${this.root}/${name}.next`, `${this.root}/${name}`);
   }
+  /** Bounded readback for an ambiguous native rename error; never guesses whether commit won. */
+  publicationState(id: string): string {
+    const pointer: SnapshotPointer | undefined = this.pointer('active.json');
+    if (pointer !== undefined) { return pointer.current === id ? 'published' : 'other'; }
+    try { return this.io.exists(`${this.root}/active.json`) ? 'unknown' : 'other'; }
+    catch (_) { return 'unknown'; }
+  }
   publish(id: string, manifest: GameDataManifest, result: string[], check: () => void): void {
     this.requireReady();
     const verified: GameDataSnapshot | undefined = this.decodePrepared(result, 'stage', id);
     if (verified === undefined || JSON.stringify(verified.manifest) !== JSON.stringify(manifest)) { throw new Error('暂存清单与校验结果不一致'); }
     const pointer: SnapshotPointer = new SnapshotPointer(); pointer.current = id; pointer.previous = this.committed?.id ?? '';
     const backup: SnapshotPointer = new SnapshotPointer(); backup.current = pointer.previous;
-    check(); this.io.mkdir(`${this.root}/snapshots`); this.io.rename(this.stagingPath(id), this.snapshotPath(id));
-    check(); this.replacePointer('active.previous.json', backup);
-    check(); this.replacePointer('active.json', pointer);
-    this.committed = verified; this.committedStamp = this.stamp();
+    try {
+      check(); this.io.mkdir(`${this.root}/snapshots`); this.io.rename(this.stagingPath(id), this.snapshotPath(id));
+      check(); this.replacePointer('active.previous.json', backup);
+      check(); this.replacePointer('active.json', pointer);
+      this.committed = verified; this.committedStamp = this.stamp();
+    } catch (error) {
+      if (this.publicationState(id) === 'published') { this.committed = verified; this.committedStamp = this.stamp(); }
+      throw error as Error;
+    }
   }
   reset(): void {
     this.requireReady(); const pointer: SnapshotPointer = new SnapshotPointer();

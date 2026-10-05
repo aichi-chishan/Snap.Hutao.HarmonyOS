@@ -110,7 +110,7 @@ const table=(snapshot,name)=>snapshot.tables.find(value=>value.name===name);
 
 function strictModelTypes() {
   const virtualRoot='/backup-model-types', files=new Map();
-  for(const name of ['BackupSnapshot','LegacyBackup','BackpackData','UIIFCodec']) {
+  for(const name of ['BackupSnapshot','LegacyBackup','BackpackData','BackpackScore','ReliquaryAffixReference','UIIFCodec']) {
     files.set(`${virtualRoot}/${name}.ts`,fs.readFileSync(path.join(root,'model',name+'.ets'),'utf8'));
   }
   const options={strict:true,noEmit:true,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,skipLibCheck:true};

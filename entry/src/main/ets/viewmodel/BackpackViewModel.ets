@@ -2,6 +2,8 @@ import { BackpackArchive, BackpackFilter, BackpackImport, BackpackItem, Backpack
 import { BackpackCatalog } from '../model/BackpackCatalog';
 import { BackpackService } from '../service/BackpackService';
 import { CultivateProject } from '../data/repo/CultivationRepo';
+import { BackpackScoreEdit, BackpackScoreProfile, BackpackScoreSettings, BackpackScoring } from '../model/BackpackScore';
+import { BackpackScoreService } from '../service/BackpackScoreService';
 
 @Observed
 export class BackpackViewModel {
@@ -13,6 +15,7 @@ export class BackpackViewModel {
   loading: boolean = false;
   message: string = '';
   filter: BackpackFilter = new BackpackFilter();
+  scoreSettings: BackpackScoreSettings = new BackpackScoreSettings();
   private generation: number = 0;
   private active: boolean = true;
 
@@ -35,10 +38,49 @@ export class BackpackViewModel {
       this.projects = projects;
       this.currentId = selected?.id ?? 0;
       this.allItems = items;
-      this.applyFilter();
+      this.scoreSettings = BackpackScoreService.load();
+      this.recalculateScores();
     } catch (e) {
       if (generation === this.generation) { this.message = (e as Error).message; }
     } finally { if (generation === this.generation) { this.loading = false; } }
+  }
+
+  beginScoreEdit(): BackpackScoreEdit {
+    if (!this.active || this.loading || this.currentId <= 0) { throw new Error('请先选择背包档案'); }
+    this.scoreSettings = BackpackScoreService.load();
+    const edit: BackpackScoreEdit = new BackpackScoreEdit();
+    edit.archiveId = this.currentId;
+    edit.generation = this.generation;
+    edit.settingsRevision = this.scoreSettings.revision;
+    edit.profile = BackpackScoreService.active(this.scoreSettings);
+    return edit;
+  }
+
+  saveScore(edit: BackpackScoreEdit, profile: BackpackScoreProfile): void {
+    this.verifyScoreOwner(edit);
+    this.scoreSettings = BackpackScoreService.save(profile, edit.settingsRevision);
+    this.recalculateScores();
+  }
+
+  deleteScore(edit: BackpackScoreEdit, id: string): void {
+    this.verifyScoreOwner(edit);
+    this.scoreSettings = BackpackScoreService.remove(id, edit.settingsRevision);
+    this.recalculateScores();
+  }
+
+  private verifyScoreOwner(edit: BackpackScoreEdit): void {
+    if (!this.active || this.loading || edit.archiveId !== this.currentId || edit.generation !== this.generation) {
+      throw new Error('背包档案或页面已改变，请重新打开评分设置');
+    }
+  }
+
+  private recalculateScores(): void {
+    const profile: BackpackScoreProfile = BackpackScoreService.active(this.scoreSettings);
+    for (const item of this.allItems) {
+      if (item.kind === 'reliquary') { item.score = BackpackScoring.calculate(item.appendPropIds, profile); }
+    }
+    this.allItems = this.allItems.slice();
+    this.applyFilter();
   }
 
   currentArchive(): BackpackArchive | undefined {
