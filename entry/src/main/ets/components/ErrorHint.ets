@@ -4,8 +4,8 @@
  */
 @Component
 export struct ErrorHint {
-  text: string = '加载失败';
-  icon: string = '⚠️';
+  @Prop text: string = '';
+  @Prop icon: string = '⚠️';
   onRetry: () => void = () => {
   };
 
@@ -13,16 +13,24 @@ export struct ErrorHint {
     Column({ space: 10 }) {
       Text(this.icon)
         .fontSize(44)
-      Text(this.text)
+        .accessibilityLevel('no')
+      Text(this.text.length > 0 ? this.text : $r('app.string.common_error'))
         .fontSize(13)
         .fontColor($r('app.color.danger'))
         .textAlign(TextAlign.Center)
         .width('100%')
-      Button('重试')
-        .fontSize(13)
-        .height(32)
+      Button({ type: ButtonType.Normal }) {
+        Text($r('app.string.common_retry'))
+          .fontSize(13)
+          .fontColor($r('sys.color.font_on_primary'))
+          .textAlign(TextAlign.Center)
+      }
+        .constraintSize({ minHeight: 44 })
+        .padding({ left: 20, right: 20, top: 10, bottom: 10 })
+        .borderRadius(12)
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .hoverEffect(HoverEffect.Highlight)
+        .accessibilityText($r('app.string.common_retry'))
         .onClick(() => {
           this.onRetry();
         })

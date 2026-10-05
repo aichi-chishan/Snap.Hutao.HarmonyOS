@@ -4,7 +4,7 @@
  */
 @Component
 export struct Loading {
-  text: string = '加载中...';
+  @Prop text: string = '';
 
   build() {
     Column({ space: 10 }) {
@@ -12,9 +12,12 @@ export struct Loading {
         .width(40)
         .height(40)
         .color($r('app.color.app_primary'))
-      Text(this.text)
+        .accessibilityLevel('no')
+      Text(this.text.length > 0 ? this.text : $r('app.string.common_loading'))
         .fontSize(13)
         .fontColor($r('app.color.text_secondary'))
+        .textAlign(TextAlign.Center)
+        .width('100%')
     }
     .width('100%')
     .padding({ top: 48, bottom: 48 })
