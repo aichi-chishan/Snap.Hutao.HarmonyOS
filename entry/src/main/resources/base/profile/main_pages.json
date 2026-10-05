@@ -21,6 +21,7 @@
     "pages/WikiAvatarPage",
     "pages/WikiMonsterPage",
     "pages/WikiWeaponPage",
-    "pages/HutaoCloudPage"
+    "pages/HutaoCloudPage",
+    "pages/WishHistoryPage"
   ]
 }

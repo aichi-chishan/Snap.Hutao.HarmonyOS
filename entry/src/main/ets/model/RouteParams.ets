@@ -4,6 +4,9 @@
  */
 
 export interface AnnouncementDetailParams {
+  region?: string;
+  language?: string;
+  level?: number;
   /** 公告 id（优先用于拼米哈游官方详情页） */
   annId: number;
   /** 标题 */

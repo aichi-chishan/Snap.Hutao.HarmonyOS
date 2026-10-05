@@ -7,6 +7,8 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { AnnouncementViewModel } from '../viewmodel/AnnouncementViewModel';
 import { Announcement, AnnouncementGroup, AnnouncementType } from '../model/Announcement';
 import { AnnouncementDetailParams } from '../model/RouteParams';
+import { AnnouncementContext } from '../model/RegionalContent';
+import { RegionUtil } from '../common/Constants';
 import { MiyoliveCode } from '../model/MiyoliveCode';
 import { Loading } from '../components/Loading';
 import { EmptyState } from '../components/EmptyState';
@@ -20,13 +22,31 @@ export struct AnnouncementPage {
   /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
+  @StorageLink('currentUid') @Watch('onOwnerChanged') currentUid: string = '';
+  @StorageLink('currentUserId') @Watch('onOwnerChanged') currentUserId: number = 0;
+  private attached: boolean = false;
   @State vm: AnnouncementViewModel = new AnnouncementViewModel();
   /** 前瞻直播兑换码弹层（对齐 Windows AnnouncementPage 兑换码 Flyout） */
   @State showCodeSheet: boolean = false;
 
   aboutToAppear(): void {
-    this.vm.load().then(() => {
-    });
+    this.attached = true; this.vm.activate(); this.onOwnerChanged();
+  }
+  aboutToDisappear(): void { this.attached = false; this.vm.dispose(); }
+  onOwnerChanged(): void {
+    if (!this.attached) { return; }
+    this.showCodeSheet = false;
+    this.vm.load(AnnouncementContext.create(RegionUtil.regionOfUid(this.currentUid) || 'cn_gf01', this.vm.context.language));
+  }
+  options(names: string[]): SelectOption[] {
+    return names.map((name: string): SelectOption => { const option: SelectOption = { value: name }; return option; });
+  }
+  chooseRegion(index: number): void {
+    this.showCodeSheet = false;
+    this.vm.load(AnnouncementContext.create(AnnouncementContext.REGIONS[index], this.vm.context.language));
+  }
+  chooseLanguage(index: number): void {
+    this.vm.load(AnnouncementContext.create(this.vm.context.region, AnnouncementContext.LANGUAGES[index]));
   }
 
   toast(msg: string): void {
@@ -92,7 +112,7 @@ export struct AnnouncementPage {
       .scrollBar(BarState.Auto)
       Button('关闭')
         .fontSize(13)
-        .height(34)
+        .height(44)
         .width('100%')
         .backgroundColor($r('app.color.card_surface'))
         .fontColor($r('app.color.text_primary'))
@@ -121,7 +141,7 @@ export struct AnnouncementPage {
       if (this.vm.redeemCodes.length > 0) {
         Button('兑换码')
           .fontSize(12)
-          .height(28)
+          .height(44)
           .margin({ right: 8 })
           .backgroundColor(this.showCodeSheet ? $r('app.color.app_primary') : $r('app.color.card_surface'))
           .fontColor(this.showCodeSheet ? Color.White : $r('app.color.app_primary'))
@@ -133,11 +153,11 @@ export struct AnnouncementPage {
       }
       Button('刷新')
         .fontSize(12)
-        .height(28)
+        .height(44)
         .backgroundColor($r('app.color.app_primary'))
         .fontColor(Color.White)
         .onClick(() => {
-          this.vm.load().then(() => {
+          this.vm.load(this.vm.context, true).then(() => {
           });
         })
     }
@@ -280,6 +300,7 @@ export struct AnnouncementPage {
     .backgroundColor($r('app.color.card_surface'))
     .border({ width: 1, color: $r('app.color.card_stroke') })
     .clip(true)
+    .hoverEffect(HoverEffect.Highlight)
     .onClick(() => {
       // 优先传 annId 拼官方详情页；无 annId 时用外链；banner 供详情页正文顶部展示
       const params: AnnouncementDetailParams = {
@@ -287,6 +308,9 @@ export struct AnnouncementPage {
         title: item.title,
         url: item.url,
         banner: item.banner,
+        region: item.sourceRegion,
+        language: item.sourceLanguage,
+        level: item.sourceLevel,
       };
       router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: params });
     })
@@ -298,6 +322,21 @@ export struct AnnouncementPage {
       PageBackdrop({ embedMode: this.embedMode })
       Column() {
         this.header()
+        Flex({ wrap: FlexWrap.Wrap }) {
+          Select(this.options(AnnouncementContext.REGION_NAMES))
+            .selected(AnnouncementContext.REGIONS.indexOf(this.vm.context.region))
+            .value(AnnouncementContext.REGION_NAMES[AnnouncementContext.REGIONS.indexOf(this.vm.context.region)])
+            .margin({ right: 8, bottom: 6 }).onSelect((index: number) => this.chooseRegion(index))
+          Select(this.options(AnnouncementContext.LANGUAGE_NAMES))
+            .selected(AnnouncementContext.LANGUAGES.indexOf(this.vm.context.language))
+            .value(AnnouncementContext.LANGUAGE_NAMES[AnnouncementContext.LANGUAGES.indexOf(this.vm.context.language)])
+            .margin({ bottom: 6 }).onSelect((index: number) => this.chooseLanguage(index))
+        }.width('100%').padding({ left: 16, right: 16 })
+        Text(`官方公开公告 · ${this.vm.context.label()}`).fontSize(12).fontColor($r('app.color.text_secondary'))
+          .width('100%').padding({ left: 16, right: 16, bottom: 8 })
+        if (this.vm.message.length > 0 && this.vm.filtered.length > 0) {
+          Text(`当前保留上次结果：${this.vm.message}`).fontSize(12).fontColor($r('app.color.danger')).padding(12)
+        }
         this.categoryTabs()
       Scroll() {
         Column({ space: 10 }) {
@@ -306,7 +345,7 @@ export struct AnnouncementPage {
           } else if (this.vm.filtered.length === 0) {
             if (this.vm.message.length > 0) {
               ErrorHint({ text: this.vm.message, onRetry: () => {
-                this.vm.load().then(() => {
+                this.vm.load(this.vm.context, true).then(() => {
                 });
               } })
             } else {
@@ -318,7 +357,7 @@ export struct AnnouncementPage {
                 GridItem() {
                   this.announcementCard(item)
                 }
-              }, (item: Announcement) => `ann_${item.id}`)
+              }, (item: Announcement) => `ann_${item.sourceRegion}_${item.sourceLanguage}_${item.id}`)
             }
             .columnsTemplate(this.vm.isWide ? '1fr 1fr 1fr' : '1fr 1fr')
             .columnsGap(10)

@@ -1,3 +1,5 @@
+import { router } from '@kit.ArkUI';
+import { WishHistoryWikiParams } from '../model/WishHistory';
 import { CultivationDraftViewModel } from '../viewmodel/CultivationDraftViewModel';
 import { CultivationDraftEditor } from '../components/CultivationDraftEditor';
 /**
@@ -22,6 +24,12 @@ export struct WikiWeaponPage {
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
   @State loading: boolean = true;
+  /** Metadata and route ownership belong to this mounted page only. */
+  private active: boolean = false;
+  private loadSequence: number = 0;
+  private routeItemId: number = 0;
+  private routeRequested: boolean = false;
+  @State routeMessage: string = '';
   @State weapons: WikiWeaponMeta[] = [];
   @State materials: Map<number, MetaMaterial> = new Map();
   @State selectedId: number = 0;
@@ -63,32 +71,78 @@ export struct WikiWeaponPage {
   /** 加入计划进行中（防重复点击） */
   @State addingPlan: boolean = false;
 
-  aboutToDisappear(): void { this.draftVm.cancel(); }
+  aboutToDisappear(): void {
+    this.active = false;
+    this.loadSequence++;
+    this.valueSequence++;
+    this.draftVm.cancel();
+  }
 
   aboutToAppear(): void {
+    this.active = true;
+    this.readRouteItem();
     this.gridMode = PreferencesStore.getBool('wiki.weapon.grid', false);
     this.load();
   }
 
-  async load(): Promise<void> {
-    this.loading = true;
-    this.weapons = await WikiMetaService.getWeapons();
-    this.materials = await WikiMetaService.getMaterials();
-    // 宽屏默认展示第一件；窄屏进入列表
-    if (this.isWide && this.weapons.length > 0) {
-      this.selectedId = this.weapons[0].id;
-      this.current = this.weapons[0];
-      await this.calcAttack();
-    } else {
-      this.selectedId = 0;
-      this.current = undefined;
+  private readRouteItem(): void {
+    this.routeItemId = 0;
+    this.routeRequested = false;
+    // Embedded pages share Index's router context; it must never select a Wiki item.
+    if (this.embedMode) { return; }
+    try {
+      const params: WishHistoryWikiParams | undefined = router.getParams() as WishHistoryWikiParams | undefined;
+      if (params !== undefined && params !== null && params.itemId !== undefined) {
+        this.routeRequested = true;
+        if (typeof params.itemId === 'number' && Number.isInteger(params.itemId)
+          && params.itemId >= 10000 && params.itemId <= 99999) { this.routeItemId = params.itemId; }
+      }
+    } catch (_) {
+      this.routeRequested = true;
     }
-    this.listSource.notifyDataReload(this.weapons.slice());
-    this.loading = false;
+  }
+
+  private ownsLoad(sequence: number): boolean { return this.active && sequence === this.loadSequence; }
+
+  async load(): Promise<void> {
+    if (!this.active) { return; }
+    const sequence: number = ++this.loadSequence;
+    const requested: boolean = this.routeRequested;
+    const itemId: number = this.routeItemId;
+    this.valueSequence++;
+    this.loading = true;
+    this.routeMessage = '';
+    try {
+      const weapons: WikiWeaponMeta[] = await WikiMetaService.getWeapons();
+      if (!this.ownsLoad(sequence)) { return; }
+      const materials: Map<number, MetaMaterial> = await WikiMetaService.getMaterials();
+      if (!this.ownsLoad(sequence)) { return; }
+      this.weapons = weapons;
+      this.materials = materials;
+      // A requested unknown/invalid ID must not silently display the first unrelated item.
+      this.current = requested
+        ? weapons.find((item: WikiWeaponMeta): boolean => item.id === itemId)
+        : (this.isWide && weapons.length > 0 ? weapons[0] : undefined);
+      this.selectedId = this.current?.id ?? 0;
+      this.routeMessage = requested && this.current === undefined ? '本地暂无该武器资料，请从列表选择或更新游戏数据' : '';
+      this.listSource.notifyDataReload(weapons.slice());
+      if (this.current !== undefined) { this.onWeaponSelected(); }
+    } catch (_) {
+      if (!this.ownsLoad(sequence)) { return; }
+      this.weapons = [];
+      this.current = undefined;
+      this.selectedId = 0;
+      this.routeMessage = '无法读取本地武器资料，请重新进入后重试';
+      this.listSource.notifyDataReload([]);
+    } finally {
+      if (this.ownsLoad(sequence)) { this.loading = false; }
+    }
   }
 
   /** 点击列表行：显式赋值页面 @State，并重置数值滑条 */
   select(w: WikiWeaponMeta): void {
+    if (!this.active) { return; }
+    this.routeMessage = '';
     this.selectedId = w.id;
     this.current = w;
     this.onWeaponSelected();
@@ -96,13 +150,14 @@ export struct WikiWeaponPage {
 
   /** 依据当前选中武器+等级+突破重算攻击力 */
   async calcAttack(): Promise<void> {
+    if (!this.active) { return; }
     const sequence: number = ++this.valueSequence;
     const maxLv: number = BaseValueService.weaponMaxLevel(this.current?.rankLevel ?? 0);
     if (this.curLevel > maxLv) {
       this.curLevel = maxLv;
     }
     const attack: number = await BaseValueService.weaponAttack(this.selectedId, this.curLevel, this.curPromoted);
-    if (sequence === this.valueSequence) { this.curAttack = attack; }
+    if (this.active && sequence === this.valueSequence) { this.curAttack = attack; }
   }
 
   /** 重置滑条为选中武器状态 */
@@ -179,6 +234,10 @@ export struct WikiWeaponPage {
       PageBackdrop({ embedMode: this.embedMode })
       Column() {
       this.header()
+      if (this.routeMessage.length > 0) {
+        Text(this.routeMessage).fontSize(12).fontColor($r('app.color.text_secondary'))
+          .width('100%').padding({ left: 16, right: 16, bottom: 8 })
+      }
       if (this.loading) {
         Column({ space: 10 }) {
           LoadingProgress().width(36).height(36).color($r('app.color.app_primary'))

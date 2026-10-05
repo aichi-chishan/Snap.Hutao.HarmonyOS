@@ -7,7 +7,9 @@
 import { router } from '@kit.ArkUI';
 import { Ledger } from '../model/Ledger';
 import { LedgerIncomeSource } from '../model/Ledger';
-import { LedgerService } from '../service/LedgerService';
+import { LedgerViewModel } from '../viewmodel/LedgerViewModel';
+import { AnnouncementContext } from '../model/RegionalContent';
+import { RegionUtil } from '../common/Constants';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageHeader } from '../components/PageHeader';
 import { PageBackdrop } from '../components/PageBackdrop';
@@ -20,30 +22,25 @@ const TAG: string = 'LedgerPage';
 @Component
 export struct LedgerPage {
   @Prop embedMode: boolean = false;
-  @StorageLink('currentUid') currentUid: string = '';
-  @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
-  @State ledger: Ledger | undefined = undefined;
-  @State loading: boolean = false;
-  @State month: number = 0;
-  @State message: string = '';
+  @StorageLink('currentUid') @Watch('onOwnerChanged') currentUid: string = '';
+  @StorageLink('isLoggedIn') @Watch('onOwnerChanged') isLoggedIn: boolean = false;
+  @StorageLink('currentUserId') @Watch('onOwnerChanged') currentUserId: number = 0;
+  @State vm: LedgerViewModel = new LedgerViewModel();
+  private attached: boolean = false;
 
-  aboutToAppear(): void {
-    this.reload();
-  }
-
+  aboutToAppear(): void { this.attached = true; this.vm.activate(); this.reload(); }
+  aboutToDisappear(): void { this.attached = false; this.vm.dispose(); }
+  onOwnerChanged(): void { this.vm.clear(); if (this.attached) { this.reload(); } }
   reload(): void {
-    this.loading = true;
-    this.message = '';
-    LedgerService.getInstance().fetchMonth(this.month, this.currentUid).then((l: Ledger) => {
-      this.ledger = l;
-      if (this.month === 0) {
-        this.month = l.month > 0 ? l.month : new Date().getMonth() + 1;
-      }
-    }).catch((e: Error) => {
-      this.message = e.message;
-    }).finally(() => {
-      this.loading = false;
-    });
+    if (!this.attached || !this.isLoggedIn || this.currentUid.length === 0) { return; }
+    const uid: string = this.currentUid;
+    const userId: number = this.currentUserId;
+    this.vm.load(uid, userId, (): boolean => this.attached && this.currentUid === uid && this.currentUserId === userId && this.isLoggedIn);
+  }
+  regionLabel(): string {
+    const region: string = RegionUtil.regionOfUid(this.currentUid);
+    const index: number = AnnouncementContext.REGIONS.indexOf(region);
+    return index < 0 ? '未知区服' : AnnouncementContext.REGION_NAMES[index];
   }
 
   /** 环比文案（正=↑绿不利，负=↓）——原石收入涨为橙、跌为绿，对齐直观感受 */
@@ -69,7 +66,7 @@ export struct LedgerPage {
         .width(36)
         .height(36)
         .color($r('app.color.app_primary'))
-      Text(this.message.length > 0 ? this.message : '加载中...')
+      Text(this.vm.message.length > 0 ? this.vm.message : '加载中...')
         .fontSize(13)
         .fontColor($r('app.color.text_secondary'))
     }
@@ -117,6 +114,17 @@ export struct LedgerPage {
         .width('100%')
         .padding({ left: 16, right: 16, top: 8 })
       }
+      if (this.isLoggedIn && this.currentUid.length > 0) {
+        Row({ space: 8 }) {
+          Text(`${this.regionLabel()} · UID ${this.currentUid}`).fontSize(12).fontColor($r('app.color.text_secondary')).layoutWeight(1)
+          Button('刷新').height(44).hoverEffect(HoverEffect.Highlight).enabled(!this.vm.loading).onClick(() => this.reload())
+        }.width('100%').padding({ left: 16, right: 16, top: 6 })
+      }
+      if (this.vm.stale) {
+        Text(`上次数据 · 本次未刷新：${this.vm.message}`).fontSize(12).fontColor($r('app.color.danger')).padding(12)
+      } else if (this.vm.loading && this.vm.ledger !== undefined) {
+        Text('正在刷新札记…').fontSize(12).fontColor($r('app.color.text_secondary')).padding(8)
+      }
       if (!this.isLoggedIn) {
         this.loginGuide()
       } else if (this.currentUid.length === 0) {
@@ -135,11 +143,11 @@ export struct LedgerPage {
         }
         .width('100%')
         .padding({ top: 80, bottom: 80 })
-      } else if (this.loading && this.ledger === undefined) {
+      } else if (this.vm.loading && this.vm.ledger === undefined) {
         this.loadingView()
-      } else if (this.ledger === undefined) {
+      } else if (this.vm.ledger === undefined) {
         Column({ space: 8 }) {
-          Text(this.message.length > 0 ? this.message : '暂无札记数据')
+          Text(this.vm.message.length > 0 ? this.vm.message : '暂无札记数据')
             .fontSize(13)
             .fontColor($r('app.color.text_secondary'))
           Button('重试')
@@ -155,8 +163,8 @@ export struct LedgerPage {
             // 昵称 / UID（对齐 Windows TravelersDiaryCard 头部右侧 Uid）
             Row() {
               Blank()
-              Text(this.ledger.nickname.length > 0
-                ? `${this.ledger.nickname} · UID ${this.ledger.uid}` : `UID ${this.ledger.uid}`)
+              Text(this.vm.ledger.nickname.length > 0
+                ? `${this.vm.ledger.nickname} · UID ${this.vm.ledger.uid}` : `UID ${this.vm.ledger.uid}`)
                 .fontSize(12)
                 .fontColor($r('app.color.text_secondary'))
             }
@@ -165,17 +173,18 @@ export struct LedgerPage {
             // 月份切换（optional_month 提供可选月份，1-12 倒序）
             Scroll() {
               Row({ space: 8 }) {
-                ForEach(this.ledger.optionalMonth.length > 0 ? this.ledger.optionalMonth : [this.ledger.month],
+                ForEach(this.vm.ledger.optionalMonth.length > 0 ? this.vm.ledger.optionalMonth : [this.vm.ledger.month],
                   (m: number) => {
                     Text(`${m} 月`)
                       .fontSize(12)
-                      .fontColor(this.month === m ? Color.White : $r('app.color.text_primary'))
-                      .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+                      .fontColor(this.vm.month === m ? Color.White : $r('app.color.text_primary'))
+                      .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+                      .hoverEffect(HoverEffect.Highlight)
                       .borderRadius(14)
-                      .backgroundColor(this.month === m ? $r('app.color.app_primary') : $r('app.color.card_inner_tint'))
-                      .border({ width: 1, color: this.month === m ? $r('app.color.app_primary') : $r('app.color.divider') })
+                      .backgroundColor(this.vm.month === m ? $r('app.color.app_primary') : $r('app.color.card_inner_tint'))
+                      .border({ width: 1, color: this.vm.month === m ? $r('app.color.app_primary') : $r('app.color.divider') })
                       .onClick(() => {
-                        this.month = m;
+                        this.vm.month = m;
                         this.reload();
                       })
                   }, (m: number) => `lm_${m}`)
@@ -191,7 +200,7 @@ export struct LedgerPage {
                 Text('今日原石')
                   .fontSize(11)
                   .fontColor($r('app.color.text_secondary'))
-                Text(`◆ ${LedgerPage.fmt(this.ledger.dayData.currentPrimogems)}`)
+                Text(`◆ ${LedgerPage.fmt(this.vm.ledger.dayData.currentPrimogems)}`)
                   .fontSize(16)
                   .fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.app_primary'))
@@ -202,7 +211,7 @@ export struct LedgerPage {
                 Text('今日摩拉')
                   .fontSize(11)
                   .fontColor($r('app.color.text_secondary'))
-                Text(`◉ ${LedgerPage.fmt(this.ledger.dayData.currentMora)}`)
+                Text(`◉ ${LedgerPage.fmt(this.vm.ledger.dayData.currentMora)}`)
                   .fontSize(16)
                   .fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.text_primary'))
@@ -224,17 +233,17 @@ export struct LedgerPage {
                   .fontWeight(FontWeight.Medium)
                   .fontColor($r('app.color.app_primary'))
                 Blank()
-                Text(this.rateText(this.ledger.monthData.primogemsRate))
+                Text(this.rateText(this.vm.ledger.monthData.primogemsRate))
                   .fontSize(12)
-                  .fontColor(this.ledger.monthData.primogemsRate >= 0 ? $r('app.color.danger') : $r('app.color.success'))
+                  .fontColor(this.vm.ledger.monthData.primogemsRate >= 0 ? $r('app.color.danger') : $r('app.color.success'))
               }
               .width('100%')
-              Text(LedgerPage.fmt(this.ledger.monthData.currentPrimogems))
+              Text(LedgerPage.fmt(this.vm.ledger.monthData.currentPrimogems))
                 .fontSize(26)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.text_primary'))
                 .width('100%')
-              Text(`上月 ${LedgerPage.fmt(this.ledger.monthData.lastPrimogems)} · 等级 ${this.ledger.monthData.currentPrimogemsLevel}`)
+              Text(`上月 ${LedgerPage.fmt(this.vm.ledger.monthData.lastPrimogems)} · 等级 ${this.vm.ledger.monthData.currentPrimogemsLevel}`)
                 .fontSize(11)
                 .fontColor($r('app.color.text_secondary'))
                 .width('100%')
@@ -253,17 +262,17 @@ export struct LedgerPage {
                   .fontWeight(FontWeight.Medium)
                   .fontColor($r('app.color.text_primary'))
                 Blank()
-                Text(this.rateText(this.ledger.monthData.moraRate))
+                Text(this.rateText(this.vm.ledger.monthData.moraRate))
                   .fontSize(12)
-                  .fontColor(this.ledger.monthData.moraRate >= 0 ? $r('app.color.danger') : $r('app.color.success'))
+                  .fontColor(this.vm.ledger.monthData.moraRate >= 0 ? $r('app.color.danger') : $r('app.color.success'))
               }
               .width('100%')
-              Text(LedgerPage.fmt(this.ledger.monthData.currentMora))
+              Text(LedgerPage.fmt(this.vm.ledger.monthData.currentMora))
                 .fontSize(26)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.text_primary'))
                 .width('100%')
-              Text(`上月 ${LedgerPage.fmt(this.ledger.monthData.lastMora)}`)
+              Text(`上月 ${LedgerPage.fmt(this.vm.ledger.monthData.lastMora)}`)
                 .fontSize(11)
                 .fontColor($r('app.color.text_secondary'))
                 .width('100%')
@@ -281,7 +290,7 @@ export struct LedgerPage {
                 .fontWeight(FontWeight.Medium)
                 .fontColor($r('app.color.text_primary'))
                 .width('100%')
-              ForEach(this.ledger.monthData.groupBy, (src: LedgerIncomeSource) => {
+              ForEach(this.vm.ledger.monthData.groupBy, (src: LedgerIncomeSource) => {
                 Column({ space: 4 }) {
                   Row() {
                     Text(src.action)

@@ -1,3 +1,4 @@
+import { WishHistoryWikiParams } from '../model/WishHistory';
 import { CultivationDraftViewModel } from '../viewmodel/CultivationDraftViewModel';
 import { CultivationDraftEditor } from '../components/CultivationDraftEditor';
 /**
@@ -186,6 +187,12 @@ export struct WikiAvatarPage {
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
   @State loading: boolean = true;
+  /** Metadata and route ownership belong to this mounted page only. */
+  private active: boolean = false;
+  private loadSequence: number = 0;
+  private routeItemId: number = 0;
+  private routeRequested: boolean = false;
+  @State routeMessage: string = '';
   @State avatars: WikiAvatarMeta[] = [];
   @State materials: Map<number, MetaMaterial> = new Map();
   @State selectedId: number = 0;
@@ -238,34 +245,81 @@ export struct WikiAvatarPage {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1500 });
   }
 
-  aboutToDisappear(): void { this.draftVm.cancel(); }
+  aboutToDisappear(): void {
+    this.active = false;
+    this.loadSequence++;
+    this.calcSeq++;
+    this.draftVm.cancel();
+  }
 
   aboutToAppear(): void {
+    this.active = true;
+    this.readRouteItem();
     this.gridMode = PreferencesStore.getBool('wiki.avatar.grid', false);
     this.load();
   }
 
-  async load(): Promise<void> {
-    this.loading = true;
-    this.avatars = await WikiMetaService.getAvatars();
-    this.materials = await WikiMetaService.getMaterials();
-    // 宽屏默认展示第一个角色详情；窄屏进入列表，点击后再进详情
-    if (this.isWide && this.avatars.length > 0) {
-      this.selectedId = this.avatars[0].id;
-      this.current = this.avatars[0];
-      this.syncCurIdx();
-      this.onAvatarSelected();
-    } else {
-      this.selectedId = 0;
-      this.current = undefined;
+  private readRouteItem(): void {
+    this.routeItemId = 0;
+    this.routeRequested = false;
+    // Embedded pages share Index's router context; it must never select a Wiki item.
+    if (this.embedMode) { return; }
+    try {
+      const params: WishHistoryWikiParams | undefined = router.getParams() as WishHistoryWikiParams | undefined;
+      if (params !== undefined && params !== null && params.itemId !== undefined) {
+        this.routeRequested = true;
+        if (typeof params.itemId === 'number' && Number.isInteger(params.itemId)
+          && params.itemId >= 10000000 && params.itemId <= 99999999) { this.routeItemId = params.itemId; }
+      }
+    } catch (_) {
+      this.routeRequested = true;
     }
-    this.listSource.notifyDataReload(this.avatars.slice());
-    this.splashSource.notifyDataReload(this.avatars.slice());
-    this.loading = false;
+  }
+
+  private ownsLoad(sequence: number): boolean { return this.active && sequence === this.loadSequence; }
+
+  async load(): Promise<void> {
+    if (!this.active) { return; }
+    const sequence: number = ++this.loadSequence;
+    const requested: boolean = this.routeRequested;
+    const itemId: number = this.routeItemId;
+    this.calcSeq++;
+    this.loading = true;
+    this.routeMessage = '';
+    try {
+      const avatars: WikiAvatarMeta[] = await WikiMetaService.getAvatars();
+      if (!this.ownsLoad(sequence)) { return; }
+      const materials: Map<number, MetaMaterial> = await WikiMetaService.getMaterials();
+      if (!this.ownsLoad(sequence)) { return; }
+      this.avatars = avatars;
+      this.materials = materials;
+      // A requested unknown/invalid ID must not silently display the first unrelated item.
+      this.current = requested
+        ? avatars.find((item: WikiAvatarMeta): boolean => item.id === itemId)
+        : (this.isWide && avatars.length > 0 ? avatars[0] : undefined);
+      this.selectedId = this.current?.id ?? 0;
+      this.routeMessage = requested && this.current === undefined ? '本地暂无该角色资料，请从列表选择或更新游戏数据' : '';
+      this.syncCurIdx();
+      this.listSource.notifyDataReload(avatars.slice());
+      this.splashSource.notifyDataReload(avatars.slice());
+      if (this.current !== undefined) { this.onAvatarSelected(); }
+    } catch (_) {
+      if (!this.ownsLoad(sequence)) { return; }
+      this.avatars = [];
+      this.current = undefined;
+      this.selectedId = 0;
+      this.routeMessage = '无法读取本地角色资料，请重新进入后重试';
+      this.listSource.notifyDataReload([]);
+      this.splashSource.notifyDataReload([]);
+    } finally {
+      if (this.ownsLoad(sequence)) { this.loading = false; }
+    }
   }
 
   /** 点击列表行：显式赋值页面 @State（弃方法派生，确保详情刷新） */
   select(a: WikiAvatarMeta): void {
+    if (!this.active) { return; }
+    this.routeMessage = '';
     this.selectedId = a.id;
     this.current = a;
     this.syncCurIdx();
@@ -293,6 +347,8 @@ export struct WikiAvatarPage {
 
   /** 名片描述懒加载（NameCard.json 按大图名匹配；与 current 异步对齐，避免切换串台） */
   async loadNameCardInfo(): Promise<void> {
+    if (!this.active) { return; }
+    const sequence: number = this.loadSequence;
     const avatar: WikiAvatarMeta | undefined = this.current;
     this.ncName = '';
     this.ncDesc = '';
@@ -301,7 +357,7 @@ export struct WikiAvatarPage {
     }
     const info = await WikiMetaService.getNameCardByPic(avatar.nameCardPic);
     // 异步返回时用户可能已切到其他角色，仅在接受者仍是当前角色时应用
-    if (info !== undefined && this.current === avatar) {
+    if (this.ownsLoad(sequence) && info !== undefined && this.current === avatar) {
       this.ncName = info.name;
       this.ncDesc = info.description;
     }
@@ -375,6 +431,8 @@ export struct WikiAvatarPage {
 
   /** 依据当前角色+等级+突破重算 生命/攻击/防御/突破属性 */
   calcAvatarBase(): void {
+    if (!this.active) { return; }
+    const seq: number = ++this.calcSeq;
     const cur: WikiAvatarMeta | undefined = this.current;
     if (cur === undefined || cur.growCurves.length === 0) {
       this.baseDataMissing = true;
@@ -396,12 +454,11 @@ export struct WikiAvatarPage {
     info.defenseBase = cur.defenseBase;
     info.promoteId = cur.promoteId;
     info.growCurves = cur.growCurves;
-    const seq: number = ++this.calcSeq;
     const reqLevel: number = this.curLevel;
     const reqPromoted: boolean = this.curPromoted;
     BaseValueService.avatarBaseValues(info, reqLevel, reqPromoted).then((v: AvatarBaseValues) => {
       // 异步返回时角色/等级/突破任一变化即为过期结果，丢弃（防拖动滑条连发时旧值覆盖新值）
-      if (seq !== this.calcSeq || this.curLevel !== reqLevel || this.curPromoted !== reqPromoted) {
+      if (!this.active || seq !== this.calcSeq || this.curLevel !== reqLevel || this.curPromoted !== reqPromoted) {
         return;
       }
       if (this.current !== undefined && this.current.id === cur.id) {
@@ -487,6 +544,10 @@ export struct WikiAvatarPage {
       PageBackdrop({ embedMode: this.embedMode })
       Column() {
       this.header()
+      if (this.routeMessage.length > 0) {
+        Text(this.routeMessage).fontSize(12).fontColor($r('app.color.text_secondary'))
+          .width('100%').padding({ left: 16, right: 16, bottom: 8 })
+      }
       if (this.loading) {
         Column({ space: 10 }) {
           LoadingProgress().width(36).height(36).color($r('app.color.app_primary'))

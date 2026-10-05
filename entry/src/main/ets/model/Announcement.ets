@@ -40,6 +40,10 @@ export class AnnouncementType {
 }
 
 export class Announcement {
+  /** Request-owned origin; never inferred from whichever account is selected later. */
+  sourceRegion: string = 'cn_gf01';
+  sourceLanguage: string = 'zh-cn';
+  sourceLevel: number = 55;
   id: number = 0;
   type: number = 0;
   typeName: string = '';
