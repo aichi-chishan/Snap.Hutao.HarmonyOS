@@ -1,80 +1,149 @@
-/**
- * AutoSignInService.ets
- * 启动自动签到（对齐 Windows AutoSignInService）：
- * - 设置默认开启（AutoSignInEnabled 默认 true）
- * - 按 UID 记录：已完成服务器日 key（区服时区口径，东八）+ 上次失败时间（10 分钟冷却）+ 区服（变更重置）
- * - EntryAbility bootstrap（恢复登录态后）调用；今日已签/冷却中直接跳过
- */
+/** Automatic sign-in is always noninteractive. Manual SignInService retains foreground verification. */
 import { UserService } from './UserService';
-import { SignInService, SignInResult } from './SignInService';
+import { UserRepo } from '../data/repo/UserRepo';
+import { BackgroundTaskRepo } from '../data/repo/BackgroundTaskRepo';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
-import { RegionUtil } from '../common/Constants';
-import { ServerTime } from '../common/ServerTime';
-import { Logger } from '../common/Logger';
+import { AppContextProvider } from '../common/AppContext';
+import { RegionUtil, RetCodes } from '../common/Constants';
+import { HoyolabClient } from '../data/network/HoyolabClient';
+import { ApiResponse } from '../model/ApiResponse';
+import { User } from '../model/User';
+import { SignInInfo } from '../model/SignInInfo';
+import { BackgroundTaskGuard, BackgroundTaskKind, BackgroundTaskPolicy, BackgroundTaskResult,
+  BackgroundOperation, BackgroundTaskState } from '../model/BackgroundTask';
 
-const TAG: string = 'AutoSignIn';
-/** 失败冷却（对齐 Windows FailureCooldown = 10min） */
-const FAILURE_COOLDOWN_MS: number = 10 * 60 * 1000;
+class ForegroundSignInGuard implements BackgroundTaskGuard {
+  private user: User;
+  private uid: string;
+  private region: string;
+  private epoch: number;
+  private revision: number;
+  private deadline: number = Date.now() + BackgroundTaskPolicy.BUDGET_MS;
+  constructor(user: User, uid: string, region: string, epoch: number, revision: number) {
+    this.user = user; this.uid = uid; this.region = region; this.epoch = epoch;
+    this.revision = revision;
+  }
+  async isActive(): Promise<boolean> {
+    if (PreferencesStore.getBackupJournal().length > 0 || UserService.getInstance().sessionRevision() !== this.revision ||
+      !PreferencesStore.getAutoSignInEnabled() || Date.now() >= this.deadline ||
+      UserService.getInstance().getCurrentUser() !== this.user || PreferencesStore.getCurrentUid() !== this.uid) { return false; }
+    if ((await BackgroundTaskRepo.get(BackgroundTaskKind.SIGN_IN)).epoch !== this.epoch) { return false; }
+    const saved: User | undefined = await UserRepo.getUserById(this.user.id);
+    return saved !== undefined && BackgroundTaskPolicy.identity(saved) === BackgroundTaskPolicy.identity(this.user) &&
+      BackgroundTaskPolicy.owns(saved, this.uid, this.region) && UserService.getInstance().getCurrentUser() === this.user &&
+      PreferencesStore.getAutoSignInEnabled() && PreferencesStore.getCurrentUid() === this.uid &&
+      UserService.getInstance().sessionRevision() === this.revision && PreferencesStore.getBackupJournal().length === 0;
+  }
+}
 
 export class AutoSignInService {
   private static instance: AutoSignInService = new AutoSignInService();
+  static getInstance(): AutoSignInService { return AutoSignInService.instance; }
 
-  static getInstance(): AutoSignInService {
-    return AutoSignInService.instance;
-  }
-
-  /** 应用启动时调用：开关开启且已登录则尝试一次 */
   async bootstrapAutoSignIn(): Promise<void> {
-    if (!PreferencesStore.getAutoSignInEnabled()) {
-      return;
-    }
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined || !user.hasCookie()) {
-      return;
-    }
-    const uid: string = PreferencesStore.getCurrentUid();
-    if (uid.length === 0) {
-      return;
-    }
-    await this.runOnce(uid);
+    if (!PreferencesStore.getAutoSignInEnabled()) { return; }
+    await this.runOnce(PreferencesStore.getCurrentUid());
   }
 
-  /** 单次尝试（已完成/冷却中跳过；结果记入偏好，静默失败不抛出） */
+  /** Foreground bootstrap shares the durable per-account/UID lease with native work. */
   async runOnce(uid: string): Promise<void> {
+    const revision: number = UserService.getInstance().sessionRevision();
+    const user: User | undefined = UserService.getInstance().getCurrentUser();
+    const region: string = RegionUtil.regionOfUid(uid);
+    if (!PreferencesStore.getAutoSignInEnabled() || user === undefined || !user.hasCookie() ||
+      uid !== PreferencesStore.getCurrentUid() || !BackgroundTaskPolicy.owns(user, uid, region)) { return; }
+    try {
+      await BackgroundTaskRepo.init(AppContextProvider.getAppContext());
+      const epoch: number = (await BackgroundTaskRepo.get(BackgroundTaskKind.SIGN_IN)).epoch;
+      await this.runBackground(user, uid, region, new ForegroundSignInGuard(user, uid, region, epoch, revision));
+    } catch (e) {
+      // No UI, token exchange, permission request, credential or UID logging from automatic work.
+    }
+  }
+
+  /** Explicit settings action; clears only this owner's current server-day block, never opens auth UI. */
+  async retryCurrent(): Promise<BackgroundTaskResult> {
     if (!PreferencesStore.getAutoSignInEnabled()) {
-      return;
+      return BackgroundTaskResult.of('disabled', '请先开启启动自动签到');
+    }
+    const revision: number = UserService.getInstance().sessionRevision();
+    const user: User | undefined = UserService.getInstance().getCurrentUser();
+    const uid: string = PreferencesStore.getCurrentUid();
+    const region: string = RegionUtil.regionOfUid(uid);
+    if (user === undefined || !BackgroundTaskPolicy.owns(user, uid, region)) {
+      return BackgroundTaskResult.of('login_required', '请先登录并选择属于此账号的 UID');
     }
     try {
-      const region: string = RegionUtil.regionOfUid(uid);
-      // 区服变更：重置该 UID 进度（对齐 Windows LastRegion 处理）
-      if (PreferencesStore.getAutoSignInRegion(uid) !== region) {
-        PreferencesStore.setAutoSignInCompletedDay(uid, '');
-        PreferencesStore.setAutoSignInLastFail(uid, 0);
-        PreferencesStore.setAutoSignInRegion(uid, region);
-      }
-      const dayKey: string = `${region}:${ServerTime.date(region)}`;
-      if (PreferencesStore.getAutoSignInCompletedDay(uid) === dayKey) {
-        return;
-      }
-      const lastFail: number = PreferencesStore.getAutoSignInLastFail(uid);
-      if (lastFail > 0 && Date.now() - lastFail < FAILURE_COOLDOWN_MS) {
-        Logger.info(TAG, `cooldown, skip uid=${uid}`);
-        return;
-      }
-      const result: SignInResult = await SignInService.getInstance().sign(uid);
-      if (result.ok || result.alreadySigned) {
-        PreferencesStore.setAutoSignInCompletedDay(uid, dayKey);
-        PreferencesStore.setAutoSignInLastFail(uid, 0);
-        Logger.info(TAG, `auto sign ok uid=${uid}${result.rewardText.length > 0 ? ` ${result.rewardText}` : ''}`);
-      } else {
-        PreferencesStore.setAutoSignInLastFail(uid, Date.now());
-        Logger.warn(TAG, `auto sign fail uid=${uid} msg=${result.message}`);
-      }
-    } catch (e) {
-      // 网络异常同样进入冷却，避免每次回前台都重试失败请求。
-      PreferencesStore.setAutoSignInLastFail(uid, Date.now());
-      Logger.warn(TAG, `runOnce fail uid=${uid} ${(e as Error).message}`);
-    }
+      await BackgroundTaskRepo.init(AppContextProvider.getAppContext());
+      const epoch: number = (await BackgroundTaskRepo.get(BackgroundTaskKind.SIGN_IN)).epoch;
+      const guard: ForegroundSignInGuard = new ForegroundSignInGuard(user, uid, region, epoch, revision);
+      if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '账号或数据状态已变化，请稍后重试'); }
+      const state: BackgroundTaskState = new BackgroundTaskState();
+      state.kind = BackgroundTaskKind.SIGN_IN; state.userId = user.id; state.uid = uid; state.region = region;
+      await BackgroundTaskRepo.clearBlocked(state);
+      return await this.runBackground(user, uid, region, guard);
+    } catch (e) { return BackgroundTaskResult.of('blocked', '自动签到暂不可用，请检查本地数据或登录状态'); }
   }
 
+  /** Bound to an explicit owner. A failed/uncertain POST is checked with GET before another POST. */
+  async runBackground(user: User, uid: string, region: string, guard: BackgroundTaskGuard): Promise<BackgroundTaskResult> {
+    const day: string = BackgroundTaskPolicy.day(region);
+    const op: BackgroundOperation = await BackgroundTaskRepo.operation(BackgroundTaskKind.SIGN_IN, user.id, uid, region);
+    if (!BackgroundTaskPolicy.due(op, day, Date.now(), true)) {
+      if (op.completedDay === day) { return BackgroundTaskResult.of('already_signed', '今日已签到', day); }
+      if (op.day === day && (op.status === 'captcha' || op.status === 'login_required' || op.status === 'manual')) {
+        return BackgroundTaskResult.of(op.status, '需要手动处理，请在应用内处理后重新排队');
+      }
+      return BackgroundTaskResult.of('cooldown', '已有任务在执行或仍在冷却，等待下次调度');
+    }
+    if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止或账号选择已变化'); }
+    const token: string = `${Date.now()}-${Math.random()}`;
+    if (!await BackgroundTaskRepo.claimOperation(op, day, token, Date.now())) {
+      return BackgroundTaskResult.of('cooldown', '已有签到任务在执行，等待下次调度');
+    }
+    let result: BackgroundTaskResult = BackgroundTaskResult.of('retry', '签到未完成，等待下次调度');
+    try {
+      result = await this.signOwned(user, uid, region, guard);
+      if (!await guard.isActive()) { result = BackgroundTaskResult.of('cancelled', '任务已停止，未提交本地成功状态'); }
+    } catch (e) {
+      result = BackgroundTaskResult.of('retry', '网络或安全凭据暂不可用，等待下次调度');
+    }
+    await BackgroundTaskRepo.finishOperation(op, token, result, 30);
+    return result;
+  }
+
+  private async signOwned(user: User, uid: string, region: string, guard: BackgroundTaskGuard): Promise<BackgroundTaskResult> {
+    if (!BackgroundTaskPolicy.owns(user, uid, region) || user.cookieToken.length === 0 || user.gameRecordCookie().length === 0) {
+      return BackgroundTaskResult.of('login_required', '请在应用内补齐登录凭据后重新排队');
+    }
+    if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
+    const beforeDay: string = BackgroundTaskPolicy.day(region);
+    const response: ApiResponse = await HoyolabClient.fetchSignInfo(uid, region, user.gameRecordCookie());
+    if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
+    const blocked: BackgroundTaskResult | undefined = BackgroundTaskPolicy.resultForResponse(response);
+    if (blocked !== undefined) { return blocked; }
+    if (response.data === undefined) { return BackgroundTaskResult.of('retry', '未取得签到状态，稍后再试'); }
+    const data: Record<string, Object> = response.data as Record<string, Object>;
+    const signedFlag: Object = data['is_sign'];
+    if (signedFlag !== true && signedFlag !== false && signedFlag !== 0 && signedFlag !== 1 &&
+      signedFlag !== 'true' && signedFlag !== 'false') {
+      return BackgroundTaskResult.of('retry', '签到状态格式异常，本次未提交签到');
+    }
+    const info: SignInInfo = SignInInfo.fromInfo(response.data);
+    const day: string = /^\d{4}-\d{2}-\d{2}$/.test(info.serverDate) ? `${region}:${info.serverDate}` : beforeDay;
+    if (day !== beforeDay || BackgroundTaskPolicy.day(region) !== beforeDay) {
+      return BackgroundTaskResult.of('manual', '设备日期与服务器日期不一致，请检查系统时间后重新排队');
+    }
+    if (info.signedToday) { return BackgroundTaskResult.of('already_signed', '今日已签到', day); }
+    if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
+    const signed: ApiResponse = await HoyolabClient.signIn(uid, region, user.gameRecordCookie());
+    if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
+    const signBlocked: BackgroundTaskResult | undefined = BackgroundTaskPolicy.resultForResponse(signed);
+    if (signBlocked !== undefined) { return signBlocked; }
+    if (signed.retcode === RetCodes.ALREADY_SIGNED) { return BackgroundTaskResult.of('already_signed', '今日已签到', day); }
+    if (BackgroundTaskPolicy.day(region) !== beforeDay) {
+      return BackgroundTaskResult.of('retry', '跨日请求已结束，下次调度会先查询服务器签到状态');
+    }
+    return BackgroundTaskResult.of('success', '后台签到成功', day);
+  }
 }

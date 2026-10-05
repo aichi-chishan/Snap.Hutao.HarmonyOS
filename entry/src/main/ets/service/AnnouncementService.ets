@@ -101,8 +101,10 @@ export class AnnouncementService {
     if (!force && cached !== undefined && cached.groupsAt > 0 && Date.now() - cached.groupsAt < AnnouncementService.TTL_MS) {
       return AnnouncementService.copy(cached.groups);
     }
-    let pending: Promise<AnnouncementGroup[]> | undefined = this.lists.get(key);
-    if (pending === undefined) { pending = this.loadGroups(context); this.lists.set(key, pending); }
+    const existing: Promise<AnnouncementGroup[]> | undefined = this.lists.get(key);
+    let pending: Promise<AnnouncementGroup[]>;
+    if (existing === undefined) { pending = this.loadGroups(context); this.lists.set(key, pending); }
+    else { pending = existing; }
     try { return AnnouncementService.copy(await pending); }
     finally { if (this.lists.get(key) === pending) { this.lists.delete(key); } }
   }
@@ -140,8 +142,10 @@ export class AnnouncementService {
     if (cached !== undefined && cached.contentsAt > 0 && Date.now() - cached.contentsAt < AnnouncementService.TTL_MS && cached.contents.has(annId)) {
       return cached.contents.get(annId)!;
     }
-    let pending: Promise<Map<number, string>> | undefined = this.bodies.get(key);
-    if (pending === undefined) { pending = this.loadContents(context); this.bodies.set(key, pending); }
+    const existing: Promise<Map<number, string>> | undefined = this.bodies.get(key);
+    let pending: Promise<Map<number, string>>;
+    if (existing === undefined) { pending = this.loadContents(context); this.bodies.set(key, pending); }
+    else { pending = existing; }
     try {
       const contents: Map<number, string> = await pending;
       const content: string | undefined = contents.get(annId);

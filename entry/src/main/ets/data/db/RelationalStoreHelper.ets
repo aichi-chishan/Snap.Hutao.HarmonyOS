@@ -12,12 +12,24 @@ const TAG: string = 'DB';
 export class RelationalStoreHelper {
   static readonly DB_NAME: string = 'snap_hutao.db';
   private static rdbStore: relationalStore.RdbStore | undefined = undefined;
+  private static initializing: Promise<void> | undefined = undefined;
 
   /** 初始化数据库（应用启动时调用一次） */
   static async init(context: common.Context): Promise<void> {
     if (RelationalStoreHelper.rdbStore !== undefined) {
       return;
     }
+    if (RelationalStoreHelper.initializing === undefined) {
+      RelationalStoreHelper.initializing = RelationalStoreHelper.open(context);
+    }
+    const pending: Promise<void> = RelationalStoreHelper.initializing;
+    try { await pending; }
+    finally {
+      if (RelationalStoreHelper.initializing === pending) { RelationalStoreHelper.initializing = undefined; }
+    }
+  }
+
+  private static async open(context: common.Context): Promise<void> {
     const storeConfig: relationalStore.StoreConfig = {
       name: RelationalStoreHelper.DB_NAME,
       securityLevel: relationalStore.SecurityLevel.S1,

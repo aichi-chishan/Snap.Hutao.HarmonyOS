@@ -52,6 +52,12 @@
     ],
     "extensionAbilities": [
       {
+        "name": "HutaoWorkSchedulerExtensionAbility",
+        "srcEntry": "./ets/background/HutaoWorkSchedulerExtensionAbility.ets",
+        "type": "workScheduler",
+        "exported": false
+      },
+      {
         "name": "EntryBackupAbility",
         "srcEntry": "./ets/entrybackupability/EntryBackupAbility.ets",
         "type": "backup",

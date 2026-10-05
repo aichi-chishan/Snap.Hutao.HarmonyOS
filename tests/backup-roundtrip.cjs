@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const ts = require(process.env.TYPESCRIPT_PATH || 'typescript');
 const base = path.resolve(__dirname, '../entry/src/main/ets');
 const cache = new Map();
-let db, prefs, vault, failTable, failVault, writes, prefsFail, sessionReloads, journal, commitError;
+let db, prefs, vault, failTable, failVault, writes, prefsFail, sessionReloads, journal, commitError, fenceCalls, cancelCalls, fenceFailure, fenceWait, events, vaultWrites, rollbackError, cleanupError;
 const clone = value => JSON.parse(JSON.stringify(value));
 const columns = {
   user_accounts: ['id','mid','aid','is_oversea','display_nickname','avatar','created_at','is_selected','cookie_account_token','cookie_ltoken_ltuid','cookie_stoken_stuid'],
@@ -29,16 +29,17 @@ function query(data, sql) {
   return rs(sql.includes('LIMIT 0')?[]:clone(data[name]), columns[name]);
 }
 const store = { version:8, querySql:async sql=>query(db,sql), createTransaction: async()=> {
+  events.push('transaction');
   const staged = clone(db);
-  return { querySql:async sql=>query(staged,sql), delete:async pred=>{writes++;staged[pred.table]=[]}, insert:async(name,row)=>{writes++;if(name===failTable)throw Error('injected write failure'); staged[name].push(clone(row)); return row.id??0;}, commit:async()=>{db=staged;if(commitError)throw Error('commit status uncertain')}, rollback:async()=>{if(commitError)throw Error('transaction already closed')} };
+  return { querySql:async sql=>query(staged,sql), delete:async pred=>{writes++;staged[pred.table]=[]}, insert:async(name,row)=>{writes++;if(name===failTable)throw Error('injected write failure'); staged[name].push(clone(row)); return row.id??0;}, commit:async()=>{db=staged;if(commitError)throw Error('commit status uncertain')}, rollback:async()=>{events.push('rollback');if(rollbackError)throw Error('rollback failure');if(commitError)throw Error('transaction already closed')} };
 }};
 const mocks = {
   '@kit.ArkData': {relationalStore:{TransactionType:{IMMEDIATE:1},RdbPredicates:class {constructor(table){this.table=table}}}},
   RelationalStoreHelper:{getStore:()=>store},
-  TokenVault:{loadCookie:async id=>vault[id]??'',saveCookie:async(id,cookie)=>{if(failVault)throw Error('injected vault failure');vault[id]=cookie},removeCookie:async id=>{delete vault[id]}},
-  PreferencesStore:{KEY_CURRENT_USER_ID:'app.current_user_id',KEY_CURRENT_UID:'app.current_uid',exportPortable:()=>clone(prefs),getBackupJournal:()=>journal,saveBackupJournal:async text=>{journal=text},replacePortable:async value=>{prefs=clone(value);if(prefsFail){prefsFail=false;throw Error('injected preference failure')}},getRefreshIntervalMinutes:()=>30},
+  TokenVault:{loadCookie:async id=>vault[id]??'',saveCookie:async(id,cookie)=>{vaultWrites++;events.push('vault');if(failVault)throw Error('injected vault failure');vault[id]=cookie},removeCookie:async id=>{if(cleanupError && id===1)throw Error('cleanup failure');delete vault[id]}},
+  PreferencesStore:{KEY_CURRENT_USER_ID:'app.current_user_id',KEY_CURRENT_UID:'app.current_uid',exportPortable:()=>{events.push('preferences');return clone(prefs)},getBackupJournal:()=>journal,saveBackupJournal:async text=>{journal=text},replacePortable:async value=>{prefs=clone(value);if(prefsFail){prefsFail=false;throw Error('injected preference failure')}},getRefreshIntervalMinutes:()=>30},
   DailyNoteService:{getInstance:()=>({isTimerRunning:()=>true,stopAutoRefresh(){},startAutoRefresh(){}})},
-  UserService:{getInstance:()=>({reloadLocalSession:async()=>{sessionReloads++}})},
+  UserService:{getInstance:()=>({beginLocalSessionReplacement:async()=>{fenceCalls++;events.push('fence');if(fenceWait)await fenceWait;if(fenceFailure)throw Error('invalidation failed');events.push('drained');return 42},cancelLocalSessionReplacement:revision=>{assert.equal(revision,42);assert.equal(journal,'');events.push('cancel');cancelCalls++},reloadLocalSession:async()=>{events.push('reload');sessionReloads++}})},
   Logger:{warn(){},info(){}}
 };
 function load(name) {
@@ -54,7 +55,7 @@ const {BackupService}=load('service/BackupService');
 const {BackupSnapshotValidator}=load('model/BackupSnapshot');
 function reset(){
   db=Object.fromEntries(Object.keys(columns).map(name=>[name,[]]));
-  db.backup_recovery=[];journal='';
+  db.backup_recovery=[];journal='';fenceCalls=0;cancelCalls=0;fenceFailure=false;fenceWait=undefined;events=[];vaultWrites=0;rollbackError=false;cleanupError=false;
   db.user_accounts=[{id:1,mid:'old-mid',aid:'old-aid',is_oversea:0,display_nickname:'fixture',avatar:'',created_at:1,is_selected:1,cookie_account_token:'',cookie_ltoken_ltuid:'',cookie_stoken_stuid:''}];
   db.user_game_roles=[{id:1,user_id:1,game_uid:'100000001',region:'cn_gf01',nickname:'fixture',level:1,is_default:1,is_chosen:1}];
   db.cultivate_projects=[{id:1,name:'fixture project',created_at:1}];
@@ -69,8 +70,13 @@ function reset(){
  assert.equal(snapshot.version,2);assert.equal(snapshot.schemaVersion,8);assert.equal(snapshot.tables.length,Object.keys(columns).length);
  for(const key of ['app.device_id','app.device_fp','app.cookie','authkey','theme.password'])assert.equal(BackupSnapshotValidator.portableKey(key),false);
  for(const mutate of [s=>delete s.tables,s=>s.version=99,s=>s.schemaVersion=99,s=>s.tables.pop(),s=>s.credentials=[],s=>s.preferences['app.device_id']='forbidden',s=>s.tables[0].rows[0].unexpected='field',s=>s.tables.find(t=>t.name==='user_game_roles').rows[0].user_id=999]){
-  reset();const bad=clone(snapshot);mutate(bad);const before=clone(db);const result=await service.restoreFromText(JSON.stringify(bad));assert.equal(result.ok,false);assert.equal(writes,0);assert.deepEqual(db,before);assert.equal(vault[1],'fixture-old-cookie');
+  reset();const bad=clone(snapshot);mutate(bad);const before=clone(db);const result=await service.restoreFromText(JSON.stringify(bad));assert.equal(result.ok,false);assert.equal(writes,0);assert.deepEqual(db,before);assert.equal(vault[1],'fixture-old-cookie');assert.equal(fenceCalls,0,'invalid backup never fences session');
  }
+ reset();fenceFailure=true;const noFence=await service.restoreFromText(text);assert.equal(noFence.ok,false);assert.equal(fenceCalls,1);assert.equal(writes,0);assert.equal(vaultWrites,0);assert.equal(cancelCalls,0);assert.deepEqual(events,['fence']);
+ reset();let releaseFence;fenceWait=new Promise(resolve=>{releaseFence=resolve});const waiting=service.restoreFromText(text);while(fenceCalls===0)await new Promise(resolve=>setImmediate(resolve));assert.equal(writes,0);assert.equal(vaultWrites,0);assert.deepEqual(events,['fence']);releaseFence();assert.equal((await waiting).ok,true);assert.ok(events.indexOf('drained')<events.indexOf('preferences'));assert.ok(events.indexOf('preferences')<events.indexOf('transaction'));assert.ok(events.indexOf('transaction')<events.indexOf('vault'));assert.equal(cancelCalls,0);assert.equal(events.at(-1),'reload');
+ reset();failTable='user_game_roles';assert.equal((await service.restoreFromText(text)).ok,false);assert.equal(cancelCalls,1);assert.ok(events.indexOf('rollback')<events.indexOf('cancel'));
+ reset();failTable='user_game_roles';rollbackError=true;assert.equal((await service.restoreFromText(text)).ok,false);assert.equal(cancelCalls,0);assert.notEqual(journal,'');
+ reset();cleanupError=true;assert.equal((await service.restoreFromText(text)).ok,true);assert.equal(cancelCalls,0);assert.notEqual(journal,'');assert.equal(sessionReloads,0);cleanupError=false;await service.recoverInterruptedRestore();assert.equal(journal,'');assert.equal(sessionReloads,1);
  reset();failVault=true;assert.equal((await service.restoreFromText(text)).ok,false);assert.equal(writes,0);assert.equal(vault[1],'fixture-old-cookie');
  reset();const old=clone(db);failTable='user_game_roles';assert.equal((await service.restoreFromText(text)).ok,false);assert.deepEqual(db,old);assert.deepEqual(vault,{1:'fixture-old-cookie'});
  reset();const oldPrefs=clone(prefs);prefsFail=true;assert.equal((await service.restoreFromText(text)).ok,false);assert.deepEqual(prefs,oldPrefs);assert.equal(db.user_accounts[0].id,1);assert.deepEqual(vault,{1:'fixture-old-cookie'});

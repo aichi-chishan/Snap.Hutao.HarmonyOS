@@ -1,0 +1,143 @@
+{
+  "locale": "fr",
+  "articles": [
+    {
+      "id": "accounts",
+      "title": "Comptes, connexion et vérification",
+      "summary": "Vérifiez d’abord le compte, le serveur et le personnage. Des identifiants expirés nécessitent une nouvelle connexion ; ouvrir l’aide ne lit aucune donnée de compte.",
+      "steps": [
+        "Dans Comptes et données, vérifiez le compte actuel et le personnage par défaut, puis revenez actualiser manuellement la page en ligne. Choisir un compte ici ne change pas celui du client du jeu.",
+        "Si la session expire, reconnectez-vous avec une méthode prise en charge sur la page de connexion. Effectuez vous-même le CAPTCHA et les vérifications supplémentaires sur leur écran ; évitez les tentatives rapides et répétées.",
+        "Si le serveur ou le personnage diffère, sélectionnez d’abord le bon personnage. La région des annonces publiques est indépendante du compte personnel.",
+        "Ne joignez jamais de cookies, mots de passe, codes de vérification ou liens authkey à un signalement. Les diagnostics ne contiennent aucune de ces données."
+      ],
+      "keywords": "login account region UID cookie captcha 登录 登入 帳號 账号 验证 credentials contraseña şifre điện thoại",
+      "route": "pages/UserPage"
+    },
+    {
+      "id": "import",
+      "title": "Archives locales et importation de fichiers",
+      "summary": "Vœux, succès et inventaire utilisent des formats différents. Vérifiez format, destination et aperçu avant d’autoriser l’écriture.",
+      "steps": [
+        "Utilisez UIGF pour les vœux, UIAF pour les succès et UIIF v1.0 pour l’inventaire. Renommer une extension ne convertit pas le fichier ; conservez d’abord une copie de l’original.",
+        "Pour les vœux, vérifiez dans l’aperçu l’UID, le nombre d’entrées et les archives sélectionnées. Une sélection vide ne signifie pas tout importer ; sélectionnez explicitement les archives voulues.",
+        "L’importation de l’inventaire remplace l’archive locale choisie. Vérifiez d’abord aperçu et destination. Elle ne lit pas la mémoire du jeu et ne modifie pas les objets en jeu.",
+        "Si un fichier est endommagé ou si son format ou sa taille n’est pas pris en charge, vérifiez l’outil d’exportation et sa version, puis réexportez un fichier compatible. Fichiers bruts et erreurs peuvent contenir des données privées ; ne les publiez pas directement."
+      ],
+      "keywords": "UIGF UIAF UIIF JSON import export inventory wishes archive 导入 导出 匯入 匯出 背包 成就 祈愿 祈願",
+      "route": ""
+    },
+    {
+      "id": "data",
+      "title": "Mise à jour des données et repli hors ligne",
+      "summary": "Les métadonnées intégrées sont disponibles hors ligne. Les mises à jour ne sont activées qu’après validation ; une interruption ou un échec n’est pas un succès.",
+      "steps": [
+        "Consultez la section de mise à jour des données du jeu dans les paramètres, puis lancez explicitement la mise à jour. En cas de panne réseau, conservez les données utilisables et vérifiez la connexion avant de réessayer.",
+        "La progression du téléchargement n’est pas une version activée. Attendez la fin ; après une annulation, laissez l’opération se terminer avant d’en lancer une autre.",
+        "Si une icône ou une description manque, vérifiez la version des données et rouvrez la page. Ne supprimez ni base de données ni identifiants pour réparer une ressource manquante.",
+        "La recherche d’aide est entièrement hors ligne. La langue ne concerne que l’aide et les messages généraux intégrés, pas toutes les pages ni les textes du jeu provenant de tiers ; les ID stables importés ou exportés ne changent jamais."
+      ],
+      "keywords": "metadata cache update offline rollback checksum 图鉴 圖鑑 数据 資料 更新 缓存 快取",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "backups",
+      "title": "Sauvegardes, restauration et reprise",
+      "summary": "Les sauvegardes complètes peuvent contenir des identifiants et des données personnelles du jeu. Elles diffèrent des diagnostics sans données de compte.",
+      "steps": [
+        "Exportez explicitement une sauvegarde dans les paramètres et conservez-la dans un endroit sûr que vous contrôlez. Ne joignez jamais une sauvegarde complète à un signalement public ; préparez une copie expurgée distincte avant de partager.",
+        "Avant de restaurer, exportez vos données actuelles et vérifiez source, version et avertissement de remplacement. La restauration modifie les données locales et nécessite votre confirmation.",
+        "Si la sauvegarde provient d’une version plus récente, mettez d’abord l’application à jour. Ne réduisez pas manuellement le numéro de version ; récupérez les fichiers endommagés depuis une sauvegarde fiable.",
+        "Si une restauration interrompue doit être reprise, redémarrez l’application pour que la récupération au démarrage traite le journal. Ne videz pas manuellement la base ni les identifiants. En cas de nouvel échec, générez des diagnostics sans données de compte et décrivez les étapes."
+      ],
+      "keywords": "backup restore recovery credentials password 备份 还原 恢复 備份 還原 復原",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "daily-note",
+      "title": "Notes en temps réel, widgets et rappels",
+      "summary": "Les widgets affichent le dernier instantané enregistré, sans garantie de données en direct. Vérifiez l’heure d’actualisation avant de vous y fier.",
+      "steps": [
+        "Revenez dans l’application, vérifiez compte et personnage, puis actualisez manuellement les notes. Vérifiez l’heure du widget pour ne pas confondre un ancien instantané avec l’état actuel du jeu.",
+        "Activez les rappels selon vos besoins dans les paramètres et répondez à la demande d’autorisation système. Après un refus, vous décidez d’une éventuelle autorisation ultérieure dans les paramètres système.",
+        "Le système peut limiter l’actualisation en arrière-plan et l’horaire des rappels. L’application ne garantit ni exécution continue en arrière-plan ni rappels à la seconde près.",
+        "Après un changement de compte, attendez une actualisation réussie du nouveau personnage, puis vérifiez le widget. Un pseudonyme identique ne suffit pas à identifier le même personnage."
+      ],
+      "keywords": "resin widget reminder background refresh daily note notification 便笺 便箋 桌面 卡片 提醒 树脂 樹脂",
+      "route": ""
+    },
+    {
+      "id": "devices",
+      "title": "Limites des appareils et accès au jeu",
+      "summary": "Pour téléphones, tablettes et appareils 2 en 1 à partir de l’API 24. La disposition dépend de la largeur du contenu ; certains effets exigent une API plus récente.",
+      "steps": [
+        "Après redimensionnement ou rotation, une zone étroite peut rester sur une colonne. Deux colonnes dépendent de la largeur du contenu, pas du nom de l’appareil. Thème et animations réduites sont dans les paramètres.",
+        "Pour lancer un jeu, configurez une URI ou un accès Bundle/Ability publiquement documenté par le fournisseur. Vérifiez sa source et lancez-le explicitement. L’application ne recherche pas arbitrairement les jeux installés.",
+        "Un échec de lancement peut indiquer une application absente, un accès modifié ou privé. Il ne prouve pas que le jeu est désinstallé ; vérifiez avec la méthode d’installation ou de lancement du fournisseur.",
+        "Utilisez le client officiel pour installer, réparer, prétélécharger ou changer le compte du jeu. Cet outil n’injecte aucun processus et ne lit pas la mémoire du jeu ; les fonctions propres au bureau ne sont pas garanties sur HarmonyOS."
+      ],
+      "keywords": "HarmonyOS API24 API26 phone tablet 2in1 launcher device launch 游戏 啟動 启动 设备 裝置",
+      "route": "pages/LaunchGamePage"
+    },
+    {
+      "id": "privacy",
+      "title": "Diagnostics, confidentialité et signalements",
+      "summary": "Vérifiez l’aperçu avant de le copier explicitement. Les diagnostics ne lisent jamais identifiants, UID, comptes réseau ou journaux bruts et ne sont jamais envoyés automatiquement.",
+      "steps": [
+        "Sélectionnez l’article et le type de problème, puis choisissez Générer l’aperçu du diagnostic. Par défaut, il contient uniquement des codes fixes de fonction et de résultat ainsi que l’heure de génération.",
+        "Vous pouvez ajouter version de l’application, niveau d’API, catégorie d’appareil et thème. Ces champs autorisés ne sont lus qu’à la génération. Numéros de série, identifiants complets du système et données de compte sont exclus.",
+        "Vérifiez l’aperçu avant de le copier dans le presse-papiers. Le système ou d’autres applications autorisées peuvent le lire ; cette page ne lit jamais son contenu existant. Quitter la page supprime l’aperçu.",
+        "Pour signaler un problème au projet, décrivez séparément les étapes de reproduction et les résultats attendu et réel. Vérifiez vos textes et captures ; ne joignez ni cookies, UID, sauvegardes ni liens de connexion."
+      ],
+      "keywords": "diagnostics feedback clipboard privacy sanitized export cookie token 诊断 診斷 隐私 隱私 剪贴板 剪貼簿",
+      "route": ""
+    }
+  ],
+  "labels": {
+    "title": "Aide et diagnostics",
+    "search": "Rechercher un problème, une fonction ou un format de fichier",
+    "scope": "La langue concerne uniquement l’aide et les messages généraux intégrés. Le reste de l’interface et les textes du jeu gardent leur langue source.",
+    "fallback": "La langue de votre système n’est pas encore prise en charge. L’aide s’affiche en anglais.",
+    "system": "Suivre le système",
+    "language": "Langue de l’aide",
+    "empty": "Aucun article trouvé. Essayez une fonction ou des mots comme UIGF ou sauvegarde.",
+    "choose": "Sélectionnez un article pour voir les étapes",
+    "back": "Tous les articles",
+    "open": "Ouvrir la page associée",
+    "diagnostics": "Aperçu du diagnostic",
+    "privacy": "Champs autorisés uniquement. Aucune lecture des comptes, UID, identifiants, presse-papiers ou journaux ; aucun envoi automatique.",
+    "environment": "Inclure version, API, catégorie d’appareil et thème (lus à la génération)",
+    "generate": "Générer l’aperçu du diagnostic",
+    "copy": "Copier l’aperçu vérifié",
+    "clear": "Supprimer l’aperçu",
+    "problem": "Choisir le type de problème (sans correction automatique)",
+    "general": "Autre échec d’opération",
+    "network": "Réseau indisponible",
+    "permission": "Problème d’autorisation",
+    "file": "Fichier non valide",
+    "login": "Session expirée",
+    "unsupported": "Opération indisponible",
+    "readFirst": "Vérifiez d’abord. Copier écrit dans le presse-papiers du système et n’envoie aucun signalement.",
+    "local": "Aide hors ligne sur cet appareil · Aucune connexion requise"
+  },
+  "outcomes": {
+    "None": "",
+    "Preparing": "Préparation en cours. Veuillez patienter.",
+    "Ready": "Prêt. Vérifiez l’aperçu avant de continuer.",
+    "Cancelled": "Annulé. Vérifiez l’état actuel de la page avant de réessayer.",
+    "InvalidFile": "Fichier non valide ou non pris en charge. Vérifiez format, taille et version d’exportation.",
+    "ImportFailed": "Importation inachevée. Vérifiez le fichier et l’archive de destination avant de réessayer.",
+    "ImportComplete": "Importation terminée : {count} entrées ajoutées.",
+    "ExportFailed": "Exportation inachevée. Vérifiez le droit d’écriture à destination et réessayez.",
+    "ExportComplete": "Exportation terminée. Conservez le fichier en lieu sûr.",
+    "Busy": "Une opération est en cours. Attendez sa fin ou annulez-la d’abord.",
+    "NetworkUnavailable": "Réseau indisponible. Vérifiez la connexion et réessayez manuellement.",
+    "PermissionRequired": "Une autorisation système est nécessaire. Examinez la demande et décidez de l’accorder ou non.",
+    "LoginExpired": "La session a peut-être expiré. Vérifiez compte et serveur, puis reconnectez-vous.",
+    "Unsupported": "Cette opération est actuellement indisponible. Consultez les limites des appareils et l’aide.",
+    "CopyComplete": "Copié. Vérifiez à nouveau le contenu avant de le partager.",
+    "CopyFailed": "Copie impossible. Vérifiez l’accès au presse-papiers système et réessayez.",
+    "Failed": "L’opération n’a pas abouti. Consultez l’aide associée et réessayez manuellement.",
+    "LocaleFailed": "Le réglage de langue n’a pas été appliqué. Réessayez plus tard."
+  }
+}

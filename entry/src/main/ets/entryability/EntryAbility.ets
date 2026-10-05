@@ -1,4 +1,4 @@
-import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
+import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, common } from '@kit.AbilityKit';
 import { bundleManager } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { ComponentContent, UIContext, display, window } from '@kit.ArkUI';
@@ -6,6 +6,7 @@ import { RelationalStoreHelper } from '../data/db/RelationalStoreHelper';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { BackupService } from '../service/BackupService';
 import { UserService } from '../service/UserService';
+import { BackgroundTaskService } from '../service/BackgroundTaskService';
 import { NotificationHelper } from '../data/local/NotificationHelper';
 import { DailyNoteService } from '../service/DailyNoteService';
 import { AutoSignInService } from '../service/AutoSignInService';
@@ -18,6 +19,8 @@ const DOMAIN = 0x4E50;
 const TAG = 'EntryAbility';
 
 export default class EntryAbility extends UIAbility {
+  private static runtimeInitialization: Promise<void> | undefined = undefined;
+  private static runtimeReady: boolean = false;
   private windowStage: window.WindowStage | undefined = undefined;
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -201,30 +204,60 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
-  private static async bootstrap(ability: EntryAbility, windowStage: window.WindowStage): Promise<void> {
-    try {
-      AppContextProvider.init(ability.context);
-      await PreferencesStore.init(ability.context);
-      // 启动次数自增（主页欢迎语文案，对齐 Windows LaunchTimes）
-      PreferencesStore.bumpLaunchTimes();
-      await RelationalStoreHelper.init(ability.context);
-      await BackupService.getInstance().recoverInterruptedRestore();
-      // Pin one verified cohort before any metadata consumer or page is created.
-      await GameDataService.initializeSnapshot();
-      await NotificationHelper.init();
-      // 恢复登录态（预登录态）：AppStorage currentUser/currentUid/isLoggedIn
-      await UserService.getInstance().restoreSession();
-      // 启动自动签到（默认开启；今日已签/失败冷却中静默跳过，对齐 Windows AutoSignInService）
-      AutoSignInService.getInstance().bootstrapAutoSignIn().catch((e: Error) => {
-        hilog.warn(DOMAIN, TAG, 'auto sign in fail: %{public}s', e.message);
-      });
-      // 便笺自动刷新：按偏好启动定时器，缓存过期则后台补一次（不 await，避免阻塞首帧）
-      DailyNoteService.getInstance().bootstrapAutoRefresh().catch((e: Error) => {
-        hilog.warn(DOMAIN, TAG, 'bootstrap auto refresh fail: %{public}s', e.message);
-      });
-    } catch (e) {
-      hilog.error(DOMAIN, TAG, 'init fail: %{public}s', JSON.stringify(e));
+  /** One process-wide initialization, shared by repeated window creation. */
+  private static async initializeRuntime(context: common.UIAbilityContext): Promise<void> {
+    if (EntryAbility.runtimeInitialization === undefined) {
+      EntryAbility.runtimeInitialization = EntryAbility.prepareRuntime(context);
     }
+    const pending: Promise<void> = EntryAbility.runtimeInitialization;
+    try { await pending; }
+    catch (e) {
+      if (EntryAbility.runtimeInitialization === pending) { EntryAbility.runtimeInitialization = undefined; }
+      if (e instanceof Error) { throw e; } throw new Error('应用运行环境初始化失败');
+    }
+  }
+
+  private static async prepareRuntime(context: common.UIAbilityContext): Promise<void> {
+    AppContextProvider.init(context);
+    await PreferencesStore.init(context);
+    PreferencesStore.bumpLaunchTimes();
+    await RelationalStoreHelper.init(context);
+    await BackgroundTaskService.init(context);
+    // Install before journal repair or any session restoration. A failed fence prevents
+    // its dependent account mutation; normal cold start preserves the original opt-in.
+    UserService.getInstance().setSessionInvalidationHook(async (reason: string): Promise<boolean> => {
+      try {
+        if (reason === 'logout' || reason === 'delete' || reason === 'localReplacement') {
+          await BackgroundTaskService.reset();
+          await DailyNoteService.getInstance().clearCardSnapshot();
+          return true;
+        }
+        if (!await BackgroundTaskService.stopAndInvalidate()) { return false; }
+        await DailyNoteService.getInstance().clearCardSnapshot();
+        return true;
+      } catch (e) {
+        hilog.warn(DOMAIN, TAG, 'background session fence failed');
+        return false;
+      }
+    });
+    await BackupService.getInstance().recoverInterruptedRestore();
+    await GameDataService.initializeSnapshot();
+    await NotificationHelper.init();
+    const restored: boolean = await UserService.getInstance().restoreSession();
+    if (restored) { await BackgroundTaskService.reconcile(); }
+    EntryAbility.runtimeReady = true;
+    // These foreground preferences remain independent from explicit OS background opt-in.
+    AutoSignInService.getInstance().bootstrapAutoSignIn().catch((e: Error) => {
+      hilog.warn(DOMAIN, TAG, 'auto sign in fail: %{public}s', e.message);
+    });
+    DailyNoteService.getInstance().bootstrapAutoRefresh().catch((e: Error) => {
+      hilog.warn(DOMAIN, TAG, 'bootstrap auto refresh fail: %{public}s', e.message);
+    });
+  }
+
+  private static async bootstrap(ability: EntryAbility, windowStage: window.WindowStage): Promise<void> {
+    try { await EntryAbility.initializeRuntime(ability.context); }
+    catch (e) { hilog.error(DOMAIN, TAG, 'init fail: %{public}s', JSON.stringify(e)); }
     try {
       // 恢复流程可能替换偏好；首次创建页面前读取最终值，避免首帧播放旧动效。
       Motion.setReducedMotion(PreferencesStore.getReduceMotionEnabled());
@@ -278,6 +311,12 @@ export default class EntryAbility extends UIAbility {
   onForeground(): void {
     AppStorage.setOrCreate('appForeground', true);
     hilog.info(DOMAIN, TAG, 'Ability onForeground');
+    if (!EntryAbility.runtimeReady) { return; }
+    if (UserService.getInstance().getCurrentUser() !== undefined) {
+      BackgroundTaskService.reconcile().catch(() => {
+        hilog.warn(DOMAIN, TAG, 'foreground background scheduling failed');
+      });
+    }
     // 回前台：定时器在后台可能被系统冻结，重新对齐并按需补刷（缓存超过刷新间隔才拉）
     DailyNoteService.getInstance().bootstrapAutoRefresh().catch((e: Error) => {
       hilog.warn(DOMAIN, TAG, 'foreground auto refresh fail: %{public}s', e.message);

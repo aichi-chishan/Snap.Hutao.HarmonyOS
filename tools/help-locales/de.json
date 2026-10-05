@@ -1,0 +1,143 @@
+{
+  "locale": "de",
+  "articles": [
+    {
+      "id": "accounts",
+      "title": "Konten, Anmeldung und Verifizierung",
+      "summary": "Prüfe zuerst Konto, Server und Spielfigur. Abgelaufene Zugangsdaten erfordern eine neue Anmeldung; das Öffnen der Hilfe liest keine Kontodaten.",
+      "steps": [
+        "Prüfe unter Konten und Daten das aktuelle Konto und die Standardspielfigur. Kehre danach zur Online-Seite zurück und aktualisiere manuell. Die Kontowahl hier wechselt nicht das Konto im Spielclient.",
+        "Melde dich bei abgelaufener Sitzung mit einer unterstützten Methode auf der Anmeldeseite erneut an. Löse CAPTCHA und zusätzliche Prüfungen selbst im Prüfungsbildschirm; vermeide schnelle Wiederholungen.",
+        "Wähle bei abweichendem Server oder Charakter zuerst die richtige Spielfigur. Die Region öffentlicher Ankündigungen ist vom persönlichen Konto unabhängig.",
+        "Sende niemals Cookies, Passwörter, Bestätigungscodes oder authkey-Links mit einem Fehlerbericht. Die Diagnose enthält diese Angaben nicht."
+      ],
+      "keywords": "login account region UID cookie captcha 登录 登入 帳號 账号 验证 credentials contraseña şifre điện thoại",
+      "route": "pages/UserPage"
+    },
+    {
+      "id": "import",
+      "title": "Lokale Archive und Dateiimport",
+      "summary": "Gebete, Erfolge und Inventar verwenden unterschiedliche Formate. Prüfe Format, Ziel und Vorschau, bevor du Schreibvorgänge bestätigst.",
+      "steps": [
+        "Nutze UIGF für Gebete, UIAF für Erfolge und UIIF v1.0 für das Inventar. Eine geänderte Dateiendung konvertiert nichts; bewahre zuerst eine Kopie des Originals auf.",
+        "Prüfe beim Gebetsimport UID, Datensatzanzahl und ausgewählte Archive in der Vorschau. Eine leere Auswahl bedeutet nicht alles importieren; wähle die gewünschten Archive ausdrücklich aus.",
+        "Der Inventarimport ersetzt das ausgewählte lokale Archiv. Prüfe Vorschau und Ziel. Er liest keinen Spielspeicher und verändert keine Gegenstände im Spiel.",
+        "Prüfe bei beschädigten Dateien oder nicht unterstütztem Format oder Umfang das Exportprogramm und seine Version. Exportiere erneut kompatibel. Rohdateien und Fehlerdetails können private Daten enthalten; veröffentliche sie nicht direkt."
+      ],
+      "keywords": "UIGF UIAF UIIF JSON import export inventory wishes archive 导入 导出 匯入 匯出 背包 成就 祈愿 祈願",
+      "route": ""
+    },
+    {
+      "id": "data",
+      "title": "Spieldaten aktualisieren und offline nutzen",
+      "summary": "Mitgelieferte Metadaten sind offline verfügbar. Updates werden erst nach Prüfung aktiviert; Abbruch oder Fehler bedeuten keinen Erfolg.",
+      "steps": [
+        "Prüfe den Bereich für Spieldatenupdates in den Einstellungen und starte das Update bewusst. Behalte bei Netzwerkfehlern die nutzbaren Daten und prüfe die Verbindung vor dem nächsten Versuch.",
+        "Downloadfortschritt ist keine aktivierte Version. Warte auf den Abschluss; lasse nach einem Abbruch den laufenden Vorgang enden, bevor du einen neuen startest.",
+        "Prüfe bei fehlenden Symbolen oder Beschreibungen die Datenversion und öffne die Seite erneut. Lösche zur Behebung fehlender Ressourcen weder Datenbank noch Zugangsdaten.",
+        "Die Hilfesuche ist vollständig offline. Die Spracheinstellung gilt nur für Hilfe und eingebundene allgemeine Meldungen, nicht alle Seiten oder fremde Spieltexte. Stabile importierte und exportierte IDs bleiben unverändert."
+      ],
+      "keywords": "metadata cache update offline rollback checksum 图鉴 圖鑑 数据 資料 更新 缓存 快取",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "backups",
+      "title": "Sicherung, Wiederherstellung und Unterbrechungen",
+      "summary": "Vollständige Sicherungen können Zugangsdaten und persönliche Spieldaten enthalten. Sie unterscheiden sich von kontofreien Diagnosen.",
+      "steps": [
+        "Exportiere eine Sicherung in den Einstellungen und verwahre sie an einem sicheren Ort unter deiner Kontrolle. Hänge sie nie an einen öffentlichen Fehlerbericht; erstelle vor dem Teilen eine gesonderte bereinigte Kopie.",
+        "Exportiere vor einer Wiederherstellung deine aktuellen Daten und prüfe Herkunft, Version und Ersetzungswarnung der Sicherung. Die Wiederherstellung verändert lokale Daten und erfordert deine Bestätigung.",
+        "Aktualisiere zuerst die App, wenn die Sicherung aus einer neueren Version stammt. Senke die Versionsnummer nicht manuell; beschaffe beschädigte Dateien erneut aus einer vertrauenswürdigen Sicherung.",
+        "Starte bei unterbrochener Wiederherstellung die App neu, damit die Startwiederherstellung das Journal verarbeitet. Lösche Datenbank oder Zugangsdaten nicht selbst. Erstelle bei weiteren Fehlern eine kontofreie Diagnose und beschreibe die Schritte."
+      ],
+      "keywords": "backup restore recovery credentials password 备份 还原 恢复 備份 還原 復原",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "daily-note",
+      "title": "Echtzeitnotizen, Widgets und Erinnerungen",
+      "summary": "Widgets zeigen den zuletzt gespeicherten Datenstand, keine garantiert aktuellen Daten. Prüfe zuerst den Aktualisierungszeitpunkt.",
+      "steps": [
+        "Kehre zur App zurück, prüfe Konto und Spielfigur und aktualisiere die Echtzeitnotizen manuell. Prüfe die Widget-Zeit, damit du alte Daten nicht für den aktuellen Spielzustand hältst.",
+        "Aktiviere Erinnerungen bei Bedarf in den Einstellungen und bearbeite die Systemabfrage. Nach einer Ablehnung entscheidest du selbst über eine spätere Freigabe in den Systemeinstellungen.",
+        "Das System kann Hintergrundaktualisierungen und Erinnerungszeiten einschränken. Dauerhafte Hintergrundausführung und sekundengenaue Erinnerungen kann diese App nicht garantieren.",
+        "Warte nach einem Kontowechsel auf die erfolgreiche Aktualisierung der neuen Spielfigur und prüfe dann das Widget. Gleiche Spitznamen allein belegen keine identische Spielfigur."
+      ],
+      "keywords": "resin widget reminder background refresh daily note notification 便笺 便箋 桌面 卡片 提醒 树脂 樹脂",
+      "route": ""
+    },
+    {
+      "id": "devices",
+      "title": "Gerätegrenzen und Spielzugänge",
+      "summary": "Für Telefone, Tablets und 2-in-1-Geräte ab API 24. Das Layout folgt der Inhaltsbreite; einige Effekte benötigen eine neuere API.",
+      "steps": [
+        "Nach Größenänderung oder Drehung kann schmaler Inhalt einspaltig bleiben. Zwei Spalten hängen von der Inhaltsbreite ab, nicht vom Gerätenamen. Thema und reduzierte Bewegung findest du in den Einstellungen.",
+        "Konfiguriere zum Spielstart eine vom Anbieter öffentlich dokumentierte URI oder einen Bundle/Ability-Zugang. Prüfe die Quelle und starte ausdrücklich. Die App durchsucht nicht beliebige installierte Spiele.",
+        "Ein fehlgeschlagener Start kann eine fehlende App, einen geänderten oder einen privaten Zugang bedeuten. Er beweist keine Deinstallation; prüfe die Installations- oder Startmethode des Anbieters.",
+        "Nutze den offiziellen Client für Installation, Reparatur, Vorabdownload und Spielkontowechsel. Dieses Werkzeug injiziert keine Prozesse und liest keinen Spielspeicher; reine Desktopfunktionen sind unter HarmonyOS nicht garantiert."
+      ],
+      "keywords": "HarmonyOS API24 API26 phone tablet 2in1 launcher device launch 游戏 啟動 启动 设备 裝置",
+      "route": "pages/LaunchGamePage"
+    },
+    {
+      "id": "privacy",
+      "title": "Diagnose, Datenschutz und Fehlerberichte",
+      "summary": "Prüfe die Vorschau vor dem bewussten Kopieren. Die Diagnose liest keine Zugangsdaten, UIDs, Online-Kontodaten oder Rohprotokolle und lädt nichts automatisch hoch.",
+      "steps": [
+        "Wähle den passenden Artikel und Problemtyp und dann Diagnosevorschau erstellen. Standardmäßig sind nur feste Funktions- und Ergebniscodes sowie die Erstellungszeit enthalten.",
+        "Optional kannst du App-Version, API-Stufe, Gerätekategorie und Thema einbeziehen. Diese erlaubten Felder werden erst beim Erstellen gelesen. Seriennummern, vollständige Systemkennungen und Kontodaten sind ausgeschlossen.",
+        "Prüfe die Vorschau vor dem Kopieren in die Zwischenablage. Das System oder berechtigte Apps können diese lesen; diese Seite liest keine vorhandenen Inhalte. Beim Verlassen wird die Vorschau verworfen.",
+        "Beschreibe bei einem Projektfehler zusätzlich Reproduktionsschritte sowie erwartetes und tatsächliches Ergebnis. Prüfe eigene Texte und Bilder; füge keine Cookies, UIDs, Sicherungen oder Anmeldelinks bei."
+      ],
+      "keywords": "diagnostics feedback clipboard privacy sanitized export cookie token 诊断 診斷 隐私 隱私 剪贴板 剪貼簿",
+      "route": ""
+    }
+  ],
+  "labels": {
+    "title": "Hilfe und Diagnose",
+    "search": "Problem, Funktion oder Dateiformat suchen",
+    "scope": "Die Sprache gilt nur für Hilfe und eingebundene allgemeine Meldungen. Andere Oberflächen und Spieltexte behalten ihre Ausgangssprache.",
+    "fallback": "Deine Systemsprache wird noch nicht unterstützt. Die Hilfe wird auf Englisch angezeigt.",
+    "system": "Systemsprache verwenden",
+    "language": "Hilfesprache",
+    "empty": "Keine Artikel gefunden. Suche nach einer Funktion oder Begriffen wie UIGF oder Sicherung.",
+    "choose": "Wähle einen Artikel für konkrete Schritte",
+    "back": "Alle Artikel",
+    "open": "Zugehörige Seite öffnen",
+    "diagnostics": "Diagnosevorschau",
+    "privacy": "Nur erlaubte Felder. Keine Lesezugriffe auf Konten, UID, Zugangsdaten, Zwischenablage oder Protokolle; kein automatisches Hochladen.",
+    "environment": "Version, API, Gerätekategorie und Thema einbeziehen (beim Erstellen gelesen)",
+    "generate": "Diagnosevorschau erstellen",
+    "copy": "Geprüfte Vorschau kopieren",
+    "clear": "Vorschau verwerfen",
+    "problem": "Problemtyp wählen (keine automatische Reparatur)",
+    "general": "Anderer Vorgangsfehler",
+    "network": "Netzwerk nicht verfügbar",
+    "permission": "Berechtigungsproblem",
+    "file": "Ungültige Datei",
+    "login": "Sitzung abgelaufen",
+    "unsupported": "Vorgang nicht verfügbar",
+    "readFirst": "Zuerst prüfen. Kopieren schreibt in die Systemzwischenablage; es sendet keinen Fehlerbericht.",
+    "local": "Offline-Hilfe auf diesem Gerät · Keine Anmeldung erforderlich"
+  },
+  "outcomes": {
+    "None": "",
+    "Preparing": "Wird vorbereitet. Bitte warten.",
+    "Ready": "Bereit. Prüfe die Vorschau vor dem Fortfahren.",
+    "Cancelled": "Abgebrochen. Prüfe vor einem neuen Versuch den aktuellen Seitenzustand.",
+    "InvalidFile": "Ungültige oder nicht unterstützte Datei. Prüfe Format, Größe und Exportversion.",
+    "ImportFailed": "Import nicht abgeschlossen. Prüfe Datei und Zielarchiv vor einem neuen Versuch.",
+    "ImportComplete": "Import abgeschlossen: {count} Datensätze hinzugefügt.",
+    "ExportFailed": "Export nicht abgeschlossen. Prüfe den Schreibzugriff auf das Ziel und versuche es erneut.",
+    "ExportComplete": "Export abgeschlossen. Bewahre die Datei sicher auf.",
+    "Busy": "Ein Vorgang läuft. Warte auf den Abschluss oder brich ihn zuerst ab.",
+    "NetworkUnavailable": "Netzwerk nicht verfügbar. Prüfe die Verbindung und versuche es manuell erneut.",
+    "PermissionRequired": "Eine Systemberechtigung ist erforderlich. Prüfe die Abfrage und entscheide über die Freigabe.",
+    "LoginExpired": "Die Sitzung ist möglicherweise abgelaufen. Prüfe Konto und Server und melde dich erneut an.",
+    "Unsupported": "Dieser Vorgang ist derzeit nicht verfügbar. Sieh unter Gerätegrenzen und Hilfe nach.",
+    "CopyComplete": "Kopiert. Prüfe den Inhalt vor dem Teilen erneut.",
+    "CopyFailed": "Kopieren fehlgeschlagen. Prüfe den Zugriff auf die Systemzwischenablage und versuche es erneut.",
+    "Failed": "Vorgang nicht abgeschlossen. Lies die zugehörige Hilfe und versuche es manuell erneut.",
+    "LocaleFailed": "Die Spracheinstellung wurde nicht übernommen. Versuche es später erneut."
+  }
+}

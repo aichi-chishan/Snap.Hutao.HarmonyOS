@@ -23,6 +23,7 @@
     "pages/WikiWeaponPage",
     "pages/HutaoCloudPage",
     "pages/WishHistoryPage",
-    "pages/HelpPage"
+    "pages/HelpPage",
+    "pages/UpdatePage"
   ]
 }

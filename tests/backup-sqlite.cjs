@@ -61,7 +61,7 @@ function harness() {
       getBackupJournal:()=>state.journal, saveBackupJournal:async text=>{ state.journalWrites++; state.journal=text; },
       replacePortable:async value=>{ state.preferenceWrites++; state.prefs=clone(value); if(state.failPrefs){ state.failPrefs=false; throw Error('injected preferences failure'); } }, getRefreshIntervalMinutes:()=>30 },
     DailyNoteService:{ getInstance:()=>({ isTimerRunning:()=>true, stopAutoRefresh(){}, startAutoRefresh(){} }) },
-    UserService:{ getInstance:()=>({ reloadLocalSession:async()=>{state.reloads++;} }) }
+    UserService:{ getInstance:()=>({ beginLocalSessionReplacement:async()=>1, cancelLocalSessionReplacement(){}, reloadLocalSession:async()=>{state.reloads++;} }) }
   };
   const cache = new Map();
   function load(relative) {

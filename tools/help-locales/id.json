@@ -1,0 +1,143 @@
+{
+  "locale": "id",
+  "articles": [
+    {
+      "id": "accounts",
+      "title": "Akun, login, dan verifikasi",
+      "summary": "Periksa akun, server, dan karakter terlebih dahulu. Kredensial kedaluwarsa memerlukan login ulang; membuka bantuan tidak membaca data akun.",
+      "steps": [
+        "Di Akun dan data, periksa akun aktif dan karakter default, lalu kembali dan segarkan halaman online secara manual. Memilih akun di sini tidak mengganti akun klien game.",
+        "Jika sesi kedaluwarsa, login lagi dengan metode yang didukung halaman login. Selesaikan sendiri CAPTCHA atau verifikasi tambahan di layar verifikasinya; hindari percobaan berulang dengan cepat.",
+        "Jika server atau karakter berbeda, pilih karakter yang benar terlebih dahulu. Wilayah pengumuman publik terpisah dari akun pribadi.",
+        "Jangan sertakan cookie, kata sandi, kode verifikasi, atau tautan authkey dalam laporan. Diagnostik tidak berisi data tersebut."
+      ],
+      "keywords": "login account region UID cookie captcha 登录 登入 帳號 账号 验证 credentials contraseña şifre điện thoại",
+      "route": "pages/UserPage"
+    },
+    {
+      "id": "import",
+      "title": "Arsip lokal dan impor berkas",
+      "summary": "Permohonan, pencapaian, dan inventaris memakai format berbeda. Periksa format, tujuan, dan pratinjau sebelum menyetujui penulisan.",
+      "steps": [
+        "Gunakan UIGF untuk Permohonan, UIAF untuk pencapaian, dan UIIF v1.0 untuk inventaris. Mengganti ekstensi tidak mengonversi berkas; simpan salinan aslinya terlebih dahulu.",
+        "Untuk Permohonan, periksa UID, jumlah catatan, dan arsip yang dipilih dalam pratinjau. Pilihan kosong bukan berarti impor semuanya; pilih arsip yang diperlukan secara eksplisit.",
+        "Impor inventaris mengganti arsip lokal yang dipilih. Periksa pratinjau dan tujuan terlebih dahulu. Impor tidak membaca memori game atau mengubah item dalam game.",
+        "Jika berkas rusak atau format atau ukurannya tidak didukung, periksa alat dan versi ekspor lalu ekspor ulang berkas yang kompatibel. Berkas mentah dan detail kesalahan mungkin berisi informasi pribadi; jangan langsung memublikasikannya."
+      ],
+      "keywords": "UIGF UIAF UIIF JSON import export inventory wishes archive 导入 导出 匯入 匯出 背包 成就 祈愿 祈願",
+      "route": ""
+    },
+    {
+      "id": "data",
+      "title": "Pembaruan data game dan cadangan offline",
+      "summary": "Metadata bawaan tersedia offline. Pembaruan aktif hanya setelah validasi; gangguan atau kegagalan bukan keberhasilan.",
+      "steps": [
+        "Periksa bagian pembaruan data game di Pengaturan, lalu mulai pembaruan secara eksplisit. Jika jaringan gagal, pertahankan data yang masih dapat dipakai dan coba lagi setelah memeriksa koneksi.",
+        "Progres unduhan bukan versi yang sudah aktif. Tunggu hingga selesai; setelah pembatalan, biarkan operasi saat ini berakhir sebelum memulai yang baru.",
+        "Jika ikon atau deskripsi hilang, periksa versi data dan buka ulang halaman. Jangan menghapus basis data atau kredensial akun untuk memperbaiki sumber daya yang hilang.",
+        "Pencarian bantuan sepenuhnya offline. Pengaturan bahasa hanya mencakup bantuan dan pesan umum yang terintegrasi, bukan semua halaman atau teks game pihak ketiga; ID stabil yang diimpor atau diekspor tidak berubah."
+      ],
+      "keywords": "metadata cache update offline rollback checksum 图鉴 圖鑑 数据 資料 更新 缓存 快取",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "backups",
+      "title": "Pencadangan, pemulihan, dan gangguan",
+      "summary": "Cadangan lengkap dapat berisi kredensial login dan data game pribadi. Ini berbeda dari diagnostik tanpa data akun.",
+      "steps": [
+        "Ekspor cadangan secara eksplisit di Pengaturan dan simpan di tempat aman yang Anda kendalikan. Jangan lampirkan cadangan lengkap ke laporan publik; buat salinan terpisah yang telah dihapus data pribadinya sebelum berbagi.",
+        "Sebelum memulihkan, ekspor data saat ini dan periksa sumber cadangan, versi, serta peringatan penggantian. Pemulihan mengubah data lokal dan memerlukan konfirmasi Anda.",
+        "Jika cadangan berasal dari versi lebih baru, perbarui aplikasi dahulu. Jangan menurunkan nomor versi secara manual; ambil kembali berkas rusak dari cadangan tepercaya.",
+        "Jika pemulihan yang terputus perlu dilanjutkan, mulai ulang aplikasi agar pemulihan saat startup memproses jurnal. Jangan mengosongkan basis data atau kredensial secara manual. Jika masih gagal, buat diagnostik tanpa data akun dan jelaskan langkahnya."
+      ],
+      "keywords": "backup restore recovery credentials password 备份 还原 恢复 備份 還原 復原",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "daily-note",
+      "title": "Catatan real-time, widget, dan pengingat",
+      "summary": "Widget menampilkan snapshot terakhir yang disimpan, bukan jaminan data langsung. Periksa waktu penyegaran sebelum mengandalkannya.",
+      "steps": [
+        "Kembali ke aplikasi, periksa akun dan karakter, lalu segarkan catatan secara manual. Periksa waktu widget agar snapshot lama tidak dianggap sebagai kondisi game terkini.",
+        "Aktifkan pengingat sesuai kebutuhan di Pengaturan dan tanggapi permintaan izin sistem. Jika ditolak, Anda memutuskan apakah akan memberikannya nanti di pengaturan sistem.",
+        "Sistem dapat membatasi penyegaran latar belakang dan waktu pengingat. Aplikasi tidak menjamin proses latar belakang terus-menerus atau pengingat tepat hingga detik.",
+        "Setelah mengganti akun, tunggu karakter baru berhasil disegarkan, lalu periksa widget. Nama panggilan yang sama saja tidak membuktikan karakter yang sama."
+      ],
+      "keywords": "resin widget reminder background refresh daily note notification 便笺 便箋 桌面 卡片 提醒 树脂 樹脂",
+      "route": ""
+    },
+    {
+      "id": "devices",
+      "title": "Batas perangkat dan akses game",
+      "summary": "Untuk ponsel, tablet, dan perangkat 2-in-1 mulai API 24. Tata letak mengikuti lebar konten; beberapa efek memerlukan API lebih baru.",
+      "steps": [
+        "Setelah mengubah ukuran atau orientasi, area konten sempit dapat tetap satu kolom. Dua kolom bergantung pada lebar konten, bukan nama perangkat. Tema dan pengurangan gerakan ada di Pengaturan.",
+        "Untuk meluncurkan game, konfigurasikan URI atau akses Bundle/Ability yang didokumentasikan publik oleh penyedia. Verifikasi sumber dan luncurkan secara eksplisit. Aplikasi tidak memindai sembarang game terpasang.",
+        "Kegagalan peluncuran dapat berarti aplikasi tidak ada, akses berubah, atau akses privat. Itu tidak membuktikan game tidak terpasang; periksa melalui metode instalasi atau peluncuran penyedia.",
+        "Gunakan klien resmi untuk instalasi, perbaikan, praunduh, dan pergantian akun game. Alat ini tidak menyuntikkan proses atau membaca memori game; fitur khusus desktop tidak dijamin tersedia di HarmonyOS."
+      ],
+      "keywords": "HarmonyOS API24 API26 phone tablet 2in1 launcher device launch 游戏 啟動 启动 设备 裝置",
+      "route": "pages/LaunchGamePage"
+    },
+    {
+      "id": "privacy",
+      "title": "Diagnostik, privasi, dan laporan",
+      "summary": "Tinjau pratinjau sebelum menyalin secara eksplisit. Diagnostik tidak membaca kredensial, UID, data akun jaringan, atau log mentah dan tidak mengunggah otomatis.",
+      "steps": [
+        "Pilih artikel dan jenis masalah, lalu pilih Buat pratinjau diagnostik. Secara default hanya berisi kode fitur dan hasil yang tetap serta waktu pembuatan.",
+        "Anda dapat menyertakan versi aplikasi, tingkat API, kategori perangkat, dan tema. Bidang yang diizinkan ini hanya dibaca saat membuat pratinjau. Nomor seri, pengenal sistem lengkap, dan data akun tidak disertakan.",
+        "Periksa pratinjau sebelum menyalinnya ke papan klip. Sistem atau aplikasi lain yang berizin dapat membacanya; halaman ini tidak membaca isi papan klip yang ada. Meninggalkan halaman membuang pratinjau.",
+        "Jika melaporkan masalah proyek, jelaskan terpisah langkah reproduksi serta hasil yang diharapkan dan aktual. Periksa teks dan tangkapan layar tambahan; jangan lampirkan cookie, UID, cadangan, atau tautan login."
+      ],
+      "keywords": "diagnostics feedback clipboard privacy sanitized export cookie token 诊断 診斷 隐私 隱私 剪贴板 剪貼簿",
+      "route": ""
+    }
+  ],
+  "labels": {
+    "title": "Bantuan dan diagnostik",
+    "search": "Cari masalah, fitur, atau format berkas",
+    "scope": "Bahasa hanya berlaku untuk bantuan dan pesan umum yang terintegrasi. Antarmuka lain dan teks game tetap memakai bahasa sumbernya.",
+    "fallback": "Bahasa sistem belum didukung. Bantuan ditampilkan dalam bahasa Inggris.",
+    "system": "Ikuti sistem",
+    "language": "Bahasa bantuan",
+    "empty": "Artikel tidak ditemukan. Coba nama fitur atau kata seperti UIGF atau cadangan.",
+    "choose": "Pilih artikel untuk melihat langkah tindakan",
+    "back": "Semua artikel",
+    "open": "Buka halaman terkait",
+    "diagnostics": "Pratinjau diagnostik",
+    "privacy": "Hanya bidang yang diizinkan. Tidak membaca akun, UID, kredensial, papan klip, atau log; tidak mengunggah otomatis.",
+    "environment": "Sertakan versi, API, kategori perangkat, dan tema (dibaca saat pembuatan)",
+    "generate": "Buat pratinjau diagnostik",
+    "copy": "Salin pratinjau yang diperiksa",
+    "clear": "Buang pratinjau",
+    "problem": "Pilih jenis masalah (tanpa perbaikan otomatis)",
+    "general": "Kegagalan operasi lainnya",
+    "network": "Jaringan tidak tersedia",
+    "permission": "Masalah izin",
+    "file": "Berkas tidak valid",
+    "login": "Sesi kedaluwarsa",
+    "unsupported": "Operasi tidak tersedia",
+    "readFirst": "Tinjau dahulu. Menyalin menulis ke papan klip sistem; tidak mengirim laporan.",
+    "local": "Bantuan offline di perangkat ini · Tidak perlu login"
+  },
+  "outcomes": {
+    "None": "",
+    "Preparing": "Sedang menyiapkan. Harap tunggu.",
+    "Ready": "Siap. Tinjau pratinjau sebelum melanjutkan.",
+    "Cancelled": "Dibatalkan. Periksa kondisi halaman sebelum mencoba lagi.",
+    "InvalidFile": "Berkas tidak valid atau tidak didukung. Periksa format, ukuran, dan versi ekspor.",
+    "ImportFailed": "Impor belum selesai. Periksa berkas dan arsip tujuan sebelum mencoba lagi.",
+    "ImportComplete": "Impor selesai: {count} catatan ditambahkan.",
+    "ExportFailed": "Ekspor belum selesai. Periksa akses tulis ke tujuan dan coba lagi.",
+    "ExportComplete": "Ekspor selesai. Simpan berkas dengan aman.",
+    "Busy": "Ada operasi berjalan. Tunggu hingga selesai atau batalkan dahulu.",
+    "NetworkUnavailable": "Jaringan tidak tersedia. Periksa koneksi dan coba lagi secara manual.",
+    "PermissionRequired": "Izin sistem diperlukan. Tinjau permintaan dan putuskan apakah akan mengizinkan.",
+    "LoginExpired": "Sesi mungkin kedaluwarsa. Periksa akun dan server, lalu login lagi.",
+    "Unsupported": "Operasi ini belum tersedia. Periksa batas perangkat dan bantuan.",
+    "CopyComplete": "Disalin. Periksa kembali isinya sebelum berbagi.",
+    "CopyFailed": "Tidak dapat menyalin. Periksa akses papan klip sistem dan coba lagi.",
+    "Failed": "Operasi belum selesai. Periksa bantuan terkait dan coba lagi secara manual.",
+    "LocaleFailed": "Pengaturan bahasa tidak diterapkan. Coba lagi nanti."
+  }
+}

@@ -33,6 +33,18 @@ export class HutaoCloudClient {
 
   /** No Cookie jar, no redirects, no automatic endpoint fallback, no credential logging. */
   static async request(path: string, body: string = '', accessToken: string = ''): Promise<Object> {
+    return HutaoCloudClient.exchange(path, body, accessToken, false);
+  }
+
+  /** Verified public challenge routes use no Bearer token; retain the server receipt envelope. */
+  static async uploadChallenge(path: string, body: string): Promise<Object> {
+    if ((path !== '/Record/Upload' && path !== '/RoleCombat/Upload') || body.length === 0) {
+      throw new Error('无效的挑战上传接口');
+    }
+    return HutaoCloudClient.exchange(path, body, '', true);
+  }
+
+  private static async exchange(path: string, body: string, accessToken: string, receipt: boolean): Promise<Object> {
     if (!path.startsWith('/') || path.startsWith('//') || path.indexOf('://') >= 0) {
       throw new Error('无效的胡桃云接口');
     }
@@ -56,9 +68,13 @@ export class HutaoCloudClient {
         throw new Error(`胡桃云 HTTP ${response.responseCode}，请检查服务状态或重新登录`);
       }
       const root: Record<string, Object> = JSON.parse(HutaoCloudJson.preserveIds(String(response.result))) as Record<string, Object>;
+      if (receipt && (root === null || typeof root !== 'object' || Array.isArray(root) || typeof root['retcode'] !== 'number')) {
+        throw new Error('胡桃云未返回有效提交结果，请核实后重新预览');
+      }
       if (Number(root['retcode'] ?? -1) !== 0) {
         throw new Error(`胡桃云 ${String(root['retcode'] ?? '-1')}：${String(root['message'] ?? '请求失败').substring(0, 240)}`);
       }
+      if (receipt) { return root; }
       const empty: Record<string, Object> = {};
       return root['data'] ?? empty;
     } finally {

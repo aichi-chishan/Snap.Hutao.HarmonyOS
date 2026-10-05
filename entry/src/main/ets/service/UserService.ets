@@ -27,99 +27,291 @@ export class UserService {
     return UserService.instance;
   }
 
-  /** 内存缓存当前用户 */
+  /** The committed object stays private while a replacement is pending. */
   private currentUser: User | undefined = undefined;
+  private currentUid: string = '';
+  private revision: number = 0;
+  private transitionPending: boolean = false;
+  private replacementRevision: number = -1;
+  private mutationTail: Promise<void> = Promise.resolve();
+  private invalidationHook: ((reason: string) => Promise<boolean>) | undefined = undefined;
+  private revisionListeners: Array<(revision: number) => void> = [];
 
   getCurrentUser(): User | undefined {
-    return this.currentUser;
+    return this.transitionPending ? undefined : this.currentUser;
+  }
+
+  /** Capture before async work. A switch away and back still changes this value. */
+  sessionRevision(): number { return this.revision; }
+
+  isSessionTransitionPending(): boolean { return this.transitionPending; }
+
+  /** Application-owned background fence. The reason contains no identity or credentials. */
+  setSessionInvalidationHook(hook: (reason: string) => Promise<boolean>): void {
+    this.invalidationHook = hook;
+  }
+
+  /** Bounded, synchronous invalidation only; async background fencing uses the hook above. */
+  addSessionRevisionListener(listener: (revision: number) => void): () => void {
+    if (this.revisionListeners.length >= 16) { throw new Error('会话监听数量超出限制'); }
+    this.revisionListeners.push(listener);
+    return (): void => {
+      const index: number = this.revisionListeners.indexOf(listener);
+      if (index >= 0) { this.revisionListeners.splice(index, 1); }
+    };
+  }
+
+  private advanceRevision(): number {
+    this.revision++;
+    for (const listener of this.revisionListeners.slice()) {
+      try { listener(this.revision); } catch (e) { Logger.warn(TAG, 'session listener failed'); }
+    }
+    return this.revision;
+  }
+
+  private beginChange(): number {
+    if (this.replacementRevision >= 0) { throw new Error('本地账号还原正在进行'); }
+    this.transitionPending = true;
+    return this.advanceRevision();
+  }
+
+  private finishChange(revision: number): void {
+    if (revision === this.revision) {
+      this.transitionPending = false;
+      // Work begun while an intent was pending must not acquire the newly committed identity.
+      this.advanceRevision();
+    }
+  }
+
+  private assertRevision(revision: number): void {
+    if (revision !== this.revision) { throw new Error('账号状态已变化，请重试'); }
+  }
+
+  private assertAvailable(): void {
+    if (this.transitionPending) { throw new Error('账号状态正在切换，请稍后重试'); }
+  }
+
+  private async prepareChange(reason: string, revision: number): Promise<void> {
+    const hook: ((reason: string) => Promise<boolean>) | undefined = this.invalidationHook;
+    if (hook !== undefined && !await hook(reason)) { throw new Error('无法确认后台任务已停止，请重试'); }
+    this.assertRevision(revision);
+  }
+
+  private queueMutation(operation: () => Promise<void>): Promise<void> {
+    const task: Promise<void> = this.mutationTail.then(operation, operation);
+    this.mutationTail = task.then(() => {}, () => {});
+    return task;
+  }
+
+  /** User.clone() shares role objects; detach them before changing defaults. */
+  private detached(user: User): User {
+    const copy: User = user.clone();
+    copy.roles = [];
+    for (const role of user.roles) {
+      const item: UserGameRole = UserGameRole.of(role.gameUid, role.region, role.nickname, role.level);
+      item.id = role.id;
+      item.userId = role.userId;
+      item.isDefault = role.isDefault;
+      item.isChosen = role.isChosen;
+      copy.roles.push(item);
+    }
+    return copy;
+  }
+
+  /** Called only inside the mutation queue; repairs a select/default write already dispatched. */
+  private async repairSelection(): Promise<void> {
+    const user: User | undefined = this.currentUser;
+    await UserRepo.selectUser(user === undefined ? 0 : user.id);
+    PreferencesStore.setCurrentUid(this.currentUid);
+  }
+
+  private async selectAndPublish(user: User | undefined, uid: string, revision: number): Promise<void> {
+    this.assertRevision(revision);
+    try {
+      await UserRepo.selectUser(user === undefined ? 0 : user.id);
+      this.assertRevision(revision);
+    } catch (e) {
+      await this.repairSelection();
+      if (e instanceof Error) { throw e; } throw new Error('账号操作失败，请重试');
+    }
+    this.currentUser = user;
+    this.currentUid = user === undefined ? '' : uid;
+    if (user === undefined) { this.clearSessionState(); }
+    else { user.isSelected = true; this.applySessionState(user, uid); }
+  }
+
+  /** Fence/drain before BackupService changes account rows or vault entries. */
+  async beginLocalSessionReplacement(): Promise<number> {
+    const revision: number = this.beginChange();
+    this.replacementRevision = revision;
+    try {
+      await this.prepareChange('localReplacement', revision);
+      await this.mutationTail;
+      this.assertRevision(revision);
+      return revision;
+    } catch (e) {
+      this.replacementRevision = -1;
+      this.finishChange(revision);
+      if (e instanceof Error) { throw e; } throw new Error('账号操作失败，请重试');
+    }
+  }
+
+  /** Only after the backup caller has restored the old database/preferences. */
+  cancelLocalSessionReplacement(revision: number): void {
+    if (this.replacementRevision !== revision) { return; }
+    this.replacementRevision = -1;
+    this.finishChange(revision);
   }
 
   // ================= 会话恢复 =================
 
-  /** 启动时恢复登录态（EntryAbility 调用）：装载当前用户 + 注入 Cookie + 同步 AppStorage */
-  async restoreSession(): Promise<void> {
+  async restoreSession(): Promise<boolean> {
+    const revision: number = this.beginChange();
     try {
-      const user: User | undefined = await UserRepo.getCurrentUser();
-      if (user !== undefined && user.hasCookie()) {
-        this.currentUser = user;
-        // 设备指纹必须先就绪：passport 接口（token 交换）需带 x-rpc-device_fp，缺指纹会被米哈游拒绝，
-        // 导致 cookie_token/ltoken 补不上 → 战绩接口全部「重新登录」（成功不阻塞）。
-        try {
-          if (!user.isOversea) { await this.ensureDeviceFingerprint(); }
-        } catch (e) {
-          Logger.warn(TAG, `ensure fingerprint fail ${(e as Error).message}`);
-        }
-        // 补齐 Token 链（cookie_token/ltoken），确保便笺/签到等可用
-        if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
-          await this.completeTokenChain(user);
-        }
-        const uid: string = await this.resolveDefaultUid(user);
-        // 历史账号可能缺昵称/头像，启动时补拉（best effort，不阻塞）
-        if (user.displayName.length === 0) {
-          await this.fetchUserFullInfo(user);
-        }
-        this.applySessionState(user, uid);
-        Logger.info(TAG, `session restored user=${user.id} uid=${uid}`);
-      } else {
-        this.clearSessionState();
-        Logger.info(TAG, 'no saved session');
+      await this.prepareChange('restore', revision);
+      await this.mutationTail;
+      this.assertRevision(revision);
+      const loaded: User | undefined = await UserRepo.getCurrentUser();
+      this.assertRevision(revision);
+      if (loaded === undefined || !loaded.hasCookie()) {
+        await this.queueMutation(async () => { await this.selectAndPublish(undefined, '', revision); });
+        return false;
       }
+      const user: User = this.detached(loaded);
+      try { if (!user.isOversea) { await this.ensureDeviceFingerprint(); } }
+      catch (e) { Logger.warn(TAG, 'ensure fingerprint failed'); }
+      this.assertRevision(revision);
+      if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
+        await this.completeTokenChainInner(user, false, revision);
+      }
+      if (user.displayName.length === 0) { await this.loadUserFullInfo(user, revision); }
+      const uid: string = this.resolveDefaultUid(user);
+      await this.queueMutation(async () => {
+        await this.commitUser(user, uid, revision, true, true);
+      });
+      Logger.info(TAG, 'session restored');
+      return true;
     } catch (e) {
-      Logger.warn(TAG, `restoreSession fail: ${JSON.stringify(e)}`);
-      this.clearSessionState();
-    }
+      // A superseded restore never clears a newer login/logout/switch.
+      Logger.warn(TAG, 'session restore did not complete');
+      return false;
+    } finally { this.finishChange(revision); }
   }
 
-  /** Reload after a successful local restore; never contacts a remote account service. */
+  /** Local-only completion of a successful backup replacement, or standalone reload. */
   async reloadLocalSession(): Promise<void> {
-    const user: User | undefined = await UserRepo.getCurrentUser();
-    this.currentUser = user;
-    if (user === undefined || !user.hasCookie()) {
-      this.currentUser = undefined;
-      this.clearSessionState();
-      return;
+    const replacing: boolean = this.replacementRevision >= 0;
+    const revision: number = replacing ? this.replacementRevision : this.beginChange();
+    let readStarted: boolean = false;
+    try {
+      if (!replacing) { await this.prepareChange('reload', revision); }
+      await this.mutationTail;
+      this.assertRevision(revision);
+      readStarted = true;
+      const loaded: User | undefined = await UserRepo.getCurrentUser();
+      this.assertRevision(revision);
+      const user: User | undefined = loaded !== undefined && loaded.hasCookie() ? this.detached(loaded) : undefined;
+      const uid: string = user === undefined ? '' : this.resolveDefaultUid(user);
+      await this.queueMutation(async () => { await this.selectAndPublish(user, uid, revision); });
+    } catch (e) {
+      // The previous object may refer to rows replaced by a committed backup. Never expose it again.
+      if (readStarted && revision === this.revision) {
+        this.currentUser = undefined;
+        this.currentUid = '';
+        this.clearSessionState();
+        try {
+          await this.queueMutation(async () => {
+            if (revision === this.revision) { await this.repairSelection(); }
+          });
+        } catch (repairError) { Logger.warn(TAG, 'local session selection repair failed'); }
+      }
+      if (e instanceof Error) { throw e; } throw new Error('账号操作失败，请重试');
+    } finally {
+      if (replacing) { this.replacementRevision = -1; }
+      this.finishChange(revision);
     }
-    let uid: string = '';
-    for (const role of user.roles) {
-      if (role.isDefault) { uid = role.gameUid; break; }
-    }
-    if (uid.length === 0 && user.roles.length > 0) { uid = user.roles[0].gameUid; }
-    this.applySessionState(user, uid);
   }
 
-  private async resolveDefaultUid(user: User): Promise<string> {
-    if (user.roles.length > 0) {
-      let def: UserGameRole | undefined = undefined;
-      for (let i = 0; i < user.roles.length; i++) {
-        if (user.roles[i].isDefault) {
-          def = user.roles[i];
-          break;
+  private resolveDefaultUid(user: User): string {
+    for (const role of user.roles) { if (role.isDefault) { return role.gameUid; } }
+    if (user.roles.length === 0) { return ''; }
+    user.roles[0].isDefault = true;
+    user.roles[0].isChosen = true;
+    return user.roles[0].gameUid;
+  }
+
+  private async storeUserMetadata(user: User, revision: number): Promise<void> {
+    this.assertRevision(revision);
+    const previous: User | undefined = await UserRepo.getUserById(user.id);
+    this.assertRevision(revision);
+    if (previous === undefined) { throw new Error('账号不存在'); }
+    user.isSelected = this.currentUser !== undefined && this.currentUser.id === user.id;
+    try {
+      await UserRepo.updateUser(user);
+      this.assertRevision(revision);
+    } catch (e) { await UserRepo.updateUser(previous); if (e instanceof Error) { throw e; } throw new Error('账号操作失败，请重试'); }
+  }
+
+  private async storeRoles(user: User, revision: number): Promise<void> {
+    this.assertRevision(revision);
+    const previous: UserGameRole[] = await UserRepo.getRolesByUserId(user.id);
+    this.assertRevision(revision);
+    try {
+      await UserRepo.upsertRoles(user.id, user.roles);
+      this.assertRevision(revision);
+    } catch (e) { await UserRepo.upsertRoles(user.id, previous); if (e instanceof Error) { throw e; } throw new Error('账号操作失败，请重试'); }
+  }
+
+  private async storeCookie(user: User, revision: number): Promise<void> {
+    this.assertRevision(revision);
+    const previous: string = await UserRepo.loadCookieFor(user.id);
+    this.assertRevision(revision);
+    try {
+      await UserRepo.saveCookieFor(user.id, user.fullCookie());
+      this.assertRevision(revision);
+    } catch (e) { await UserRepo.saveCookieFor(user.id, previous); if (e instanceof Error) { throw e; } throw new Error('账号操作失败，请重试'); }
+  }
+
+  /** Queue-owned rollback prevents a superseded partial write being adopted by the next intent. */
+  private async commitUser(user: User, uid: string, revision: number, details: boolean, select: boolean): Promise<void> {
+    this.assertRevision(revision);
+    const previous: User | undefined = user.id > 0 ? await UserRepo.getUserById(user.id) : undefined;
+    this.assertRevision(revision);
+    let inserted: boolean = false;
+    try {
+      if (user.id <= 0) {
+        await UserRepo.insertUser(user);
+        inserted = true;
+        this.assertRevision(revision);
+      } else if (previous === undefined) { throw new Error('账号不存在'); }
+      if (details) {
+        await this.storeCookie(user, revision);
+        await this.storeUserMetadata(user, revision);
+      }
+      await this.storeRoles(user, revision);
+      if (select) { await this.selectAndPublish(user, uid, revision); }
+    } catch (e) {
+      if (inserted) { await UserRepo.deleteUser(user.id); }
+      else if (previous !== undefined) {
+        if (details) {
+          await UserRepo.saveCookieFor(previous.id, previous.fullCookie());
+          await UserRepo.updateUser(previous);
         }
+        await UserRepo.upsertRoles(previous.id, previous.roles);
       }
-      if (def !== undefined) {
-        return def.gameUid;
-      }
-      // 未设置默认且仅有一个角色：自动绑定为默认 UID（对齐 Windows 首次进入即绑定）
-      const auto: string = user.roles[0].gameUid;
-      try {
-        await UserRepo.setDefaultUid(user.id, auto);
-        user.roles[0].isDefault = true;
-      } catch (e) {
-        Logger.warn(TAG, `auto bind default uid fail: ${(e as Error).message}`);
-      }
-      return auto;
+      await this.repairSelection();
+      if (e instanceof Error) { throw e; } throw new Error('账号操作失败，请重试');
     }
-    return '';
   }
 
-  /** 全局 AppStorage 状态同步 */
   private applySessionState(user: User, uid: string): void {
     AppStorage.setOrCreate<boolean>('isLoggedIn', true);
     AppStorage.setOrCreate<number>('currentUserId', user.id);
     AppStorage.setOrCreate<string>('currentUid', uid);
     AppStorage.setOrCreate<string>('currentUserName', user.displayName);
     AppStorage.setOrCreate<string>('currentUserAvatar', user.avatar);
-    // 会话级 Cookie 注入
+    PreferencesStore.setCurrentUserId(user.id);
+    PreferencesStore.setCurrentUid(uid);
     ApiClient.getInstance().setCookie(user.fullCookie(), user.isOversea);
   }
 
@@ -129,7 +321,6 @@ export class UserService {
     AppStorage.setOrCreate<string>('currentUid', '');
     AppStorage.setOrCreate<string>('currentUserName', '');
     AppStorage.setOrCreate<string>('currentUserAvatar', '');
-    // 清持久化会话标记（杀后台/重启后不再自动恢复）
     PreferencesStore.setCurrentUserId(0);
     PreferencesStore.setCurrentUid('');
     ApiClient.getInstance().setCookie('');
@@ -166,71 +357,44 @@ export class UserService {
    * @param avatar 可选头像
    */
   async loginWithCookie(rawCookie: string, displayName: string, avatar: string, isOversea: boolean = false): Promise<User> {
-    const parsed: User = new User();
-    parsed.isOversea = isOversea;
-    const hasCookie: boolean = parsed.applyCookie(rawCookie);
-    if (!hasCookie || !UserService.validateCookie(parsed)) {
-      throw new Error('Cookie 中未解析到有效 token，请确认已复制完整 Cookie');
-    }
-    parsed.displayName = displayName;
-    parsed.avatar = avatar;
-    parsed.createdAt = Date.now();
-
-    // 去重：优先按 mid / stuid / account_id 匹配
-    const existingId: number = await this.findDuplicate(parsed);
-    let saved: User = parsed;
-    if (existingId > 0) {
-      // upsert：复用原账号 id，更新 Cookie/昵称
-      const old: User | undefined = await UserRepo.getUserById(existingId);
+    const revision: number = this.beginChange();
+    try {
+      const parsed: User = new User();
+      parsed.isOversea = isOversea;
+      if (!parsed.applyCookie(rawCookie) || !UserService.validateCookie(parsed)) {
+        throw new Error('Cookie 中未解析到有效 token，请确认已复制完整 Cookie');
+      }
+      parsed.displayName = displayName;
+      parsed.avatar = avatar;
+      parsed.createdAt = Date.now();
+      await this.prepareChange('login', revision);
+      await this.mutationTail;
+      this.assertRevision(revision);
+      const existingId: number = await this.findDuplicate(parsed);
+      this.assertRevision(revision);
+      const old: User | undefined = existingId > 0 ? await UserRepo.getUserById(existingId) : undefined;
+      this.assertRevision(revision);
+      const saved: User = old === undefined ? parsed : this.detached(old);
       if (old !== undefined) {
-        saved = old.clone();
         saved.applyCookie(rawCookie);
         saved.displayName = displayName.length > 0 ? displayName : old.displayName;
         saved.avatar = avatar.length > 0 ? avatar : old.avatar;
-        await UserRepo.updateUser(saved);
-        Logger.info(TAG, `upsert existing user ${existingId}`);
-      } else {
-        await UserRepo.insertUser(saved);
       }
-    } else {
-      await UserRepo.insertUser(saved);
-    }
-    // 登录即选中该账号（否则所有账号 is_selected=0，账号列表全部显示"切换"且无状态可变）
-    await UserRepo.selectUser(saved.id);
-
-    // Cookie 密文落库
-    await UserRepo.saveCookieFor(saved.id, rawCookie);
-
-    // 设备指纹必须先就绪：passport 接口（token 交换）需带 x-rpc-device_fp，
-    // 缺指纹会被米哈游拒绝 → cookie_token/ltoken 补不上 → 战绩接口全部报「重新登录」
-    try {
-      if (!saved.isOversea) { await this.ensureDeviceFingerprint(); }
-    } catch (e) {
-      Logger.warn(TAG, `ensure fingerprint fail ${e.message}`);
-    }
-
-    // 补齐 Token 链（best effort）
-    await this.completeTokenChain(saved);
-
-    // 选为当前账号
-    await UserRepo.selectUser(saved.id);
-    await UserRepo.saveCookieFor(saved.id, saved.fullCookie());
-
-    // 拉取角色绑定
-    const roles: UserGameRole[] = await this.fetchAndStoreRoles(saved);
-    saved.roles = roles;
-    await UserRepo.updateUser(saved);
-
-    // 补充分显示昵称/头像（getUserFullInfo）
-    if (saved.displayName.length === 0 || saved.avatar.length === 0) {
-      await this.fetchUserFullInfo(saved);
-    }
-
-    const uid: string = await this.resolveDefaultUid(saved);
-    this.currentUser = saved;
-    this.applySessionState(saved, uid);
-    Logger.info(TAG, `login ok user=${saved.id} nickname=${saved.displayName} uid=${uid}`);
-    return saved;
+      try { if (!saved.isOversea) { await this.ensureDeviceFingerprint(); } }
+      catch (e) { Logger.warn(TAG, 'ensure fingerprint failed'); }
+      this.assertRevision(revision);
+      await this.completeTokenChainInner(saved, false, revision);
+      saved.roles = await this.fetchRoles(saved, revision);
+      if (saved.displayName.length === 0 || saved.avatar.length === 0) {
+        await this.loadUserFullInfo(saved, revision);
+      }
+      const uid: string = this.resolveDefaultUid(saved);
+      await this.queueMutation(async () => {
+        await this.commitUser(saved, uid, revision, true, true);
+      });
+      Logger.info(TAG, 'login completed');
+      return saved;
+    } finally { this.finishChange(revision); }
   }
 
   /**
@@ -239,6 +403,8 @@ export class UserService {
    */
   async loginWithSession(stuid: string, stoken: string, mid: string, accountName: string): Promise<User> {
     if (stuid.length === 0 || stoken.length === 0) {
+      const revision: number = this.beginChange();
+      this.finishChange(revision);
       throw new Error('登录结果缺少关键 token，请重试');
     }
     const pairs: string[] = [];
@@ -248,7 +414,7 @@ export class UserService {
       pairs.push(`mid=${mid}`);
     }
     const rawCookie: string = pairs.join('; ');
-    Logger.info(TAG, `loginWithSession stuid=${stuid} hasName=${accountName.length > 0}`);
+    Logger.info(TAG, 'login from session');
     return this.loginWithCookie(rawCookie, accountName, '');
   }
 
@@ -276,32 +442,50 @@ export class UserService {
   /** Token 链补齐：SToken→LToken→cookie_token（best effort，失败仅记录）。
    *  说明：这两个接口需要 DS Gen2/PROD 签名 + 完整 passport(XRpc2) 头；
    *  缺 app_id/game_biz/sdk_version 等头会被米哈游拒绝导致拿不到 cookie_token。 */
-  private async completeTokenChain(user: User): Promise<void> {
-    await this.completeTokenChainInner(user, false);
-  }
-
-  /** 强制刷新 Cookie 凭证（对齐 Windows RefreshCookieTokenAsync：忽略现有 token 换新并落库）。
-   *  返回 true 表示刷新后 cookie_token 非空（SToken 失效时返回 false，需重新登录）。 */
+  /** Refresh detached credentials; publication requires both revision and selected-object ownership. */
   async refreshCookieTokenForced(user: User): Promise<boolean> {
+    this.assertAvailable();
+    const revision: number = this.revision;
     const owner: User | undefined = this.selectedOwner(user);
-    if (user.stoken.length === 0 && user.stokenV2.length === 0) {
-      return false;
-    }
-    await this.completeTokenChainInner(user, true);
-    await UserRepo.saveCookieFor(user.id, user.fullCookie());
-    if (owner !== undefined && this.currentUser === owner) {
-      this.currentUser = user;
-      ApiClient.getInstance().setCookie(user.fullCookie(), user.isOversea);
-    }
-    return user.cookieToken.length > 0;
+    if (user.stoken.length === 0 && user.stokenV2.length === 0) { return false; }
+    const snapshot: User = this.detached(user);
+    await this.completeTokenChainInner(snapshot, true, revision);
+    await this.publishTokens(user, snapshot, owner, revision);
+    return snapshot.cookieToken.length > 0;
   }
 
-  private async completeTokenChainInner(user: User, forceRefresh: boolean): Promise<void> {
+  private async publishTokens(user: User, snapshot: User, owner: User | undefined, revision: number): Promise<void> {
+    await this.queueMutation(async () => {
+      this.assertRevision(revision);
+      const stored: User | undefined = await UserRepo.getUserById(user.id);
+      this.assertRevision(revision);
+      if (stored === undefined || !this.sameIdentity(stored, user)) { throw new Error('账号状态已变化，请重试'); }
+      const metadataChanged: boolean = snapshot.aid !== user.aid;
+      try {
+        await this.storeCookie(snapshot, revision);
+        if (metadataChanged) { await this.storeUserMetadata(snapshot, revision); }
+        this.assertRevision(revision);
+      } catch (e) {
+        await UserRepo.saveCookieFor(stored.id, stored.fullCookie());
+        if (metadataChanged) { await UserRepo.updateUser(stored); }
+        if (e instanceof Error) { throw e; } throw new Error('账号操作失败，请重试');
+      }
+      user.applyCookie(snapshot.fullCookie());
+      user.aid = snapshot.aid;
+      if (owner !== undefined && this.currentUser === owner) {
+        owner.applyCookie(snapshot.fullCookie());
+        owner.aid = snapshot.aid;
+        ApiClient.getInstance().setCookie(owner.fullCookie(), owner.isOversea);
+      }
+    });
+  }
+
+  private async completeTokenChainInner(user: User, forceRefresh: boolean, revision: number): Promise<void> {
     if (user.stoken.length === 0 && user.stokenV2.length === 0) {
       return;
     }
     if (user.isOversea) {
-      await this.completeOverseaTokenChain(user, forceRefresh);
+      await this.completeOverseaTokenChain(user, forceRefresh, revision);
       return;
     }
     // 兜底：fp 缺失时先取（passport 交换需 x-rpc-device_fp，缺则被拒 → cookie_token 补不上）
@@ -312,6 +496,7 @@ export class UserService {
         Logger.warn(TAG, 'ensure fp before token chain fail');
       }
     }
+    this.assertRevision(revision);
     const stokenCookie: string = user.stokenCookie();
     const passportHeaders: Record<string, string> = HoyolabClient.passportHeaders();
     const fullHeaders: Record<string, string> = HoyolabClient.merge(passportHeaders, {
@@ -321,10 +506,12 @@ export class UserService {
     if (forceRefresh || user.cookieToken.length === 0) {
       try {
         const dsHeaders: Record<string, string> = await this.buildProdDsHeader();
+        this.assertRevision(revision);
         fullHeaders['DS'] = dsHeaders['DS'];
         const resp: ApiResponse = await ApiClient.getInstance().get(
           'https://passport-api.mihoyo.com/account/auth/api/getCookieAccountInfoBySToken',
           fullHeaders);
+        this.assertRevision(revision);
         if (resp.success && resp.data !== undefined) {
           const data = resp.data as Record<string, Object>;
           // 参考项目 UidCookieToken：{ uid, cookie_token }。uid 即 account_id
@@ -337,12 +524,13 @@ export class UserService {
               user.aid = accountId;
             }
           } else {
-            Logger.warn(TAG, `getCookieAccountInfo retcode=${resp.retcode} data empty, msg=${resp.message}`);
+            Logger.warn(TAG, `getCookieAccountInfo retcode=${resp.retcode} data empty`);
           }
         } else {
-          Logger.warn(TAG, `getCookieAccountInfo fail retcode=${resp.retcode} msg=${resp.message} cookieLen=${stokenCookie.length} fpLen=${PreferencesStore.getDeviceFp().length}`);
+          Logger.warn(TAG, `getCookieAccountInfo fail retcode=${resp.retcode} cookieLen=${stokenCookie.length} fpLen=${PreferencesStore.getDeviceFp().length}`);
         }
       } catch (e) {
+        this.assertRevision(revision);
         Logger.warn(TAG, 'complete cookie_token fail');
       }
     }
@@ -350,10 +538,12 @@ export class UserService {
     if (forceRefresh || user.ltoken.length === 0) {
       try {
         const dsHeaders: Record<string, string> = await this.buildProdDsHeader();
+        this.assertRevision(revision);
         fullHeaders['DS'] = dsHeaders['DS'];
         const resp: ApiResponse = await ApiClient.getInstance().get(
           'https://passport-api.mihoyo.com/account/auth/api/getLTokenBySToken',
           fullHeaders);
+        this.assertRevision(revision);
         if (resp.success && resp.data !== undefined) {
           const data = resp.data as Record<string, Object>;
           // 参考项目 LTokenWrapper：{ ltoken }。ltuid 复用 stuid（同一账号 ID）
@@ -364,32 +554,35 @@ export class UserService {
               user.ltuid = user.stuid.length > 0 ? user.stuid : user.stuidV2;
             }
           } else {
-            Logger.warn(TAG, `getLToken retcode=${resp.retcode} data empty, msg=${resp.message}`);
+            Logger.warn(TAG, `getLToken retcode=${resp.retcode} data empty`);
           }
         } else {
-          Logger.warn(TAG, `getLToken fail retcode=${resp.retcode} msg=${resp.message}`);
+          Logger.warn(TAG, `getLToken fail retcode=${resp.retcode}`);
         }
       } catch (e) {
+        this.assertRevision(revision);
         Logger.warn(TAG, 'complete ltoken fail');
       }
     }
-    await UserRepo.saveCookieFor(user.id, user.fullCookie());
+    this.assertRevision(revision);
   }
 
   /** HoYoLAB token exchange is POST with STokenWrapper (upstream PassportClientOversea). */
-  private async completeOverseaTokenChain(user: User, forceRefresh: boolean): Promise<void> {
+  private async completeOverseaTokenChain(user: User, forceRefresh: boolean, revision: number): Promise<void> {
     const aid: string = user.aid || user.stuid || user.accountId;
     const body: Record<string, string> = { 'stoken': user.stokenV2 || user.stoken, 'uid': aid };
     const headers: Record<string, string> = HoyolabClient.getBaseHeaders('os_asia');
     headers['Cookie'] = user.stokenCookie();
     const paths: string[] = ['getCookieAccountInfoBySToken', 'getLTokenBySToken'];
     for (const path of paths) {
+      this.assertRevision(revision);
       if (!forceRefresh && ((path === paths[0] && user.cookieToken.length > 0) ||
         (path === paths[1] && user.ltoken.length > 0))) {
         continue;
       }
       const response: ApiResponse = await ApiClient.getInstance().postJson(
         `https://api-account-os.hoyoverse.com/account/auth/api/${path}`, JSON.stringify(body), headers);
+      this.assertRevision(revision);
       if (!response.success || response.data === undefined) {
         Logger.warn(TAG, `oversea token exchange failed code=${response.retcode}`);
         continue;
@@ -410,7 +603,7 @@ export class UserService {
         }
       }
     }
-    await UserRepo.saveCookieFor(user.id, user.fullCookie());
+    this.assertRevision(revision);
   }
 
   /** 生成 passport 接口所需 DS Gen2/PROD 头（对齐 Windows PassportClient SignDataAsync(Gen2, PROD, true)：
@@ -431,29 +624,38 @@ export class UserService {
    *  onRetry 由调用方提供（重新执行原 GET）。返回最终响应。 */
   static async retryWithRefreshedCookie(
     user: User, onRetry: () => Promise<ApiResponse>): Promise<ApiResponse> {
-    const ok: boolean = await UserService.getInstance().refreshCookieTokenForced(user);
+    const service: UserService = UserService.getInstance();
+    const revision: number = service.sessionRevision();
+    const ok: boolean = await service.refreshCookieTokenForced(user);
+    service.assertRevision(revision);
+    service.assertAvailable();
     if (!ok) {
       const fail: ApiResponse = ApiResponse.fail(RetCodes.COOKIE_EXPIRED,
         'SToken 已失效，请到「账号与数据」重新登录');
       return fail;
     }
-    return onRetry();
+    const response: ApiResponse = await onRetry();
+    service.assertRevision(revision);
+    return response;
   }
 
   /** 公开封装：补齐当前用户 Token 链（供各 Service 在缺 cookie_token 时调用） */
   async completeTokenChainPublic(user: User): Promise<void> {
+    this.assertAvailable();
+    const revision: number = this.revision;
     const owner: User | undefined = this.selectedOwner(user);
-    await this.completeTokenChain(user);
-    // A late refresh must never replace cookies after switch/logout/restore, even when IDs are reused.
-    if (owner !== undefined && this.currentUser === owner) {
-      ApiClient.getInstance().setCookie(user.fullCookie(), user.isOversea);
-    }
+    const snapshot: User = this.detached(user);
+    await this.completeTokenChainInner(snapshot, false, revision);
+    await this.publishTokens(user, snapshot, owner, revision);
+  }
+
+  private sameIdentity(a: User, b: User): boolean {
+    return a.id === b.id && a.isOversea === b.isOversea && a.mid === b.mid && a.aid === b.aid;
   }
 
   private selectedOwner(user: User): User | undefined {
     const selected: User | undefined = this.currentUser;
-    return selected !== undefined && selected.id === user.id && selected.isOversea === user.isOversea &&
-      selected.mid === user.mid && selected.aid === user.aid ? selected : undefined;
+    return selected !== undefined && this.sameIdentity(selected, user) ? selected : undefined;
   }
 
   /** 公开封装：确保设备指纹就绪（供各 Service 请求前调用，降风控/保住 token 交换） */
@@ -461,7 +663,7 @@ export class UserService {
     try {
       await this.ensureDeviceFingerprint();
     } catch (e) {
-      Logger.warn(TAG, `ensure fingerprint public fail ${(e as Error).message}`);
+      Logger.warn(TAG, 'ensure fingerprint public failed');
     }
   }
 
@@ -482,6 +684,18 @@ export class UserService {
 
   /** 拉取账号完整信息（昵称/头像），address 该账号有效 aid；失败仅记录 */
   async fetchUserFullInfo(user: User): Promise<void> {
+    this.assertAvailable();
+    const revision: number = this.revision;
+    const snapshot: User = this.detached(user);
+    await this.loadUserFullInfo(snapshot, revision);
+    await this.queueMutation(async () => {
+      await this.storeUserMetadata(snapshot, revision);
+      user.displayName = snapshot.displayName;
+      user.avatar = snapshot.avatar;
+    });
+  }
+
+  private async loadUserFullInfo(user: User, revision: number): Promise<void> {
     const id: string = user.aid.length > 0 ? user.aid
       : (user.accountId.length > 0 ? user.accountId
         : (user.stuid.length > 0 ? user.stuid : ''));
@@ -496,6 +710,7 @@ export class UserService {
         'Cookie': user.isOversea ? user.gameRecordCookie() : user.stokenCookie(),
         'Referer': user.isOversea ? 'https://www.hoyolab.com/' : 'https://bbs.mihoyo.com/',
       });
+      this.assertRevision(revision);
       if (resp.success && resp.data !== undefined) {
         const data = resp.data as Record<string, Object>;
         const info = data['user_info'] as Record<string, Object>;
@@ -512,16 +727,16 @@ export class UserService {
           }
           if (nickname.length > 0) {
             user.displayName = nickname;
-            Logger.info(TAG, `fetched nickname=${nickname}`);
+            Logger.info(TAG, 'profile name fetched');
           }
           if (avatarUrl.length > 0) {
             user.avatar = avatarUrl;
-            Logger.info(TAG, `fetched avatar=${avatarUrl}`);
+            Logger.info(TAG, 'profile avatar fetched');
           }
-          await UserRepo.updateUser(user);
         }
       }
     } catch (e) {
+      this.assertRevision(revision);
       Logger.warn(TAG, 'fetch user full info fail');
     }
   }
@@ -530,11 +745,23 @@ export class UserService {
 
   /** 通过 SToken → actionTicket → getUserGameRoles 拉取并持久化角色 */
   async fetchAndStoreRoles(user: User): Promise<UserGameRole[]> {
+    this.assertAvailable();
+    const revision: number = this.revision;
+    const snapshot: User = this.detached(user);
+    snapshot.roles = await this.fetchRoles(snapshot, revision);
+    this.resolveDefaultUid(snapshot);
+    await this.queueMutation(async () => { await this.storeRoles(snapshot, revision); });
+    this.assertRevision(revision);
+    return snapshot.roles;
+  }
+
+  private async fetchRoles(user: User, revision: number): Promise<UserGameRole[]> {
     const rolesResp: ApiResponse = user.isOversea
       ? await ApiClient.getInstance().get(
         'https://api-os-takumi.hoyoverse.com/binding/api/getUserGameRolesByCookie?game_biz=hk4e_global',
         HoyolabClient.merge(HoyolabClient.getBaseHeaders('os_asia'), { 'Cookie': user.gameRecordCookie() }))
-      : await this.fetchChineseRoles(user);
+      : await this.fetchChineseRoles(user, revision);
+    this.assertRevision(revision);
     if (rolesResp.success && rolesResp.data !== undefined) {
       const rolesData = rolesResp.data as Record<string, Object>;
       const list = rolesData['list'] as Array<Object>;
@@ -562,42 +789,26 @@ export class UserService {
           roles.push(role);
         }
       }
-      await UserRepo.upsertRoles(user.id, roles);
-      // 回读落库后的角色（带 is_default 标志），保证返回行与 DB 一致
-      const stored: UserGameRole[] = await UserRepo.getRolesByUserId(user.id);
-      if (stored.length > 0) {
-        let hasDefault: boolean = false;
-        for (let i = 0; i < stored.length; i++) {
-          if (stored[i].isDefault) {
-            hasDefault = true;
-            break;
-          }
-        }
-        // 未设置默认且仅有一个角色：自动绑定为默认 UID（对齐 Windows 首次进入即绑定）
-        if (!hasDefault) {
-          await UserRepo.setDefaultUid(user.id, stored[0].gameUid);
-          stored[0].isDefault = true;
-        }
-      }
       Logger.info(TAG, `roles fetched count=${roles.length}`);
-      return stored;
+      return roles;
     }
-    Logger.warn(TAG, `getUserGameRoles fail retcode=${rolesResp.retcode} msg=${rolesResp.message}`);
+    Logger.warn(TAG, `getUserGameRoles fail retcode=${rolesResp.retcode}`);
     if (rolesResp.retcode === RetCodes.RISK_CONTROL) {
       throw new Error('获取角色被风控拦截，请稍后重试');
     }
     return user.roles;
   }
 
-  private async fetchChineseRoles(user: User): Promise<ApiResponse> {
+  private async fetchChineseRoles(user: User, revision: number): Promise<ApiResponse> {
     if (user.stoken.length === 0) {
       Logger.warn(TAG, 'no stoken, skip role fetch');
       return ApiResponse.fail(-1, '无法获取角色凭证');
     }
     const stuid: string = user.stuid.length > 0 ? user.stuid : user.aid;
     const ticketResp: ApiResponse = await HoyolabClient.getActionTicket(user.stokenCookie(), user.stoken, stuid);
+    this.assertRevision(revision);
     if (!ticketResp.success || ticketResp.data === undefined) {
-      Logger.warn(TAG, `getActionTicket fail retcode=${ticketResp.retcode} msg=${ticketResp.message}`);
+      Logger.warn(TAG, `getActionTicket fail retcode=${ticketResp.retcode}`);
       if (ticketResp.retcode === RetCodes.RISK_CONTROL) {
         throw new Error('获取角色被风控拦截，请稍后重试');
       }
@@ -614,56 +825,102 @@ export class UserService {
 
   // ================= 账号管理 =================
 
-  /** 切换账号 */
+  /** 切换账号。Failed/superseded transitions retain the last committed session. */
   async switchUser(userId: number): Promise<void> {
-    const user: User | undefined = await UserRepo.getUserById(userId);
-    if (user === undefined) {
-      throw new Error('账号不存在');
-    }
-    await UserRepo.selectUser(userId);
-    const uid: string = await this.resolveDefaultUid(user);
-    this.currentUser = user;
-    this.applySessionState(user, uid);
-    Logger.info(TAG, `switched to user=${userId} uid=${uid}`);
+    const revision: number = this.beginChange();
+    try {
+      await this.prepareChange('switch', revision);
+      await this.mutationTail;
+      this.assertRevision(revision);
+      const loaded: User | undefined = await UserRepo.getUserById(userId);
+      this.assertRevision(revision);
+      if (loaded === undefined) { throw new Error('账号不存在'); }
+      const user: User = this.detached(loaded);
+      const uid: string = this.resolveDefaultUid(user);
+      await this.queueMutation(async () => {
+        await this.commitUser(user, uid, revision, false, true);
+      });
+      Logger.info(TAG, 'account switched');
+    } finally { this.finishChange(revision); }
   }
 
-  /** 删除账号 */
   async deleteUser(userId: number): Promise<void> {
-    await DailyNoteReminderService.cancelUser(userId);
-    await UserRepo.deleteUser(userId);
-    if (this.currentUser !== undefined && this.currentUser.id === userId) {
-      this.currentUser = undefined;
-      this.clearSessionState();
-    }
+    const revision: number = this.beginChange();
+    try {
+      await this.prepareChange('delete', revision);
+      await DailyNoteReminderService.cancelUser(userId);
+      this.assertRevision(revision);
+      await this.queueMutation(async () => {
+        this.assertRevision(revision);
+        try {
+          await UserRepo.deleteUser(userId);
+        } finally {
+          // A delete may fail after removing its account row. Fail closed for that selected identity.
+          if (this.currentUser === undefined || this.currentUser.id === userId) {
+            this.currentUser = undefined;
+            this.currentUid = '';
+            this.clearSessionState();
+          }
+          await this.repairSelection();
+        }
+        this.assertRevision(revision);
+      });
+    } finally { this.finishChange(revision); }
   }
 
-  /** 退出登录（清当前态，不清账号数据） */
   async logout(): Promise<void> {
-    this.currentUser = undefined;
-    this.clearSessionState();
-    Logger.info(TAG, 'logged out');
+    const revision: number = this.beginChange();
+    try {
+      await this.prepareChange('logout', revision);
+      // Clear foreground only after the persistent background fence succeeds.
+      this.currentUser = undefined;
+      this.currentUid = '';
+      this.clearSessionState();
+      await this.queueMutation(async () => {
+        this.assertRevision(revision);
+        await this.selectAndPublish(undefined, '', revision);
+      });
+      Logger.info(TAG, 'logged out');
+    } finally { this.finishChange(revision); }
   }
 
-  /** 刷新当前账号角色列表并更新默认 UID */
   async refreshRolesOfCurrent(): Promise<void> {
-    const user: User | undefined = this.currentUser;
-    if (user === undefined) {
-      return;
-    }
-    const roles: UserGameRole[] = await this.fetchAndStoreRoles(user);
-    user.roles = roles;
-    await UserRepo.updateUser(user);
-    const uid: string = await this.resolveDefaultUid(user);
-    AppStorage.setOrCreate<string>('currentUid', uid);
+    this.assertAvailable();
+    const selected: User | undefined = this.currentUser;
+    if (selected === undefined) { return; }
+    const revision: number = this.beginChange();
+    try {
+      await this.prepareChange('refreshRoles', revision);
+      const user: User = this.detached(selected);
+      user.roles = await this.fetchRoles(user, revision);
+      const uid: string = this.resolveDefaultUid(user);
+      await this.queueMutation(async () => {
+        await this.commitUser(user, uid, revision, false, true);
+      });
+    } finally { this.finishChange(revision); }
   }
 
-  /** 设置默认 UID */
   async setDefaultUid(userId: number, uid: string): Promise<void> {
-    await UserRepo.setDefaultUid(userId, uid);
-    const user: User | undefined = this.currentUser;
-    if (user !== undefined) {
-      user.roles = await UserRepo.getRolesByUserId(userId);
-      AppStorage.setOrCreate<string>('currentUid', uid);
-    }
+    const revision: number = this.beginChange();
+    try {
+      await this.prepareChange('defaultUid', revision);
+      await this.mutationTail;
+      this.assertRevision(revision);
+      const loaded: User | undefined = await UserRepo.getUserById(userId);
+      this.assertRevision(revision);
+      if (loaded === undefined) { throw new Error('账号不存在'); }
+      const user: User = this.detached(loaded);
+      let found: boolean = false;
+      for (const role of user.roles) {
+        role.isDefault = role.gameUid === uid;
+        role.isChosen = role.isDefault;
+        found = found || role.isDefault;
+      }
+      if (!found) { throw new Error('账号未绑定该角色'); }
+      await this.queueMutation(async () => {
+        const selected: boolean = this.currentUser !== undefined && this.currentUser.id === userId;
+        await this.commitUser(user, uid, revision, false, selected);
+      });
+    } finally { this.finishChange(revision); }
   }
 }

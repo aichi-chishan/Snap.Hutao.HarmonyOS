@@ -3,6 +3,7 @@
  * 深境螺旋：总览（总星数/最深楼层/战斗场次）+ 层列表（每层星级、每半场出战角色）。
  */
 import { router } from '@kit.ArkUI';
+import { ChallengeCloudUploadCard } from '../components/ChallengeCloudUploadCard';
 import { SpiralAbyssViewModel } from '../viewmodel/SpiralAbyssViewModel';
 import { AbyssHistoryEntry } from '../data/repo/SpiralAbyssRepo';
 import { SpiralAbyssData, SpiralAbyssFloor, SpiralAbyssLevel, SpiralAbyssAvatar, SpiralAbyssBattle, SpiralAbyssRank } from '../model/SpiralAbyss';
@@ -482,6 +483,9 @@ export struct SpiralAbyssPage {
 
         Scroll() {
           Column({ space: 10 }) {
+            ChallengeCloudUploadCard({ uid: this.currentUid, kind: 'abyss',
+              scheduleId: this.vm.abyss?.scheduleId ?? 0,
+              available: this.isLoggedIn && !this.vm.loading && !this.vm.fromHistory && this.vm.scheduleType === 1 })
             if (this.vm.loading) {
               Column({ space: 10 }) {
                 LoadingProgress()

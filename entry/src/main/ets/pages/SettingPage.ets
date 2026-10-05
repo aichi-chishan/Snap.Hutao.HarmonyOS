@@ -22,11 +22,11 @@ import EntryAbility from '../entryability/EntryAbility';
 import { GameDataService, GameDataUpdateStatus } from '../service/GameDataService';
 import { GameDataUpdater } from '../data/remote/GameDataUpdater';
 import { RiskVerifyService } from '../service/RiskVerifyService';
-import { ApiClient } from '../data/network/ApiClient';
 import { BackupService } from '../service/BackupService';
 import { SupportService } from '../service/SupportService';
 import { BackgroundMediaService } from '../service/BackgroundMediaService';
 import { HutaoDailyImageService } from '../service/HutaoDailyImageService';
+import { BackgroundTaskSettings } from '../components/BackgroundTaskSettings';
 
 const TAG: string = 'SettingPage';
 
@@ -100,7 +100,7 @@ export struct SettingPage {
   @State geetestInput: string = '';
   /** 应用版本与更新检查（GitHub Releases） */
   @State appVersion: string = '';
-  @State updating: boolean = false;
+  @State backgroundControlsActive: boolean = false;
   /** 每日一图加载状态（选中该背景时展示） */
   @State hutaoDailyStatus: string = '首次使用将自动下载今日一图';
   /** 读取主页卡片配置行（按用户顺序排序） */
@@ -158,6 +158,7 @@ export struct SettingPage {
   @State gachaRows: GachaArchiveRow[] = [];
 
   aboutToAppear(): void {
+    this.backgroundControlsActive = true;
     this.attachDataUpdates();
     this.mediaIndex = Math.max(0, this.mediaTypes.indexOf(PreferencesStore.getString(BackgroundMediaService.TYPE_KEY, 'none')));
     this.mediaMuted = PreferencesStore.getBool(BackgroundMediaService.MUTED_KEY, true);
@@ -214,73 +215,6 @@ export struct SettingPage {
     } catch (e) {
       Logger.warn('SettingPage', `versionName fail: ${(e as Error).message}`);
     }
-  }
-
-  /**
-   * 应用更新检查：GitHub Releases latest 与当前 versionName 比对。
-   * GitHub API 响应无 retcode → ApiResponse.success=true、data 为完整 JSON。
-   */
-  async checkAppUpdate(): Promise<void> {
-    if (this.updating) {
-      return;
-    }
-    this.updating = true;
-    try {
-      const resp = await ApiClient.getInstance().get(
-        'https://api.github.com/repos/aichi-chishan/Snap.Hutao.HarmonyOS/releases/latest',
-        { 'Accept': 'application/vnd.github+json', 'User-Agent': 'Snap.Hutao.HarmonyOS' });
-      if (!resp.success || resp.data === undefined) {
-        this.toast(resp.retcode === 404 ? '仓库还没有发布版本' : `检查失败：${resp.message}`);
-        return;
-      }
-      const data = resp.data as Record<string, Object>;
-      const tag: string = String(data['tag_name'] ?? '').replace(/^v/i, '');
-      const htmlUrl: string = String(data['html_url'] ?? '');
-      if (tag.length === 0) {
-        this.toast('仓库还没有发布版本');
-        return;
-      }
-      if (tag === this.appVersion) {
-        this.toast(`已是最新版本 v${this.appVersion}`);
-        return;
-      }
-      this.confirmOpenUrl(`发现新版本 v${tag}（当前 v${this.appVersion}），是否打开发布页？`, htmlUrl);
-    } catch (e) {
-      this.toast(`检查失败：${(e as Error).message}`);
-    } finally {
-      this.updating = false;
-    }
-  }
-
-  /** 确认后用浏览器打开链接 */
-  private confirmOpenUrl(message: string, url: string): void {
-    this.getUIContext().showAlertDialog({
-      title: '发现新版本',
-      message: message,
-      primaryButton: {
-        value: '取消',
-        action: () => {
-        }
-      },
-      secondaryButton: {
-        value: '打开发布页',
-        action: () => {
-          try {
-            const host = this.getHostContext();
-            if (host === undefined) {
-              return;
-            }
-            (host as common.UIAbilityContext).openLink(url).catch((e: Error) => {
-              this.toast(`打开失败：${e.message}`);
-            });
-          } catch (e) {
-            this.toast(`打开失败：${(e as Error).message}`);
-          }
-        }
-      },
-      cancel: () => {
-      }
-    });
   }
 
   private getHostContext(): common.UIAbilityContext | undefined {
@@ -561,7 +495,12 @@ export struct SettingPage {
   }
 
   /** Detach observation without cancelling foreground work or writing torn-down State. */
+  onPageShow(): void { this.backgroundControlsActive = true; }
+
+  onPageHide(): void { this.backgroundControlsActive = false; }
+
   aboutToDisappear(): void {
+    this.backgroundControlsActive = false;
     this.dataViewActive = false; this.dataGeneration++;
     this.dataUnsubscribe?.(); this.dataUnsubscribe = undefined;
   }
@@ -1252,6 +1191,8 @@ export struct SettingPage {
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
 
+          BackgroundTaskSettings({ active: this.backgroundControlsActive })
+
           this.sectionTitle('主页卡片')
           Text('控制主页仪表板各卡片的显示与排列顺序（对齐 Windows 主页卡片设置）')
             .fontSize(11)
@@ -1432,13 +1373,13 @@ export struct SettingPage {
               Text('检查应用更新')
                 .fontSize(15)
                 .fontColor($r('app.color.text_primary'))
-              Text('对比 GitHub Releases 最新版本（元数据热更见「云资源同步」）')
+              Text('手动检查发布通道与版本说明（游戏数据更新独立管理）')
                 .fontSize(11)
                 .fontColor($r('app.color.text_secondary'))
             }
             .alignItems(HorizontalAlign.Start)
             .layoutWeight(1)
-            Text(this.updating ? '检查中...' : '检查')
+            Text('查看')
               .fontSize(12)
               .fontColor($r('app.color.app_primary'))
               .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -1452,7 +1393,7 @@ export struct SettingPage {
           .border({ width: 1, color: $r('app.color.card_stroke') })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
-            this.checkAppUpdate();
+            router.pushUrl({ url: 'pages/UpdatePage' });
           })
         }
         .width('100%')
