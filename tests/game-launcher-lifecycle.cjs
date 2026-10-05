@@ -1,0 +1,21 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const ts=require(process.env.TYPESCRIPT_PATH||'../ci/node_modules/typescript');
+const page=fs.readFileSync('entry/src/main/ets/pages/LaunchGamePage.ets','utf8');
+let text=page.slice(0,page.indexOf('  build() {'))+'}';text=text.replace('@Entry\n','').replace('@Component\n','').replace('export struct LaunchGamePage','export class LaunchGamePage');
+const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return{promise,resolve,reject}};
+let calls=0,saves=0,clears=0,gate;
+const target={displayName:'Game',packageName:'com.game',abilityName:'Entry',uri:''};
+const api={GamePackage:class{},GameLauncherService:{getTarget:()=>({...target}),targetStatus:()=> 'ready',saveTarget:()=>{saves++;return ''},clearTarget:()=>{clears++},launch:()=>{calls++;gate=deferred();return gate.promise}}};
+const output=ts.transpileModule(text,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,experimentalDecorators:true}}).outputText;
+const m={exports:{}};vm.runInNewContext(`(function(require,module,exports){${output}\n})`,{Prop:()=>{},State:()=>{},StorageProp:()=>()=>{}})(()=>api,m,m.exports);
+(async()=>{
+ const x=new m.exports.LaunchGamePage();await x.launch();assert.equal(calls,0);x.aboutToAppear();const first=x.launch();await x.launch();assert.equal(calls,1);assert.equal(saves,1);x.clear();assert.equal(clears,0);assert.equal(x.save(),false);
+ x.aboutToDisappear();gate.resolve({message:'stale'});await first;assert.notEqual(x.message,'stale');x.aboutToAppear();assert.equal(x.launching,false);
+ const second=x.launch();x.aboutToDisappear();x.aboutToAppear();assert.equal(x.launching,true);await x.launch();assert.equal(calls,2);gate.resolve({message:'old screen'});await second;assert.equal(x.message,'ready');assert.equal(x.launching,false);
+ const third=x.launch();gate.reject(Error('platform'));await third;assert.match(x.message,/无法/);assert.equal(x.launching,false);x.clear();assert.equal(clears,1);
+ for(const size of [80,2048,255])assert(page.includes(`.maxLength(${size}).enabled(!this.launching)`));
+ assert(!page.match(/aboutToDisappear\(\): void \{[^}]*this\.(launching|message)\s*=/));
+ console.log('PASS: public game launch duplicate, edit, clear, detach/remount, rejection and bounds controls');
+})().catch(e=>{console.error(e);process.exitCode=1});

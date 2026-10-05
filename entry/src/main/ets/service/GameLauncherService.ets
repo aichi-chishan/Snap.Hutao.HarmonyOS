@@ -37,6 +37,10 @@ export class GameLauncherService {
   }
 
   static validationMessage(target: GamePackage): string {
+    if (target.displayName.length > 80 || target.uri.length > 2048 ||
+      target.packageName.length > 255 || target.abilityName.length > 255) {
+      return '启动入口文字超过允许长度';
+    }
     if (target.uri.trim().length > 0) {
       // A route is supplied by the user/vendor; do not guess a game scheme or scan packages.
       if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(target.uri.trim()) || /\s/.test(target.uri.trim())) {

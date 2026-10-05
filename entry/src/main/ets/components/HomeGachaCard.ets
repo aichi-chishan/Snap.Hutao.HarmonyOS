@@ -18,6 +18,7 @@ const PURPLE_GUARANTEE: number = 10;
 
 @Component
 export struct HomeGachaCard {
+  @StorageProp('reduceMotion') reduceMotion: boolean = false;
   @Prop uid: string = '';
   @Prop pools: HomePoolSummary[] = [];
   @Prop total: number = 0;
@@ -185,7 +186,7 @@ export struct HomeGachaCard {
     }
     .scrollable(ScrollDirection.Horizontal)
     .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
+    .edgeEffect(this.reduceMotion ? EdgeEffect.None : EdgeEffect.Spring)
     .width('100%')
     .alignSelf(ItemAlign.Stretch)
     .layoutWeight(this.fillHeight ? 1 : 0)
@@ -204,7 +205,7 @@ export struct HomeGachaCard {
     }
     .scrollable(ScrollDirection.Horizontal)
     .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
+    .edgeEffect(this.reduceMotion ? EdgeEffect.None : EdgeEffect.Spring)
     .width('100%')
     .align(Alignment.TopStart)
   }
@@ -221,8 +222,9 @@ export struct HomeGachaCard {
       .index(this.pageIndex)
       .indicator(false)
       .loop(false)
-      .duration(240)
-      .curve(Motion.springFast())
+      .effectMode(this.reduceMotion ? EdgeEffect.None : EdgeEffect.Spring)
+      .duration(this.reduceMotion ? 0 : 240)
+      .curve(this.reduceMotion ? Curve.Linear : Motion.springFast())
       .width('100%')
       .layoutWeight(this.fillHeight ? 1 : 0)
       .onChange((idx: number) => {
@@ -237,7 +239,7 @@ export struct HomeGachaCard {
             .height(6)
             .borderRadius(3)
             .backgroundColor(idx === this.pageIndex ? $r('app.color.app_primary') : $r('app.color.divider'))
-            .animation({ duration: 150, curve: Curve.EaseOut })
+            .animation({ duration: this.reduceMotion ? 0 : 150, curve: Curve.EaseOut })
         }, (page: GachaArchiveStatPage, idx: number) => `pip_${idx}_${page.uid}`)
       }
       .width('100%')

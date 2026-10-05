@@ -82,6 +82,7 @@ function immersiveAvailable(): boolean {
 @Component
 export struct RiskVerifyModal {
   @StorageProp('isDarkMode') isDark: boolean = false;
+  @StorageProp('reduceMotion') reduceMotion: boolean = false;
   @StorageLink(KEY_RISK_SHOW) isShow: boolean = false;
   @StorageLink(KEY_RISK_REQ) req: RiskVerifyRequest = new RiskVerifyRequest();
   @State statusText: string = '';
@@ -365,7 +366,8 @@ export struct RiskVerifyModal {
           .onClick(() => {
             RiskVerifyService.getInstance().cancel();
           })
-          .transition(TransitionEffect.OPACITY.animation({ duration: 220, curve: Curve.EaseOut }))
+          .transition(this.reduceMotion ? TransitionEffect.IDENTITY.animation({ duration: 0 }) :
+            TransitionEffect.OPACITY.animation({ duration: 220, curve: Curve.EaseOut }))
 
         Column() {
           // 标题行
@@ -390,8 +392,9 @@ export struct RiskVerifyModal {
           Row({ space: 6 }) {
             Circle({ width: 6, height: 6 })
               .fill(this.loadFailed ? $r('app.color.danger') : $r('app.color.app_primary'))
-              .opacity(this.statusText.includes('请完成') ? 1 : 0.35)
-              .animation({ duration: 700, curve: Curve.EaseInOut, iterations: -1, playMode: PlayMode.Alternate })
+              .opacity(this.reduceMotion || this.statusText.includes('请完成') ? 1 : 0.35)
+              .animation({ duration: this.reduceMotion ? 0 : 700, curve: Curve.EaseInOut,
+                iterations: this.reduceMotion ? 1 : -1, playMode: PlayMode.Alternate })
             Text(this.statusText.length > 0 ? this.statusText : '正在发起人机验证...')
               .fontSize(13)
               .fontColor(this.loadFailed ? $r('app.color.danger') : $r('app.color.text_secondary'))
@@ -466,16 +469,16 @@ export struct RiskVerifyModal {
         .borderRadius(24)
         // API 26+ 沉浸光感材质；API 23/24 用 backgroundEffect 实时磨砂玻璃（材质观感一致）
         .attributeModifier(new GuardedMaterialModifier(this.material))
-        .backgroundColor(this.material !== undefined ? Color.Transparent : (this.isDark ? '#B31E1E22' : '#B3F2F0EC'))
+        .backgroundColor(this.material !== undefined ? Color.Transparent : $r('app.color.risk_modal_surface'))
         .backgroundEffect(this.material !== undefined ? undefined : {
           radius: 48,
-          color: this.isDark ? '#801E1E22' : '#80F2F0EC',
+          color: $r('app.color.risk_modal_tint'),
           saturation: 1.2,
           brightness: this.isDark ? 0.9 : 1.1,
         })
         .shadow({ radius: 40, color: 'rgba(0,0,0,0.35)', offsetY: 12 })
         .alignItems(HorizontalAlign.Start)
-        .transition(TransitionEffect.asymmetric(
+        .transition(this.reduceMotion ? TransitionEffect.IDENTITY.animation({ duration: 0 }) : TransitionEffect.asymmetric(
           // 进场：spring 弹性放大 + 上浮 + 渐显
           TransitionEffect.scale({ x: 0.92, y: 0.92 })
             .combine(TransitionEffect.translate({ y: 36 }))

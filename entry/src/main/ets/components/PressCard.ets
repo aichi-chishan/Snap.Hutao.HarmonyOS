@@ -20,7 +20,8 @@ export struct PressCard {
   onTap: () => void = () => {
   };
   /** 按下缩放（默认 0.97） */
-  pressScaleTo: number = 0.97;
+  @Prop pressScaleTo: number = 0.97;
+  @StorageProp('reduceMotion') @Watch('onMotionChanged') reduceMotion: boolean = false;
   /** 卡片壳背景（Color.Transparent = 无壳底，由调用方自绘） */
   @Prop cardBg: ResourceColor = Color.Transparent;
   /** 卡片壳圆角（默认 12） */
@@ -33,15 +34,28 @@ export struct PressCard {
   /** 按压缩放（回弹） */
   @State pressScale: number = 1;
 
+  aboutToAppear(): void {
+    this.pressScale = 1;
+  }
+
+  onMotionChanged(): void {
+    if (this.reduceMotion) {
+      this.pressScale = 1;
+    }
+  }
+
   /** 处理按压状态：缩放动画切换 */
   private handleTouch(type: TouchType): void {
-    const uiContext = this.getUIContext();
+    if (this.reduceMotion) {
+      this.pressScale = 1;
+      return;
+    }
     if (type === TouchType.Down) {
-      uiContext.animateTo({ duration: 90, curve: Curve.EaseOut }, () => {
+      this.getUIContext().animateTo({ duration: 90, curve: Curve.EaseOut }, () => {
         this.pressScale = this.pressScaleTo;
       });
     } else if (type === TouchType.Up || type === TouchType.Cancel) {
-      uiContext.animateTo({ duration: 260, curve: curves.springCurve(0.1, 1, 228, 30) }, () => {
+      this.getUIContext().animateTo({ duration: 260, curve: curves.springCurve(0.1, 1, 228, 30) }, () => {
         this.pressScale = 1;
       });
     }
@@ -67,13 +81,16 @@ export struct PressCard {
     })
     .shadow(this.shadowEnabled ? {
       radius: 14,
-      color: '#18000000',
+      color: $r('app.color.card_shadow'),
       offsetX: 0,
       offsetY: 5,
     } : undefined)
-    .scale({ x: this.pressScale, y: this.pressScale })
+    .scale({ x: this.reduceMotion ? 1 : this.pressScale, y: this.reduceMotion ? 1 : this.pressScale })
     .hoverEffect(HoverEffect.Highlight)
-    .animation({ duration: 90, curve: Curve.EaseOut })
+    .animation({ duration: this.reduceMotion ? 0 : 90, curve: Curve.EaseOut })
+    .onBlur(() => {
+      this.pressScale = 1;
+    })
     .onTouch((event: TouchEvent) => {
       this.handleTouch(event.type);
     })

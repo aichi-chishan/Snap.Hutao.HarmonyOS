@@ -82,6 +82,7 @@ class DashCardSpec {
     @StorageProp('topAvoidVp') topAvoidVp: number = 0;
     @StorageProp('bottomAvoidVp') bottomAvoidVp: number = 0;
     @StorageProp('isDarkMode') isDark: boolean = false;
+    @StorageProp('reduceMotion') reduceMotion: boolean = false;
     /** 当前选中页签（窄屏 0-3 / 宽屏 0-7） */
     @State currentIndex: number = 0;
     /** 宽屏侧边栏（>=840vp 平板/PC 显示） */
@@ -460,12 +461,26 @@ class DashCardSpec {
 
   /** 宽屏内容切换（统一入口）：animateTo 驱动 geometryTransition 指示条与页面转场 */
   private switchTo(index: number): void {
-    this.getUIContext().animateTo({ curve: Motion.springSoft() }, () => {
+    if (this.reduceMotion) {
       this.currentIndex = index;
-    });
+    } else {
+      this.getUIContext().animateTo({ curve: Motion.springSoft() }, () => {
+        this.currentIndex = index;
+      });
+    }
     // 切回主页自动拉新数据（对齐 Windows；替代下拉刷新——模拟器 Refresh+Scroll 嵌套渲染异常）
     if (index === 0) {
       this.reloadHome();
+    }
+  }
+
+  private toggleSidebar(): void {
+    if (this.reduceMotion) {
+      this.sidebarFold = !this.sidebarFold;
+    } else {
+      this.getUIContext().animateTo({ curve: Motion.springSoft() }, () => {
+        this.sidebarFold = !this.sidebarFold;
+      });
     }
   }
 
@@ -526,7 +541,7 @@ class DashCardSpec {
         ? BlurStyle.COMPONENT_THICK : BlurStyle.NONE, {
         colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
       })
-      .barBackgroundColor('#00FFFFFF')
+      .barBackgroundColor(Color.Transparent)
       .width('100%')
       .height('100%')
       .backgroundColor(Color.Transparent)
@@ -627,9 +642,7 @@ class DashCardSpec {
       .borderRadius(8)
       .hoverEffect(HoverEffect.Highlight)
       .onClick(() => {
-        this.getUIContext().animateTo({ curve: Motion.springSoft() }, () => {
-          this.sidebarFold = !this.sidebarFold;
-        });
+        this.toggleSidebar();
       })
 
       // 版本号（胡桃 x.y.z，来自 bundleManager versionName）
@@ -726,14 +739,15 @@ class DashCardSpec {
         .height(18)
         .borderRadius(2)
         .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary') : Color.Transparent)
-        .geometryTransition(this.currentIndex === index ? 'navIndicator' : '')
+        .geometryTransition(!this.reduceMotion && this.currentIndex === index ? 'navIndicator' : '')
       NavIcon({ name: 'Announcement', iconSize: 24 })
       if (!this.sidebarFold) {
         Text('主页')
           .fontSize(15)
           .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Normal)
           .fontColor(this.currentIndex === index ? $r('app.color.app_primary') : $r('app.color.text_primary'))
-          .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
+          .transition(this.reduceMotion ? TransitionEffect.IDENTITY.animation({ duration: 0 }) :
+            TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
       }
       Blank()
     }
@@ -742,7 +756,7 @@ class DashCardSpec {
     .borderRadius(10)
     .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary_bg') : Color.Transparent)
     .hoverEffect(HoverEffect.Highlight)
-    .animation({ curve: Motion.springFast() })
+    .animation(this.reduceMotion ? { duration: 0 } : { curve: Motion.springFast() })
     .onClick(() => {
       this.switchTo(index);
     })
@@ -766,7 +780,7 @@ class DashCardSpec {
         .height(18)
         .borderRadius(2)
         .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary') : Color.Transparent)
-        .geometryTransition(this.currentIndex === index ? 'navIndicator' : '')
+        .geometryTransition(!this.reduceMotion && this.currentIndex === index ? 'navIndicator' : '')
       if (Index.isEmoji(icon)) {
         Text(icon)
           .fontSize(18)
@@ -780,7 +794,8 @@ class DashCardSpec {
           .fontSize(15)
           .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Normal)
           .fontColor(this.currentIndex === index ? $r('app.color.app_primary') : $r('app.color.text_primary'))
-          .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
+          .transition(this.reduceMotion ? TransitionEffect.IDENTITY.animation({ duration: 0 }) :
+            TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
       }
       Blank()
     }
@@ -789,7 +804,7 @@ class DashCardSpec {
     .borderRadius(10)
     .backgroundColor(this.currentIndex === index ? $r('app.color.app_primary_bg') : Color.Transparent)
     .hoverEffect(HoverEffect.Highlight)
-    .animation({ curve: Motion.springFast() })
+    .animation(this.reduceMotion ? { duration: 0 } : { curve: Motion.springFast() })
     .onClick(() => {
       this.switchTo(index);
     })
@@ -901,7 +916,7 @@ class DashCardSpec {
     .width('100%')
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
-    .animation({ curve: Motion.springFast() })
+    .animation(this.reduceMotion ? { duration: 0 } : { curve: Motion.springFast() })
   }
 
   /** All form factors consume the same ordered/visible dashboard card configuration. */
@@ -1498,7 +1513,7 @@ class DashCardSpec {
     .padding(10)
     .borderRadius($r('app.float.card_radius'))
     .backgroundColor($r('app.color.card_surface'))
-    .transition(Motion.riseIn())
+    .transition(this.reduceMotion ? TransitionEffect.IDENTITY.animation({ duration: 0 }) : Motion.riseIn())
     .hoverEffect(HoverEffect.Highlight)
     .onClick(onClick)
   }

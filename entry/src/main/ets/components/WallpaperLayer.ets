@@ -29,6 +29,7 @@ const MICA_DARK_BRIGHTNESS: number = 1.15;
 export struct WallpaperLayer {
   /** 是否深色模式（AppStorage isDarkMode，主题切换实时更新；@Watch 触发重渲） */
   @StorageProp('isDarkMode') @Watch('onDarkChanged') isDark: boolean = false;
+  @StorageProp('reduceMotion') @Watch('onMotionChanged') reduceMotion: boolean = false;
   /** 背景来源：none / local */
   @Prop @Watch('onBgChanged') bgType: string = 'local';
   /** 本地图片目录（local 生效；空回退内置图） */
@@ -68,6 +69,16 @@ export struct WallpaperLayer {
   /** 主题切换实时触发（@StorageProp isDark 变化自动重建 build，无需手动占位） */
   onDarkChanged(): void {
     this.imgOpacity = this.isDark ? 1 - this.currentLuminance : this.currentLuminance;
+  }
+
+  /** 动态关闭过渡时，以零时长重定向当前不透明度；不重载图片或更改轮换计时器。 */
+  onMotionChanged(): void {
+    if (this.reduceMotion && this.hasImage) {
+      const target: number = this.isDark ? 1 - this.currentLuminance : this.currentLuminance;
+      this.getUIContext().animateTo({ duration: 0 }, () => {
+        this.imgOpacity = Math.min(1, Math.max(0, target));
+      });
+    }
   }
 
   /** 背景来源/目录变化时重新装载 */
@@ -131,9 +142,13 @@ export struct WallpaperLayer {
       if (sequence !== this.imageSequence) { return; }
       this.currentLuminance = l;
       const target: number = this.isDark ? 1 - l : l;
-      this.getUIContext().animateTo({ duration: 1000, curve: Curve.EaseInOut }, () => {
+      if (this.reduceMotion) {
         this.imgOpacity = Math.min(1, Math.max(0, target));
-      });
+      } else {
+        this.getUIContext().animateTo({ duration: 1000, curve: Curve.EaseInOut }, () => {
+          this.imgOpacity = Math.min(1, Math.max(0, target));
+        });
+      }
     });
   }
 

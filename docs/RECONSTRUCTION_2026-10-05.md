@@ -53,6 +53,17 @@ A persisted app.reduce_motion switch is restored after backup recovery and befor
 
 ### Verification
 
-Fresh aggregate: 15 host suites passed with TypeScript5.9.3 and NODE_PATH cleared. Focused coverage includes 17 offline-gacha tests and 22 StandardIconService cases, plus production preference/startup/settings and raw-cache short-write regressions. New cache tests use actual host filesystem operations with HTTP doubles. App-resource references in changed ArkTS files resolve; diff whitespace checks pass. Official native compiler/lint/HAP/device/account checks remain unrun.
+Fresh aggregate: 15 host suites passed with TypeScript5.9.3 and NODE_PATH cleared. Focused coverage includes 18 offline-gacha tests and 22 StandardIconService cases, plus production preference/startup/settings and raw-cache short-write regressions. New cache tests use actual host filesystem operations with HTTP doubles. App-resource references in changed ArkTS files resolve; diff whitespace checks pass. Official native compiler/lint/HAP/device/account checks remain unrun.
 
 Additional API evidence: [file I/O](https://github.com/openharmony/docs/blob/master/en/application-dev/reference/apis-core-file-kit/js-apis-file-fs.md), [HTTP](https://github.com/openharmony/docs/blob/master/en/application-dev/reference/apis-network-kit/js-apis-http.md), [curves](https://github.com/openharmony/docs/blob/master/en/application-dev/reference/apis-arkui/js-apis-curve.md). Used additions remain below minimum API24; maxRedirects is API23 and stepsCurve is API9.
+
+
+## Checkpoint 4: motion consumers and public game-launch lifecycle
+
+Reduced-motion preference now reaches PressCard, Index navigation/sidebar/visual transitions, HomeGachaCard paging/indicators, RiskVerifyModal visual effects and wallpaper fades. Risk verification HTML, protocol and Web-controller callbacks remain unchanged. WikiAvatarPage paging also uses zero-duration non-physical curves when reduced. Native animation interruption still needs device observation. Other scroll edge effects, background video and system-native defaults are not claimed disabled.
+
+Public game-entry editing/clearing is disabled during a launch request. Duplicate launch requests, stale results after page detach/remount and unexpected launch rejection are handled. Bounded text fields are enforced in both UI and service validation; no game scheme, installed-package discovery or Windows launch support is invented. Theme resources now own the edited card shadows and verification-panel colors.
+
+The exact staged snapshot for this checkpoint passed 17 host suites, independently of simultaneous uncommitted UIGF/snapshot work. Focused new tests execute launch interruption/repeated-action paths and motion consumer policies. Full-resource reference checks and diff whitespace checks pass.
+
+Native validation has now succeeded for the earlier exact checkpoint `77304749bbb605108d05cf8c6f99f84d96ebdd2e`: clean official SDK build, 0 native lint errors, 45 warnings and 1 suggestion, verified unsigned HAP minimum API24/target26. The full count/canary/warning evidence is recorded in NATIVE_VALIDATION_RECONSTRUCTION_2026-10-05.md. That result does not automatically validate this later checkpoint or device behavior.
