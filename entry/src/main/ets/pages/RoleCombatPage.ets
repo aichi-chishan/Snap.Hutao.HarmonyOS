@@ -4,7 +4,6 @@
  * 数据源：role_combat 接口（need_detail=true）。
  */
 import { router } from '@kit.ArkUI';
-import { ChallengeCloudUploadCard } from '../components/ChallengeCloudUploadCard';
 import { RoleCombatViewModel } from '../viewmodel/RoleCombatViewModel';
 import { RoleCombatDataItem, RoleCombatRoundData, RoleCombatAvatar, RoleCombatBuff, RoleCombatEnemy, RoleCombatAvatarStat } from '../model/RoleCombat';
 import { RoleCombatHistoryEntry } from '../data/repo/RoleCombatRepo';
@@ -627,9 +626,6 @@ export struct RoleCombatPage {
       } else {
         Scroll() {
           Column({ space: 10 }) {
-            ChallengeCloudUploadCard({ uid: this.currentUid, kind: 'roleCombat',
-              scheduleId: this.vm.current()?.schedule.scheduleId ?? 0,
-              available: this.isLoggedIn && !this.vm.loading && !this.vm.fromHistory && this.vm.currentIndex === 0 })
             // 期数历史（本地累积存档，对齐 Windows 左侧期数列表；点历史期回看，⟲ 实时回当前）
             if (this.vm.history.length > 0) {
               Scroll() {
