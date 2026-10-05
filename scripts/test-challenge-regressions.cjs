@@ -79,7 +79,7 @@ async function main() {
     }
     RelationalStoreHelper.rdbStore = undefined;
     await RelationalStoreHelper.init({});
-    assert.equal(sqlStore.version, 6);
+    assert.equal(sqlStore.version, 7);
     for (const table of ['challenge_records', 'cultivate_inventory', 'backup_recovery']) {
       assert.equal(sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name=?").get(table).n, 1);
     }

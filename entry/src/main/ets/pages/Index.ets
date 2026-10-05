@@ -40,6 +40,7 @@ import { SettingPage } from './SettingPage';
 import { RoleCombatPage } from './RoleCombatPage';
 import { HardChallengePage } from './HardChallengePage';
 import { CultivationPage } from './CultivationPage';
+import { BackpackPage } from './BackpackPage';
 import { WikiAvatarPage } from './WikiAvatarPage';
 import { WikiWeaponPage } from './WikiWeaponPage';
 import { WikiMonsterPage } from './WikiMonsterPage';
@@ -690,6 +691,7 @@ class DashCardSpec {
         this.navItem(3, 'DailyNote', '实时便笺')
         this.navItem(4, 'AvatarProperty', '我的角色')
         this.navItem(5, 'Cultivation', '养成计划')
+        this.navItem(17, 'Backpack', '离线背包')
 
         this.navSectionTitle('周期')
         this.navItem(6, 'SpiralAbyss', '深境螺旋')
@@ -881,6 +883,10 @@ class DashCardSpec {
         PageContainer() {
           LaunchGamePage({ embedMode: true })
           }
+      } else if (this.currentIndex === 17) {
+        PageContainer() {
+          BackpackPage({ embedMode: true })
+        }
       } else if (this.currentIndex === 16) {
         PageContainer() {
           HutaoCloudPage({ embedMode: true })
@@ -1595,6 +1601,9 @@ class DashCardSpec {
 
         this.entryCard('Cultivation', '养成计划', '角色养成 / 材料计算', () => {
           router.pushUrl({ url: 'pages/CultivationPage' });
+        })
+        this.entryCard('Backpack', '离线背包', 'UIIF 导入导出 / 库存与装备', () => {
+          router.pushUrl({ url: 'pages/BackpackPage' });
         })
         this.entryCard('Achievement', '成就管理', '进度统计 / UIAF 导入导出', () => {
           router.pushUrl({ url: 'pages/AchievementPage' });

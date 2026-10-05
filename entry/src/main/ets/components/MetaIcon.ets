@@ -19,6 +19,23 @@ const META_TAG: string = 'MetaIcon';
 /** 进程内图标解析缓存：key = category/name → 沙盒路径；使用前确认文件仍在。 */
 const RAW_CACHE: Map<string, string> = new Map();
 
+/** One immutable native Image request; source equality alone cannot identify retries. */
+class MetaIconFrame {
+  readonly id: number;
+  readonly token: number;
+  readonly source: string;
+  readonly size: number;
+  readonly circular: boolean;
+
+  constructor(id: number, token: number, source: string, size: number, circular: boolean) {
+    this.id = id;
+    this.token = token;
+    this.source = source;
+    this.size = size;
+    this.circular = circular;
+  }
+}
+
 @Component
 export struct MetaIcon {
   /** 图标类别目录 */
@@ -26,13 +43,15 @@ export struct MetaIcon {
   /** 图标名（不含扩展名，如 UI_AvatarIcon_Ayaka）；也兼容 http/file:// 完整源 */
   @Prop @Watch('onMetaChanged') name: string = '';
   /** 显示尺寸（vp） */
-  @Prop iconSize: number = 32;
+  @Prop @Watch('onRenderChanged') iconSize: number = 32;
   /** true 时按圆形裁剪（头像场景，objectFit Cover） */
-  @Prop circular: boolean = false;
+  @Prop @Watch('onRenderChanged') circular: boolean = false;
   /** true 时 rawfile 缺失走云端资源包缓存通道 */
   @Prop @Watch('onMetaChanged') remoteFallback: boolean = false;
   /** 当前图源 */
   @State src: string = '';
+  @State private frames: MetaIconFrame[] = [];
+  private nextFrameId: number = 0;
   /** 异步解析令牌：name/category 变化后丢弃过期结果 */
   private resolveToken: number = 0;
 
@@ -53,16 +72,33 @@ export struct MetaIcon {
     this.resolve();
   }
 
+  /** Resizing/reclipping owns a fresh Image node without rereading or downloading its source. */
+  onRenderChanged(): void {
+    if (this.attached) { this.publishSource(this.src); }
+  }
+
+  private publishSource(source: string): void {
+    this.src = source;
+    this.frames = source.length > 0 ? [new MetaIconFrame(++this.nextFrameId, this.resolveToken,
+      source, this.iconSize, this.circular)] : [];
+  }
+
+  private onImageError(frame: MetaIconFrame): void {
+    if (!this.attached || frame.token !== this.resolveToken || this.frames.length !== 1 ||
+      this.frames[0].id !== frame.id) { return; }
+    // A decode failure is a display failure, not permission to delete a user's URI or shared cache file.
+    this.publishSource('');
+  }
+
   resolve(): void {
     if (!this.attached) { return; }
     const token: number = ++this.resolveToken;
-    this.src = '';
+    this.publishSource('');
     if (this.name.length === 0) {
-      this.src = '';
       return;
     }
     if (this.name.startsWith('https://') || this.name.startsWith('http://') || this.name.startsWith('file://')) {
-      this.src = this.name;
+      this.publishSource(this.name);
       return;
     }
     // Metadata names are path segments, never arbitrary relative filesystem paths.
@@ -71,7 +107,7 @@ export struct MetaIcon {
     try {
       const remote: string = GameDataService.getInstance().readIcon(this.category, this.name);
       if (remote.length > 0) {
-        this.src = remote;
+        this.publishSource(remote);
         return;
       }
     } catch (e) {
@@ -113,7 +149,7 @@ export struct MetaIcon {
     if (cached !== undefined) {
       try {
         if (fileIo.accessSync(cached)) {
-          if (this.attached && token === this.resolveToken) { this.src = fileUri.getUriFromPath(cached); }
+          if (this.attached && token === this.resolveToken) { this.publishSource(fileUri.getUriFromPath(cached)); }
           return;
         }
       } catch (_) { /* Evicted cache entries are retried below. */ }
@@ -125,7 +161,7 @@ export struct MetaIcon {
       if (fileIo.accessSync(dest)) {
         RAW_CACHE.set(key, dest);
         if (this.attached && token === this.resolveToken) {
-          this.src = fileUri.getUriFromPath(dest);
+          this.publishSource(fileUri.getUriFromPath(dest));
         }
         return;
       }
@@ -142,12 +178,12 @@ export struct MetaIcon {
       const src: string = fileUri.getUriFromPath(dest);
       RAW_CACHE.set(key, dest);
       if (this.attached && token === this.resolveToken) {
-        this.src = src;
+        this.publishSource(src);
       }
     } catch (e) {
       Logger.warn(META_TAG, `rawfile ${category}/${name} fail: ${(e as Error).message}`);
       if (this.attached && token === this.resolveToken) {
-        this.src = '';
+        this.publishSource('');
       }
       if (this.remoteFallback) {
         this.tryRemote(category, name, token).catch((error: Error) => {
@@ -171,7 +207,7 @@ export struct MetaIcon {
       const src: string = fileUri.getUriFromPath(found);
       RAW_CACHE.set(`${category}/${name}`, found);
       if (this.attached && token === this.resolveToken) {
-        this.src = src;
+        this.publishSource(src);
       }
     }
   }
@@ -195,12 +231,17 @@ export struct MetaIcon {
 
   build() {
     if (this.name.length > 0 && this.src !== '') {
-      Image(this.src)
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .objectFit(this.circular ? ImageFit.Cover : ImageFit.Contain)
-        .borderRadius(this.circular ? this.iconSize / 2 : 0)
-        .draggable(false)
+      ForEach(this.frames, (frame: MetaIconFrame) => {
+        Image(frame.source)
+          .width(frame.size)
+          .height(frame.size)
+          .objectFit(frame.circular ? ImageFit.Cover : ImageFit.Contain)
+          .borderRadius(frame.circular ? frame.size / 2 : 0)
+          // ArkUI derives the decode size from layout/density and fit, preserving non-square sources.
+          .autoResize(true)
+          .draggable(false)
+          .onError(() => { this.onImageError(frame); })
+      }, (frame: MetaIconFrame) => `${frame.id}`)
     } else {
       Column()
         .width(this.iconSize)
