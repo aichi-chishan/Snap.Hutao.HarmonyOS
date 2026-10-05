@@ -9,6 +9,7 @@ import { Logger } from '../../common/Logger';
 
 const TAG: string = 'StandardIconService';
 const STATIC_BASE: string = 'https://api.snaphutaorp.org/static/raw/';
+const STATIC_REDIRECT_BASE: string = 'https://static.snaphutaorp.org/static/raw/';
 
 export class StandardIconService {
   static readonly MAX_BYTES: number = 8 * 1024 * 1024;
@@ -23,6 +24,21 @@ export class StandardIconService {
   static localPath(category: string, name: string): string {
     if (!StandardIconService.validSegment(category) || !StandardIconService.validSegment(name)) { return ''; }
     return `${AppContextProvider.getCacheDir()}/remote/${category}/${name}.png`;
+  }
+
+  /** Preserve existing local aliases; only IconElement uses the upstream intrinsic names. */
+  private static sourceName(category: string, name: string): string {
+    if (category !== 'IconElement') { return name; }
+    switch (name) {
+      case 'UI_Icon_Element_Anemo': return 'UI_Icon_Element_Wind';
+      case 'UI_Icon_Element_Cryo': return 'UI_Icon_Element_Ice';
+      case 'UI_Icon_Element_Dendro': return 'UI_Icon_Element_Grass';
+      case 'UI_Icon_Element_Electro': return 'UI_Icon_Element_Electric';
+      case 'UI_Icon_Element_Geo': return 'UI_Icon_Element_Rock';
+      case 'UI_Icon_Element_Hydro': return 'UI_Icon_Element_Water';
+      case 'UI_Icon_Element_Pyro': return 'UI_Icon_Element_Fire';
+      default: return name;
+    }
   }
 
   /** One active request per destination, released on both success and failure. */
@@ -87,12 +103,34 @@ export class StandardIconService {
     } catch (_) { return false; }
   }
 
-  private static async materialize(category: string, name: string, destination: string): Promise<string> {
-    StandardIconService.prepareDirectory(category);
-    if (StandardIconService.cached(destination)) { return destination; }
+  private static isRedirect(status: number): boolean {
+    return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+  }
+
+  /** Exact comparison excludes credentials, ports, query/fragment, changed paths and other hosts. */
+  private static checkedRedirect(response: http.HttpResponse, expected: string): string {
+    const headers: Record<string, Object> = response.header as Record<string, Object>;
+    if (headers === undefined || headers === null || typeof headers !== 'object' || Array.isArray(headers)) {
+      throw new Error('Missing icon redirect headers');
+    }
+    let location: string = '';
+    let count: number = 0;
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === 'location') {
+        count++;
+        if (typeof headers[key] !== 'string') { throw new Error('Invalid icon redirect location'); }
+        location = headers[key] as string;
+      }
+    }
+    if (count !== 1 || location !== expected) { throw new Error('Untrusted icon redirect'); }
+    return location;
+  }
+
+  /** Never enable automatic redirects: every hop retains the same size and timeout limits. */
+  private static async requestIcon(url: string): Promise<http.HttpResponse> {
     const request: http.HttpRequest = http.createHttp();
     try {
-      const response: http.HttpResponse = await request.request(`${STATIC_BASE}${category}/${name}.png`, {
+      return await request.request(url, {
         method: http.RequestMethod.GET,
         expectDataType: http.HttpDataType.ARRAY_BUFFER,
         connectTimeout: 10000,
@@ -101,18 +139,30 @@ export class StandardIconService {
         maxRedirects: 0,
         usingCache: false,
       });
-      if (response.responseCode !== http.ResponseCode.OK || !(response.result instanceof ArrayBuffer)) {
-        throw new Error('Invalid icon response');
-      }
-      const bytes: Uint8Array = new Uint8Array(response.result as ArrayBuffer);
-      // This is a bounded signature/size guard, not a full PNG decoder.
-      if (bytes.byteLength < StandardIconService.MIN_BYTES || bytes.byteLength > StandardIconService.MAX_BYTES ||
-        !StandardIconService.hasPngSignature(bytes)) { throw new Error('Invalid PNG icon'); }
-      // Recheck directories after the asynchronous request before creating any temporary output.
-      const directory: string = StandardIconService.prepareDirectory(category);
-      if (!StandardIconService.cached(destination)) { StandardIconService.publish(directory, destination, bytes); }
-      return destination;
     } finally { request.destroy(); }
+  }
+
+  private static async materialize(category: string, name: string, destination: string): Promise<string> {
+    StandardIconService.prepareDirectory(category);
+    if (StandardIconService.cached(destination)) { return destination; }
+    const relative: string = `${category}/${StandardIconService.sourceName(category, name)}.png`;
+    let response: http.HttpResponse = await StandardIconService.requestIcon(`${STATIC_BASE}${relative}`);
+    if (StandardIconService.isRedirect(response.responseCode)) {
+      const target: string = StandardIconService.checkedRedirect(response, `${STATIC_REDIRECT_BASE}${relative}`);
+      response = await StandardIconService.requestIcon(target);
+    }
+    // A redirect on the second request is rejected here; a loop can never add a third hop.
+    if (response.responseCode !== http.ResponseCode.OK || !(response.result instanceof ArrayBuffer)) {
+      throw new Error('Invalid icon response');
+    }
+    const bytes: Uint8Array = new Uint8Array(response.result as ArrayBuffer);
+    // This is a bounded signature/size guard, not a full PNG decoder.
+    if (bytes.byteLength < StandardIconService.MIN_BYTES || bytes.byteLength > StandardIconService.MAX_BYTES ||
+      !StandardIconService.hasPngSignature(bytes)) { throw new Error('Invalid PNG icon'); }
+    // Recheck directories after the asynchronous request before creating any temporary output.
+    const directory: string = StandardIconService.prepareDirectory(category);
+    if (!StandardIconService.cached(destination)) { StandardIconService.publish(directory, destination, bytes); }
+    return destination;
   }
 
   /** API9 mkdtemp/rename/write: only this invocation's unique staging directory is ever removed. */

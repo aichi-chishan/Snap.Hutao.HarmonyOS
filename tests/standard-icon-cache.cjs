@@ -167,3 +167,105 @@ test('cleanup failure cannot delete published data or turn it into a partial fil
   assert.deepEqual(fs.readdirSync(h.temps[0]), [], 'successful rename left only an empty owned directory');
   assert.equal(await ensure(h), destination(h)); assert.equal(h.requests.length, 1);
 }));
+
+const flush = async () => { for (let index = 0; index < 12; index++) await Promise.resolve(); };
+const apiUrl = 'https://api.snaphutaorp.org/static/raw/AvatarIcon/UI_AvatarIcon_Test.png';
+const staticUrl = 'https://static.snaphutaorp.org/static/raw/AvatarIcon/UI_AvatarIcon_Test.png';
+const redirect = (location = staticUrl, code = 302) => ({ responseCode: code, header: { location }, result: buffer([]) });
+
+for (const status of [301, 302, 303, 307, 308]) {
+  test(`${status} permits exactly the configured api-to-static same-path hop`, () => withHarness(async h => {
+    const a = ensure(h), b = ensure(h); assert.equal(h.requests.length, 1); assert.equal(h.requests[0].url, apiUrl);
+    h.requests[0].resolve({ responseCode: status, header: { LoCaTiOn: staticUrl }, result: buffer([]) }); await flush();
+    assert.equal(h.requests.length, 2); assert.equal(h.requests[1].url, staticUrl); assert.equal(h.clients[0].destroyed, 1);
+    const c = ensure(h); assert.equal(h.requests.length, 2, 'single-flight remains held throughout both hops');
+    for (const req of h.requests) {
+      assert.equal(req.options.maxRedirects, 0); assert.equal(req.options.maxLimit, 8 * 1024 * 1024);
+      assert.equal(req.options.connectTimeout, 10000); assert.equal(req.options.readTimeout, 20000);
+      assert.equal(req.options.usingCache, false); assert.equal(req.options.method, 'GET');
+    }
+    h.requests[1].resolve(success()); assert.deepEqual(await Promise.all([a, b, c]), [destination(h), destination(h), destination(h)]);
+    assert.deepEqual(fs.readFileSync(destination(h)), png()); assert.equal(h.renames.length, 1);
+    assert.ok(h.clients.every(client => client.destroyed === 1));
+  }));
+}
+
+const aliases = { Anemo: 'Wind', Cryo: 'Ice', Dendro: 'Grass', Electro: 'Electric', Geo: 'Rock', Hydro: 'Water', Pyro: 'Fire' };
+for (const [localName, sourceName] of Object.entries(aliases)) {
+  test(`IconElement ${localName} uses canonical ${sourceName} across redirect but retains local identity`, () => withHarness(async h => {
+    const name = `UI_Icon_Element_${localName}`;
+    const relative = `IconElement/UI_Icon_Element_${sourceName}.png`;
+    const result = h.Service.ensure('IconElement', name);
+    assert.equal(h.requests[0].url, `https://api.snaphutaorp.org/static/raw/${relative}`);
+    h.requests[0].resolve(redirect(`https://static.snaphutaorp.org/static/raw/${relative}`)); await flush();
+    assert.equal(h.requests[1].url, `https://static.snaphutaorp.org/static/raw/${relative}`);
+    h.requests[1].resolve(success()); const file = await result;
+    assert.equal(file, h.Service.localPath('IconElement', name)); assert.ok(file.endsWith(`/${name}.png`));
+    assert.deepEqual(fs.readFileSync(file), png()); assert.equal(await h.Service.ensure('IconElement', name), file);
+    assert.equal(h.requests.length, 2, 'canonical source does not change local cache identity');
+  }));
+}
+
+test('element aliases apply only to exact IconElement identities; canonical and unrelated names are unchanged', () => withHarness(async h => {
+  for (const [category, name] of [['AvatarIcon', 'UI_Icon_Element_Anemo'], ['ItemIcon', 'UI_Icon_Element_Pyro'],
+    ['IconElement', 'UI_Icon_Element_Wind'], ['IconElement', 'UI_Icon_Element_Unknown'], ['Bg', 'UI_Icon_None']]) {
+    const result = h.Service.ensure(category, name);
+    assert.equal(h.requests.at(-1).url, `https://api.snaphutaorp.org/static/raw/${category}/${name}.png`);
+    h.requests.at(-1).resolve(success()); assert.equal(await result, h.Service.localPath(category, name));
+  }
+}));
+
+const refusedLocations = [
+  staticUrl.replace('https:', 'http:'),
+  staticUrl.replace('static.snaphutaorp.org', 'evil.example'),
+  staticUrl.replace('static.snaphutaorp.org', 'static.snaphutaorp.org.evil.example'),
+  staticUrl.replace('static.snaphutaorp.org', 'user@static.snaphutaorp.org'),
+  staticUrl.replace('static.snaphutaorp.org', 'user:pass@static.snaphutaorp.org'),
+  staticUrl.replace('static.snaphutaorp.org', 'static.snaphutaorp.org:443'),
+  staticUrl.replace('static.snaphutaorp.org', 'static.snaphutaorp.org:8443'),
+  staticUrl.replace('/AvatarIcon/', '/ItemIcon/'),
+  staticUrl.replace('/UI_AvatarIcon_Test.png', '/other.png'),
+  staticUrl.replace('/static/raw/', '/static/../static/raw/'),
+  staticUrl.replace('/AvatarIcon/', '/%41vatarIcon/'),
+  staticUrl + '?download=1', staticUrl + '#image', ` ${staticUrl}`, `${staticUrl} `,
+  staticUrl.replace('https://', '//'), '/static/raw/AvatarIcon/UI_AvatarIcon_Test.png', '',
+  staticUrl.replace('static.snaphutaorp.org', 'htserver.wdg12.work'), apiUrl,
+];
+for (let index = 0; index < refusedLocations.length; index++) {
+  test(`redirect refusal ${index + 1} makes no untrusted or altered-path request`, () => withHarness(async h => {
+    const result = ensure(h); h.requests[0].resolve(redirect(refusedLocations[index]));
+    assert.equal(await result, ''); assert.equal(h.requests.length, 1); assert.equal(h.temps.length, 0);
+    assert.equal(fs.existsSync(destination(h)), false); assert.equal(h.clients[0].destroyed, 1);
+  }));
+}
+
+for (const header of [undefined, null, {}, [], { location: null }, { location: [staticUrl] },
+  { Location: staticUrl, location: staticUrl }, { location: `${staticUrl}, ${staticUrl}` }]) {
+  test(`missing or ambiguous redirect header ${JSON.stringify(header)} fails closed`, () => withHarness(async h => {
+    const result = ensure(h); h.requests[0].resolve({ responseCode: 302, header, result: buffer([]) });
+    assert.equal(await result, ''); assert.equal(h.requests.length, 1); assert.equal(h.temps.length, 0);
+  }));
+}
+
+for (const next of [apiUrl, staticUrl, 'https://evil.example/again']) {
+  test(`second redirect ${next} is refused without a third request`, () => withHarness(async h => {
+    const result = ensure(h); h.requests[0].resolve(redirect()); await flush();
+    h.requests[1].resolve(redirect(next, 307)); assert.equal(await result, '');
+    assert.equal(h.requests.length, 2); assert.equal(h.temps.length, 0); assert.ok(h.clients.every(c => c.destroyed === 1));
+  }));
+}
+
+for (const invalid of ['html', 'oversized', 'network']) {
+  test(`redirected ${invalid} response keeps PNG/budget/failure checks and remains retryable`, () => withHarness(async h => {
+    const result = ensure(h); h.requests[0].resolve(redirect()); await flush();
+    if (invalid === 'network') h.requests[1].reject(Error('second-hop network failure'));
+    else {
+      const bytes = invalid === 'html' ? buffer(Buffer.from('<html>' + 'invalid'.repeat(15))) : new ArrayBuffer(h.Service.MAX_BYTES + 1);
+      h.requests[1].resolve({ responseCode: 200, result: bytes });
+    }
+    assert.equal(await result, ''); assert.equal(h.temps.length, 0); assert.equal(fs.existsSync(destination(h)), false);
+    assert.ok(h.clients.every(client => client.destroyed === 1));
+    const retry = ensure(h); assert.equal(h.requests[2].url, apiUrl); h.requests[2].resolve(success());
+    assert.equal(await retry, destination(h));
+  }));
+}

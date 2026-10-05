@@ -65,6 +65,7 @@ const mocks = {
   BackupService: { BackupService: { getInstance: () => ({ recoverInterruptedRestore: async () => {
     if (recoveryValue !== undefined) live.set('app.reduce_motion', recoveryValue);
   } }) } },
+  GameDataService: { GameDataService: { initializeSnapshot: async () => {} } },
   NotificationHelper: { NotificationHelper: { init: async () => {} } },
   UserService: { UserService: { getInstance: () => ({ restoreSession: async () => {} }) } },
   AutoSignInService: { AutoSignInService: { getInstance: () => ({ bootstrapAutoSignIn: async () => {} }) } },

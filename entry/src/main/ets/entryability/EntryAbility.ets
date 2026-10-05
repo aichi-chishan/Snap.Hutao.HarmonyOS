@@ -11,6 +11,7 @@ import { DailyNoteService } from '../service/DailyNoteService';
 import { AutoSignInService } from '../service/AutoSignInService';
 import { AppContextProvider } from '../common/AppContext';
 import { Motion } from '../common/Motion';
+import { GameDataService } from '../service/GameDataService';
 import { buildRiskVerifyOverlay } from '../components/RiskVerifyModal';
 
 const DOMAIN = 0x4E50;
@@ -208,6 +209,8 @@ export default class EntryAbility extends UIAbility {
       PreferencesStore.bumpLaunchTimes();
       await RelationalStoreHelper.init(ability.context);
       await BackupService.getInstance().recoverInterruptedRestore();
+      // Pin one verified cohort before any metadata consumer or page is created.
+      await GameDataService.initializeSnapshot();
       await NotificationHelper.init();
       // 恢复登录态（预登录态）：AppStorage currentUser/currentUid/isLoggedIn
       await UserService.getInstance().restoreSession();
