@@ -10,6 +10,8 @@ const sent = [];
 let launchError = 0;
 const signWaits = new Map();
 const archives = [];
+const announcementWaits = new Map();
+const announcementRequests = [];
 const prefs = {
   getString: (key, fallback) => values.get(key) ?? fallback,
   getBool: (key, fallback) => values.get(key) ?? fallback,
@@ -29,7 +31,10 @@ const mocks = {
   DailyNoteRepo: { DailyNoteRepo: { get: async (_, uid) => ({ note: { uid, refreshTime: 0 } }) } },
   SignInService: { SignInService: { getInstance: () => ({ fetchInfo: uid => signWaits.get(uid) || Promise.resolve({ uid }) }) } },
   CalendarService: { CalendarService: { getInstance: () => ({ fetchCalendar: async uid => [{ uid, startTime: 0, endTime: Date.now() + 100000 }] }) } },
-  AnnouncementService: { AnnouncementService: { getInstance: () => ({ fetchList: async () => [] }) } },
+  AnnouncementService: { AnnouncementService: { getInstance: () => ({ fetchList: async (region, level, language) => {
+    announcementRequests.push({region, level, language});
+    return announcementWaits.get(region) ?? [];
+  } }) } },
   UserService: { UserService: { getInstance: () => ({ getCurrentUser: () => ({ id: 1 }) }) } },
 };
 for (const name of ['SpiralAbyssService', 'RoleCombatService', 'HardChallengeService']) mocks[name] = { [name]: { getInstance: () => ({ fetch: async () => undefined }) } };
@@ -95,5 +100,18 @@ function load(name) {
   await home.load('');
   assert.equal(home.note, undefined); assert.equal(home.signInfo, undefined); assert.equal(home.acts.length, 0); assert.equal(home.gachaTotal, 0);
   assert.ok(!archives.includes(''), 'logout must not create an empty archive');
+  let finishUs, finishAsia;
+  announcementWaits.set('os_usa', new Promise(resolve => { finishUs = resolve; }));
+  announcementWaits.set('os_asia', new Promise(resolve => { finishAsia = resolve; }));
+  const usLoad = home.load('600000001');
+  const asiaLoad = home.load('800000001');
+  assert.equal(home.announcements.length, 0, 'old region preview clears before async work');
+  assert.equal(home.announcementsLoaded, false);
+  finishAsia([{id: 2, sourceRegion:'os_asia', sourceLanguage:'zh-cn'}]); await asiaLoad;
+  finishUs([{id: 1, sourceRegion:'os_usa', sourceLanguage:'zh-cn'}]); await usLoad;
+  assert.equal(home.announcements[0].sourceRegion, 'os_asia', 'late region never replaces active preview');
+  assert.equal(home.announcements[0].id, 2);
+  assert.deepEqual(announcementRequests.slice(-2), [
+    {region:'os_usa',level:55,language:'zh-cn'}, {region:'os_asia',level:55,language:'zh-cn'}]);
   console.log('ui-platform-contracts: PASS (server dates, seven-day boundaries, native routing, metadata enums, video source, account races)');
 })().catch(error => { console.error(error); process.exitCode = 1; });

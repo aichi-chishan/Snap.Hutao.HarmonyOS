@@ -3,8 +3,7 @@
  * 主页·旅行者札记卡（对齐 Windows TravelersDiaryCard）：
  * 当月原石 + 摩拉收入摘要，点击进札记页。
  */
-import { Ledger } from '../model/Ledger';
-import { LedgerService } from '../service/LedgerService';
+import { LedgerViewModel } from '../viewmodel/LedgerViewModel';
 import { PressCard } from './PressCard';
 import { NavIcon } from './NavIcon';
 
@@ -12,21 +11,24 @@ import { NavIcon } from './NavIcon';
 export struct HomeTravelersDiaryCard {
   onTap: () => void = () => {
   };
-  @StorageLink('currentUid') currentUid: string = '';
-  @State ledger: Ledger | undefined = undefined;
+  @StorageLink('currentUid') @Watch('onOwnerChanged') currentUid: string = '';
+  @StorageLink('currentUserId') @Watch('onOwnerChanged') currentUserId: number = 0;
+  @State vm: LedgerViewModel = new LedgerViewModel();
   @State loaded: boolean = false;
+  private attached: boolean = false;
+  private generation: number = 0;
 
-  aboutToAppear(): void {
-    if (this.currentUid.length === 0) {
-      this.loaded = true;
-      return;
-    }
-    LedgerService.getInstance().fetchMonth(0, this.currentUid).then((l: Ledger) => {
-      this.ledger = l;
-      this.loaded = true;
-    }).catch(() => {
-      this.loaded = true;
-    });
+  aboutToAppear(): void { this.attached = true; this.vm.activate(); this.onOwnerChanged(); }
+  aboutToDisappear(): void { this.attached = false; this.generation++; this.vm.dispose(); }
+  onOwnerChanged(): void {
+    this.vm.clear();
+    const generation: number = ++this.generation;
+    this.loaded = this.currentUid.length === 0;
+    if (!this.attached || this.currentUid.length === 0) { return; }
+    const uid: string = this.currentUid;
+    const owner: number = this.currentUserId;
+    const owns: () => boolean = (): boolean => this.attached && this.generation === generation && this.currentUid === uid && this.currentUserId === owner;
+    this.vm.load(uid, owner, owns).then(() => { if (owns()) { this.loaded = true; } });
   }
 
   static fmt(n: number): string {
@@ -55,7 +57,7 @@ export struct HomeTravelersDiaryCard {
             .fontColor($r('app.color.text_primary'))
           Blank()
           Text(this.loaded
-            ? (this.currentUid.length === 0 ? '未登录' : (this.ledger !== undefined ? this.ledger.nickname : '未获取'))
+            ? (this.currentUid.length === 0 ? (this.currentUserId > 0 ? '未选角色' : '未登录') : (this.vm.ledger !== undefined ? this.vm.ledger.nickname : '未获取'))
             : '...')
             .fontSize(11)
             .fontColor($r('app.color.text_secondary'))
@@ -64,10 +66,10 @@ export struct HomeTravelersDiaryCard {
         .height(24)
         .flexShrink(0)
 
-        if (this.loaded && this.ledger !== undefined) {
+        if (this.loaded && this.vm.ledger !== undefined) {
           Row({ space: 8 }) {
             Column({ space: 2 }) {
-              Text(`◆ ${HomeTravelersDiaryCard.fmt(this.ledger.monthData.currentPrimogems)}`)
+              Text(`◆ ${HomeTravelersDiaryCard.fmt(this.vm.ledger.monthData.currentPrimogems)}`)
                 .fontSize(16)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.app_primary'))
@@ -79,7 +81,7 @@ export struct HomeTravelersDiaryCard {
             .layoutWeight(1)
 
             Column({ space: 2 }) {
-              Text(`◉ ${HomeTravelersDiaryCard.fmt(this.ledger.monthData.currentMora)}`)
+              Text(`◉ ${HomeTravelersDiaryCard.fmt(this.vm.ledger.monthData.currentMora)}`)
                 .fontSize(16)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.text_primary'))

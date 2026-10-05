@@ -25,6 +25,8 @@ import { HomeLaunchCard } from '../components/HomeLaunchCard';
 import { HomeTravelersDiaryCard } from '../components/HomeTravelersDiaryCard';
 import { HomeActCard } from '../components/HomeActCard';
 import { HomeAnnouncementCard } from '../components/HomeAnnouncementCard';
+import { Announcement } from '../model/Announcement';
+import { AnnouncementDetailParams } from '../model/RouteParams';
 import { HomeGachaBannerCard } from '../components/HomeGachaBannerCard';
 import { HomeActBannerCard } from '../components/HomeActBannerCard';
 import { HomeCalendarCard } from '../components/HomeCalendarCard';
@@ -41,6 +43,7 @@ import { RoleCombatPage } from './RoleCombatPage';
 import { HardChallengePage } from './HardChallengePage';
 import { CultivationPage } from './CultivationPage';
 import { BackpackPage } from './BackpackPage';
+import { WishHistoryPage } from './WishHistoryPage';
 import { WikiAvatarPage } from './WikiAvatarPage';
 import { WikiWeaponPage } from './WikiWeaponPage';
 import { WikiMonsterPage } from './WikiMonsterPage';
@@ -692,6 +695,7 @@ class DashCardSpec {
         this.navItem(4, 'AvatarProperty', '我的角色')
         this.navItem(5, 'Cultivation', '养成计划')
         this.navItem(17, 'Backpack', '离线背包')
+        this.navItem(18, 'GachaLog', 'UP 历史')
 
         this.navSectionTitle('周期')
         this.navItem(6, 'SpiralAbyss', '深境螺旋')
@@ -883,6 +887,10 @@ class DashCardSpec {
         PageContainer() {
           LaunchGamePage({ embedMode: true })
           }
+      } else if (this.currentIndex === 18) {
+        PageContainer() {
+          WishHistoryPage({ embedMode: true })
+        }
       } else if (this.currentIndex === 17) {
         PageContainer() {
           BackpackPage({ embedMode: true })
@@ -1068,8 +1076,10 @@ class DashCardSpec {
           HomeAnnouncementCard({
             items: this.homeVm.announcements,
             loaded: this.homeVm.announcementsLoaded,
-            onTapAnnouncement: (id: number, banner: string) => {
-              router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: { annId: id, title: '', banner: banner } });
+            onTapAnnouncement: (item: Announcement) => {
+              const params: AnnouncementDetailParams = { annId: item.id, title: item.title, banner: item.banner,
+                region: item.sourceRegion, language: item.sourceLanguage, level: item.sourceLevel };
+              router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: params });
             },
             onTapMore: () => {
               router.pushUrl({ url: 'pages/AnnouncementPage' });
@@ -1320,8 +1330,10 @@ class DashCardSpec {
         HomeAnnouncementCard({
           items: this.homeVm.announcements,
           loaded: this.homeVm.announcementsLoaded,
-          onTapAnnouncement: (id: number, banner: string) => {
-            router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: { annId: id, title: '', banner: banner } });
+          onTapAnnouncement: (item: Announcement) => {
+            const params: AnnouncementDetailParams = { annId: item.id, title: item.title, banner: item.banner,
+                region: item.sourceRegion, language: item.sourceLanguage, level: item.sourceLevel };
+              router.pushUrl({ url: 'pages/AnnouncementDetailPage', params: params });
           },
           onTapMore: () => {
             router.pushUrl({ url: 'pages/AnnouncementPage' });
@@ -1601,6 +1613,9 @@ class DashCardSpec {
 
         this.entryCard('Cultivation', '养成计划', '角色养成 / 材料计算', () => {
           router.pushUrl({ url: 'pages/CultivationPage' });
+        })
+        this.entryCard('GachaLog', 'UP 历史', '角色与武器历次 UP / 距上次结束时长', () => {
+          router.pushUrl({ url: 'pages/WishHistoryPage' });
         })
         this.entryCard('Backpack', '离线背包', 'UIIF 导入导出 / 库存与装备', () => {
           router.pushUrl({ url: 'pages/BackpackPage' });

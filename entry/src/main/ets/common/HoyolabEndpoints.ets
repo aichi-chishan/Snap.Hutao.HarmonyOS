@@ -2,6 +2,27 @@ import { AppConstants, RegionUtil } from './Constants';
 
 /** Protocol routing from upstream ApiEndpoints.csv; account and game regions stay explicit. */
 export class HoyolabEndpoints {
+  static readonly REGIONS: string[] = ['cn_gf01', 'cn_qd01', 'os_usa', 'os_euro', 'os_asia', 'os_cht'];
+
+  static requireRegion(region: string): void {
+    if (!HoyolabEndpoints.REGIONS.includes(region)) { throw new Error('请选择有效的游戏区服'); }
+  }
+
+  static ledgerUrl(region: string): string {
+    HoyolabEndpoints.requireRegion(region);
+    return HoyolabEndpoints.isOverseaRegion(region)
+      ? 'https://sg-hk4e-api.hoyolab.com/event/ysledgeros/month_info'
+      : 'https://hk4e-api.mihoyo.com/event/ys_ledger/monthInfo';
+  }
+
+  static announcementUrl(path: string, region: string): string {
+    HoyolabEndpoints.requireRegion(region);
+    if (path !== 'getAnnList' && path !== 'getAnnContent') { throw new Error('公告接口无效'); }
+    return HoyolabEndpoints.isOverseaRegion(region)
+      ? `https://sg-hk4e-api.hoyoverse.com/common/hk4e_global/announcement/api/${path}`
+      : `https://hk4e-ann-api.mihoyo.com/common/hk4e_cn/announcement/api/${path}`;
+  }
+
   static isOverseaRegion(region: string): boolean {
     return RegionUtil.isOverseaRegion(region);
   }

@@ -283,12 +283,13 @@ export class UserService {
   /** 强制刷新 Cookie 凭证（对齐 Windows RefreshCookieTokenAsync：忽略现有 token 换新并落库）。
    *  返回 true 表示刷新后 cookie_token 非空（SToken 失效时返回 false，需重新登录）。 */
   async refreshCookieTokenForced(user: User): Promise<boolean> {
+    const owner: User | undefined = this.selectedOwner(user);
     if (user.stoken.length === 0 && user.stokenV2.length === 0) {
       return false;
     }
     await this.completeTokenChainInner(user, true);
     await UserRepo.saveCookieFor(user.id, user.fullCookie());
-    if (this.currentUser !== undefined && this.currentUser.id === user.id) {
+    if (owner !== undefined && this.currentUser === owner) {
       this.currentUser = user;
       ApiClient.getInstance().setCookie(user.fullCookie(), user.isOversea);
     }
@@ -441,9 +442,18 @@ export class UserService {
 
   /** 公开封装：补齐当前用户 Token 链（供各 Service 在缺 cookie_token 时调用） */
   async completeTokenChainPublic(user: User): Promise<void> {
+    const owner: User | undefined = this.selectedOwner(user);
     await this.completeTokenChain(user);
-    // 同步全局会话 Cookie（含新补的 ltoken/ltoken）
-    ApiClient.getInstance().setCookie(user.fullCookie(), user.isOversea);
+    // A late refresh must never replace cookies after switch/logout/restore, even when IDs are reused.
+    if (owner !== undefined && this.currentUser === owner) {
+      ApiClient.getInstance().setCookie(user.fullCookie(), user.isOversea);
+    }
+  }
+
+  private selectedOwner(user: User): User | undefined {
+    const selected: User | undefined = this.currentUser;
+    return selected !== undefined && selected.id === user.id && selected.isOversea === user.isOversea &&
+      selected.mid === user.mid && selected.aid === user.aid ? selected : undefined;
   }
 
   /** 公开封装：确保设备指纹就绪（供各 Service 请求前调用，降风控/保住 token 交换） */

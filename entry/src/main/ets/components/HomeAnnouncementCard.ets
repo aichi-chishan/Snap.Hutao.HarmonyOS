@@ -10,7 +10,7 @@ import { PressCard } from './PressCard';
 export struct HomeAnnouncementCard {
   @Prop items: Announcement[] = [];
   @Prop loaded: boolean = false;
-  onTapAnnouncement: (id: number, banner: string) => void = (id: number, banner: string) => {
+  onTapAnnouncement: (item: Announcement) => void = (item: Announcement) => {
   };
   onTapMore: () => void = () => {
   };
@@ -105,7 +105,7 @@ export struct HomeAnnouncementCard {
     .alignItems(VerticalAlign.Center)
     .padding({ top: 6, bottom: 6 })
     .onClick(() => {
-      this.onTapAnnouncement(item.id, item.banner)
+      this.onTapAnnouncement(item)
     })
   }
 

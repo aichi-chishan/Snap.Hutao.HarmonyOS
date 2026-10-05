@@ -13,6 +13,7 @@ import { SignInService } from '../service/SignInService';
 import { CalendarService } from '../service/CalendarService';
 import { ActCalendarEntry } from '../model/ActCalendarEntry';
 import { Announcement } from '../model/Announcement';
+import { AnnouncementContext } from '../model/RegionalContent';
 import { AnnouncementService } from '../service/AnnouncementService';
 import { UserService } from '../service/UserService';
 import { SpiralAbyssData } from '../model/SpiralAbyss';
@@ -126,13 +127,15 @@ export class HomeViewModel {
     this.noteLoaded = false;
     this.signLoaded = false;
     this.actsLoaded = false;
+    this.announcements = [];
+    this.announcementsLoaded = false;
     this.loading = true;
     const tasks: Promise<void>[] = [
       this.loadGacha(uid, generation),
       this.loadNote(uid, generation),
       this.loadSignIn(uid, generation),
       this.loadActs(uid, generation),
-      this.loadAnnouncements(),
+      this.loadAnnouncements(uid, generation),
       this.loadChallenges(uid),
     ];
     try {
@@ -261,13 +264,16 @@ export class HomeViewModel {
   }
 
   /** 公告预览：网络（getAnnList）前 3 条 */
-  private async loadAnnouncements(): Promise<void> {
+  private async loadAnnouncements(uid: string, generation: number): Promise<void> {
     try {
-      const list: Announcement[] = await AnnouncementService.getInstance().fetchList('cn_gf01', 60);
+      const context: AnnouncementContext = AnnouncementContext.forUid(uid);
+      const list: Announcement[] = await AnnouncementService.getInstance().fetchList(context.region, context.level, context.language);
+      if (generation !== this.loadGeneration) { return; }
       this.announcements = list.length > 3 ? list.slice(0, 3) : list;
       this.announcementsLoaded = true;
     } catch (e) {
       Logger.warn(TAG, `loadAnnouncements fail: ${(e as Error).message}`);
+      if (generation !== this.loadGeneration) { return; }
       this.announcementsLoaded = true;
     }
   }

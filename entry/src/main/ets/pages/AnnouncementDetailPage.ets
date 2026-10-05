@@ -11,6 +11,7 @@ import { router } from '@kit.ArkUI';
 import { webview } from '@kit.ArkWeb';
 import { AnnouncementDetailParams } from '../model/RouteParams';
 import { AnnouncementService } from '../service/AnnouncementService';
+import { AnnouncementContext } from '../model/RegionalContent';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'AnnDetail';
@@ -46,27 +47,35 @@ struct AnnouncementDetailPage {
   @State webUrl: string = '';
   private annId: number = 0;
   private banner: string = '';
+  @State context: AnnouncementContext = new AnnouncementContext();
+  @State message: string = '';
+  private attached: boolean = false;
+  private controllerReady: boolean = false;
+  private generation: number = 0;
   /** 正文滚动区视口高度（vp，onAreaChange 读取；Web 模式按它自适应） */
   @State bodyAreaH: number = 0;
   /** 正文滚动区底部内边距（与下方 Column.padding bottom 一致，Web 高度需扣除） */
   private static readonly BODY_BOTTOM_PAD: number = 24;
 
   aboutToAppear(): void {
-    const params = router.getParams() as AnnouncementDetailParams;
+    this.attached = true;
+    const params: AnnouncementDetailParams = router.getParams() as AnnouncementDetailParams;
     this.title = params?.title ?? '公告详情';
     this.annId = params?.annId ?? 0;
     this.banner = params?.banner ?? '';
-    // 备用外链优先（外部卡片直接跳原文），否则用 annId 拼米游社文章页
-    this.officialUrl = params?.url && params.url.length > 0
-      ? params.url
-      : (this.annId > 0 ? `https://www.miyoushe.com/ys/article/${this.annId}` : '');
+    this.officialUrl = AnnouncementService.officialUrl(params?.url ?? '');
+    try { this.context = AnnouncementContext.create(params?.region ?? 'cn_gf01', params?.language ?? 'zh-cn', params?.level ?? 55); }
+    catch (e) { this.message = (e as Error).message; this.isLoading = false; return; }
     this.loadAndRender();
   }
+
+  aboutToDisappear(): void { this.attached = false; this.generation++; this.controllerReady = false; }
 
   /** 深浅色切换：正文重新生成（Windows OnActualThemeChanged 同款行为） */
   onDarkChanged(): void {
     if (this.htmlReady && this.lastContent.length > 0) {
       this.html = AnnouncementDetailPage.buildDocument(this.lastContent, this.title, this.banner, this.isDark);
+      this.loadDocument();
     }
   }
 
@@ -74,25 +83,38 @@ struct AnnouncementDetailPage {
   private lastContent: string = '';
 
   async loadAndRender(): Promise<void> {
+    const generation: number = ++this.generation;
     this.isLoading = true;
+    this.message = '';
     if (this.annId > 0) {
       try {
-        const content: string = await AnnouncementService.getInstance().fetchContent(this.annId, 'cn_gf01', 60);
+        const content: string = await AnnouncementService.getInstance().fetchContent(this.annId, this.context.region, this.context.level, this.context.language);
+        if (!this.attached || generation !== this.generation) { return; }
         if (content.length > 0) {
           this.lastContent = content;
           this.html = AnnouncementDetailPage.buildDocument(content, this.title, this.banner, this.isDark);
           this.htmlReady = true;
+          this.loadDocument();
           Logger.info(TAG, `rendered html len=${content.length}`);
         }
       } catch (e) {
+        if (!this.attached || generation !== this.generation) { return; }
+        this.message = (e as Error).message;
         Logger.warn(TAG, `fetch content fail ${(e as Error).message}`);
       }
     }
-    // 官方原文链接兜底（loadAndRender 中未被备用外链覆盖时）
-    if (this.officialUrl.length === 0 && this.annId > 0) {
-      this.officialUrl = `https://www.miyoushe.com/ys/article/${this.annId}`;
-    }
-    this.isLoading = false;
+    if (this.attached && generation === this.generation) { this.isLoading = false; }
+  }
+
+  private loadDocument(): void {
+    if (!this.attached || !this.controllerReady || !this.htmlReady || this.showWeb) { return; }
+    const base: string = this.context.region.startsWith('os_') ? 'https://www.hoyolab.com/' : 'https://www.miyoushe.com/';
+    try { this.controller.loadData(this.html, 'text/html', 'UTF-8', base, base); }
+    catch (e) { Logger.warn(TAG, `loadData fail ${(e as Error).message}`); }
+  }
+
+  private static escape(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   /**
@@ -112,19 +134,21 @@ struct AnnouncementDetailPage {
       }
     }
     const bodyColor: string = isDark ? 'color:rgba(255,255,255,1)' : 'color:rgba(0,0,0,1)';
-    const bannerPart: string = banner.length > 0 ? `<img src="${banner}"/>` : '';
+    const bannerPart: string = /^https:\/\//i.test(banner) ? `<img src="${AnnouncementDetailPage.escape(banner)}"/>` : '';
+    const safeTitle: string = AnnouncementDetailPage.escape(title);
     return `<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title}</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; font-src https: data:; media-src https:; script-src 'none'; frame-src 'none'">
+<title>${safeTitle}</title>
 <style>
   body::-webkit-scrollbar { display: none; }
   img { border: none; vertical-align: middle; width: 100%; }
 </style>
 </head>
 <body style="${bodyColor}; background-color: transparent;">
-<h3>${title}</h3>
+<h3>${safeTitle}</h3>
 ${bannerPart}
 <br>
 ${c}
@@ -182,6 +206,9 @@ ${c}
       .alignItems(VerticalAlign.Center)
       .backgroundColor($r('app.color.card_background'))
 
+      Text(`官方公告 · ${this.context.label()}`).fontSize(12).fontColor($r('app.color.text_secondary'))
+        .width('100%').padding({ left: 16, right: 16, bottom: 8 })
+
       Scroll() {
         Column({ space: 10 }) {
           if (this.isLoading) {
@@ -206,7 +233,7 @@ ${c}
               .height(this.webHeight())
           } else if (this.htmlReady) {
             Web({ src: 'about:blank', controller: this.controller })
-              .javaScriptAccess(true)
+              .javaScriptAccess(false)
               .darkMode(this.isDark ? WebDarkMode.On : WebDarkMode.Off)
               .forceDarkAccess(this.isDark)
               .width('100%')
@@ -214,16 +241,11 @@ ${c}
               .onControllerAttached(() => {
                 // loadData 必须在 controller 就绪后调用（17100001）；baseUrl 用 https 域
                 // 避免 data: 文档源下远程图片被 CORS 拦截
-                try {
-                  this.controller.loadData(this.html, 'text/html', 'UTF-8',
-                    'https://www.miyoushe.com/', 'https://www.miyoushe.com/');
-                } catch (e) {
-                  Logger.warn(TAG, `loadData fail ${(e as Error).message}`);
-                }
+                this.controllerReady = true; this.loadDocument();
               })
           } else {
             Column({ space: 10 }) {
-              Text('该公告正文暂不可用，可点击右上角「打开原文」查看官方页面。')
+              Text(this.message || '该公告正文暂不可用，请返回列表刷新后重试。')
                 .fontSize(14)
                 .fontColor($r('app.color.text_secondary'))
             }
