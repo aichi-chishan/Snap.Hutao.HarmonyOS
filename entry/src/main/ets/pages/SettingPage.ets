@@ -76,6 +76,14 @@ export struct SettingPage {
   @State dataDone: number = 0;
   @State dataTotal: number = 0;
   @State dataVersion: string = '';
+  @State dataPending: string = '';
+  @State dataChecking: boolean = false;
+  @State dataCanRollback: boolean = false;
+  private dataViewActive: boolean = false;
+  private dataGeneration: number = 0;
+  private dataCheckPending: boolean = false;
+  private dataUpdatePending: boolean = false;
+  private dataConfirmationPending: boolean = false;
   @State dataHasUpdate: string = '';
   @State dataUrl: string = '';
   /** 数据源 URL 编辑弹窗 */
@@ -144,6 +152,11 @@ export struct SettingPage {
   @State gachaRows: GachaArchiveRow[] = [];
 
   aboutToAppear(): void {
+    this.dataViewActive = true;
+    this.dataGeneration++;
+    this.dataBusy = this.dataUpdatePending;
+    this.dataChecking = this.dataCheckPending;
+    this.refreshDataState();
     this.mediaIndex = Math.max(0, this.mediaTypes.indexOf(PreferencesStore.getString(BackgroundMediaService.TYPE_KEY, 'none')));
     this.mediaMuted = PreferencesStore.getBool(BackgroundMediaService.MUTED_KEY, true);
     this.mediaLoop = PreferencesStore.getBool(BackgroundMediaService.LOOP_KEY, true);
@@ -546,57 +559,94 @@ export struct SettingPage {
   }
 
   /** 选择本地背景图片文件夹（FOLDER 模式） */
-  /** 数据源管理：检查 GitHub 最新元数据版本 */
+  aboutToDisappear(): void { this.dataViewActive = false; this.dataGeneration++; }
+
+  private refreshDataState(): void {
+    this.dataVersion = GameDataService.getInstance().remoteVersion();
+    const pending: string = GameDataService.getInstance().pendingState();
+    this.dataPending = pending === 'bundled' ? '已安排恢复内置数据，重启后生效' :
+      (pending === 'remote' ? `已保存 ${GameDataService.getInstance().pendingVersion()}，重启后生效` : '');
+    this.dataCanRollback = GameDataService.getInstance().canRollback();
+  }
+
+  /** Checking never changes the process-pinned dataset. */
   async checkDataUpdate(): Promise<void> {
+    if (!this.dataViewActive || this.dataCheckPending || this.dataUpdatePending) { return; }
+    const generation: number = this.dataGeneration;
+    this.dataCheckPending = true; this.dataChecking = true;
     try {
       const has: boolean | null = await GameDataService.getInstance().checkUpdateAvailable();
-      if (has === null) {
-        this.dataHasUpdate = '检查失败：请确认数据源地址与网络';
-      } else if (has) {
-        this.dataHasUpdate = '发现新版本，点击"立即更新"获取最新数据';
-      } else {
-        this.dataHasUpdate = '已是最新版本';
-      }
+      if (!this.dataViewActive || generation !== this.dataGeneration) { return; }
+      this.refreshDataState();
+      this.dataHasUpdate = has === null ? '检查失败：请确认受信任的数据源地址与网络' :
+        (has ? '发现新版本，可下载并校验完整数据；重启后生效' :
+          (this.dataPending.length > 0 ? this.dataPending : '已是最新版本'));
     } catch (e) {
-      this.dataHasUpdate = `检查失败：${(e as Error).message}`;
-    }
-  }
-
-  /** 数据源管理：全量更新（元数据 JSON） */
-  async updateGameData(): Promise<void> {
-    if (this.dataBusy) {
-      return;
-    }
-    this.dataBusy = true;
-    this.dataDone = 0;
-    this.dataTotal = 0;
-    try {
-      const ver: string = await GameDataService.getInstance().updateAll((done: number, total: number, cur: string) => {
-        this.dataDone = done;
-        this.dataTotal = total;
-      });
-      this.dataVersion = ver;
-      this.dataHasUpdate = `更新完成（${ver}）`;
-      this.toast(`数据更新完成：${ver}`);
-    } catch (e) {
-      this.dataHasUpdate = `更新失败：${(e as Error).message}`;
+      if (this.dataViewActive && generation === this.dataGeneration) { this.dataHasUpdate = `检查失败：${(e as Error).message}`; }
     } finally {
-      this.dataBusy = false;
+      this.dataCheckPending = false;
+      if (this.dataViewActive) { this.dataChecking = false; }
     }
   }
 
-  /** 修改数据源清单 URL（保存到 Preferences，下次更新生效） */
-  applyDataUrl(): void {
-    const url: string = this.urlInput.trim();
-    if (url.length === 0 || !url.startsWith('http')) {
-      this.toast('请输入合法的 http(s) 清单地址');
-      return;
+  async updateGameData(): Promise<void> {
+    if (!this.dataViewActive || this.dataUpdatePending || this.dataCheckPending || this.dataConfirmationPending) { return; }
+    const generation: number = this.dataGeneration;
+    this.dataUpdatePending = true; this.dataBusy = true;
+    this.dataDone = 0; this.dataTotal = 0;
+    try {
+      const version: string = await GameDataService.getInstance().updateAll((done: number, total: number, current: string) => {
+        if (this.dataViewActive && generation === this.dataGeneration) { this.dataDone = done; this.dataTotal = total; }
+      });
+      if (!this.dataViewActive || generation !== this.dataGeneration) { return; }
+      this.refreshDataState();
+      this.dataHasUpdate = `已完整校验并保存 ${version}；当前页面仍使用原版本，请重启应用生效`;
+      this.toast('新数据已保存，重启应用后生效');
+    } catch (e) {
+      if (this.dataViewActive && generation === this.dataGeneration) { this.dataHasUpdate = `更新失败，现有数据未切换：${(e as Error).message}`; }
+    } finally {
+      this.dataUpdatePending = false;
+      if (this.dataViewActive) { this.dataBusy = false; this.refreshDataState(); }
     }
-    GameDataUpdater.setManifestUrl(url);
-    this.dataUrl = url;
-    this.showUrlEdit = false;
-    this.dataHasUpdate = '';
-    this.toast('数据源已更新');
+  }
+
+  applyDataUrl(): void {
+    if (!this.dataViewActive || this.dataUpdatePending || this.dataCheckPending || this.dataConfirmationPending) { return; }
+    try {
+      const url: string = this.urlInput.trim();
+      GameDataUpdater.setManifestUrl(url);
+      this.dataUrl = GameDataUpdater.manifestUrl();
+      this.showUrlEdit = false;
+      this.dataHasUpdate = '';
+      this.toast('受信任数据源已保存，下次更新使用');
+    } catch (e) { this.toast(`数据源未更改：${(e as Error).message}`); }
+  }
+
+  private async changeSavedData(rollback: boolean): Promise<void> {
+    if (!this.dataViewActive || this.dataUpdatePending || this.dataCheckPending || this.dataConfirmationPending) { return; }
+    const generation: number = this.dataGeneration;
+    this.dataConfirmationPending = true;
+    let response: ShowDialogSuccessResponse;
+    try {
+      response = await this.getUIContext().getPromptAction().showDialog({
+      title: rollback ? '回滚已保存的游戏数据' : '恢复内置游戏数据',
+      message: '仅调整下次启动使用的数据；当前页面保持原版本，已有快照文件不会删除。重启后生效。',
+      buttons: [{ text: '取消', color: $r('app.color.text_secondary') }, { text: '确认', color: $r('app.color.app_primary') }],
+      });
+    } finally { this.dataConfirmationPending = false; }
+    if (!this.dataViewActive || generation !== this.dataGeneration || response.index !== 1 || this.dataUpdatePending || this.dataCheckPending || this.dataConfirmationPending) { return; }
+    this.dataUpdatePending = true; this.dataBusy = true;
+    try {
+      if (rollback) {
+        if (!await GameDataService.rollbackRemote()) { throw new Error('没有可用的上一版数据'); }
+      } else { GameDataService.clearRemote(); }
+      if (this.dataViewActive && generation === this.dataGeneration) { this.refreshDataState(); this.toast('下次启动的数据已调整，请重启应用'); }
+    } catch (e) {
+      if (this.dataViewActive && generation === this.dataGeneration) { this.toast(`未能调整数据：${(e as Error).message}`); }
+    } finally {
+      this.dataUpdatePending = false;
+      if (this.dataViewActive) { this.dataBusy = false; this.refreshDataState(); }
+    }
   }
 
   /** 选择本地背景图片文件夹（FOLDER 模式） */
@@ -858,13 +908,13 @@ export struct SettingPage {
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
 
-          this.sectionTitle('云资源同步（GitHub 直连失败自动走镜像加速）')
+          this.sectionTitle('游戏数据完整更新（重启生效）')
           Row() {
             Column({ space: 2 }) {
               Text('游戏数据源（GitHub）')
                 .fontSize(15)
                 .fontColor($r('app.color.text_primary'))
-              Text('角色/武器/怪物/成就元数据与常用图标已内置安装包；此处仅同步版本更新。直连失败自动回退 ghfast/ghproxy 镜像')
+              Text('仅访问受信任的 GitHub 数据仓库；固定提交后完整校验，失败保留原数据，不使用镜像回退。当前进程固定使用同一版数据。')
                 .fontSize(11)
                 .fontColor($r('app.color.text_secondary'))
             }
@@ -881,15 +931,17 @@ export struct SettingPage {
               .fontSize(12)
               .fontColor($r('app.color.text_secondary'))
             Blank()
-            Text(GameDataService.getInstance().remoteVersion().length > 0
-              ? `当前版本 ${GameDataService.getInstance().remoteVersion()}`
+            Text(this.dataVersion.length > 0
+              ? `当前版本 ${this.dataVersion}`
               : '未更新（使用内置数据）')
               .fontSize(10)
               .fontColor($r('app.color.text_primary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .constraintSize({ maxWidth: '55%' })
-            Text('修改')
+            Button('修改')
+              .enabled(!this.dataBusy && !this.dataChecking)
+              .constraintSize({ minHeight: 44 })
               .fontSize(12)
               .fontColor($r('app.color.app_primary'))
               .padding({ left: 10 })
@@ -911,18 +963,20 @@ export struct SettingPage {
             .padding({ left: 14, right: 14, top: 2, bottom: 2 })
           }
           Row() {
-            Button('检查更新')
+            Button(this.dataChecking ? '正在检查…' : '检查更新')
+              .enabled(!this.dataBusy && !this.dataChecking)
               .fontSize(13)
-              .height(34)
+              .constraintSize({ minHeight: 44 })
               .backgroundColor($r('app.color.app_primary_bg'))
               .fontColor($r('app.color.app_primary'))
               .margin({ right: 10 })
               .onClick(() => {
                 this.checkDataUpdate();
               })
-            Button('立即更新')
+            Button(this.dataBusy ? '正在处理…' : '下载并校验')
+              .enabled(!this.dataBusy && !this.dataChecking)
               .fontSize(13)
-              .height(34)
+              .constraintSize({ minHeight: 44 })
               .backgroundColor($r('app.color.app_primary'))
               .fontColor(Color.White)
               .onClick(() => {
@@ -944,6 +998,18 @@ export struct SettingPage {
           .width('100%')
           .padding(14)
           .alignItems(VerticalAlign.Center)
+
+          if (this.dataPending.length > 0) {
+            Text(this.dataPending).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+          }
+          Flex({ wrap: FlexWrap.Wrap }) {
+            Button('回滚上一版').constraintSize({ minHeight: 44 }).margin({ right: 8, bottom: 8 })
+              .enabled(this.dataCanRollback && !this.dataBusy && !this.dataChecking)
+              .hoverEffect(HoverEffect.Highlight).onClick(() => { this.changeSavedData(true).catch(() => { if (this.dataViewActive) { this.toast('无法完成确认，请重试'); } }); })
+            Button('恢复内置数据').constraintSize({ minHeight: 44 }).margin({ bottom: 8 })
+              .enabled(!this.dataBusy && !this.dataChecking)
+              .hoverEffect(HoverEffect.Highlight).onClick(() => { this.changeSavedData(false).catch(() => { if (this.dataViewActive) { this.toast('无法完成确认，请重试'); } }); })
+          }.width('100%')
 
           this.sectionTitle('祈愿数据管理')
           if (this.gachaRows.length === 0) {
@@ -1321,9 +1387,9 @@ export struct SettingPage {
               .fontSize(11)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')
-            TextInput({ placeholder: 'https://raw.githubusercontent.com/你的用户名/snap-hutao-data/main/manifest-hutao.json', text: this.urlInput })
+            TextInput({ placeholder: 'https://raw.githubusercontent.com/aichi-chishan/snap-hutao-data/main/manifest-hutao.json', text: this.urlInput })
               .fontSize(12)
-              .height(40)
+              .constraintSize({ minHeight: 44 })
               .width('100%')
               .onChange((v: string) => {
                 this.urlInput = v;
@@ -1331,7 +1397,7 @@ export struct SettingPage {
             Row({ space: 10 }) {
               Button('取消')
                 .fontSize(13)
-                .height(34)
+                .constraintSize({ minHeight: 44 })
                 .layoutWeight(1)
                 .backgroundColor($r('app.color.card_surface'))
                 .fontColor($r('app.color.text_primary'))
@@ -1340,7 +1406,7 @@ export struct SettingPage {
                 })
               Button('保存')
                 .fontSize(13)
-                .height(34)
+                .constraintSize({ minHeight: 44 })
                 .layoutWeight(1)
                 .backgroundColor($r('app.color.app_primary'))
                 .fontColor(Color.White)
@@ -1359,9 +1425,6 @@ export struct SettingPage {
         .padding({ left: 20, right: 20 })
         .justifyContent(FlexAlign.Center)
         .backgroundColor($r('app.color.overlay_scrim'))
-        .onClick(() => {
-          this.showUrlEdit = false;
-        })
       }
       if (this.showGeetestEdit) {
         Column() {

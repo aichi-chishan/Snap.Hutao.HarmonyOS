@@ -1,18 +1,13 @@
 /**
- * GameDataService.ets
- * 游戏元数据服务（业务封装层，对接 GameDataUpdater 的"取与存"）：
- *  - 每类元数据：远端更新文件（filesDir/gamedata/metadata/{域}.json）优先，缺省回退 rawfile 内置
- *  - 版本戳统一由 GameDataUpdater 管理（channelVersion），本服务只做"读最优源"
- *  - 数据域（新增域只需加一个枚举）+ path 约定：
- *      WikiAvatar  -> metadata/wiki_avatar.json      （角色图鉴元数据）
- *      WikiWeapon  -> metadata/wiki_weapon.json      （武器图鉴元数据）
- *      WikiMonster -> metadata/wiki_monster.json     （怪物图鉴元数据）
- *      Achievement -> metadata/achievement.json      （成就新数据集，含分类）
- *      曲线表      -> metadata/avatar_curve.json     （头像/武器等级曲线表）
+ * Game-data facade: one verified metadata/icon cohort is pinned for this process.
+ * Updates/reset/rollback change the next-launch selection, never existing consumers.
+ * Legacy community domains retain their bundled compatibility fallback; old per-file
+ * caches and Preferences version strings are not evidence of a complete snapshot.
  */
 import { util } from '@kit.ArkTS';
 import { AppContextProvider } from '../common/AppContext';
 import { GameDataUpdater, UpdateProgress } from '../data/remote/GameDataUpdater';
+import { GameDataManifestPolicy, ItemType } from '../data/remote/GameDataManifestPolicy';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'GameDataService';
@@ -32,6 +27,14 @@ export class GameDataService {
   static getInstance(): GameDataService {
     return GameDataService.instance;
   }
+
+  /** Coalesce startup validation before any metadata consumer or page is mounted. */
+  static initializeSnapshot(): Promise<void> { return GameDataUpdater.initializeSnapshot(); }
+
+  pendingVersion(): string { return GameDataUpdater.pendingVersion(); }
+  pendingState(): string { return GameDataUpdater.pendingState(); }
+  canRollback(): boolean { return GameDataUpdater.canRollback(); }
+  static rollbackRemote(): Promise<boolean> { return GameDataUpdater.rollback(); }
 
   /** 该域对应 rawfile 内置文件名（回退源；与远端同名，远端成功后覆盖语义） */
   private static rawfileOf(domain: GameDataDomain): string {
@@ -74,6 +77,7 @@ export class GameDataService {
    * 返回值可能为空串（两者皆无）——调用方自行兜底。
    */
   async readText(domain: GameDataDomain): Promise<string> {
+    await GameDataService.initializeSnapshot();
     // 1) 远端更新版
     const remote: string = GameDataUpdater.readMetadata(GameDataService.remotePathOf(domain));
     if (remote.length > 0) {
@@ -115,15 +119,10 @@ export class GameDataService {
 
   /** 发布清单的 path 保留 metadata/ 前缀；与下载器 itemPath 的落盘规则一致。 */
   static async readMetadataFile(name: string): Promise<string> {
+    await GameDataService.initializeSnapshot();
+    GameDataManifestPolicy.validatePath(`metadata/${name}`, ItemType.Text);
     const remote: string = GameDataUpdater.readMetadata(`metadata/${name}`);
-    if (remote.length > 0) {
-      try {
-        JSON.parse(remote);
-        return remote;
-      } catch (e) {
-        Logger.warn(TAG, `invalid remote metadata ${name}, using bundled data`);
-      }
-    }
+    if (remote.length > 0) { return remote; } // Entire selected cohort was verified together at startup.
     const raw: Uint8Array = await AppContextProvider.getResourceManager().getRawFileContent(`metadata/${name}`);
     return util.TextDecoder.create('utf-8').decodeToString(raw);
   }
@@ -146,6 +145,7 @@ export class GameDataService {
   /** 检查是否有更新可用（清单可拉取；失败返回 null 表示网络/地址问题） */
   async checkUpdateAvailable(): Promise<boolean | null> {
     try {
+      await GameDataService.initializeSnapshot();
       const manifest = await GameDataUpdater.fetchManifest();
       return GameDataUpdater.hasUpdate(manifest);
     } catch (e) {
@@ -154,7 +154,7 @@ export class GameDataService {
     }
   }
 
-  /** 清空远端数据（回退 rawfile 内置；用于恢复出厂） */
+  /** 下次启动回退整版内置数据；保留当前读者和既有文件。 */
   static clearRemote(): void {
     GameDataUpdater.clearAll();
   }

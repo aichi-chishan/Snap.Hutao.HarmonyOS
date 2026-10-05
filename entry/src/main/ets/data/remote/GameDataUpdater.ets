@@ -1,394 +1,222 @@
-/**
- * GameDataUpdater.ets
- * 游戏数据更新引擎（数据管理核心，供未来软件内从 GitHub 拉取最新游戏数据）：
- *
- * 设计目标：
- *  1. 单一清单协议（manifest-{CHANNEL}.json）集中管理全部可更新数据（元数据 JSON / 图标 PNG / 立绘大图 / 曲线表）
- *  2. 版本戳管理（本地版本 < 远端版本才触发更新；断网/失败静默回退本地包内数据）
- *  3. 并发下载 + 进度回传（request.agent 后台代理：断点续传/自动重试/后台通知）
- *  4. 原子替换（.download 临时目录 → 全部成功后才重命名覆盖，避免半成品覆盖生产数据）
- *  5. 目录分层：filesDir/gamedata/{分类}/{文件名}（用户数据路径，非 cacheDir，升级不丢缓存）
- *
- * 清单协议（GitHub raw 托管，仓库由用户维护）：
- *  {
- *    "channel": "hutao-cn",
- *    "channelVersion": "2026.08.24.1",
- *    "items": [
- *      { "type": "text",  "path": "metadata/character.json",  "url": "...", "version": 3 },
- *      { "type": "image", "path": "icons/AvatarIcon/xxx.png", "url": "...", "version": 5 }
- *    ]
- *  }
- *
- * 注意：本引擎只做"取与存"，不解析内容（解析由各 Service 负责），保证单一职责。
- */
-import { fileIo } from '@kit.CoreFileKit';
+/** Foreground-only, operation-pinned immutable cohorts. No resume queue, mirror or live-file deletion. */
+import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
-import { util } from '@kit.ArkTS';
+import { taskpool } from '@kit.ArkTS';
 import { AppContextProvider } from '../../common/AppContext';
 import { PreferencesStore } from '../prefs/PreferencesStore';
 import { Logger } from '../../common/Logger';
-import { GitHubMirror } from '../../common/GitHubMirror';
+import { GameDataItem, GameDataManifest, GameDataManifestPolicy, GameDataSource, ItemType } from './GameDataManifestPolicy';
+import { GameDataSnapshot, GameDataSnapshotStore } from './GameDataSnapshotStore';
+import { HarmonySnapshotIo } from './HarmonySnapshotIo';
+import { prepareGameDataSnapshot } from './GameDataSnapshotWorker';
+export { GameDataItem, GameDataManifest, ItemType } from './GameDataManifestPolicy';
 
 const TAG: string = 'GameDataUpdater';
-
-/** 更新条目类型：text=JSON/元数据；icon=图片（兼容 image 旧写法） */
-export class ItemType {
-  static readonly Text: string = 'text';
-  static readonly Icon: string = 'icon';
-  static readonly Image: string = 'image';
-}
-
-/** 清单条目（GitHub 协议） */
-export class GameDataItem {
-  /** text/icon/image */
-  type: string = ItemType.Text;
-  /** 相对路径（如 metadata/character.json），同时作为本地缓存键 */
-  path: string = '';
-  /** 下载地址（GitHub raw 或任何可公开 GET 的地址） */
-  url: string = '';
-  /** 条目级版本号（变更时 +1，仅用于记录） */
-  version: number = 0;
-}
-
-/** 清单（GitHub 协议根对象） */
-export class GameDataManifest {
-  channel: string = '';
-  channelVersion: string = '';
-  items: GameDataItem[] = [];
-}
-
-/** 更新进度（回调到 UI） */
 export class UpdateProgress {
-  /** 已成功项 */
   done: number = 0;
-  /** 总项 */
   total: number = 0;
-  /** 当前项名 */
   current: string = '';
 }
 
 export class GameDataUpdater {
-  /** 数据子目录：text 元数据 */
-  private static readonly SUB_METADATA: string = 'metadata';
-  /** 数据子目录：image 图标/大图 */
-  private static readonly SUB_IMAGE: string = 'images';
-  /** 元数据文件缓存（同步 IO 每文件进程内仅一次，避免 UI 线程重复大文件读） */
-  private static metaCache: Map<string, string> = new Map<string, string>();
-
-  /** 本地版本戳 key（Preferences 记录上一次成功的 channelVersion） */
-  private static versionKey(): string {
-    return 'gamedata_manifest_version';
+  private static ioValue: HarmonySnapshotIo | undefined = undefined;
+  private static storeValue: GameDataSnapshotStore | undefined = undefined;
+  private static initializing: Promise<void> | undefined = undefined;
+  private static updating: boolean = false;
+  private static io(): HarmonySnapshotIo {
+    if (GameDataUpdater.ioValue === undefined) { GameDataUpdater.ioValue = new HarmonySnapshotIo(AppContextProvider.getFilesDir()); }
+    return GameDataUpdater.ioValue;
   }
-
-  /** 清单地址 key（设置页可修改） */
-  private static manifestUrlKey(): string {
-    return 'gamedata_manifest_url';
+  private static store(): GameDataSnapshotStore {
+    if (GameDataUpdater.storeValue === undefined) {
+      GameDataUpdater.storeValue = new GameDataSnapshotStore(GameDataUpdater.io().root, GameDataUpdater.io());
+    }
+    return GameDataUpdater.storeValue;
   }
-
-  /** 默认清单地址（指向 aichi-chishan/snap-hutao-data；用户可在设置页运行时改） */
-  static defaultManifestUrl(): string {
-    return 'https://raw.githubusercontent.com/aichi-chishan/snap-hutao-data/main/manifest-hutao.json';
+  static initializeSnapshot(): Promise<void> {
+    if (GameDataUpdater.initializing === undefined) { GameDataUpdater.initializing = GameDataUpdater.initialize(); }
+    return GameDataUpdater.initializing;
   }
-
-  /** 读取当前清单地址（未设置时回退默认） */
-  static manifestUrl(): string {
-    return PreferencesStore.getString(GameDataUpdater.manifestUrlKey(), GameDataUpdater.defaultManifestUrl());
+  private static async verify(mode: string, id: string = '', item: string = '', hash: string = ''): Promise<string[]> {
+    const task: taskpool.Task = new taskpool.Task(prepareGameDataSnapshot, AppContextProvider.getFilesDir(), mode, id, item, hash);
+    const configs: taskpool.Configs = { timeout: mode === 'selection' || mode === 'file' ? 15000 : 60000 };
+    return await taskpool.execute(task, configs) as string[];
   }
-
-  /** 设置清单地址（设置页调用） */
+  private static async initialize(): Promise<void> {
+    let lock: fileIo.File | undefined = undefined;
+    try {
+      lock = GameDataUpdater.io().acquire();
+      GameDataUpdater.store().adoptSelection(await GameDataUpdater.verify('selection'), true);
+    } catch (_) {
+      // A late worker is read-only. Keep this process wholly bundled and do not change disk pointers.
+      GameDataUpdater.store().failInitialization();
+      Logger.warn(TAG, 'snapshot validation unavailable; bundled cohort pinned until restart');
+    } finally { if (lock !== undefined) { GameDataUpdater.io().release(lock); } }
+  }
+  static snapshotState(): string { return GameDataUpdater.store().stateText(); }
+  private static async refreshCommitted(): Promise<void> {
+    if (GameDataUpdater.store().needsRefresh()) {
+      GameDataUpdater.store().adoptSelection(await GameDataUpdater.verify('selection'), false);
+    }
+  }
+  static defaultManifestUrl(): string { return `${GameDataManifestPolicy.RAW_ROOT}main/manifest-hutao.json`; }
+  static manifestUrl(): string { return PreferencesStore.getString('gamedata_manifest_url', GameDataUpdater.defaultManifestUrl()); }
   static setManifestUrl(url: string): void {
-    PreferencesStore.setString(GameDataUpdater.manifestUrlKey(), url.trim().length > 0 ? url.trim() : GameDataUpdater.defaultManifestUrl());
+    const selected: string = url.trim() === '' ? GameDataUpdater.defaultManifestUrl() : url.trim();
+    GameDataManifestPolicy.source(selected);
+    if (GameDataUpdater.updating) { throw new Error('正在更新，请完成后再更改数据源'); }
+    const lock: fileIo.File = GameDataUpdater.io().acquire();
+    try { PreferencesStore.setString('gamedata_manifest_url', selected); }
+    finally { GameDataUpdater.io().release(lock); }
   }
+  static localVersion(): string { return GameDataUpdater.store().current()?.manifest.channelVersion ?? ''; }
+  static pendingVersion(): string { return GameDataUpdater.store().pendingVersion(); }
+  static pendingState(): string { return GameDataUpdater.store().pendingState(); }
+  static canRollback(): boolean { return !GameDataUpdater.updating && GameDataUpdater.store().canRollback(); }
+  static hasUpdate(remote: GameDataManifest): boolean { return remote.sourceRevision !== GameDataUpdater.store().committedRevision(); }
 
-  /** 本地数据根目录（filesDir/gamedata——正式持久数据，非缓存） */
-  private static root(): string {
-    return `${AppContextProvider.getFilesDir()}/gamedata`;
-  }
-
-  /** 元数据文件路径（text） */
-  static metadataPath(relPath: string): string {
-    return `${GameDataUpdater.root()}/${GameDataUpdater.SUB_METADATA}/${relPath}`;
-  }
-
-  /** 图片文件路径（image） */
-  static imagePath(relPath: string): string {
-    return `${GameDataUpdater.root()}/${GameDataUpdater.SUB_IMAGE}/${relPath}`;
-  }
-
-  /** 按条目类型取完整落盘路径（text → metadata/；icon/image → images/） */
-  private static itemPath(item: GameDataItem): string {
-    if (item.type === ItemType.Icon || item.type === ItemType.Image) {
-      return GameDataUpdater.imagePath(item.path);
-    }
-    return GameDataUpdater.metadataPath(item.path);
-  }
-
-  /** 本地版本戳（0=未更新过） */
-  static localVersion(): string {
-    return PreferencesStore.getString(GameDataUpdater.versionKey(), '');
-  }
-
-  /** 清空本地远端数据与版本戳（回退 rawfile 内置数据） */
-  static clearAll(): void {
-    GameDataUpdater.metaCache.clear();
-    try {
-      fileIo.rmdirSync(GameDataUpdater.root());
-    } catch (e) {
-      // 不存在则忽略
-    }
-    PreferencesStore.setString(GameDataUpdater.versionKey(), '');
-    Logger.info(TAG, 'remote gamedata cleared');
-  }
-
-  /** 是否有更新（远端版本 > 本地版本） */
-  static hasUpdate(remote: GameDataManifest): boolean {
-    if (remote.channelVersion.length === 0) {
-      return false;
-    }
-    return remote.channelVersion !== GameDataUpdater.localVersion();
-  }
-
-  /** 拉取清单（纯 GET text） */
-  static async fetchManifest(): Promise<GameDataManifest> {
-    const resp = await GameDataUpdater.httpGetString(GameDataUpdater.manifestUrl());
-    const root = JSON.parse(resp) as Record<string, Object>;
-    const manifest: GameDataManifest = new GameDataManifest();
-    manifest.channel = String(root['channel'] ?? '');
-    manifest.channelVersion = String(root['channelVersion'] ?? '');
-    const arr = (root['items'] as Object[]) ?? [];
-    for (const r of arr) {
-      const o = r as Record<string, Object>;
-      const item: GameDataItem = new GameDataItem();
-      item.type = String(o['type'] ?? ItemType.Text);
-      item.path = String(o['path'] ?? '');
-      item.url = String(o['url'] ?? '');
-      item.version = Number(o['version'] ?? 0);
-      if (item.path.length > 0 && item.url.length > 0) {
-        manifest.items.push(item);
-      }
-    }
-    Logger.info(TAG, `manifest: channel=${manifest.channel} ver=${manifest.channelVersion} items=${manifest.items.length}`);
-    return manifest;
-  }
-
-  /** 本地是否存在某条目（已更新过则 true） */
-  static isItemLocal(item: GameDataItem): boolean {
-    try {
-      fileIo.accessSync(GameDataUpdater.itemPath(item));
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /** 读取已更新的元数据文本；未更新/不存在返回 ''。进程内缓存（同步 IO 只在主线程发生一次） */
+  private static metadataName(path: string): string { return path.startsWith('metadata/') ? path : `metadata/${path}`; }
   static readMetadata(relPath: string): string {
-    const cached: string | undefined = GameDataUpdater.metaCache.get(relPath);
-    if (cached !== undefined) {
-      return cached;
-    }
-    try {
-      const p = GameDataUpdater.metadataPath(relPath);
-      const f = fileIo.openSync(p, fileIo.OpenMode.READ_ONLY);
-      try {
-        const st: fileIo.Stat = fileIo.statSync(f.fd);
-        const buf: ArrayBuffer = new ArrayBuffer(st.size);
-        fileIo.readSync(f.fd, buf);
-        const text: string = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
-        GameDataUpdater.metaCache.set(relPath, text);
-        return text;
-      } finally {
-        fileIo.closeSync(f);
-      }
-    } catch (e) {
-      GameDataUpdater.metaCache.set(relPath, '');
-      Logger.warn(TAG, `readMetadata ${relPath} fail`);
-      return '';
-    }
+    const current: GameDataSnapshot | undefined = GameDataUpdater.store().current();
+    const path: string = GameDataUpdater.metadataName(relPath);
+    // Legacy community domains have no slot in the verified cohort and use their bundled fallback.
+    try { GameDataManifestPolicy.validatePath(path, ItemType.Text); } catch (_) { return ''; }
+    return current?.metadata.get(path) ?? '';
   }
-
-  /** 读取已更新的图片相对路径（file:// 前缀供 Image 组件使用）；不存在返回 ''。
-   *  注意：fileIo.accessSync 在部分 API/模拟器实现对"路径不存在"不抛异常（返回成功），
-   *  导致 readImage 幽灵路径 → Image 渲染空白；此处改用 openSync 真实校验可打开。 */
+  static metadataPath(relPath: string): string {
+    const current: GameDataSnapshot | undefined = GameDataUpdater.store().current();
+    const path: string = GameDataUpdater.metadataName(relPath); GameDataManifestPolicy.validatePath(path, ItemType.Text);
+    return current === undefined ? '' : `${current.directory}/${path}`;
+  }
+  static imagePath(relPath: string): string {
+    const current: GameDataSnapshot | undefined = GameDataUpdater.store().current();
+    GameDataManifestPolicy.validatePath(relPath, ItemType.Icon);
+    return current !== undefined && current.paths.has(relPath) ? `${current.directory}/${relPath}` : '';
+  }
   static readImage(relPath: string): string {
-    const p = GameDataUpdater.imagePath(relPath);
-    let f: fileIo.File | undefined = undefined;
-    try {
-      f = fileIo.openSync(p, fileIo.OpenMode.READ_ONLY);
-      return `file://${p}`;
-    } catch (e) {
-      return '';
-    } finally {
-      if (f !== undefined) {
-        try {
-          fileIo.closeSync(f);
-        } catch (e) {
-          // 关闭失败忽略
-        }
-      }
-    }
+    GameDataUpdater.store().current();
+    try { const path: string = GameDataUpdater.imagePath(relPath); return path === '' ? '' : fileUri.getUriFromPath(path); }
+    catch (_) { return ''; }
   }
-
-  /**
-   * 全量更新（顺序执行，逐项下载）：
-   * @param onProgress 进度回调（可空）
-   * @returns 更新后的 manifest；清单拉取失败（断网/地址错误）时抛错给调用方提示
-   */
-  static async update(onProgress?: (p: UpdateProgress) => void): Promise<GameDataManifest> {
-    const manifest = await GameDataUpdater.fetchManifest();
-    if (manifest.items.length === 0) {
-      Logger.warn(TAG, 'manifest has no items, skip');
-      return manifest;
-    }
-    let done = 0;
-    let failed: number = 0;
-    for (const item of manifest.items) {
-      try {
-        await GameDataUpdater.downloadItem(item);
-        if (onProgress !== undefined) {
-          const p: UpdateProgress = new UpdateProgress();
-          p.done = done + 1;
-          p.total = manifest.items.length;
-          p.current = item.path;
-          onProgress(p);
-        }
-      } catch (e) {
-        failed += 1;
-        Logger.warn(TAG, `update item fail ${item.path}: ${(e as Error).message}`);
-      }
-      done += 1;
-    }
-    GameDataUpdater.metaCache.clear();
-    if (failed > 0) {
-      throw new Error(`数据更新未完成：${failed} 个文件下载失败，请重试`);
-    }
-    PreferencesStore.setString(GameDataUpdater.versionKey(), manifest.channelVersion);
-    Logger.info(TAG, `update done items=${manifest.items.length} version=${manifest.channelVersion}`);
-    return manifest;
+  static isItemLocal(item: GameDataItem): boolean {
+    const current: GameDataSnapshot | undefined = GameDataUpdater.store().current();
+    try { GameDataManifestPolicy.validatePath(item.path, item.type); return current?.paths.has(item.path) ?? false; }
+    catch (_) { return false; }
   }
-
-  /** 仅更新缺失项（增量：已存在且版本戳不同才重新下载） */
   static async ensureItem(item: GameDataItem): Promise<void> {
-    if (GameDataUpdater.isItemLocal(item)) {
-      return;
-    }
-    await GameDataUpdater.downloadItem(item);
+    await GameDataUpdater.initializeSnapshot();
+    if (!GameDataUpdater.isItemLocal(item)) { throw new Error('请更新完整游戏数据，不支持单文件覆盖'); }
+  }
+  /** Reset is a next-launch tombstone; existing readers and every legacy/snapshot byte remain intact. */
+  static clearAll(): void {
+    if (GameDataUpdater.updating) { throw new Error('正在更新，请完成后再重置'); }
+    const lock: fileIo.File = GameDataUpdater.io().acquire();
+    try { GameDataUpdater.store().reset(); }
+    finally { GameDataUpdater.io().release(lock); }
+  }
+  static async rollback(): Promise<boolean> {
+    if (GameDataUpdater.updating) { throw new Error('正在更新，请完成后再回滚'); }
+    GameDataUpdater.updating = true;
+    let lock: fileIo.File | undefined = undefined;
+    try {
+      await GameDataUpdater.initializeSnapshot(); lock = GameDataUpdater.io().acquire();
+      await GameDataUpdater.refreshCommitted();
+      const id: string = GameDataUpdater.store().rollbackId(); if (id === '') { return false; }
+      return GameDataUpdater.store().rollback(await GameDataUpdater.verify('rollback', id));
+    } finally { if (lock !== undefined) { GameDataUpdater.io().release(lock); } GameDataUpdater.updating = false; }
   }
 
-  /** 下载单条目到临时文件后原子替换（避免半成品覆盖） */
-  private static async downloadItem(item: GameDataItem): Promise<void> {
-    const dest = GameDataUpdater.itemPath(item);
-    const parent = dest.substring(0, dest.lastIndexOf('/'));
-    await GameDataUpdater.mkdirp(parent);
-    // 临时文件（.download 后缀），成功后 rename 覆盖
-    const tmp = `${dest}.download`;
-    try {
-      fileIo.unlinkSync(tmp);
-    } catch (e) {
-      // 不存在则忽略
+  /** Branch/tag is resolved afresh per operation; an explicit 40-hex commit needs no mutable lookup. */
+  static async fetchManifest(): Promise<GameDataManifest> {
+    const selected: string = GameDataUpdater.manifestUrl();
+    const source: GameDataSource = GameDataManifestPolicy.source(selected);
+    let revision: string = source.ref;
+    if (!GameDataManifestPolicy.isRevision(revision)) {
+      const bytes: Uint8Array = await GameDataUpdater.getBytes(
+        `https://api.github.com/repos/${GameDataManifestPolicy.REPOSITORY}/commits?sha=${source.ref}&per_page=1`, 2 * 1024 * 1024);
+      const commits: Object[] = GameDataManifestPolicy.array(GameDataManifestPolicy.parseJson(GameDataUpdater.io().decode(bytes)), 'commits');
+      if (commits.length !== 1) { throw new Error('无法解析唯一数据版本'); }
+      revision = GameDataManifestPolicy.text(GameDataManifestPolicy.object(commits[0], 'commit')['sha'], 'sha');
+      if (!GameDataManifestPolicy.isRevision(revision)) { throw new Error('数据源未返回可信提交版本'); }
     }
-    await GameDataUpdater.downloadWithAgent(item.url, tmp);
-    try {
-      fileIo.unlinkSync(dest);
-    } catch (e) {
-      // 不存在则忽略（首次）
-    }
-    fileIo.renameSync(tmp, dest);
-    Logger.info(TAG, `item ok ${item.path} <- ${item.type}`);
+    const bytes: Uint8Array = await GameDataUpdater.getBytes(
+      `${GameDataManifestPolicy.RAW_ROOT}${revision}/${source.file}`, GameDataManifestPolicy.MAX_MANIFEST_BYTES);
+    if (GameDataUpdater.manifestUrl() !== selected) { throw new Error('检查期间数据源已变化，请重试'); }
+    return GameDataManifestPolicy.parse(GameDataUpdater.io().decode(bytes), source, revision);
   }
-
-  /** http 下载（流式分段写盘，避免整块大 Buffer 占内存；GitHub raw 场景足够）：
-   *  说明：request.agent 后台下载需 request_agent 模块声明且任务管理模式更重（断点续传/后台通知），
-   *  当前 manifest 多为小文件（元数据 JSON/图标 PNG），http 直接下载 + 临时文件原子替换已保证可靠性；
-   *  后续若引入大体积资源包（立绘/桌面壁纸），可在本方法内切换为 request.agent。 */
-  private static async downloadWithAgent(url: string, filePath: string): Promise<void> {
-    let lastErr: Error = new Error('unknown');
-    for (const candidate of GitHubMirror.candidates(url)) {
-      try {
-        await GameDataUpdater.downloadOnce(candidate, filePath);
-        return;
-      } catch (e) {
-        lastErr = e as Error;
+  private static checkSource(source: string, deadline: number): void {
+    if (GameDataUpdater.manifestUrl() !== source) { throw new Error('数据源已变化，旧版本保持不变'); }
+    if (Date.now() >= deadline) { throw new Error('本次更新已超时，旧版本保持不变'); }
+  }
+  private static space(used: number, incoming: number): void {
+    if (used + incoming + GameDataManifestPolicy.MAX_MANIFEST_BYTES > 3 * GameDataManifestPolicy.MAX_SNAPSHOT_BYTES ||
+      GameDataUpdater.io().freeBytes() < incoming + GameDataManifestPolicy.MAX_MANIFEST_BYTES + 16 * 1024 * 1024) {
+      throw new Error('游戏数据存储空间不足，旧版本保持不变');
+    }
+  }
+  static async update(onProgress?: (p: UpdateProgress) => void): Promise<GameDataManifest> {
+    if (GameDataUpdater.updating) { throw new Error('已有游戏数据更新任务，请勿重复启动'); }
+    GameDataUpdater.updating = true;
+    let lock: fileIo.File | undefined = undefined;
+    try {
+      await GameDataUpdater.initializeSnapshot(); lock = GameDataUpdater.io().acquire();
+      await GameDataUpdater.refreshCommitted();
+      const source: string = GameDataUpdater.manifestUrl(); const deadline: number = Date.now() + 24 * 60 * 60 * 1000;
+      const manifest: GameDataManifest = await GameDataUpdater.fetchManifest(); GameDataUpdater.checkSource(source, deadline);
+      if (!GameDataUpdater.hasUpdate(manifest)) { return manifest; }
+      const id: string = `${manifest.sourceRevision}-${Date.now()}-${Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, '0')}`;
+      let used: number = GameDataUpdater.io().usedBytes(); GameDataUpdater.space(used, 0);
+      const staging: string = GameDataUpdater.store().begin(id);
+      let total: number = 0; let done: number = 0;
+      for (const item of manifest.items) {
+        GameDataUpdater.checkSource(source, deadline);
+        GameDataUpdater.space(used, item.size > 0 ? item.size : GameDataManifestPolicy.MAX_FILE_BYTES);
+        const bytes: Uint8Array = await GameDataUpdater.getBytes(item.url, item.size > 0 ? item.size : GameDataManifestPolicy.MAX_FILE_BYTES);
+        GameDataUpdater.checkSource(source, deadline);
+        const hash: string = await GameDataUpdater.io().sha256Async(bytes);
+        GameDataUpdater.checkSource(source, deadline);
+        total += bytes.length;
+        if (total > GameDataManifestPolicy.MAX_SNAPSHOT_BYTES) { throw new Error('完整快照超过容量限制'); }
+        GameDataUpdater.space(used, bytes.length);
+        GameDataUpdater.io().write(`${staging}/${item.path}`, bytes);
+        const descriptor: string = JSON.stringify(item);
+        let receipt: string[];
+        try { receipt = await GameDataUpdater.verify('file', id, descriptor, hash); }
+        catch (error) { throw new Error(`数据文件 ${item.path} 校验失败：${(error as Error).message}`); }
+        GameDataUpdater.checkSource(source, deadline);
+        if (receipt.length !== 6 || receipt[0] !== 'file' || receipt[1] !== GameDataUpdater.io().root || receipt[2] !== id ||
+          receipt[3] !== descriptor || receipt[4] !== String(bytes.length) || receipt[5] !== hash) {
+          throw new Error('文件校验收据与本次更新不一致');
+        }
+        item.size = bytes.length; item.sha256 = hash; used += bytes.length; done++;
+        if (onProgress !== undefined) {
+          const progress: UpdateProgress = new UpdateProgress(); progress.done = done; progress.total = manifest.items.length; progress.current = item.path;
+          try { onProgress(progress); } catch (_) { Logger.warn(TAG, 'progress callback unavailable'); }
+        }
       }
-    }
-    throw lastErr;
+      const receipt: Uint8Array = GameDataUpdater.io().encode(JSON.stringify(manifest));
+      if (receipt.length > GameDataManifestPolicy.MAX_MANIFEST_BYTES) { throw new Error('完整快照收据过大'); }
+      GameDataUpdater.io().write(`${staging}/complete.json`, receipt);
+      const verified: string[] = await GameDataUpdater.verify('stage', id);
+      GameDataUpdater.store().publish(id, manifest, verified, (): void => GameDataUpdater.checkSource(source, deadline));
+      Logger.info(TAG, `verified cohort saved: ${manifest.channelVersion}; restart required`);
+      return manifest;
+    } finally { if (lock !== undefined) { GameDataUpdater.io().release(lock); } GameDataUpdater.updating = false; }
   }
 
-  private static async downloadOnce(url: string, filePath: string): Promise<void> {
-    const req = http.createHttp();
+  /** Small bounded foreground requests only; redirects and untrusted mirrors are never followed. */
+  private static async getBytes(url: string, limit: number): Promise<Uint8Array> {
+    const client: http.HttpRequest = http.createHttp();
     try {
-      // expectDataType STRING 兼容二进制安全写入（UTF-8 元数据）；图片走 ARRAY_BUFFER 由调用方分派太复杂，
-      // 统一用 ARRAY_BUFFER：写盘原始字节，文本由下游 readMetadata 做 UTF-8 解码。
-      const resp = await req.request(url, {
-        method: http.RequestMethod.GET,
-        expectDataType: http.HttpDataType.ARRAY_BUFFER,
-        connectTimeout: 15000,
-        readTimeout: 60000,
+      const result: http.HttpResponse = await client.request(url, {
+        method: http.RequestMethod.GET, expectDataType: http.HttpDataType.ARRAY_BUFFER,
+        header: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'SnapHutaoHarmonyOS' },
+        connectTimeout: 15000, readTimeout: 60000, maxRedirects: 0, maxLimit: limit, usingCache: false,
       });
-      if (resp.responseCode !== http.ResponseCode.OK) {
-        throw new Error(`http ${resp.responseCode}`);
-      }
-      const file = fileIo.openSync(filePath,
-        fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
-      try {
-        fileIo.writeSync(file.fd, resp.result as ArrayBuffer);
-      } finally {
-        fileIo.closeSync(file);
-      }
-    } finally {
-      req.destroy();
-    }
-  }
-
-  /** 中文 UTF-8 文本 GET（清单） */
-  private static async httpGetString(url: string): Promise<string> {
-    // 直连失败自动回退公共镜像（国内直连 GitHub 不稳定）
-    let lastErr: Error = new Error('unknown');
-    for (const candidate of GitHubMirror.candidates(url)) {
-      try {
-        return await GameDataUpdater.httpGetStringOnce(candidate);
-      } catch (e) {
-        lastErr = e as Error;
-      }
-    }
-    throw lastErr;
-  }
-
-  private static async httpGetStringOnce(url: string): Promise<string> {
-    const req = http.createHttp();
-    try {
-      const resp = await req.request(url, {
-        method: http.RequestMethod.GET,
-        expectDataType: http.HttpDataType.STRING,
-        connectTimeout: 15000,
-        readTimeout: 30000,
-      });
-      if (resp.responseCode !== http.ResponseCode.OK) {
-        throw new Error(`http ${resp.responseCode}`);
-      }
-      return resp.result as string;
-    } finally {
-      req.destroy();
-    }
-  }
-
-  /** 递归创建目录 */
-  private static async mkdirp(path: string): Promise<void> {
-    try {
-      fileIo.mkdirSync(path);
-      return;
-    } catch (e) {
-      // 父级可能不存在：逐级创建
-    }
-    const segs: string[] = path.split('/');
-    let cur: string = '';
-    for (let i = 0; i < segs.length; i++) {
-      cur += (i === 0 ? '' : '/') + segs[i];
-      try {
-        fileIo.mkdirSync(cur);
-      } catch (e) {
-        // 已存在或中间级失败
-      }
-    }
+      if (result.responseCode !== http.ResponseCode.OK || !(result.result instanceof ArrayBuffer)) { throw new Error(`数据下载 HTTP ${result.responseCode}`); }
+      const bytes: Uint8Array = new Uint8Array(result.result);
+      if (bytes.length < 1 || bytes.length > limit) { throw new Error('数据下载为空或超过大小限制'); }
+      return bytes;
+    } finally { client.destroy(); }
   }
 }
