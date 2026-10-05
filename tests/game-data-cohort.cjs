@@ -73,12 +73,23 @@ function install(store, io, revision = A, version = 'one') { const s = stage(sto
 let count = 0;
 async function test(name, fn) { await fn(); console.log('PASS ' + (++count) + ': ' + name); }
 
+function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
+function outcome(promise) { return promise.then(value => ({ value }), error => ({ error })); }
+async function until(check) {
+  const deadline = Date.now() + 10000;
+  while (!check()) { if (Date.now() > deadline) throw new Error('condition timed out'); await new Promise(done => setTimeout(done, 2)); }
+}
+const pause = () => new Promise(done => setTimeout(done, 15));
+const pointerBytes = env => { const file = path.join(env.directory, 'gamedata/cohort-v1/active.json'); return fs.existsSync(file) ? fs.readFileSync(file) : undefined; };
+const isItemUrl = url => url.includes('/metadata/') || url.includes('/icons/');
 const sandboxes = [];
 function environment() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hutao-cohort-')); sandboxes.push(directory);
   const state = { directory, prefs: new Map(), revision: A, version: 'one', schema: 1, files: new Map(raw), requests: [],
     free: 10 * 1024 ** 3, failUrl: '', requestGate: null, requestHook: null, workerFailure: '', workerGate: null,
-    workerHook: null, workerResultHook: null, late: null, ioHook: null, uriCalls: [] };
+    workerHook: null, workerResultHook: null, late: null, ioHook: null, uriCalls: [],
+    requestBarrier: null, hashGate: null, workerBarrier: null, afterRename: null, itemLatency: 0, abortSupported: false, destroyThrows: false,
+    activeHTTP: 0, peakHTTP: 0, activeItems: 0, peakItems: 0, abortCalls: [], writeCalls: [] };
   const handles = new Map(), locks = new Map(); let executing;
   const fileIo = {
     OpenMode: { READ_ONLY: 0, READ_WRITE: 2, CREATE: fs.constants.O_CREAT, TRUNC: fs.constants.O_TRUNC, NOFOLLOW: fs.constants.O_NOFOLLOW },
@@ -91,10 +102,10 @@ function environment() {
     closeSync(handle) { if (handle.locked && locks.get(handle.file) === handle) locks.delete(handle.file); handles.delete(handle.fd); fs.closeSync(handle.fd); },
     lstatSync(file) { return fs.lstatSync(file); }, statSync(file) { return typeof file === 'number' ? fs.fstatSync(file) : fs.statSync(file); },
     readSync(fd, bytes) { state.ioHook?.('read', handles.get(fd).file); return fs.readSync(fd, Buffer.from(bytes), 0, bytes.byteLength, null); },
-    writeSync(fd, bytes) { const result = state.ioHook?.('write', handles.get(fd).file); if (typeof result === 'number') return result; return fs.writeSync(fd, Buffer.from(bytes)); },
+    writeSync(fd, bytes) { state.writeCalls.push(handles.get(fd).file); const result = state.ioHook?.('write', handles.get(fd).file); if (typeof result === 'number') return result; return fs.writeSync(fd, Buffer.from(bytes)); },
     fsyncSync(fd) { state.ioHook?.('fsync', handles.get(fd).file); fs.fsyncSync(fd); },
     mkdirSync(file) { state.ioHook?.('mkdir', file); fs.mkdirSync(file); },
-    renameSync(from, to) { state.ioHook?.('rename', to); fs.renameSync(from, to); },
+    renameSync(from, to) { state.ioHook?.('rename', to); fs.renameSync(from, to); state.afterRename?.(to); },
     listFileSync(file, options) { return fs.readdirSync(file, { recursive: options.recursion }).slice(0, options.listNum); },
   };
   const taskpool = {
@@ -103,28 +114,57 @@ function environment() {
       assert.ok(configs.timeout > 0 && configs.timeout <= 60000);
       state.workerHook?.(task);
       if (state.workerGate) await state.workerGate;
+      if (state.workerBarrier) await state.workerBarrier(task);
       if (state.workerFailure === task.args[1]) { state.late = task; throw new Error('worker timed out'); }
       executing = task; let result; try { result = structuredClone(task.fn(...task.args)); } finally { executing = undefined; }
       return state.workerResultHook ? state.workerResultHook(result, task) : result;
     }
   };
   const http = { RequestMethod: { GET: 1 }, HttpDataType: { ARRAY_BUFFER: 1 }, ResponseCode: { OK: 200 }, createHttp() {
-    return { destroy() {}, async request(url, options) {
-      state.requests.push(url); assert.equal(options.maxRedirects, 0); assert.equal(options.usingCache, false); assert.ok(options.maxLimit <= P.MAX_FILE_BYTES);
-      state.requestHook?.(url); if (state.requestGate) await state.requestGate;
-      if (state.failUrl && url.endsWith(state.failUrl)) return { responseCode: 500, result: new ArrayBuffer(0) };
-      let bytes;
-      if (url.startsWith('https://api.github.com/repos/')) bytes = encode(JSON.stringify([{ sha: state.revision }]));
-      else if (url === `${P.RAW_ROOT}${state.revision}/manifest-hutao.json`) bytes = encode('\uFEFF' + JSON.stringify(manifest(state.revision, state.version, state.schema, state.files)));
-      else { const prefix = P.RAW_ROOT + state.revision + '/'; assert.ok(url.startsWith(prefix), 'unpinned URL: ' + url); bytes = state.files.get(url.slice(prefix.length)); assert.ok(bytes, url); }
-      return { responseCode: 200, result: Uint8Array.from(bytes).buffer };
-    } };
+    let url = '', active = false, destroyed = false, rejectPending;
+    const client = {
+      destroy() {
+        if (active) state.abortCalls.push(url);
+        if (state.destroyThrows) throw new Error('destroy unavailable');
+        destroyed = true;
+        if (active && state.abortSupported) rejectPending?.(new Error('native request aborted'));
+      },
+      async request(requestUrl, options) {
+        url = requestUrl; active = true;
+        const isItem = url.includes('/metadata/') || url.includes('/icons/');
+        state.activeHTTP++; state.peakHTTP = Math.max(state.peakHTTP, state.activeHTTP);
+        if (isItem) { state.activeItems++; state.peakItems = Math.max(state.peakItems, state.activeItems); }
+        state.requests.push(url); assert.equal(options.maxRedirects, 0); assert.equal(options.usingCache, false); assert.ok(options.maxLimit <= P.MAX_FILE_BYTES);
+        try {
+          return await new Promise((resolve, reject) => {
+            rejectPending = reject;
+            (async () => {
+              state.requestHook?.(url);
+              if (state.requestGate) await state.requestGate;
+              if (state.requestBarrier) await state.requestBarrier(url, client);
+              if (isItem && state.itemLatency) await new Promise(done => setTimeout(done, state.itemLatency));
+              if (destroyed && state.abortSupported) throw new Error('native request aborted');
+              if (state.failUrl && url.endsWith(state.failUrl)) return { responseCode: 500, result: new ArrayBuffer(0) };
+              let bytes;
+              if (url.startsWith('https://api.github.com/repos/')) bytes = encode(JSON.stringify([{ sha: state.revision }]));
+              else if (url === `${P.RAW_ROOT}${state.revision}/manifest-hutao.json`) bytes = encode('\uFEFF' + JSON.stringify(manifest(state.revision, state.version, state.schema, state.files)));
+              else { const prefix = P.RAW_ROOT + state.revision + '/'; assert.ok(url.startsWith(prefix), 'unpinned URL: ' + url); bytes = state.files.get(url.slice(prefix.length)); assert.ok(bytes, url); }
+              return { responseCode: 200, result: Uint8Array.from(bytes).buffer };
+            })().then(resolve, reject);
+          });
+        } finally {
+          active = false; rejectPending = undefined; state.activeHTTP--;
+          if (isItem) state.activeItems--;
+        }
+      }
+    };
+    return client;
   } };
   const boundaries = {
     '@kit.CoreFileKit': { fileIo, fileUri: { getUriFromPath(file) { state.uriCalls.push(file); return 'file://bundle/' + encodeURIComponent(file); } }, statfs: { getFreeSizeSync: () => state.free } },
     '@kit.ArkTS': { taskpool, util: { TextEncoder: class { encodeInto(text) { return encode(text); } }, TextDecoder: { create: (_, options) => ({ decodeToString: bytes => new TextDecoder('utf-8', options).decode(bytes) }) } } },
     '@kit.NetworkKit': { http },
-    '@kit.CryptoArchitectureKit': { cryptoFramework: { createMd() { const hash = crypto.createHash('sha256'); return { updateSync(blob) { hash.update(blob.data); }, digestSync() { return { data: hash.digest() }; }, async update(blob) { hash.update(blob.data); }, async digest() { return { data: hash.digest() }; } }; } } },
+    '@kit.CryptoArchitectureKit': { cryptoFramework: { createMd() { const hash = crypto.createHash('sha256'); return { updateSync(blob) { hash.update(blob.data); }, digestSync() { return { data: hash.digest() }; }, async update(blob) { if (state.hashGate) await state.hashGate; hash.update(blob.data); }, async digest() { return { data: hash.digest() }; } }; } } },
     AppContext: { AppContextProvider: { getFilesDir: () => directory, getResourceManager: () => ({ async getRawFileContent(name) { return Uint8Array.from(fs.readFileSync(path.join(root, 'entry/src/main/resources/rawfile', name))); } }) } },
     PreferencesStore: { PreferencesStore: { getString: (key, fallback) => state.prefs.get(key) ?? fallback, setString: (key, value) => state.prefs.set(key, value) } },
     Logger: { Logger: { info() {}, warn() {} } },
@@ -315,8 +355,15 @@ function environment() {
     await assert.rejects(U.update(), /重复/); assert.throws(() => U.clearAll(), /正在更新/); assert.throws(() => U.setManifestUrl(P.RAW_ROOT + B + '/manifest-hutao.json'), /正在更新/);
     await assert.rejects(other.update(), /另一任务/); env.requestGate = null; release(); await running;
     env.revision = B; env.version = 'two'; let checked = false;
-    await U.update(() => { if (!checked) { checked = true; assert.throws(() => U.clearAll(), /正在更新/); assert.throws(() => U.setManifestUrl(P.RAW_ROOT + 'main/manifest-hutao.json'), /正在更新/); } });
-    assert.equal(checked, true);
+    const callbackErrors = [];
+    await U.update(() => { if (!checked) {
+      checked = true;
+      for (const action of [() => U.clearAll(), () => U.setManifestUrl(P.RAW_ROOT + 'main/manifest-hutao.json')]) {
+        try { action(); callbackErrors.push(undefined); } catch (error) { callbackErrors.push(error); }
+      }
+    } });
+    assert.equal(checked, true); assert.equal(callbackErrors.length, 2);
+    for (const error of callbackErrors) assert.match(error?.message ?? '', /正在更新/);
   });
   await test('startup worker failure pins bundled data and disallows mutation rather than adopting late results', async () => {
     const env = environment(); env.workerFailure = 'selection'; const U = await env.updater(), late = env.late;
@@ -390,6 +437,252 @@ function environment() {
     env.workerResultHook = (result, task) => { if (task.args[1] === 'file') result[2] = A + '-1-00000001'; return result; };
     await assert.rejects(U.update(), /收据/); env.workerResultHook = null;
     assert.equal((await env.updater()).localVersion(), 'two');
+  });
+  await test('four lanes overlap bounded requests, tolerate out-of-order completion and report verified monotonic progress', async () => {
+    const env = environment(), U = await env.updater(); env.itemLatency = 20;
+    env.requestBarrier = url => url.endsWith('/metadata/Achievement.json') ? new Promise(done => setTimeout(done, 60)) : undefined;
+    const completed = [], states = [], progress = []; let last = 0;
+    await U.update(p => { states.push(U.updateStatus()); progress.push({ ...p }); });
+    for (let index = 0; index < progress.length; index++) {
+      const p = progress[index], state = states[index];
+      assert.ok(state.activeFiles >= 0 && state.activeFiles <= 4);
+      assert.ok(p.done >= last);
+      if (p.done > last) { completed.push(p.current); last = p.done; }
+    }
+    assert.equal(env.peakItems, 4); assert.ok(env.peakHTTP <= 4);
+    assert.notEqual(completed[0], 'metadata/Achievement.json'); assert.equal(new Set(completed).size, 18);
+    assert.ok(states.some(state => state.state === 'validating'));
+    const status = U.updateStatus(); assert.equal(status.state, 'completed'); assert.equal(status.activeFiles, 0);
+    assert.equal(status.done, 18); assert.equal(status.settled, true); assert.equal(status.canCancel, false);
+    assert.equal(status.bytes, [...raw.values()].reduce((sum, bytes) => sum + bytes.length, 0));
+  });
+  await test('cancel before network and during branch/manifest waits is truthful and retains admission until settlement', async () => {
+    const early = environment(), E = await early.updater(); let requested = false, cancelling;
+    const initial = outcome(E.update(() => { if (!requested) { requested = true; cancelling = E.cancelUpdate(); } }));
+    assert.match((await initial).error.message, /取消/); assert.equal((await cancelling).state, 'cancelled'); assert.equal(early.requests.length, 0);
+    for (const phase of ['branch', 'manifest']) {
+      const env = environment(), U = await env.updater(), other = await env.updater(), gate = deferred();
+      env.requestBarrier = url => (phase === 'branch' ? url.startsWith('https://api.github.com/') : url.endsWith('/manifest-hutao.json')) ? gate.promise : undefined;
+      const running = outcome(U.update());
+      await until(() => env.activeHTTP === 1 && env.requests.some(url => phase === 'branch' ? url.startsWith('https://api.github.com/') : url.endsWith('/manifest-hutao.json')));
+      const stop = U.cancelUpdate(); let settled = false; stop.then(() => { settled = true; });
+      await pause(); assert.equal(settled, false); assert.equal(U.updateStatus().state, 'cancelling'); assert.equal(U.updateStatus().settled, false);
+      await assert.rejects(U.update(), /重复/); await assert.rejects(other.update(), /另一任务/);
+      assert.ok(env.abortCalls.length > 0); env.requestBarrier = null; gate.resolve();
+      assert.match((await running).error.message, /取消/); const result = await stop;
+      assert.equal(result.state, 'cancelled'); assert.equal(result.settled, true); assert.equal(env.activeHTTP, 0);
+      assert.equal(env.requests.filter(isItemUrl).length, 0); assert.equal(pointerBytes(env), undefined);
+    }
+  });
+  await test('cancel drains four outstanding HTTP promises before allowing a replacement update', async () => {
+    const env = environment(), U = await env.updater(); await U.update(); const before = pointerBytes(env);
+    env.revision = B; env.version = 'two'; const gate = deferred(); env.requestBarrier = url => isItemUrl(url) ? gate.promise : undefined;
+    const running = outcome(U.update()); await until(() => env.activeItems === 4);
+    const beforeStop = env.requests.filter(isItemUrl).length, id = U.updateStatus().id;
+    const stop = U.cancelUpdate(), repeated = U.cancelUpdate(); let settled = false; stop.then(() => { settled = true; });
+    await pause(); assert.equal(settled, false); assert.equal(U.updateStatus().activeFiles, 4); assert.equal(U.updateStatus().canCancel, false);
+    assert.equal(env.requests.filter(isItemUrl).length, beforeStop); await assert.rejects(U.update(), /重复/);
+    env.requestBarrier = null; gate.resolve(); assert.match((await running).error.message, /取消/);
+    for (const result of [await stop, await repeated]) { assert.equal(result.id, id); assert.equal(result.state, 'cancelled'); assert.equal(result.activeFiles, 0); }
+    assert.deepEqual(pointerBytes(env), before); env.revision = C; env.version = 'three'; await U.update();
+    assert.equal((await env.updater()).localVersion(), 'three'); assert.notEqual(U.updateStatus().id, id);
+  });
+  await test('native destroy can settle supported aborts, while late transport callbacks remain unable to write', async () => {
+    const env = environment(), U = await env.updater(), gate = deferred(); env.abortSupported = true;
+    env.requestBarrier = url => isItemUrl(url) ? gate.promise : undefined;
+    const running = outcome(U.update()); await until(() => env.activeItems === 4);
+    const stop = await U.cancelUpdate(); assert.equal(stop.state, 'cancelled'); assert.equal(env.activeItems, 0);
+    assert.match((await running).error.message, /取消/); const writes = env.writeCalls.length;
+    env.requestBarrier = null; gate.resolve(); await pause(); assert.equal(env.writeCalls.length, writes); assert.equal(pointerBytes(env), undefined);
+    env.revision = B; env.version = 'two'; await U.update(); assert.equal((await env.updater()).localVersion(), 'two');
+  });
+  await test('cancel waits for asynchronous native hashes and prevents subsequent staging writes', async () => {
+    const env = environment(), U = await env.updater(), gate = deferred(); env.hashGate = gate.promise;
+    const running = outcome(U.update()); await until(() => U.updateStatus().activeFiles === 4 && env.activeHTTP === 0 && env.requests.filter(isItemUrl).length === 4);
+    const stop = U.cancelUpdate(); let settled = false; stop.then(() => { settled = true; }); const writes = env.writeCalls.length;
+    await pause(); assert.equal(settled, false); await assert.rejects(U.update(), /重复/);
+    env.hashGate = null; gate.resolve(); assert.match((await running).error.message, /取消/); assert.equal((await stop).state, 'cancelled');
+    assert.equal(env.writeCalls.length, writes); assert.equal(pointerBytes(env), undefined);
+  });
+  await test('cancel during file or final read-only verification drains the awaited workers without publishing', async () => {
+    for (const phase of ['file', 'stage']) {
+      const env = environment(), U = await env.updater(), gate = deferred(); let waiting = 0;
+      env.workerBarrier = task => { if (task.args[1] === phase) { waiting++; return gate.promise; } };
+      const running = outcome(U.update()); await until(() => waiting === (phase === 'file' ? 4 : 1));
+      const stop = U.cancelUpdate(); let settled = false; stop.then(() => { settled = true; }); await pause();
+      assert.equal(settled, false); assert.equal(U.updateStatus().state, 'cancelling'); assert.equal(U.updateStatus().settled, false);
+      assert.throws(() => U.setManifestUrl(P.RAW_ROOT + B + '/manifest-hutao.json'), /正在更新/);
+      env.workerBarrier = null; gate.resolve(); assert.match((await running).error.message, /取消/);
+      assert.equal((await stop).state, 'cancelled'); assert.equal(pointerBytes(env), undefined);
+    }
+  });
+  await test('first parallel failure stops admission and drains other requests even when native destroy throws', async () => {
+    const env = environment(), U = await env.updater(), gate = deferred(); env.destroyThrows = true;
+    env.failUrl = 'metadata/Achievement.json';
+    env.requestBarrier = url => isItemUrl(url) && !url.endsWith(env.failUrl) ? gate.promise : undefined;
+    const running = outcome(U.update()); await until(() => U.updateStatus().state === 'failed' && env.activeItems > 0);
+    const started = env.requests.filter(isItemUrl).length; assert.ok(started <= 4);
+    const stop = U.cancelUpdate(); let settled = false; stop.then(() => { settled = true; }); await pause();
+    assert.equal(settled, false); assert.equal(U.updateStatus().canCancel, false); assert.equal(U.updateStatus().settled, false);
+    assert.equal(env.requests.filter(isItemUrl).length, started); await assert.rejects(U.update(), /重复/);
+    env.requestBarrier = null; gate.resolve(); assert.match((await running).error.message, /HTTP 500/);
+    const result = await stop; assert.equal(result.state, 'failed'); assert.match(result.error, /HTTP 500/);
+    assert.equal(result.activeFiles, 0); assert.equal(env.activeHTTP, 0); assert.equal(pointerBytes(env), undefined);
+  });
+  await test('cancel reentrancy at final file and final-validation phase cannot publish incomplete work', async () => {
+    for (const phase of ['last-file', 'validating']) {
+      const env = environment(), U = await env.updater(); let requested = false, stop;
+      const running = outcome(U.update(p => {
+        if (!requested && ((phase === 'last-file' && p.total > 0 && p.done === p.total) || (phase === 'validating' && U.updateStatus().state === 'validating'))) {
+          requested = true; stop = U.cancelUpdate();
+        }
+      }));
+      assert.match((await running).error.message, /取消/); assert.equal((await stop).state, 'cancelled');
+      assert.equal(pointerBytes(env), undefined); assert.equal(U.updateStatus().done, 18);
+    }
+  });
+  await test('an already-published pointer wins cancellation, including an ambiguous post-rename native error', async () => {
+    for (const afterError of [false, true]) {
+      const env = environment(), U = await env.updater(); let stop;
+      env.afterRename = to => { if (to.endsWith('/active.json')) { stop = U.cancelUpdate(); if (afterError) throw new Error('post-rename error'); } };
+      const result = await U.update(); assert.equal(result.channelVersion, 'one'); const cancelled = await stop;
+      assert.equal(cancelled.state, 'completed'); assert.equal(cancelled.canCancel, false); assert.equal(cancelled.settled, true);
+      assert.equal(U.pendingVersion(), 'one'); env.afterRename = null; assert.equal((await env.updater()).localVersion(), 'one');
+    }
+  });
+  await test('shared snapshot and workspace reservations reduce spare lanes instead of multiplying byte budgets', async () => {
+    for (const limit of ['snapshot', 'workspace']) {
+      const env = environment(), load = env.runtime(), U = load('GameDataUpdater').GameDataUpdater, policy = load('GameDataManifestPolicy').GameDataManifestPolicy;
+      policy.MAX_SNAPSHOT_BYTES = (limit === 'snapshot' ? 16 : 20) * 1024 ** 2;
+      await U.initializeSnapshot(); env.itemLatency = 15;
+      if (limit === 'workspace') {
+        const file = path.join(env.directory, 'gamedata/cohort-v1/staging/retained.bin'); fs.mkdirSync(path.dirname(file), { recursive: true });
+        const fd = fs.openSync(file, 'w'); fs.ftruncateSync(fd, 40 * 1024 ** 2); fs.closeSync(fd);
+      }
+      await U.update(); assert.ok(env.peakItems <= (limit === 'snapshot' ? 2 : 1));
+      assert.equal(U.updateStatus().state, 'completed'); assert.equal(U.updateStatus().bytes, [...raw.values()].reduce((sum, value) => sum + value.length, 0));
+    }
+  });
+  await test('status snapshots are copies and old cancellation completion remains bound to its original invocation', async () => {
+    const env = environment(), U = await env.updater(), gate = deferred(); env.requestBarrier = url => isItemUrl(url) ? gate.promise : undefined;
+    let replacement, started = false;
+    const running = outcome(U.update(() => {
+      const state = U.updateStatus();
+      if (!started && state.state === 'cancelled' && state.settled) {
+        started = true; env.requestBarrier = null; env.revision = B; env.version = 'two'; replacement = U.update();
+      }
+    }));
+    await until(() => env.activeItems === 4); const copy = U.updateStatus(), original = copy.id;
+    copy.state = 'completed'; copy.done = 999; copy.settled = true;
+    assert.equal(U.updateStatus().state, 'downloading'); assert.equal(U.updateStatus().done, 0);
+    const stop = U.cancelUpdate(); gate.resolve(); assert.match((await running).error.message, /取消/);
+    const result = await stop; assert.equal(result.id, original); assert.equal(result.state, 'cancelled');
+    await replacement; assert.notEqual(U.updateStatus().id, original); assert.equal(U.updateStatus().state, 'completed');
+  });
+  await test('a stale cancel identifier cannot stop a replacement invocation', async () => {
+    const env = environment(), U = await env.updater(); await U.update(); const oldId = U.updateStatus().id;
+    env.revision = B; env.version = 'two'; const gate = deferred(); env.requestBarrier = url => isItemUrl(url) ? gate.promise : undefined;
+    const running = outcome(U.update()); await until(() => env.activeItems === 4); const currentId = U.updateStatus().id;
+    const stale = await U.cancelUpdate(oldId); assert.equal(stale.id, currentId); assert.equal(stale.state, 'downloading');
+    assert.equal(U.updateStatus().canCancel, true); const stop = U.cancelUpdate(currentId);
+    env.requestBarrier = null; gate.resolve(); assert.match((await running).error.message, /取消/); assert.equal((await stop).id, currentId);
+  });
+  await test('page-lifecycle subscribers immediately catch up, receive terminal drain state and detach without cancelling', async () => {
+    const env = environment(), U = await env.updater(), gate = deferred(), first = [], reopened = [];
+    const unsubscribe = U.subscribeUpdate(status => { first.push({ ...status }); status.state = 'tampered'; status.id = -1; });
+    assert.equal(first[0].state, 'idle'); assert.equal(U.updateStatus().state, 'idle');
+    env.requestBarrier = url => isItemUrl(url) ? gate.promise : undefined;
+    const running = outcome(U.update()); await until(() => env.activeItems === 4);
+    unsubscribe(); unsubscribe(); const stoppedCount = first.length;
+    const detach = U.subscribeUpdate(status => reopened.push({ ...status }));
+    assert.equal(reopened[0].state, 'downloading'); assert.equal(reopened[0].activeFiles, 4);
+    const stop = U.cancelUpdate(reopened[0].id); assert.equal(reopened.at(-1).state, 'cancelling');
+    assert.equal(reopened.at(-1).settled, false); env.requestBarrier = null; gate.resolve();
+    assert.match((await running).error.message, /取消/); await stop;
+    assert.equal(reopened.at(-1).state, 'cancelled'); assert.equal(reopened.at(-1).settled, true);
+    assert.equal(first.length, stoppedCount); detach();
+    env.revision = B; await U.update(); assert.equal(reopened.at(-1).state, 'cancelled');
+  });
+  await test('subscriber exceptions and reentrant registration or cancellation cannot leak stale outer states', async () => {
+    const env = environment(), U = await env.updater(), gate = deferred(), observed = [], added = [];
+    env.requestBarrier = url => isItemUrl(url) ? gate.promise : undefined;
+    let registered = false, removeAdded, requested = false, stop;
+    const removes = [U.subscribeUpdate(() => { throw new Error('page listener error'); })];
+    removes.push(U.subscribeUpdate(status => {
+      if (!registered && status.state === 'preparing') {
+        registered = true; removeAdded = U.subscribeUpdate(value => added.push({ ...value }));
+      }
+      if (!requested && status.state === 'downloading' && status.activeFiles === 4) {
+        requested = true; stop = U.cancelUpdate(status.id);
+      }
+    }));
+    removes.push(U.subscribeUpdate(status => observed.push({ ...status })));
+    const running = outcome(U.update()); await until(() => requested);
+    assert.equal(added.filter(status => status.state === 'preparing').length, 1);
+    const cancelAt = observed.findIndex(status => status.state === 'cancelling'); assert.ok(cancelAt >= 0);
+    assert.ok(observed.slice(cancelAt).every(status => status.state !== 'downloading'));
+    env.requestBarrier = null; gate.resolve(); assert.match((await running).error.message, /取消/); await stop;
+    assert.equal(observed.at(-1).state, 'cancelled'); removes.forEach(remove => remove()); removeAdded();
+  });
+  await test('subscription count is bounded and each duplicate callback registration has independent ownership', async () => {
+    const env = environment(), U = await env.updater(), remove = []; let events = 0;
+    const listener = () => { events++; };
+    for (let index = 0; index < 16; index++) remove.push(U.subscribeUpdate(listener));
+    assert.equal(events, 16); assert.throws(() => U.subscribeUpdate(listener), /订阅过多/);
+    remove[0](); remove[0](); const replacement = U.subscribeUpdate(listener);
+    assert.equal(events, 17); remove.slice(1).forEach(stop => stop()); replacement();
+    const empty = U.subscribeUpdate(() => {}); empty(); await U.update(); assert.equal(events, 17);
+  });
+  // Independent reviewer fault probes, preserved here using the shared portable harness.
+ await test('independent: staging I/O failure drains already-awaiting file workers before releasing writer ownership', async () => {
+  const env=environment(),U=await env.updater(),other=await env.updater(),gate=deferred();let waiting=0,failed=false;
+  env.workerBarrier=task=>{if(task.args[1]==='file'){waiting++;return gate.promise;}};
+  env.ioHook=(event,file)=>{if(event==='write'&&file.includes('/metadata/')&&waiting>=2&&!failed){failed=true;throw new Error('independent staged-write fault');}};
+  let terminal=false;const running=outcome(U.update());running.then(()=>terminal=true);
+  await until(()=>failed&&U.updateStatus().state==='failed');
+  const before=env.writeCalls.length;await pause();assert.equal(terminal,false);assert.equal(U.updateStatus().settled,false);
+  assert.ok(U.updateStatus().activeFiles>=2);await assert.rejects(other.update(),/另一任务/);
+  const cancel=U.cancelUpdate(U.updateStatus().id);let cancelled=false;cancel.then(()=>cancelled=true);await pause();assert.equal(cancelled,false);
+  assert.equal(env.writeCalls.length,before);gate.resolve();assert.match((await running).error.message,/staged-write fault/);
+  const settled=await cancel;assert.equal(settled.state,'failed');assert.equal(settled.settled,true);assert.equal(settled.activeFiles,0);
+  assert.equal(pointerBytes(env),undefined);
+ });
+ await test('independent: unreadable post-rename pointer reports unknown commit then restart recovers verified published cohort', async()=>{
+  const env=environment(),U=await env.updater();let triggered=false;
+  env.afterRename=to=>{if(to.endsWith('/active.json')){triggered=true;env.ioHook=(event,file)=>{if(event==='open'&&file.endsWith('/active.json'))throw Object.assign(new Error('independent pointer read denied'),{code:'EACCES'});};throw new Error('independent ambiguous rename');}};
+  await assert.rejects(U.update(),/提交结果未确认/);assert.equal(triggered,true);assert.equal(U.updateStatus().state,'failed');assert.equal(U.updateStatus().settled,true);
+  assert.equal(JSON.parse(pointerBytes(env)).current.startsWith(A),true);
+  env.ioHook=null;env.afterRename=null;const restarted=await env.updater();assert.equal(restarted.localVersion(),'one');
+  const itemsBefore=env.requests.filter(isItemUrl).length;await U.update();assert.equal(env.requests.filter(isItemUrl).length,itemsBefore);
+  assert.equal(U.updateStatus().state,'completed');
+ });
+ await test('independent: cancellation during staging directory publication never switches the active pointer', async()=>{
+  const env=environment(),U=await env.updater();await U.update();const before=pointerBytes(env);env.revision=B;env.version='two';let cancel;
+  env.afterRename=to=>{if(to.includes('/snapshots/'))cancel=U.cancelUpdate(U.updateStatus().id);};
+  await assert.rejects(U.update(),/取消/);assert.equal((await cancel).state,'cancelled');assert.deepEqual(pointerBytes(env),before);
+  env.afterRename=null;assert.equal((await env.updater()).localVersion(),'one');
+ });
+ await test('independent: captured progress invariants are checked outside intentionally swallowed observer callbacks',async()=>{
+  const env=environment(),U=await env.updater(),progress=[];env.itemLatency=10;
+  await U.update(value=>progress.push({progress:{...value},status:U.updateStatus()}));
+  assert.ok(progress.length>18);
+  for(let i=0;i<progress.length;i++){
+   assert.ok(progress[i].status.activeFiles>=0&&progress[i].status.activeFiles<=4);
+   if(i)assert.ok(progress[i].progress.done>=progress[i-1].progress.done);
+   assert.ok(progress[i].progress.done<=progress[i].progress.total);
+  }
+  assert.equal(progress.at(-1).status.state,'completed');assert.equal(progress.at(-1).status.activeFiles,0);
+ });
+  await test('mock-latency benchmark reports serial versus four-lane overlap without a device-speed claim', async () => {
+    const samples = [];
+    for (const lanes of [1, 4]) {
+      const env = environment(), U = await env.updater(); U.MAX_PARALLEL = lanes; env.itemLatency = 25;
+      for (let index = 0; index < 16; index++) env.files.set(`icons/Test/extra_${index}.png`, raw.get('icons/Test/sample.png'));
+      const start = performance.now(); await U.update(); const elapsedMs = Math.round(performance.now() - start);
+      assert.ok(env.peakItems <= lanes); assert.equal(U.updateStatus().done, 34);
+      samples.push({ lanes, mockDelayMsPerItem: 25, files: 34, elapsedMs, peakItemRequests: env.peakItems });
+    }
+    console.log('HOST_MOCK_LATENCY_BENCHMARK ' + JSON.stringify(samples));
   });
   console.log(`game-data-cohort: PASS ${count} production policy/store/updater tests (host boundaries only)`);
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {

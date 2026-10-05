@@ -19,7 +19,7 @@ import { Motion } from '../common/Motion';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageBackdrop } from '../components/PageBackdrop';
 import EntryAbility from '../entryability/EntryAbility';
-import { GameDataService } from '../service/GameDataService';
+import { GameDataService, GameDataUpdateStatus } from '../service/GameDataService';
 import { GameDataUpdater } from '../data/remote/GameDataUpdater';
 import { RiskVerifyService } from '../service/RiskVerifyService';
 import { ApiClient } from '../data/network/ApiClient';
@@ -79,6 +79,12 @@ export struct SettingPage {
   @State dataPending: string = '';
   @State dataChecking: boolean = false;
   @State dataCanRollback: boolean = false;
+  @State dataCanCancel: boolean = false;
+  @State dataPhase: string = '';
+  @State dataCancelling: boolean = false;
+  private dataOperationId: number = 0;
+  private dataUnsubscribe: (() => void) | undefined = undefined;
+  private dataCancelPending: boolean = false;
   private dataViewActive: boolean = false;
   private dataGeneration: number = 0;
   private dataCheckPending: boolean = false;
@@ -152,11 +158,7 @@ export struct SettingPage {
   @State gachaRows: GachaArchiveRow[] = [];
 
   aboutToAppear(): void {
-    this.dataViewActive = true;
-    this.dataGeneration++;
-    this.dataBusy = this.dataUpdatePending;
-    this.dataChecking = this.dataCheckPending;
-    this.refreshDataState();
+    this.attachDataUpdates();
     this.mediaIndex = Math.max(0, this.mediaTypes.indexOf(PreferencesStore.getString(BackgroundMediaService.TYPE_KEY, 'none')));
     this.mediaMuted = PreferencesStore.getBool(BackgroundMediaService.MUTED_KEY, true);
     this.mediaLoop = PreferencesStore.getBool(BackgroundMediaService.LOOP_KEY, true);
@@ -558,8 +560,49 @@ export struct SettingPage {
       })
   }
 
-  /** 选择本地背景图片文件夹（FOLDER 模式） */
-  aboutToDisappear(): void { this.dataViewActive = false; this.dataGeneration++; }
+  /** Detach observation without cancelling foreground work or writing torn-down State. */
+  aboutToDisappear(): void {
+    this.dataViewActive = false; this.dataGeneration++;
+    this.dataUnsubscribe?.(); this.dataUnsubscribe = undefined;
+  }
+
+  private attachDataUpdates(): void {
+    this.dataUnsubscribe?.(); this.dataUnsubscribe = undefined;
+    this.dataViewActive = true; this.dataGeneration++;
+    const generation: number = this.dataGeneration;
+    this.dataChecking = this.dataCheckPending;
+    this.refreshDataState();
+    this.dataUnsubscribe = GameDataService.subscribeUpdate((status: GameDataUpdateStatus): void => {
+      if (this.dataViewActive && generation === this.dataGeneration) { this.applyDataUpdateStatus(status); }
+    });
+  }
+
+  private dataActionBlocked(): boolean {
+    return this.dataCheckPending || this.dataUpdatePending || this.dataConfirmationPending ||
+      !GameDataService.updateStatus().settled;
+  }
+
+  private applyDataUpdateStatus(status: GameDataUpdateStatus): void {
+    if (!this.dataViewActive || status.id < this.dataOperationId) { return; }
+    this.dataOperationId = status.id;
+    this.dataBusy = this.dataUpdatePending || !status.settled;
+    this.dataCanCancel = status.canCancel;
+    this.dataCancelling = status.state === 'cancelling' && !status.settled;
+    this.dataDone = status.done; this.dataTotal = status.total;
+    const count: string = status.total > 0 ? ` · 已校验 ${status.done}/${status.total}` : '';
+    if (status.state === 'preparing') { this.dataPhase = '正在确认数据版本'; }
+    else if (status.state === 'downloading') { this.dataPhase = `正在下载与校验 · ${status.activeFiles} 个任务进行中${count}`; }
+    else if (status.state === 'validating') { this.dataPhase = `正在校验完整数据${count}`; }
+    else if (this.dataCancelling) { this.dataPhase = `正在取消，等待已启动任务结束${count}`; }
+    else if (status.state === 'failed' && !status.settled) { this.dataPhase = `更新失败，等待已启动任务结束${count}`; }
+    else { this.dataPhase = ''; }
+    if (!status.settled) { return; }
+    this.refreshDataState();
+    if (status.state === 'completed') {
+      this.dataHasUpdate = this.dataPending.length > 0 ? `更新操作已完成；${this.dataPending}` : '更新操作已完成，已保存数据未变化';
+    } else if (status.state === 'cancelled') { this.dataHasUpdate = '更新已取消，当前数据保持不变'; }
+    else if (status.state === 'failed') { this.dataHasUpdate = `更新失败：${status.error}`; }
+  }
 
   private refreshDataState(): void {
     this.dataVersion = GameDataService.getInstance().remoteVersion();
@@ -571,7 +614,7 @@ export struct SettingPage {
 
   /** Checking never changes the process-pinned dataset. */
   async checkDataUpdate(): Promise<void> {
-    if (!this.dataViewActive || this.dataCheckPending || this.dataUpdatePending) { return; }
+    if (!this.dataViewActive || this.dataActionBlocked()) { return; }
     const generation: number = this.dataGeneration;
     this.dataCheckPending = true; this.dataChecking = true;
     try {
@@ -590,28 +633,62 @@ export struct SettingPage {
   }
 
   async updateGameData(): Promise<void> {
-    if (!this.dataViewActive || this.dataUpdatePending || this.dataCheckPending || this.dataConfirmationPending) { return; }
+    if (!this.dataViewActive || this.dataActionBlocked()) { return; }
     const generation: number = this.dataGeneration;
     this.dataUpdatePending = true; this.dataBusy = true;
-    this.dataDone = 0; this.dataTotal = 0;
+    this.dataDone = 0; this.dataTotal = 0; this.dataHasUpdate = '';
+    let operationId: number = this.dataOperationId;
     try {
-      const version: string = await GameDataService.getInstance().updateAll((done: number, total: number, current: string) => {
-        if (this.dataViewActive && generation === this.dataGeneration) { this.dataDone = done; this.dataTotal = total; }
-      });
-      if (!this.dataViewActive || generation !== this.dataGeneration) { return; }
-      this.refreshDataState();
-      this.dataHasUpdate = `已完整校验并保存 ${version}；当前页面仍使用原版本，请重启应用生效`;
-      this.toast('新数据已保存，重启应用后生效');
+      // Progress belongs to the service subscription, not this page's Promise lifetime.
+      const update: Promise<string> = GameDataService.getInstance().updateAll();
+      operationId = GameDataService.updateStatus().id;
+      await update;
+      if (!this.dataViewActive || generation !== this.dataGeneration || operationId !== GameDataService.updateStatus().id) { return; }
+      this.applyDataUpdateStatus(GameDataService.updateStatus());
+      this.toast(this.dataPending.length > 0 ? '新数据已保存，重启应用后生效' : '更新操作已完成');
     } catch (e) {
-      if (this.dataViewActive && generation === this.dataGeneration) { this.dataHasUpdate = `更新失败，现有数据未切换：${(e as Error).message}`; }
+      if (this.dataViewActive && generation === this.dataGeneration && operationId === GameDataService.updateStatus().id) {
+        const status: GameDataUpdateStatus = GameDataService.updateStatus();
+        this.applyDataUpdateStatus(status);
+        if (status.state !== 'cancelled' && status.state !== 'failed') { this.dataHasUpdate = `更新未完成：${(e as Error).message}`; }
+      }
     } finally {
       this.dataUpdatePending = false;
-      if (this.dataViewActive) { this.dataBusy = false; this.refreshDataState(); }
+      if (this.dataViewActive) {
+        // Reconcile ownership without replacing a new error with an older terminal status.
+        this.dataBusy = !GameDataService.updateStatus().settled; this.refreshDataState();
+      }
+    }
+  }
+
+  private async cancelGameData(): Promise<void> {
+    if (!this.dataViewActive || this.dataCancelPending || this.dataConfirmationPending || !this.dataCanCancel) { return; }
+    const generation: number = this.dataGeneration;
+    const operationId: number = this.dataOperationId;
+    this.dataCancelPending = true; this.dataConfirmationPending = true;
+    try {
+      const response: ShowDialogSuccessResponse = await this.getUIContext().getPromptAction().showDialog({
+        title: '取消游戏数据更新',
+        message: '停止本次下载，并等待已启动的下载与校验结束。当前数据保持不变；已经保存的完整更新不会撤销。',
+        buttons: [{ text: '继续更新', color: $r('app.color.text_secondary') }, { text: '取消更新', color: $r('app.color.app_primary') }],
+      });
+      if (!this.dataViewActive || generation !== this.dataGeneration || response.index !== 1) { return; }
+      const result: GameDataUpdateStatus = await GameDataService.cancelUpdate(operationId);
+      if (!this.dataViewActive || generation !== this.dataGeneration || result.id !== operationId ||
+        GameDataService.updateStatus().id !== operationId) { return; }
+      this.applyDataUpdateStatus(GameDataService.updateStatus());
+      if (result.state === 'completed') { this.toast('更新已经完成，取消不会撤销已保存结果；请重启后查看'); }
+      else if (result.state === 'cancelled') { this.toast('本次更新已取消'); }
+    } catch (e) {
+      if (this.dataViewActive && generation === this.dataGeneration) { this.toast(`无法完成取消：${(e as Error).message}`); }
+    } finally {
+      this.dataCancelPending = false; this.dataConfirmationPending = false;
+      if (this.dataViewActive) { this.applyDataUpdateStatus(GameDataService.updateStatus()); }
     }
   }
 
   applyDataUrl(): void {
-    if (!this.dataViewActive || this.dataUpdatePending || this.dataCheckPending || this.dataConfirmationPending) { return; }
+    if (!this.dataViewActive || this.dataActionBlocked()) { return; }
     try {
       const url: string = this.urlInput.trim();
       GameDataUpdater.setManifestUrl(url);
@@ -623,7 +700,7 @@ export struct SettingPage {
   }
 
   private async changeSavedData(rollback: boolean): Promise<void> {
-    if (!this.dataViewActive || this.dataUpdatePending || this.dataCheckPending || this.dataConfirmationPending) { return; }
+    if (!this.dataViewActive || this.dataActionBlocked()) { return; }
     const generation: number = this.dataGeneration;
     this.dataConfirmationPending = true;
     let response: ShowDialogSuccessResponse;
@@ -634,7 +711,7 @@ export struct SettingPage {
       buttons: [{ text: '取消', color: $r('app.color.text_secondary') }, { text: '确认', color: $r('app.color.app_primary') }],
       });
     } finally { this.dataConfirmationPending = false; }
-    if (!this.dataViewActive || generation !== this.dataGeneration || response.index !== 1 || this.dataUpdatePending || this.dataCheckPending || this.dataConfirmationPending) { return; }
+    if (!this.dataViewActive || generation !== this.dataGeneration || response.index !== 1 || this.dataActionBlocked()) { return; }
     this.dataUpdatePending = true; this.dataBusy = true;
     try {
       if (rollback) {
@@ -645,7 +722,7 @@ export struct SettingPage {
       if (this.dataViewActive && generation === this.dataGeneration) { this.toast(`未能调整数据：${(e as Error).message}`); }
     } finally {
       this.dataUpdatePending = false;
-      if (this.dataViewActive) { this.dataBusy = false; this.refreshDataState(); }
+      if (this.dataViewActive) { this.applyDataUpdateStatus(GameDataService.updateStatus()); }
     }
   }
 
@@ -962,7 +1039,7 @@ export struct SettingPage {
             .width('100%')
             .padding({ left: 14, right: 14, top: 2, bottom: 2 })
           }
-          Row() {
+          Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
             Button(this.dataChecking ? '正在检查…' : '检查更新')
               .enabled(!this.dataBusy && !this.dataChecking)
               .fontSize(13)
@@ -982,6 +1059,17 @@ export struct SettingPage {
               .onClick(() => {
                 this.updateGameData();
               })
+            if (this.dataCanCancel || this.dataCancelling) {
+              Button(this.dataCancelling ? '正在取消…' : '取消更新')
+                .enabled(this.dataCanCancel)
+                .fontSize(13)
+                .constraintSize({ minHeight: 44 })
+                .backgroundColor($r('app.color.app_primary_bg'))
+                .fontColor($r('app.color.app_primary'))
+                .margin({ left: 8 })
+                .hoverEffect(HoverEffect.Highlight)
+                .onClick(() => { this.cancelGameData(); })
+            }
             if (this.dataBusy) {
               LoadingProgress()
                 .width(18)
@@ -997,8 +1085,10 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .alignItems(VerticalAlign.Center)
 
+          if (this.dataPhase.length > 0) {
+            Text(this.dataPhase).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+          }
           if (this.dataPending.length > 0) {
             Text(this.dataPending).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
           }

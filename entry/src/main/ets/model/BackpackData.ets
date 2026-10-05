@@ -1,3 +1,5 @@
+import { BackpackScoreResult } from './BackpackScore';
+
 /** Offline backpack records. UIIF v1.0 has no standard UID, instance ID or lock fields. */
 export enum BackpackCategory {
   Weapon = 0, Reliquary = 1, UpgradeItem = 2, Food = 3, Material = 4,
@@ -16,6 +18,8 @@ export class BackpackArchive {
 }
 
 export class BackpackItem {
+  /** Derived view only; never written into the original UIIF item. */
+  score: BackpackScoreResult = new BackpackScoreResult();
   archiveId: number = 0;
   /** Local identity, never a rounded number or the shared itemId of duplicate equipment. */
   instanceId: string = '';

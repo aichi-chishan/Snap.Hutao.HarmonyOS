@@ -12,6 +12,7 @@ import { PageBackdrop } from '../components/PageBackdrop';
 import { EmptyState } from '../components/EmptyState';
 import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
+import { BackpackScoreEdit, BackpackScoreProfile, BackpackScoring, BackpackSubStat } from '../model/BackpackScore';
 
 @Entry
 @Component
@@ -42,6 +43,8 @@ export struct BackpackPage {
   @State projectIndex: number = 0;
   @State replaceMaterials: boolean = false;
   @State editCount: string = '';
+  @State scoreDraft: BackpackScoreProfile = new BackpackScoreProfile();
+  private scoreEdit: BackpackScoreEdit | undefined = undefined;
   private source: SimpleDataSource<BackpackItem> = new SimpleDataSource<BackpackItem>([]);
   private searchTimer: number = -1;
   private attached: boolean = false;
@@ -79,11 +82,51 @@ export struct BackpackPage {
     return archive === undefined ? '选择或创建离线档案' : `${archive.name} · UID ${archive.uid}`;
   }
   private openSheet(mode: string): void { this.sheetMode = mode; this.showSheet = true; }
+  private openScore(): void {
+    if (!this.available()) { return; }
+    try {
+      this.scoreEdit = this.vm.beginScoreEdit();
+      this.scoreDraft = BackpackScoreProfile.clone(this.scoreEdit.profile);
+      this.openSheet('score');
+    } catch (e) { this.toast((e as Error).message); }
+  }
+  private choosePreset(preset: number): void {
+    const next: BackpackScoreProfile = BackpackScoreProfile.create(preset);
+    next.id = this.scoreDraft.id;
+    this.scoreDraft = next;
+  }
+  private changeWeight(index: number, value: number): void {
+    const next: BackpackScoreProfile = BackpackScoreProfile.clone(this.scoreDraft);
+    next.weights[index] = Math.round(value * 10) / 10;
+    next.preset = 5;
+    this.scoreDraft = next;
+  }
+  private saveScore(): void {
+    if (!this.available() || this.scoreEdit === undefined) { return; }
+    try {
+      this.vm.saveScore(this.scoreEdit, this.scoreDraft);
+      this.showSheet = false; this.scoreEdit = undefined; this.refreshList();
+      this.toast('评分配置已应用');
+    } catch (e) { this.toast((e as Error).message); }
+  }
+  private async deleteScore(): Promise<void> {
+    const edit: BackpackScoreEdit | undefined = this.scoreEdit;
+    const id: string = this.scoreDraft.id;
+    if (!this.available() || edit === undefined || id.length === 0) { return; }
+    this.busy = true;
+    try {
+      if (!await this.confirm('删除评分配置', `删除「${this.scoreDraft.name}」？删除活动配置后恢复默认评分，物品原始数据不变。`, '删除配置')) { return; }
+      this.vm.deleteScore(edit, id);
+      this.showSheet = false; this.scoreEdit = undefined; this.refreshList();
+    } catch (e) { this.toast((e as Error).message); }
+    finally { this.busy = false; }
+  }
+
   private applyFilters(): void {
     this.vm.filter.keyword = this.keyword;
     this.vm.filter.category = this.categoryIndex - 1;
     this.vm.filter.lockedOnly = this.lockedOnly;
-    this.vm.filter.sort = ['id', 'name', 'rarity', 'level', 'count'][this.sortIndex];
+    this.vm.filter.sort = ['id', 'name', 'rarity', 'level', 'count', 'score'][this.sortIndex];
     this.vm.applyFilter();
     this.source.notifyDataReload(this.vm.items);
   }
@@ -250,6 +293,7 @@ export struct BackpackPage {
           Button('导出').height(44).margin({ right: 8, bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.exportFile())
           Button('手动添加').height(44).margin({ right: 8, bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.openSheet('manual'))
           Button('同步养成库存').height(44).margin({ right: 8, bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.openSheet('sync'))
+          Button('评分设置').height(44).margin({ right: 8, bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.openScore())
           Button('删除档案').height(44).margin({ bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.deleteArchive())
         }.enabled(this.available())
       }
@@ -266,13 +310,16 @@ export struct BackpackPage {
         Select(this.options(['全部分类'].concat(BackpackCatalog.CATEGORY_NAMES))).selected(this.categoryIndex)
           .value(this.categoryIndex === 0 ? '全部分类' : BackpackCatalog.CATEGORY_NAMES[this.categoryIndex - 1])
           .margin({ right: 8, bottom: 6 }).onSelect((index: number) => { this.categoryIndex = index; this.applyFilters(); })
-        Select(this.options(['物品 ID', '名称', '品质', '等级', '数量'])).selected(this.sortIndex)
-          .value(['物品 ID', '名称', '品质', '等级', '数量'][this.sortIndex])
+        Select(this.options(['物品 ID', '名称', '品质', '等级', '数量', '圣遗物评分'])).selected(this.sortIndex)
+          .value(['物品 ID', '名称', '品质', '等级', '数量', '圣遗物评分'][this.sortIndex])
           .margin({ right: 8, bottom: 6 }).onSelect((index: number) => { this.sortIndex = index; this.applyFilters(); })
         Row({ space: 4 }) {
           Checkbox({ name: 'locked' }).select(this.lockedOnly).onChange((value: boolean) => { this.lockedOnly = value; this.applyFilters(); })
           Text('仅已知锁定').fontSize(12).fontColor($r('app.color.text_secondary'))
         }
+      }
+      if (this.vm.scoreSettings.warning.length > 0) {
+        Text(this.vm.scoreSettings.warning).fontSize(12).fontColor($r('app.color.danger')).width('100%')
       }
       Text(`${this.vm.items.length} / ${this.vm.allItems.length} 项 · 未识别物品保留原始 ID 与数据`)
         .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
@@ -285,6 +332,9 @@ export struct BackpackPage {
       MetaIcon({ category: item.iconCategory, name: item.icon, iconSize: 44, remoteFallback: false })
       Column({ space: 5 }) {
         Text(item.name).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        if (item.kind === 'reliquary') {
+          Text(BackpackScoring.label(item.score)).fontSize(12).fontColor($r('app.color.app_primary')).maxLines(2)
+        }
         Text(BackpackCatalog.detail(item)).fontSize(12).fontColor($r('app.color.text_secondary')).maxLines(2)
         Text(`${BackpackCatalog.CATEGORY_NAMES[item.category]} · #${item.itemId}${item.isLocked === true ? ' · 已锁定' : ''}`)
           .fontSize(11).fontColor($r('app.color.text_secondary'))
@@ -307,7 +357,11 @@ export struct BackpackPage {
         if (this.selected.kind === 'reliquary') {
           Text(`副词条原始 ID（含重复强化记录）：\n${this.selected.appendPropIds.length > 0 ? this.selected.appendPropIds.join('、') : '无记录'}`)
             .fontSize(13).fontColor($r('app.color.text_secondary'))
-          Text('原始等级减 1 为显示等级。此页暂不计算评分，词条 ID 不冒充已解析数值。')
+          Text(BackpackScoring.label(this.selected.score)).fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.app_primary'))
+          ForEach(this.selected.score.stats, (stat: BackpackSubStat) => {
+            Text(BackpackScoring.statLabel(stat)).fontSize(13).fontColor($r('app.color.text_primary'))
+          }, (stat: BackpackSubStat) => `${stat.property}:${stat.rawValue}:${stat.rolls}`)
+          Text('原始等级减 1 为显示等级。背包评分使用独立预设，仅计算副词条；未识别的词条会使评分不可用。')
             .fontSize(12).fontColor($r('app.color.text_secondary'))
         }
         if (this.selected.kind === 'material' || this.selected.kind === 'furniture') {
@@ -333,10 +387,64 @@ export struct BackpackPage {
   }
 
   @Builder
+  scoreWeight(index: number) {
+    Row({ space: 10 }) {
+      Text(BackpackScoreProfile.LABELS[index]).fontSize(13).fontColor($r('app.color.text_primary')).width(100)
+      Slider({ value: this.scoreDraft.weights[index], min: 0, max: 1, step: 0.1 }).layoutWeight(1)
+        .enabled(this.available()).onChange((value: number) => this.changeWeight(index, value))
+      Text(this.scoreDraft.weights[index].toFixed(1)).fontSize(13).fontColor($r('app.color.text_secondary')).width(30)
+    }.width('100%')
+  }
+
+  @Builder
+  scoreEditor() {
+    Column({ space: 12 }) {
+      Text('圣遗物评分配置').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
+      Text('所有背包共用活动配置，与角色推荐评分分开。取消不会保存改动。').fontSize(12).fontColor($r('app.color.text_secondary'))
+      Flex({ wrap: FlexWrap.Wrap }) {
+        ForEach([0, 1, 2, 3, 4], (preset: number) => {
+          Button(BackpackScoreProfile.PRESETS[preset]).height(44).margin({ right: 8, bottom: 6 })
+            .enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.choosePreset(preset))
+        }, (preset: number) => `${preset}`)
+      }
+      if (this.vm.scoreSettings.profiles.length > 0) {
+        Select(this.options(this.vm.scoreSettings.profiles.map((profile: BackpackScoreProfile): string => profile.name)))
+          .value(this.scoreDraft.name).enabled(this.available()).onSelect((index: number) => {
+            this.scoreDraft = BackpackScoreProfile.clone(this.vm.scoreSettings.profiles[index]);
+          })
+      }
+      TextInput({ text: this.scoreDraft.name, placeholder: '配置名称' }).maxLength(80).enabled(this.available())
+        .onChange((value: string) => {
+          const next: BackpackScoreProfile = BackpackScoreProfile.clone(this.scoreDraft);
+          next.name = value; this.scoreDraft = next;
+        })
+      this.scoreWeight(0)
+      this.scoreWeight(1)
+      this.scoreWeight(2)
+      this.scoreWeight(3)
+      this.scoreWeight(4)
+      this.scoreWeight(5)
+      this.scoreWeight(6)
+      Text('固定生命、攻击、防御不计分。权重 0 表示不计入该项；合法零分仍会显示。').fontSize(12).fontColor($r('app.color.text_secondary'))
+      Flex({ wrap: FlexWrap.Wrap }) {
+        Button('另存为新配置').height(44).margin({ right: 8, bottom: 6 }).enabled(this.available()).hoverEffect(HoverEffect.Highlight)
+          .onClick(() => { const next: BackpackScoreProfile = BackpackScoreProfile.clone(this.scoreDraft); next.id = ''; this.scoreDraft = next; })
+        if (this.scoreDraft.id.length > 0) {
+          Button('删除当前配置').height(44).margin({ right: 8, bottom: 6 }).enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.deleteScore())
+        }
+        Button('应用并保存').height(44).enabled(this.available() && this.vm.scoreSettings.warning.length === 0)
+          .hoverEffect(HoverEffect.Highlight).onClick(() => this.saveScore())
+      }
+    }.width('100%').alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
   sheetContent() {
     Scroll() {
       Column({ space: 14 }) {
-        if (this.sheetMode === 'create') {
+        if (this.sheetMode === 'score') {
+          this.scoreEditor()
+        } else if (this.sheetMode === 'create') {
           Text('创建离线背包档案').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
           Text('UID 由你明确指定，不需要登录；同一 UID 可以保留不同时间的快照。').fontSize(13).fontColor($r('app.color.text_secondary'))
           TextInput({ text: this.newName, placeholder: '档案名称，例如 主号 · 10 月背包' }).maxLength(80).onChange((value: string) => this.newName = value)
@@ -409,7 +517,7 @@ export struct BackpackPage {
             } else {
               List({ space: 8 }) {
                 LazyForEach(this.source, (item: BackpackItem) => { ListItem() { this.itemRow(item) } },
-                  (item: BackpackItem): string => `${this.vm.currentId}:${item.instanceId}:${item.count}:${item.level}:${item.category}`)
+                  (item: BackpackItem): string => `${this.vm.currentId}:${item.instanceId}:${item.count}:${item.level}:${item.category}:${item.score.available}:${item.score.value}:${this.vm.scoreSettings.revision}`)
               }.layoutWeight(1).height('100%').padding({ bottom: 24 })
             }
             if (this.isWide) {

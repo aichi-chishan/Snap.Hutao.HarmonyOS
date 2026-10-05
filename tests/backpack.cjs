@@ -49,6 +49,8 @@ const mocks={
   AppContextProvider:{getResourceManager:()=>({getRawFileContent:async name=>new Uint8Array(fs.readFileSync(path.join(rawRoot,name)))})},
   WikiMetaService:{getWeapons:async()=>[{id:11501,name:'测试单手剑',icon:'UI_EquipIcon_Test',rankLevel:5}]},
 };
+const scorePrefs = new Map();
+mocks.PreferencesStore = { getString: (key, fallback) => scorePrefs.get(key) ?? fallback, setString: (key, value) => scorePrefs.set(key, value) };
 const cache=new Map();
 function load(relative) {
   const file=path.resolve(root,relative.endsWith('.ets')?relative:relative+'.ets');

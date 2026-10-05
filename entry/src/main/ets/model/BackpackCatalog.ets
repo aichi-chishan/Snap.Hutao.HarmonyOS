@@ -30,7 +30,11 @@ export class BackpackCatalog {
     });
     result.sort((left: BackpackItem, right: BackpackItem): number => {
       let diff: number = 0;
-      if (filter.sort === 'level') { diff = right.level - left.level; }
+      if (filter.sort === 'score') {
+        if (left.score.available !== right.score.available) { return left.score.available ? -1 : 1; }
+        if (left.score.available) { diff = right.score.value - left.score.value; }
+      }
+      else if (filter.sort === 'level') { diff = right.level - left.level; }
       else if (filter.sort === 'count') { diff = right.count - left.count; }
       else if (filter.sort === 'rarity') { diff = right.rarity - left.rarity; }
       else if (filter.sort === 'name') { diff = left.name.localeCompare(right.name); }

@@ -9,6 +9,8 @@ import { AppContextProvider } from '../common/AppContext';
 import { GameDataUpdater, UpdateProgress } from '../data/remote/GameDataUpdater';
 import { GameDataManifestPolicy, ItemType } from '../data/remote/GameDataManifestPolicy';
 import { Logger } from '../common/Logger';
+import { GameDataUpdateStatus } from '../model/GameDataUpdateStatus';
+export { GameDataUpdateStatus } from '../model/GameDataUpdateStatus';
 
 const TAG: string = 'GameDataService';
 
@@ -30,6 +32,11 @@ export class GameDataService {
 
   /** Coalesce startup validation before any metadata consumer or page is mounted. */
   static initializeSnapshot(): Promise<void> { return GameDataUpdater.initializeSnapshot(); }
+  static updateStatus(): GameDataUpdateStatus { return GameDataUpdater.updateStatus(); }
+  static subscribeUpdate(listener: (status: GameDataUpdateStatus) => void): () => void {
+    return GameDataUpdater.subscribeUpdate(listener);
+  }
+  static cancelUpdate(expectedId?: number): Promise<GameDataUpdateStatus> { return GameDataUpdater.cancelUpdate(expectedId); }
 
   pendingVersion(): string { return GameDataUpdater.pendingVersion(); }
   pendingState(): string { return GameDataUpdater.pendingState(); }

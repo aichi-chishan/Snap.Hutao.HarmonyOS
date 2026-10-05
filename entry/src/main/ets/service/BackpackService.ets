@@ -5,6 +5,8 @@ import { CultivateProject, CultivationRepo } from '../data/repo/CultivationRepo'
 import { UIIFService } from './UIIFService';
 import { AppContextProvider } from '../common/AppContext';
 import { util } from '@kit.ArkTS';
+import { BackpackScoring, BackpackScoreProfile } from '../model/BackpackScore';
+import { BackpackScoreService } from './BackpackScoreService';
 import { WikiMetaService, WikiWeaponMeta } from './WikiMetaService';
 
 class BackpackReference {
@@ -63,7 +65,9 @@ export class BackpackService {
     const references: Map<string, BackpackReference> = await BackpackService.catalog();
     const weapons: Map<number, WikiWeaponMeta> = new Map<number, WikiWeaponMeta>();
     for (const weapon of await WikiMetaService.getWeapons()) { weapons.set(weapon.id, weapon); }
+    const profile: BackpackScoreProfile = BackpackScoreService.active(BackpackScoreService.load());
     for (const item of items) {
+      if (item.kind === 'reliquary') { item.score = BackpackScoring.calculate(item.appendPropIds, profile); }
       item.name = `${BackpackCatalog.CATEGORY_NAMES[item.category]} #${item.itemId}`;
       if (item.kind === 'weapon') {
         const weapon: WikiWeaponMeta | undefined = weapons.get(item.itemId);
