@@ -32,7 +32,7 @@ export struct AppBackButton {
     .backgroundColor($r('app.color.card_surface'))
     .shadow({
       radius: 10,
-      color: $r('app.color.nav_scrim'),
+      color: $r('app.color.card_shadow'),
       offsetX: 0,
       offsetY: 2,
     })

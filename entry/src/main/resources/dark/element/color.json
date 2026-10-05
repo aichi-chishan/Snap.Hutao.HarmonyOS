@@ -147,6 +147,18 @@
     {
       "name": "overlay_scrim",
       "value": "#8C000000"
+    },
+    {
+      "name": "card_shadow",
+      "value": "#40000000"
+    },
+    {
+      "name": "risk_modal_surface",
+      "value": "#B31E1E22"
+    },
+    {
+      "name": "risk_modal_tint",
+      "value": "#801E1E22"
     }
   ]
 }
