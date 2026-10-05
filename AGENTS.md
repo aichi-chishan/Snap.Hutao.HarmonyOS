@@ -8,6 +8,8 @@
 - **build-profile.json5 不入库**（含本地签名），API 版本改动只存在本地；换机后需手动把 compatibleSdkVersion 改回 6.1.1(24)。
 - API 26 能力（沉浸光感 systemMaterial/ImmersiveMaterial、deviceInfo.apiAvailable('26.0.0')）必须**运行时门控**，低版本回退（参考 Motion.detectImmersive / Index.panelMaterial）。
 - **不移植**：所有胡桃云服务器功能（通行证/云备份/云统计/云攻略/云壁纸/反馈页）与注入类功能（背包内存读取/插件/游戏内悬浮/注册表切号/启动游戏进程链）。
+  - 云功能**实现已删除**，只保留入口占位：导航「系统 → 胡桃通行证与云」与首页卡片指向 `pages/HutaoCloudPage.ets`（纯说明页，无网络请求、无凭据读写）；祈愿页「五星经验分布」同为占位说明（云统计已移除）。**勿在占位页里补实现**。
+  - 静态资源 CDN（`StandardIconService` 图标、`HutaoDailyImageService` 每日壁纸）不属于云账号功能，保留。
 - 仅国服（米哈游 API 用国服端点）。
 
 ## 关键环境与工具（务必利用）

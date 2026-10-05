@@ -21,8 +21,6 @@ import { util } from '@kit.ArkTS';
 import { GachaLogViewModel } from '../viewmodel/GachaLogViewModel';
 import { GachaType } from '../model/GachaType';
 import { GachaPoolRules } from '../model/GachaPoolRules';
-import { GachaPrediction, GachaPredictionService } from '../service/GachaPredictionService';
-import { HutaoCloudService } from '../service/HutaoCloudService';
 import { GachaItem } from '../model/GachaItem';
 import { GachaArchive } from '../model/GachaArchive';
 import { UigfArchivePreview } from '../model/UigfImportPreparation';
@@ -157,13 +155,7 @@ export struct GachaLogPage {
   @State showExportOptions: boolean = false;
   @State urlInput: string = '';
   @State initialized: boolean = false;
-  @State prediction: GachaPrediction = new GachaPrediction();
-  @State predictionLoading: boolean = false;
-  @State predictionMessage: string = '点击查询胡桃云经验分布，不会自动联网';
   @State poolSelectionLoading: boolean = false;
-  private predictionRequest: number = 0;
-  private predictionArchiveId: number = 0;
-  private predictionSessionRevision: number = -1;
   private poolSelectionRequest: number = 0;
   /** 池卡片快照（整体替换驱动渲染） */
   @State poolCards: PoolCardData[] = [];
@@ -217,7 +209,7 @@ export struct GachaLogPage {
   }
 
   aboutToDisappear(): void {
-    this.invalidatePrediction();
+    this.invalidatePoolSelection();
     this.pageActive = false;
     this.pageEpoch++;
     this.historyGeneration++;
@@ -249,7 +241,7 @@ export struct GachaLogPage {
   }
 
   private resetLocalView(): void {
-    this.invalidatePrediction();
+    this.invalidatePoolSelection();
     this.historyGeneration++;
     this.historyLoading = false;
     this.historyLoadedFor = -1;
@@ -863,7 +855,7 @@ export struct GachaLogPage {
             .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
-              this.selectPredictionPool(type);
+              this.selectPool(type);
             })
         }, (type: number) => `${type}`)
       }
@@ -902,7 +894,7 @@ export struct GachaLogPage {
     if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
     this.beyondMode = !this.beyondMode;
     const target: number = this.beyondMode ? GachaType.UGC_STANDARD : GachaType.AVATAR_EVENT;
-    this.selectPredictionPool(target);
+    this.selectPool(target);
   }
 
   /**
@@ -2493,20 +2485,15 @@ export struct GachaLogPage {
     return -1;
   }
 
-  private invalidatePrediction(): void {
-    this.predictionRequest++;
-    this.predictionLoading = false;
-    this.prediction = new GachaPrediction();
-    this.predictionArchiveId = 0;
-    this.predictionSessionRevision = -1;
-    this.predictionMessage = '点击查询胡桃云经验分布，不会自动联网';
+  private invalidatePoolSelection(): void {
     this.poolSelectionRequest++;
     this.poolSelectionLoading = false;
   }
 
-  private async selectPredictionPool(type: number): Promise<void> {
+  /** 切换卡池：只读本地归档，不触发任何网络请求。 */
+  private async selectPool(type: number): Promise<void> {
     if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
-    this.invalidatePrediction();
+    this.invalidatePoolSelection();
     const request: number = ++this.poolSelectionRequest;
     const epoch: number = this.pageEpoch;
     this.poolSelectionLoading = true;
@@ -2516,175 +2503,27 @@ export struct GachaLogPage {
       this.syncAll();
     } catch (e) {
       if (this.pageActive && epoch === this.pageEpoch && request === this.poolSelectionRequest) {
-        this.predictionMessage = '本地历史读取失败，请重新选择卡池';
+        this.toast(`卡池切换失败：${(e as Error).message}`);
       }
     } finally {
       if (request === this.poolSelectionRequest) { this.poolSelectionLoading = false; }
     }
   }
-
-  private predictionTypes(): number[] {
-    return this.beyondMode ? GachaType.BEYOND_ORDER : GachaType.QUERY_ORDER;
-  }
-
-  private predictionPoolOptions(): SelectOption[] {
-    const options: SelectOption[] = [];
-    for (const type of this.predictionTypes()) {
-      const option: SelectOption = { value: GachaType.nameOf(type) };
-      options.push(option);
-    }
-    return options;
-  }
-
-  /** No role-pool fallback: the exact selected archive/pool must have a recent known reset. */
-  private currentPity(): number {
-    if (this.vm.currentArchiveId <= 0 || this.poolSelectionLoading) { return -1; }
-    const card: PoolCardData | undefined = this.poolCards.find((value: PoolCardData): boolean => value.gachaType === this.vm.currentPoolType);
-    if (card === undefined || !card.fivePityKnown) { return -1; }
-    const pity: number = GachaLogPage.pityFromHistory(this.vm.items, this.vm.currentPoolType, 5);
-    return pity === card.sinceLastFive ? pity : -1;
-  }
-
-  private predictionUnavailableReason(): string {
-    if (this.vm.currentArchiveId <= 0) { return '请先选择有记录的本地归档'; }
-    if (this.poolSelectionLoading) { return '正在读取所选卡池的本地历史'; }
-    if (GachaPoolRules.distributionKind(this.vm.currentPoolType).length === 0) { return '该卡池没有适用的有限五星经验模型'; }
-    if (this.currentPity() < 0) { return '本地历史缺少可确认的五星重置，或品质/垫数无效，暂不预测'; }
-    return '';
-  }
-
-  /** Bounded primitive snapshot; pending network work never retains the full local history array. */
-  private predictionHistoryKey(): string {
-    const pity: number = this.currentPity();
-    if (pity < 0) { return ''; }
-    let key: string = '';
-    for (let index: number = 0; index <= pity; index++) {
-      const item: GachaItem = this.vm.items[index];
-      key += `${item.gachaId}:${item.rankType};`;
-    }
-    return key;
-  }
-
-  private predictionOwnerMatches(request: number, epoch: number, archiveId: number, type: number,
-    pity: number, historyKey: string, gameUid: string, loggedIn: boolean): boolean {
-    return this.pageActive && request === this.predictionRequest && epoch === this.pageEpoch &&
-      archiveId === this.vm.currentArchiveId && type === this.vm.currentPoolType && historyKey === this.predictionHistoryKey() &&
-      gameUid === this.vm.gameAccountUid && loggedIn === this.isLoggedIn && pity === this.currentPity();
-  }
-
-  /** Explicit action only; no render, lifecycle or pool-selection path submits a cloud request. */
-  private async fetchPrediction(): Promise<void> {
-    if (!this.pageActive || this.predictionLoading || this.poolSelectionLoading || this.vm.isRefreshing || this.vm.isTransferring) { return; }
-    const reason: string = this.predictionUnavailableReason();
-    if (reason.length > 0) { this.predictionMessage = reason; return; }
-    const request: number = ++this.predictionRequest;
-    const epoch: number = this.pageEpoch;
-    const archiveId: number = this.vm.currentArchiveId;
-    const type: number = this.vm.currentPoolType;
-    const pity: number = this.currentPity();
-    const historyKey: string = this.predictionHistoryKey();
-    const gameUid: string = this.vm.gameAccountUid;
-    const loggedIn: boolean = this.isLoggedIn;
-    this.prediction = new GachaPrediction();
-    this.predictionArchiveId = archiveId;
-    this.predictionLoading = true;
-    this.predictionMessage = '正在读取胡桃云经验分布';
-    try {
-      const cloud: HutaoCloudService = HutaoCloudService.getInstance();
-      await cloud.initialize();
-      if (!this.predictionOwnerMatches(request, epoch, archiveId, type, pity, historyKey, gameUid, loggedIn)) { return; }
-      if (!cloud.isLoggedIn()) { this.predictionMessage = '请先登录胡桃云通行证；与游戏账号登录相互独立'; return; }
-      const revision: number = cloud.getSessionRevision();
-      const result: GachaPrediction = await GachaPredictionService.fetch(type, pity);
-      if (!this.predictionOwnerMatches(request, epoch, archiveId, type, pity, historyKey, gameUid, loggedIn)) { return; }
-      if (!cloud.isLoggedIn() || revision !== cloud.getSessionRevision()) {
-        this.predictionMessage = '云登录状态已变化，请重新查询';
-        return;
-      }
-      if (result.available && (result.poolType !== type || result.pity !== pity)) {
-        this.predictionMessage = '经验分布与当前卡池或垫数不一致，请重试';
-        return;
-      }
-      this.predictionSessionRevision = revision;
-      this.prediction = result;
-      this.predictionMessage = result.message;
-    } catch (_) {
-      if (request === this.predictionRequest && epoch === this.pageEpoch && this.pageActive) {
-        this.predictionMessage = '经验分布读取失败，请检查胡桃云登录或网络后重试';
-      }
-    } finally {
-      if (request === this.predictionRequest) { this.predictionLoading = false; }
-    }
-  }
-
-  private predictionIsCurrent(): boolean {
-    const cloud: HutaoCloudService = HutaoCloudService.getInstance();
-    return this.pageActive && !this.predictionLoading && this.prediction.available &&
-      this.predictionArchiveId === this.vm.currentArchiveId && this.prediction.poolType === this.vm.currentPoolType &&
-      this.prediction.pity === this.currentPity() && cloud.isLoggedIn() && this.predictionSessionRevision === cloud.getSessionRevision();
-  }
-
-  private predictionStatusText(): string {
-    const reason: string = this.predictionUnavailableReason();
-    if (reason.length > 0) { return reason; }
-    if (this.prediction.available && !this.predictionIsCurrent()) { return '历史或云登录状态已变化，请重新查询'; }
-    return this.predictionMessage;
-  }
-
-  private predictionPercent(value: number): string {
-    return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(2)}%`;
-  }
-
-  private predictionRetrievedText(): string {
-    if (!Number.isSafeInteger(this.prediction.retrievedAt) || this.prediction.retrievedAt <= 0) { return '本机获取时间未记录'; }
-    const retrieved: Date = new Date(this.prediction.retrievedAt);
-    if (!Number.isFinite(retrieved.getTime())) { return '本机获取时间无效'; }
-    return `本机获取时间：${retrieved.toISOString().substring(0, 19).replace('T', ' ')} UTC；不是样本采集日期`;
-  }
-
+  /** 胡桃云经验分布未接入（占位）：本移植版不提供云统计，不做任何预测。 */
   @Builder
-  predictionPanel() {
-    Column({ space: 10 }) {
+  distributionPanel() {
+    Column({ space: 6 }) {
       Text('五星经验分布').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
-      Select(this.predictionPoolOptions()).selected(this.predictionTypes().indexOf(this.vm.currentPoolType))
-        .value(GachaType.nameOf(this.vm.currentPoolType)).constraintSize({ minHeight: 44 })
-        .accessibilityText('选择经验预测卡池').enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
-        .onSelect((index: number) => {
-          const types: number[] = this.predictionTypes();
-          if (index >= 0 && index < types.length) { this.selectPredictionPool(types[index]); }
-        })
-      Text(this.predictionStatusText())
+      Text('本移植版不提供胡桃云统计，经验分布数据源未接入；此处仅保留入口占位，不计算也不联网。')
         .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
-      Button(this.predictionLoading ? '正在读取经验分布' : '查询胡桃云经验分布')
-        .constraintSize({ minHeight: 44 }).hoverEffect(HoverEffect.Highlight)
-        .enabled(!this.predictionLoading && !this.poolSelectionLoading && !this.vm.isRefreshing && !this.vm.isTransferring && this.predictionUnavailableReason().length === 0)
-        .onClick(() => this.fetchPrediction())
-      if (this.predictionIsCurrent()) {
-        Text(`当前已记录垫数：${this.prediction.pity}；下一抽条件经验比例：${this.predictionPercent(this.prediction.nextProbability)}`)
-          .fontSize(13).fontColor($r('app.color.text_primary')).width('100%')
-        Text(`条件分布众数：再 ${this.prediction.predictedRemaining} 抽；该位置条件频率 ${this.predictionPercent(this.prediction.predictedProbability)}`)
-          .fontSize(13).fontColor($r('app.color.text_primary')).width('100%')
-        Flex({ wrap: FlexWrap.Wrap }) {
-          ForEach([10, 20, 30, 50], (count: number) => {
-            Text(`再 ${count} 抽内：${this.predictionPercent(GachaPredictionService.within(this.prediction, count))}`)
-              .fontSize(12).fontColor($r('app.color.text_primary')).padding(8).margin({ right: 6, bottom: 4 })
-          }, (count: number) => `empirical_${this.predictionRequest}_${count}`)
-        }.width('100%')
-        Text(`云分布样本：${this.prediction.sampleEvents} 次五星事件；垫数之后的条件样本：${this.prediction.remainingEvents} 次`)
-          .fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
-        Text(this.predictionRetrievedText()).fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
-      }
-      Text('仅按云端历史样本与已记录垫数计算条件频率；不是理论概率、未来结果保证或指定 UP 概率。缺失的本地记录会影响判断。')
-        .fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
     }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
       .borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
   }
-
   /** Remaining counts require the selected pool's recent reset to be verifiable from local rows. */
   @Builder
   countdownSection() {
     Column({ space: 10 }) {
-      this.predictionPanel()
+      this.distributionPanel()
       if (this.poolCards.length === 0) {
         Text('暂无池记录，可导入 UIGF 或刷新本地归档').fontSize(13).fontColor($r('app.color.text_secondary')).width('100%').padding(16)
       }
@@ -2694,7 +2533,7 @@ export struct GachaLogPage {
           if (!card.isCurrent) {
             Button('选择该池后校验历史').constraintSize({ minHeight: 44 }).hoverEffect(HoverEffect.Highlight)
               .enabled(!this.poolSelectionLoading && !this.vm.isRefreshing && !this.vm.isTransferring)
-              .onClick(() => this.selectPredictionPool(card.gachaType))
+              .onClick(() => this.selectPool(card.gachaType))
           }
           Row({ space: 8 }) {
             Column({ space: 4 }) {

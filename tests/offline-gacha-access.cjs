@@ -71,11 +71,11 @@ function harness(initial=[{id:1,uid:A,isSelected:false},{id:2,uid:B,isSelected:t
   const {GachaLogViewModel:Model}=load('viewmodel/GachaLogViewModel');
   const {UigfService}=load('service/UigfService');
   const model=new Model();
-  const names=['aboutToAppear','aboutToDisappear','onLoginStateChanged','onUidChanged','resetLocalView','invalidatePrediction','reloadData','archiveOptions','currentArchiveIndex','chooseLocalArchive','refreshAccount','submitUrlImport','uigfImport','uigfExport','confirmUigfImport','prepareUigfExport','changeUigfSelection','loadHistoryWishes'];
+  const names=['aboutToAppear','aboutToDisappear','onLoginStateChanged','onUidChanged','resetLocalView','invalidatePoolSelection','reloadData','archiveOptions','currentArchiveIndex','chooseLocalArchive','refreshAccount','submitUrlImport','uigfImport','uigfExport','confirmUigfImport','prepareUigfExport','changeUigfSelection','loadHistoryWishes'];
   const compiled=ts.transpileModule('export class Page {\n'+names.map(method).join('\n')+'\n}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});
   assert.equal(compiled.diagnostics.length,0,'page methods');
   const pageModule={exports:{}};
-  vm.runInNewContext(`(function(module,exports){${compiled.outputText}\n})`,{...globals,UigfService,GachaPrediction:class{},WikiMetaService:metadata,
+  vm.runInNewContext(`(function(module,exports){${compiled.outputText}\n})`,{...globals,UigfService,WikiMetaService:metadata,
     Logger:{warn(){}},GACHA_TAG:'host',UIGF_MAX_BYTES:32*1024*1024,ArrayBuffer:class extends ArrayBuffer{constructor(size){state.allocations.push(size);super(size);}},GachaHistoryService:{getInstance:()=>({buildHistory:async()=>state.nextHistory ? state.nextHistory.promise : []})},
     picker:{DocumentSelectOptions:class{},DocumentSaveOptions:class{},DocumentViewPicker:class{
       async select(){state.pickerCalls++;return state.nextPicker ? state.nextPicker.promise : ['/fixture.json'];}
