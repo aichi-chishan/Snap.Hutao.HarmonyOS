@@ -20,6 +20,9 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { util } from '@kit.ArkTS';
 import { GachaLogViewModel } from '../viewmodel/GachaLogViewModel';
 import { GachaType } from '../model/GachaType';
+import { GachaPoolRules } from '../model/GachaPoolRules';
+import { GachaPrediction, GachaPredictionService } from '../service/GachaPredictionService';
+import { HutaoCloudService } from '../service/HutaoCloudService';
 import { GachaItem } from '../model/GachaItem';
 import { GachaArchive } from '../model/GachaArchive';
 import { UigfArchivePreview } from '../model/UigfImportPreparation';
@@ -40,8 +43,6 @@ import { PreferencesStore } from '../data/prefs/PreferencesStore';
 const GACHA_TAG: string = 'GachaLogPage';
 const UIGF_MAX_BYTES: number = 32 * 1024 * 1024;
 
-const ORANGE_GUARANTEE: number = 90;
-const PURPLE_GUARANTEE: number = 10;
 
 /** 多池卡片响应式断点（读组件自身宽度，非屏幕宽）：<840 单列 / 840~1199 双列 / >=1200 四列 */
 const POOL_SINGLE_COLUMN_VP: number = 840;
@@ -75,6 +76,8 @@ class PoolCardData {
   fourCount: number = 0;
   sinceLastFive: number = 0;
   sinceLastFour: number = 0;
+  fivePityKnown: boolean = false;
+  fourPityKnown: boolean = false;
   avgOrange: number = 0;
   /** UP 平均抽数（对齐 Windows AverageUpOrangePull） */
   avgUpOrange: number = 0;
@@ -154,6 +157,14 @@ export struct GachaLogPage {
   @State showExportOptions: boolean = false;
   @State urlInput: string = '';
   @State initialized: boolean = false;
+  @State prediction: GachaPrediction = new GachaPrediction();
+  @State predictionLoading: boolean = false;
+  @State predictionMessage: string = '点击查询胡桃云经验分布，不会自动联网';
+  @State poolSelectionLoading: boolean = false;
+  private predictionRequest: number = 0;
+  private predictionArchiveId: number = 0;
+  private predictionSessionRevision: number = -1;
+  private poolSelectionRequest: number = 0;
   /** 池卡片快照（整体替换驱动渲染） */
   @State poolCards: PoolCardData[] = [];
   /** 宽屏断点（>=840vp 两列，窄屏单列） */
@@ -206,6 +217,7 @@ export struct GachaLogPage {
   }
 
   aboutToDisappear(): void {
+    this.invalidatePrediction();
     this.pageActive = false;
     this.pageEpoch++;
     this.historyGeneration++;
@@ -237,6 +249,7 @@ export struct GachaLogPage {
   }
 
   private resetLocalView(): void {
+    this.invalidatePrediction();
     this.historyGeneration++;
     this.historyLoading = false;
     this.historyLoadedFor = -1;
@@ -436,6 +449,12 @@ export struct GachaLogPage {
       card.fourCount = pool.fourStarCount;
       card.sinceLastFive = pool.sinceLastFive;
       card.sinceLastFour = pool.sinceLastFour;
+      if (pool.gachaType === this.vm.currentPoolType) {
+        const five: number = GachaLogPage.pityFromHistory(this.vm.items, pool.gachaType, 5);
+        const four: number = GachaLogPage.pityFromHistory(this.vm.items, pool.gachaType, 4);
+        card.fivePityKnown = five >= 0 && five === card.sinceLastFive;
+        card.fourPityKnown = four >= 0 && four === card.sinceLastFour;
+      }
       card.avgOrange = pool.averageOrangePull;
       card.maxOrange = pool.maxOrangePull;
       card.minOrange = pool.minOrangePull;
@@ -499,7 +518,7 @@ export struct GachaLogPage {
   private static cardKey(card: PoolCardData): string {
     return `${card.gachaType}_${card.typeName}_${card.totalCount}_${card.fiveCount}_${card.fourCount}_` +
       `${card.sinceLastFive}_${card.sinceLastFour}_${card.startDate}_${card.endDate}_${card.avgOrange}_` +
-      `${card.avgUpOrange}_${card.maxOrange}_${card.minOrange}_${card.fivePulls.length}`;
+      `${card.avgUpOrange}_${card.maxOrange}_${card.minOrange}_${card.fivePulls.length}_${card.isCurrent}_${card.fivePityKnown}_${card.fourPityKnown}`;
   }
 
   /** 按当前组件宽度与池数决定列数：<840 单列 / 840~1199 双列 / >=1200 最多四列（池少则降列） */
@@ -722,11 +741,12 @@ export struct GachaLogPage {
   }
 
   /**
-   * 列表行水位条颜色：距金抽数 0→90 在 success→danger 资源色间线性插值
+   * 列表行水位条颜色：距金抽数按该池阈值 在 success→danger 资源色间线性插值
    * （等价 Windows #48FF7A→#FF4949 渐变，端点取现有资源色，深浅色各自生效；20% 透明度由 .opacity 统一叠加）
    */
-  private listBarColor(lastPull: number): ResourceColor {
-    const t: number = Math.max(0, Math.min(1, lastPull / ORANGE_GUARANTEE));
+  private listBarColor(lastPull: number, type: number): ResourceColor {
+    const threshold: number = GachaPoolRules.fiveStarThreshold(type);
+    const t: number = threshold > 0 ? Math.max(0, Math.min(1, lastPull / threshold)) : 0;
     try {
       // getColorSync 数字 id 重载（Resource 重载已弃用）
       const from: number = getContext(this).resourceManager.getColorSync($r('app.color.success').id);
@@ -839,12 +859,11 @@ export struct GachaLogPage {
             .borderRadius(14)
             .backgroundColor(this.vm.currentPoolType === type ? $r('app.color.app_primary') : $r('app.color.card_surface'))
             .border({ width: 1, color: $r('app.color.card_stroke') })
-            .constraintSize({ minWidth: 56 })
+            .constraintSize({ minWidth: 56, minHeight: 44 })
+            .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
-              this.vm.selectPool(type).then(() => {
-                this.syncAll();
-              });
+              this.selectPredictionPool(type);
             })
         }, (type: number) => `${type}`)
       }
@@ -853,13 +872,15 @@ export struct GachaLogPage {
     .scrollBar(BarState.Auto)
     .edgeEffect(EdgeEffect.Spring)
     .width('100%')
-    .height(40)
+    .height(44)
   }
 
   /** 颂愿（千星奇域）模式切换 chip（对齐 Windows SwitchToBeyondGachaMode） */
   @Builder
   beyondToggleChip() {
     Text(this.beyondMode ? '颂愿·开' : '颂愿')
+      .constraintSize({ minHeight: 44 }).accessibilityText('切换常规与颂愿卡池')
+      .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
       .fontSize(12)
       .fontWeight(this.beyondMode ? FontWeight.Bold : FontWeight.Normal)
       .fontColor(this.beyondMode ? Color.White : $r('app.color.text_secondary'))
@@ -878,11 +899,10 @@ export struct GachaLogPage {
 
   /** 切换颂愿模式：换默认选中池并重建快照 */
   toggleBeyondMode(): void {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
     this.beyondMode = !this.beyondMode;
     const target: number = this.beyondMode ? GachaType.UGC_STANDARD : GachaType.AVATAR_EVENT;
-    this.vm.selectPool(target).then(() => {
-      this.syncAll();
-    });
+    this.selectPredictionPool(target);
   }
 
   /**
@@ -894,6 +914,7 @@ export struct GachaLogPage {
   @Builder
   guaranteeBar(label: string, cur: number, guarantee: number, desc: string, color: Resource) {
     Column({ space: 3 }) {
+      if (guarantee > 0 && cur >= 0) {
       Stack({ alignContent: Alignment.Center }) {
         // 底层通栏进度条：透明背景、前景 20% 透明度、圆角 4、高 32（Stack clip 裁出圆角）
         Progress({
@@ -931,6 +952,10 @@ export struct GachaLogPage {
       .height(32)
       .borderRadius(4)
       .clip(true)
+      } else {
+        Text(guarantee <= 0 ? '无适用阈值' : '历史不足，垫数未知')
+          .fontSize(12).fontColor($r('app.color.text_secondary')).constraintSize({ minHeight: 32 })
+      }
       Text(desc)
         .fontSize(10)
         .fontColor($r('app.color.text_secondary'))
@@ -1028,7 +1053,7 @@ export struct GachaLogPage {
 
   /**
    * 列表视图（对齐 Windows SummaryListTemplate）：全宽行三层叠放——
-   * ① 底层通栏 Progress（Max=90 保底阈值，Value=距金抽数，前景按抽数绿→红渐变、20% 透明度）；
+   * ① 底层通栏 Progress（使用对应卡池阈值，Value=距金抽数，前景按抽数绿→红渐变、20% 透明度）；
    * ② 左 40×40 圆角图标 + 品质色名称；③ 右「保底」角标 →「UP」角标 → 计数（minWidth 24 居中防跳动）。
    */
   @Builder
@@ -1036,17 +1061,19 @@ export struct GachaLogPage {
     Column({ space: 4 }) {
       ForEach(card.fivePulls, (pull: FiveStarPull) => {
         Stack({ alignContent: Alignment.Start }) {
+          if (GachaPoolRules.fiveStarThreshold(card.gachaType) > 0) {
           Progress({
-            value: Math.min(pull.lastPull, ORANGE_GUARANTEE),
-            total: ORANGE_GUARANTEE,
+            value: Math.min(pull.lastPull, GachaPoolRules.fiveStarThreshold(card.gachaType)),
+            total: GachaPoolRules.fiveStarThreshold(card.gachaType),
             type: ProgressType.Linear,
           })
             .width('100%')
             .height(40)
-            .color(this.listBarColor(pull.lastPull))
+            .color(this.listBarColor(pull.lastPull, card.gachaType))
             .opacity(0.2)
             .borderRadius(4)
             .style({ strokeWidth: 40 })
+          }
           Row({ space: 6 }) {
             this.pullIcon(pull)
             Text(pull.name)
@@ -1266,11 +1293,11 @@ export struct GachaLogPage {
         // 星号列定宽——距金抽数位数不影响布局）
         Grid() {
           GridItem() {
-            this.guaranteeBar('距上个五星', card.sinceLastFive, ORANGE_GUARANTEE,
+            this.guaranteeBar('距上个五星', card.fivePityKnown ? card.sinceLastFive : -1, GachaPoolRules.fiveStarThreshold(card.gachaType),
               `累计五星 ${card.fiveCount} 个`, $r('app.color.five_star'))
           }
           GridItem() {
-            this.guaranteeBar('距上个四星', card.sinceLastFour, PURPLE_GUARANTEE,
+            this.guaranteeBar('距上个四星', card.fourPityKnown ? card.sinceLastFour : -1, GachaPoolRules.fourStarThreshold(card.gachaType),
               `累计四星 ${card.fourCount} 个`, $r('app.color.four_star'))
           }
         }
@@ -2447,192 +2474,266 @@ export struct GachaLogPage {
     }
   }
 
-  /** 单抽五星概率（pity 为第 pity 抽，1 起）：74 前基准 0.6%，74 起软保底线性抬升至 90 硬保底 */
-  private static pullFiveRate(pity: number): number {
-    if (pity >= ORANGE_GUARANTEE) {
-      return 1;
+  /** Only the bounded recent window before a known reset can establish recorded pity. */
+  private static pityFromHistory(items: GachaItem[], type: number, rank: number): number {
+    const threshold: number = rank === 5 ? GachaPoolRules.fiveStarThreshold(type) : GachaPoolRules.fourStarThreshold(type);
+    if (threshold <= 0 || items.length === 0) { return -1; }
+    const seen: Set<string> = new Set<string>();
+    let previous: string = '';
+    for (let index: number = 0; index < Math.min(items.length, threshold); index++) {
+      const item: GachaItem = items[index];
+      const matching: boolean = type === 301 || type === 400 ? item.gachaType === 301 || item.gachaType === 400 : item.gachaType === type;
+      if (!matching || !Number.isInteger(item.rankType) || item.rankType < (GachaType.isBeyond(type) ? 1 : 3) || item.rankType > 5 ||
+        typeof item.gachaId !== 'string' || item.gachaId.length === 0 || item.gachaId.length > 128 || !/^[0-9]+$/.test(item.gachaId)) { return -1; }
+      const cursor: string = item.gachaId.replace(/^0+/, '') || '0';
+      if (seen.has(cursor) || (previous.length > 0 && (cursor.length > previous.length ||
+        (cursor.length === previous.length && cursor >= previous)))) { return -1; }
+      seen.add(cursor);
+      previous = cursor;
+      if (item.rankType === rank) { return index; }
     }
-    if (pity >= 74) {
-      return Math.min(1, 0.06 + (pity - 73) * 0.06);
-    }
-    return 0.006;
+    return -1;
   }
 
-  /** 当前垫 c 抽时，接下来 N 抽内至少出一个五星的概率（0-1） */
-  private static predictFive(c: number, n: number): number {
-    let survive: number = 1;
-    const end: number = Math.min(c + n, ORANGE_GUARANTEE);
-    for (let i: number = c + 1; i <= end; i++) {
-      survive *= (1 - GachaLogPage.pullFiveRate(i));
-    }
-    return 1 - survive;
+  private invalidatePrediction(): void {
+    this.predictionRequest++;
+    this.predictionLoading = false;
+    this.prediction = new GachaPrediction();
+    this.predictionArchiveId = 0;
+    this.predictionSessionRevision = -1;
+    this.predictionMessage = '点击查询胡桃云经验分布，不会自动联网';
+    this.poolSelectionRequest++;
+    this.poolSelectionLoading = false;
   }
 
-  /** 抽卡预测面板：当前池接下来 N 抽出五星概率（对齐 Windows PullPredictionService 的概率模型） */
+  private async selectPredictionPool(type: number): Promise<void> {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
+    this.invalidatePrediction();
+    const request: number = ++this.poolSelectionRequest;
+    const epoch: number = this.pageEpoch;
+    this.poolSelectionLoading = true;
+    try {
+      await this.vm.selectPool(type);
+      if (!this.pageActive || epoch !== this.pageEpoch || request !== this.poolSelectionRequest || type !== this.vm.currentPoolType) { return; }
+      this.syncAll();
+    } catch (e) {
+      if (this.pageActive && epoch === this.pageEpoch && request === this.poolSelectionRequest) {
+        this.predictionMessage = '本地历史读取失败，请重新选择卡池';
+      }
+    } finally {
+      if (request === this.poolSelectionRequest) { this.poolSelectionLoading = false; }
+    }
+  }
+
+  private predictionTypes(): number[] {
+    return this.beyondMode ? GachaType.BEYOND_ORDER : GachaType.QUERY_ORDER;
+  }
+
+  private predictionPoolOptions(): SelectOption[] {
+    const options: SelectOption[] = [];
+    for (const type of this.predictionTypes()) {
+      const option: SelectOption = { value: GachaType.nameOf(type) };
+      options.push(option);
+    }
+    return options;
+  }
+
+  /** No role-pool fallback: the exact selected archive/pool must have a recent known reset. */
+  private currentPity(): number {
+    if (this.vm.currentArchiveId <= 0 || this.poolSelectionLoading) { return -1; }
+    const card: PoolCardData | undefined = this.poolCards.find((value: PoolCardData): boolean => value.gachaType === this.vm.currentPoolType);
+    if (card === undefined || !card.fivePityKnown) { return -1; }
+    const pity: number = GachaLogPage.pityFromHistory(this.vm.items, this.vm.currentPoolType, 5);
+    return pity === card.sinceLastFive ? pity : -1;
+  }
+
+  private predictionUnavailableReason(): string {
+    if (this.vm.currentArchiveId <= 0) { return '请先选择有记录的本地归档'; }
+    if (this.poolSelectionLoading) { return '正在读取所选卡池的本地历史'; }
+    if (GachaPoolRules.distributionKind(this.vm.currentPoolType).length === 0) { return '该卡池没有适用的有限五星经验模型'; }
+    if (this.currentPity() < 0) { return '本地历史缺少可确认的五星重置，或品质/垫数无效，暂不预测'; }
+    return '';
+  }
+
+  /** Bounded primitive snapshot; pending network work never retains the full local history array. */
+  private predictionHistoryKey(): string {
+    const pity: number = this.currentPity();
+    if (pity < 0) { return ''; }
+    let key: string = '';
+    for (let index: number = 0; index <= pity; index++) {
+      const item: GachaItem = this.vm.items[index];
+      key += `${item.gachaId}:${item.rankType};`;
+    }
+    return key;
+  }
+
+  private predictionOwnerMatches(request: number, epoch: number, archiveId: number, type: number,
+    pity: number, historyKey: string, gameUid: string, loggedIn: boolean): boolean {
+    return this.pageActive && request === this.predictionRequest && epoch === this.pageEpoch &&
+      archiveId === this.vm.currentArchiveId && type === this.vm.currentPoolType && historyKey === this.predictionHistoryKey() &&
+      gameUid === this.vm.gameAccountUid && loggedIn === this.isLoggedIn && pity === this.currentPity();
+  }
+
+  /** Explicit action only; no render, lifecycle or pool-selection path submits a cloud request. */
+  private async fetchPrediction(): Promise<void> {
+    if (!this.pageActive || this.predictionLoading || this.poolSelectionLoading || this.vm.isRefreshing || this.vm.isTransferring) { return; }
+    const reason: string = this.predictionUnavailableReason();
+    if (reason.length > 0) { this.predictionMessage = reason; return; }
+    const request: number = ++this.predictionRequest;
+    const epoch: number = this.pageEpoch;
+    const archiveId: number = this.vm.currentArchiveId;
+    const type: number = this.vm.currentPoolType;
+    const pity: number = this.currentPity();
+    const historyKey: string = this.predictionHistoryKey();
+    const gameUid: string = this.vm.gameAccountUid;
+    const loggedIn: boolean = this.isLoggedIn;
+    this.prediction = new GachaPrediction();
+    this.predictionArchiveId = archiveId;
+    this.predictionLoading = true;
+    this.predictionMessage = '正在读取胡桃云经验分布';
+    try {
+      const cloud: HutaoCloudService = HutaoCloudService.getInstance();
+      await cloud.initialize();
+      if (!this.predictionOwnerMatches(request, epoch, archiveId, type, pity, historyKey, gameUid, loggedIn)) { return; }
+      if (!cloud.isLoggedIn()) { this.predictionMessage = '请先登录胡桃云通行证；与游戏账号登录相互独立'; return; }
+      const revision: number = cloud.getSessionRevision();
+      const result: GachaPrediction = await GachaPredictionService.fetch(type, pity);
+      if (!this.predictionOwnerMatches(request, epoch, archiveId, type, pity, historyKey, gameUid, loggedIn)) { return; }
+      if (!cloud.isLoggedIn() || revision !== cloud.getSessionRevision()) {
+        this.predictionMessage = '云登录状态已变化，请重新查询';
+        return;
+      }
+      if (result.available && (result.poolType !== type || result.pity !== pity)) {
+        this.predictionMessage = '经验分布与当前卡池或垫数不一致，请重试';
+        return;
+      }
+      this.predictionSessionRevision = revision;
+      this.prediction = result;
+      this.predictionMessage = result.message;
+    } catch (_) {
+      if (request === this.predictionRequest && epoch === this.pageEpoch && this.pageActive) {
+        this.predictionMessage = '经验分布读取失败，请检查胡桃云登录或网络后重试';
+      }
+    } finally {
+      if (request === this.predictionRequest) { this.predictionLoading = false; }
+    }
+  }
+
+  private predictionIsCurrent(): boolean {
+    const cloud: HutaoCloudService = HutaoCloudService.getInstance();
+    return this.pageActive && !this.predictionLoading && this.prediction.available &&
+      this.predictionArchiveId === this.vm.currentArchiveId && this.prediction.poolType === this.vm.currentPoolType &&
+      this.prediction.pity === this.currentPity() && cloud.isLoggedIn() && this.predictionSessionRevision === cloud.getSessionRevision();
+  }
+
+  private predictionStatusText(): string {
+    const reason: string = this.predictionUnavailableReason();
+    if (reason.length > 0) { return reason; }
+    if (this.prediction.available && !this.predictionIsCurrent()) { return '历史或云登录状态已变化，请重新查询'; }
+    return this.predictionMessage;
+  }
+
+  private predictionPercent(value: number): string {
+    return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(2)}%`;
+  }
+
+  private predictionRetrievedText(): string {
+    if (!Number.isSafeInteger(this.prediction.retrievedAt) || this.prediction.retrievedAt <= 0) { return '本机获取时间未记录'; }
+    const retrieved: Date = new Date(this.prediction.retrievedAt);
+    if (!Number.isFinite(retrieved.getTime())) { return '本机获取时间无效'; }
+    return `本机获取时间：${retrieved.toISOString().substring(0, 19).replace('T', ' ')} UTC；不是样本采集日期`;
+  }
+
   @Builder
   predictionPanel() {
-    if (this.poolCards.length > 0) {
-      Column({ space: 8 }) {
-        Row({ space: 6 }) {
-          NavIcon({ name: 'GachaLog', iconSize: 16 })
-          Text('抽卡预测')
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1)
-          Text(this.vm.currentPoolType === GachaType.WEAPON_EVENT ? '武器活动祈愿' : '角色活动祈愿')
-            .fontSize(11)
-            .fontColor($r('app.color.text_secondary'))
-        }
-        .width('100%')
-
-        Row({ space: 8 }) {
-          ForEach([10, 20, 30, 50, 90], (n: number) => {
-            Column({ space: 3 }) {
-              Text(`${Math.round(GachaLogPage.predictFive(this.currentPity(), n) * 100)}%`)
-                .fontSize(15)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.five_star'))
-              Text(`${n} 抽内`)
-                .fontSize(10)
-                .fontColor($r('app.color.text_secondary'))
-            }
-            .layoutWeight(1)
-            .padding({ top: 8, bottom: 8 })
-            .borderRadius(10)
-            .backgroundColor($r('app.color.page_background'))
-            .alignItems(HorizontalAlign.Center)
-          }, (n: number) => `pred_${n}_${this.currentPity()}`)
-        }
-        .width('100%')
-
-        Text('基于 0.6% 基准概率 + 74 抽软保底 + 90 抽硬保底的概率模型；「歪」后大保底必为 UP')
-          .fontSize(10)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%')
+    Column({ space: 10 }) {
+      Text('五星经验分布').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+      Select(this.predictionPoolOptions()).selected(this.predictionTypes().indexOf(this.vm.currentPoolType))
+        .value(GachaType.nameOf(this.vm.currentPoolType)).constraintSize({ minHeight: 44 })
+        .accessibilityText('选择经验预测卡池').enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
+        .onSelect((index: number) => {
+          const types: number[] = this.predictionTypes();
+          if (index >= 0 && index < types.length) { this.selectPredictionPool(types[index]); }
+        })
+      Text(this.predictionStatusText())
+        .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+      Button(this.predictionLoading ? '正在读取经验分布' : '查询胡桃云经验分布')
+        .constraintSize({ minHeight: 44 }).hoverEffect(HoverEffect.Highlight)
+        .enabled(!this.predictionLoading && !this.poolSelectionLoading && !this.vm.isRefreshing && !this.vm.isTransferring && this.predictionUnavailableReason().length === 0)
+        .onClick(() => this.fetchPrediction())
+      if (this.predictionIsCurrent()) {
+        Text(`当前已记录垫数：${this.prediction.pity}；下一抽条件经验比例：${this.predictionPercent(this.prediction.nextProbability)}`)
+          .fontSize(13).fontColor($r('app.color.text_primary')).width('100%')
+        Text(`条件分布众数：再 ${this.prediction.predictedRemaining} 抽；该位置条件频率 ${this.predictionPercent(this.prediction.predictedProbability)}`)
+          .fontSize(13).fontColor($r('app.color.text_primary')).width('100%')
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach([10, 20, 30, 50], (count: number) => {
+            Text(`再 ${count} 抽内：${this.predictionPercent(GachaPredictionService.within(this.prediction, count))}`)
+              .fontSize(12).fontColor($r('app.color.text_primary')).padding(8).margin({ right: 6, bottom: 4 })
+          }, (count: number) => `empirical_${this.predictionRequest}_${count}`)
+        }.width('100%')
+        Text(`云分布样本：${this.prediction.sampleEvents} 次五星事件；垫数之后的条件样本：${this.prediction.remainingEvents} 次`)
+          .fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
+        Text(this.predictionRetrievedText()).fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
       }
-      .width('100%')
-      .padding(14)
-      .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_surface'))
-    }
+      Text('仅按云端历史样本与已记录垫数计算条件频率；不是理论概率、未来结果保证或指定 UP 概率。缺失的本地记录会影响判断。')
+        .fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
+    }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
+      .borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
   }
 
-  /** 当前池已垫抽数（预测用） */
-  private currentPity(): number {
-    for (const card of this.poolCards) {
-      if (card.gachaType === this.vm.currentPoolType) {
-        return card.sinceLastFive;
-      }
-    }
-    // 未找到当前池：取角色池垫数
-    for (const card of this.poolCards) {
-      if (card.gachaType === GachaType.AVATAR_EVENT) {
-        return card.sinceLastFive;
-      }
-    }
-    return 0;
-  }
-
-  /** 倒计时区：各池距保底剩余抽数卡 */
+  /** Remaining counts require the selected pool's recent reset to be verifiable from local rows. */
   @Builder
   countdownSection() {
-    if (this.poolCards.length === 0) {
-      Text('暂无池数据，点击右上角「刷新」拉取')
-        .fontSize(13)
-        .fontColor($r('app.color.text_secondary'))
-        .width('100%')
-        .padding({ top: 24, bottom: 24 })
-        .textAlign(TextAlign.Center)
-    } else {
     Column({ space: 10 }) {
       this.predictionPanel()
+      if (this.poolCards.length === 0) {
+        Text('暂无池记录，可导入 UIGF 或刷新本地归档').fontSize(13).fontColor($r('app.color.text_secondary')).width('100%').padding(16)
+      }
       ForEach(this.poolCards, (card: PoolCardData) => {
         Column({ space: 10 }) {
-          Row({ space: 6 }) {
-            Text('◆')
-              .fontSize(10)
-              .fontColor($r('app.color.app_primary'))
-            Text(card.typeName)
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary'))
-              .layoutWeight(1)
-            if (card.lastFiveName.length > 0) {
-              Text(`最近五星：${card.lastFiveName}`)
-                .fontSize(11)
-                .fontColor($r('app.color.text_secondary'))
-            }
+          Text(card.typeName).fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary')).width('100%')
+          if (!card.isCurrent) {
+            Button('选择该池后校验历史').constraintSize({ minHeight: 44 }).hoverEffect(HoverEffect.Highlight)
+              .enabled(!this.poolSelectionLoading && !this.vm.isRefreshing && !this.vm.isTransferring)
+              .onClick(() => this.selectPredictionPool(card.gachaType))
           }
-          .width('100%')
-
           Row({ space: 8 }) {
-            // 五星倒计时
             Column({ space: 4 }) {
-              Text(`${Math.max(0, ORANGE_GUARANTEE - card.sinceLastFive)}`)
-                .fontSize(30)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.five_star'))
-              Text('距五星保底抽数')
-                .fontSize(11)
-                .fontColor($r('app.color.text_secondary'))
-              Progress({
-                value: Math.min(card.sinceLastFive, ORANGE_GUARANTEE),
-                total: ORANGE_GUARANTEE,
-                type: ProgressType.Linear,
-              })
-                .width('100%')
-                .color($r('app.color.five_star'))
-                .style({ strokeWidth: 6 })
-              Text(`已垫 ${card.sinceLastFive} / 保底 ${ORANGE_GUARANTEE} 抽`)
-                .fontSize(10)
-                .fontColor($r('app.color.text_secondary'))
-            }
-            .layoutWeight(1)
-            .padding(12)
-            .borderRadius(10)
-            .backgroundColor($r('app.color.page_background'))
-            .border({ width: 1, color: $r('app.color.divider') })
-            .alignItems(HorizontalAlign.Center)
-
-            // 四星倒计时
+              Text(card.fivePityKnown ? `${GachaPoolRules.fiveStarThreshold(card.gachaType) - card.sinceLastFive}` : '--')
+                .fontSize(30).fontWeight(FontWeight.Bold).fontColor($r('app.color.five_star'))
+              Text('按已记录历史距五星阈值').fontSize(11).fontColor($r('app.color.text_secondary'))
+              if (GachaPoolRules.fiveStarThreshold(card.gachaType) <= 0) {
+                Text('无适用的有限五星阈值').fontSize(11).fontColor($r('app.color.text_secondary'))
+              } else if (card.fivePityKnown) {
+                Progress({ value: card.sinceLastFive, total: GachaPoolRules.fiveStarThreshold(card.gachaType), type: ProgressType.Linear })
+                  .width('100%').color($r('app.color.five_star')).style({ strokeWidth: 6 })
+                Text(`已记录 ${card.sinceLastFive} / 阈值 ${GachaPoolRules.fiveStarThreshold(card.gachaType)} 抽`).fontSize(11).fontColor($r('app.color.text_secondary'))
+              } else {
+                Text(card.isCurrent ? '本地历史不足或品质不明' : '选择该池后校验历史').fontSize(11).fontColor($r('app.color.text_secondary'))
+              }
+            }.layoutWeight(1).padding(12).borderRadius(10).backgroundColor($r('app.color.page_background'))
+              .border({ width: 1, color: $r('app.color.divider') }).alignItems(HorizontalAlign.Center)
             Column({ space: 4 }) {
-              Text(`${Math.max(0, PURPLE_GUARANTEE - card.sinceLastFour)}`)
-                .fontSize(30)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.four_star'))
-              Text('距四星保底抽数')
-                .fontSize(11)
-                .fontColor($r('app.color.text_secondary'))
-              Progress({
-                value: Math.min(card.sinceLastFour, PURPLE_GUARANTEE),
-                total: PURPLE_GUARANTEE,
-                type: ProgressType.Linear,
-              })
-                .width('100%')
-                .color($r('app.color.four_star'))
-                .style({ strokeWidth: 6 })
-              Text(`已垫 ${card.sinceLastFour} / 保底 ${PURPLE_GUARANTEE} 抽`)
-                .fontSize(10)
-                .fontColor($r('app.color.text_secondary'))
-            }
-            .layoutWeight(1)
-            .padding(12)
-            .borderRadius(10)
-            .backgroundColor($r('app.color.page_background'))
-            .border({ width: 1, color: $r('app.color.divider') })
-            .alignItems(HorizontalAlign.Center)
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .padding(14)
-        .borderRadius($r('app.float.card_radius'))
-        .backgroundColor($r('app.color.card_surface'))
-        .border({ width: 1, color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
-      }, (card: PoolCardData) => `cd_${card.gachaType}`)
-      }
-      .width('100%')
-    }
+              Text(card.fourPityKnown ? `${GachaPoolRules.fourStarThreshold(card.gachaType) - card.sinceLastFour}` : '--')
+                .fontSize(30).fontWeight(FontWeight.Bold).fontColor($r('app.color.four_star'))
+              Text('按已记录历史距四星阈值').fontSize(11).fontColor($r('app.color.text_secondary'))
+              if (GachaPoolRules.fourStarThreshold(card.gachaType) <= 0) {
+                Text('无适用的四星阈值').fontSize(11).fontColor($r('app.color.text_secondary'))
+              } else if (card.fourPityKnown) {
+                Progress({ value: card.sinceLastFour, total: GachaPoolRules.fourStarThreshold(card.gachaType), type: ProgressType.Linear })
+                  .width('100%').color($r('app.color.four_star')).style({ strokeWidth: 6 })
+                Text(`已记录 ${card.sinceLastFour} / 阈值 ${GachaPoolRules.fourStarThreshold(card.gachaType)} 抽`).fontSize(11).fontColor($r('app.color.text_secondary'))
+              } else {
+                Text(card.isCurrent ? '本地历史不足或品质不明' : '选择该池后校验历史').fontSize(11).fontColor($r('app.color.text_secondary'))
+              }
+            }.layoutWeight(1).padding(12).borderRadius(10).backgroundColor($r('app.color.page_background'))
+              .border({ width: 1, color: $r('app.color.divider') }).alignItems(HorizontalAlign.Center)
+          }.width('100%')
+          Text('只按本地已记录历史计算，不能确认缺失的记录。').fontSize(11).fontColor($r('app.color.text_secondary'))
+        }.width('100%').padding(14).borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
+      }, (card: PoolCardData) => `cd_${card.key}`)
+    }.width('100%')
   }
 }

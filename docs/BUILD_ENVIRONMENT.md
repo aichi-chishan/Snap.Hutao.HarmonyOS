@@ -115,3 +115,13 @@ codelinter --exit-on error -c code-linter.json5 -f json -o lint-report.json .
 `tests/lint-report-gate.cjs` 包含伪造成功退出码的错误报告、内部扫描异常、空/坏/旧报告及固定下载来源等回归；这些离线测试不替代真实原生扫描。
 
 当前门禁保守拒绝空 findings 数组，包括实际上可能没有任何问题的工程；这是为避免把本版工具的不可靠空报告误判为通过。未来若要允许真正的零 findings，必须先增加与同次检查绑定的成功安全探针和完整扫描证据；不能仅放宽为空数组就通过。该限制不会改变内部检查异常必须阻断的规则。
+
+### 单条规则的等价 AST 补充检查
+
+进一步捕获原始异常栈后，确认本版 HomeCheck 0.9.0 的 `NoDynamicDeleteCheck` 在处理类字段初始化语句时，直接访问不存在的 CFG。只有这一条 `@typescript-eslint/no-dynamic-delete` 获准使用等价补充检查：配置中关闭该损坏的原生 matcher，`ci/run-native-lint.cjs` 必须先执行 `ci/check-dynamic-delete.cjs`，通过后才启动其余原生规则。
+
+补充检查遵循 [TypeScript-ESLint 官方规则说明](https://typescript-eslint.io/rules/no-dynamic-delete/) 和[官方规则实现](https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/rules/no-dynamic-delete.ts)：允许直接属性及字符串/数字字面量键，拒绝动态计算键；额外防止 TypeScript 类型断言包装绕过检查。它逐节点检查原始源码，不用正则删掉 struct、装饰器、UI body 或删除表达式。普通 TS/JS 使用固定 TypeScript 5.9.3，ETS 使用已校验 SDK 的原生 ArkTS parser，并合并 SDK 自身 OpenHarmony/HMS 语法配置以正确解析 HdsTabs。任何缺失的原生 parser 或语法歧义都会阻断生产 ETS 检查。
+
+离线测试会明确跳过仅依赖原生 parser 的成功案例，并验证缺少 parser 时生产门禁确实拒绝；启用 CLT 的 lint job 会实际运行这些原生语法案例。有效/无效删除、类字段初始化、嵌套 UI 回调、畸形语法、字面量变动态键的变异以及真实 runner 的阻断链均有回归。
+
+这个替代方案**尚未恢复完整原生 lint 覆盖**：移除第一个 matcher 的阻塞后，下一个 `NoUnsafeAssignmentCheck` 也出现相同 CFG 解引用错误。该规则和其他原生规则没有被关闭；内部错误门禁仍会失败。不得把补充 AST 检查通过或 JSON 的 0 error 写成完整 lint 通过。

@@ -105,7 +105,9 @@ fs.writeFileSync(report,JSON.stringify([{filePath:path.join(root,'entry/src/main
 fs.writeFileSync(path.join(process.env.FIXTURE_CLT,'codelinter/linter/result/arkPerfCheck.log'),'[INFO] '+JSON.stringify({projectPath:root})+'\nFile count: 1\nChecking completed.\n'+(process.env.FIXTURE_CRASH?'[ERROR] Error running file check: getDeclaringMethod\n':''));
 `);fs.chmodSync(fakeLinter,0o755);
 const runner=path.resolve(__dirname,'../ci/run-native-lint.cjs');
-for(const crash of [false,true]) {
+const realSdk=process.env.DEVECO_CLI_CLT_PATH && path.join(process.env.DEVECO_CLI_CLT_PATH,'sdk');
+if(realSdk && fs.existsSync(realSdk)) fs.symlinkSync(realSdk,path.join(fakeClt,'sdk'));
+if(realSdk && fs.existsSync(realSdk)) for(const crash of [false,true]) {
   const evidence=path.join(temp,crash?'runner-failure':'runner-success');
   const result=spawnSync(process.execPath,[runner,evidence],{cwd:root,env:{...process.env,DEVECO_CLI_CLT_PATH:fakeClt,FIXTURE_CLT:fakeClt,FIXTURE_CRASH:crash?'1':''},encoding:'utf8'});
   assert.equal(result.status,crash?1:0,result.stderr);
@@ -114,5 +116,22 @@ for(const crash of [false,true]) {
   if(crash)assert.match(result.stderr,/coverage is incomplete/);
   const repeated=spawnSync(process.execPath,[runner,evidence],{cwd:root,env:{...process.env,DEVECO_CLI_CLT_PATH:fakeClt,FIXTURE_CLT:fakeClt}});
   assert.notEqual(repeated.status,0,'Existing evidence directory cannot be reused');
+}
+if(realSdk && fs.existsSync(realSdk)) {
+  const scan=path.join(fakeClt,'codelinter/linter/result/arkPerfCheck.log');
+  const lock=scan+'.hutao-lock';
+  fs.mkdirSync(lock);const before=fs.readFileSync(scan);
+  const blocked=spawnSync(process.execPath,[runner,path.join(temp,'runner-held-lock')],{cwd:root,env:{...process.env,DEVECO_CLI_CLT_PATH:fakeClt,FIXTURE_CLT:fakeClt},encoding:'utf8'});
+  assert.equal(blocked.status,1);assert.ok(fs.existsSync(lock));assert.deepEqual(fs.readFileSync(scan),before);fs.rmdirSync(lock);
+  const hook=path.join(temp,'deny-cross-device-rename.cjs');
+  fs.writeFileSync(hook,"require('node:fs').renameSync=()=>{const e=new Error('cross-device fixture');e.code='EXDEV';throw e};");
+  const evidence=path.join(temp,'runner-cross-device');
+  const cross=spawnSync(process.execPath,[runner,evidence],{cwd:root,env:{...process.env,DEVECO_CLI_CLT_PATH:fakeClt,FIXTURE_CLT:fakeClt,NODE_OPTIONS:'--require='+hook},encoding:'utf8'});
+  assert.equal(cross.status,0,cross.stderr);assert.deepEqual(fs.readFileSync(path.join(evidence,'previous-scan.log')),before);assert.equal(fs.existsSync(lock),false);
+}
+if(!realSdk || !fs.existsSync(realSdk)) {
+  const result=spawnSync(process.execPath,[runner,path.join(temp,'missing-parser-evidence')],{cwd:root,env:{...process.env,DEVECO_CLI_CLT_PATH:fakeClt},encoding:'utf8'});
+  assert.equal(result.status,1);assert.match(result.stderr,/Native SDK ArkTS parser is required/);
+  console.log('lint-report-gate: SKIP native-parser-dependent runner success fixtures without CLT; missing-parser rejection verified');
 }
 console.log('lint-report-gate: PASS (fresh project-bound evidence, scanner crashes, malformed/empty/stale reports, canary errors, warning policy, exact release pins)');
