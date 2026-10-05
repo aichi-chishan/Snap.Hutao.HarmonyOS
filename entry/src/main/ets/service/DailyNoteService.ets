@@ -277,6 +277,12 @@ export class DailyNoteService {
       }
     }
     Logger.info(TAG, `refresh ok uid=${uid} resin=${note.currentResin}/${note.maxResin}`);
+    // 派遣头像排查：接口可能返回哈希文件名（本地/CND 无对应图标，UI 改走接口 URL）
+    for (const expedition of note.expeditions) {
+      if (expedition.iconName().length === 0) {
+        Logger.info(TAG, `expedition icon unmapped: ${expedition.avatarSideIcon}`);
+      }
+    }
     return note;
   }
 

@@ -243,11 +243,12 @@ export struct MetaIcon {
           .onError(() => { this.onImageError(frame); })
       }, (frame: MetaIconFrame) => `${frame.id}`)
     } else {
+      // 缺图/加载中：中性半透明底板（勿用 page_background——深色主题下即纯黑，看起来像黑块）
       Column()
         .width(this.iconSize)
         .height(this.iconSize)
         .borderRadius(this.iconSize / 6)
-        .backgroundColor($r('app.color.page_background'))
+        .backgroundColor($r('app.color.icon_placeholder'))
     }
   }
 }

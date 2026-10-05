@@ -4,6 +4,7 @@
  */
 import { fileIo } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { AppContextProvider } from '../../common/AppContext';
 import { Logger } from '../../common/Logger';
 
@@ -49,8 +50,8 @@ export class StandardIconService {
     catch (_) { return ''; }
     const existing: Promise<string> | undefined = StandardIconService.pending.get(destination);
     if (existing !== undefined) { return existing; }
-    const task: Promise<string> = StandardIconService.materialize(category, name, destination).catch((): string => {
-      Logger.warn(TAG, 'icon unavailable; a later request can retry');
+    const task: Promise<string> = StandardIconService.materialize(category, name, destination).catch((error: Error): string => {
+      Logger.warn(TAG, `icon unavailable (${category}/${name}): ${error.message}`);
       return '';
     });
     StandardIconService.pending.set(destination, task);
@@ -142,15 +143,42 @@ export class StandardIconService {
     } finally { request.destroy(); }
   }
 
+  /** 平台在 maxRedirects=0 且收到 3xx 时的拒绝（libcurl 47 → 2300047），此时拿不到 Location */
+  private static redirectRefusedByClient(failure: BusinessError): boolean {
+    if (failure === undefined || failure === null) { return false; }
+    const message: string = typeof failure.message === 'string' ? failure.message : '';
+    return failure.code === 2300047 || /redirect/i.test(message);
+  }
+
+  /**
+   * 取图标：入口固定为 api 主机。
+   * - 平台把 3xx 作为响应返回：Location 必须精确等于固定的 static 目标，否则 fail closed
+   *   （不发起第二次请求，语义与原实现一致）；
+   * - API24 实测：maxRedirects=0 时客户端对 3xx 直接抛 2300047 而不是返回 302，因此拿不到
+   *   Location；此时只按硬编码的 static 主机 + 同一相对路径重试一次。
+   * 两条路径都只访问 api/static 两个固定地址，不会跟随服务端给出的任意 URL。
+   */
+  private static async requestPinnedRedirect(url: string, pinned: string): Promise<http.HttpResponse> {
+    let response: http.HttpResponse;
+    try {
+      response = await StandardIconService.requestIcon(url);
+    } catch (error) {
+      const failure: BusinessError = error as BusinessError;
+      if (!StandardIconService.redirectRefusedByClient(failure)) { throw error as Error; }
+      Logger.warn(TAG, `client refused to follow redirect (${failure.code}); retrying pinned static host`);
+      return await StandardIconService.requestIcon(pinned);
+    }
+    if (!StandardIconService.isRedirect(response.responseCode)) { return response; }
+    StandardIconService.checkedRedirect(response, pinned);
+    return await StandardIconService.requestIcon(pinned);
+  }
+
   private static async materialize(category: string, name: string, destination: string): Promise<string> {
     StandardIconService.prepareDirectory(category);
     if (StandardIconService.cached(destination)) { return destination; }
     const relative: string = `${category}/${StandardIconService.sourceName(category, name)}.png`;
-    let response: http.HttpResponse = await StandardIconService.requestIcon(`${STATIC_BASE}${relative}`);
-    if (StandardIconService.isRedirect(response.responseCode)) {
-      const target: string = StandardIconService.checkedRedirect(response, `${STATIC_REDIRECT_BASE}${relative}`);
-      response = await StandardIconService.requestIcon(target);
-    }
+    const response: http.HttpResponse = await StandardIconService.requestPinnedRedirect(
+      `${STATIC_BASE}${relative}`, `${STATIC_REDIRECT_BASE}${relative}`);
     // A redirect on the second request is rejected here; a loop can never add a third hop.
     if (response.responseCode !== http.ResponseCode.OK || !(response.result instanceof ArrayBuffer)) {
       throw new Error('Invalid icon response');

@@ -42,7 +42,8 @@ const C=m.exports.MetaIcon;
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve()};
 const render=x=>{rendered.length=0;x.build();assert.equal(rendered.length,1);return rendered[0]};
 const expectImage=x=>{const node=render(x);assert.equal(node.kind,'Image');assert.equal(typeof node.onError,'function');assert.equal(node.autoResize,true);return node};
-const expectMissing=x=>{assert.equal(x.src,'');const node=render(x);assert.equal(node.kind,'Column');assert.equal(node.backgroundColor,'app.color.page_background');assert.equal(node.width,x.iconSize);assert.equal(node.height,x.iconSize)};
+// 缺图占位必须是中性主题色：曾用 app.color.page_background，深色主题下即纯黑（真机显示为黑块）。
+const expectMissing=x=>{assert.equal(x.src,'');const node=render(x);assert.equal(node.kind,'Column');assert.equal(node.backgroundColor,'app.color.icon_placeholder');assert.equal(node.width,x.iconSize);assert.equal(node.height,x.iconSize)};
 (async()=>{
  const x=new C();x.category='AvatarIcon';x.name='first';x.remoteFallback=true;x.aboutToAppear();
  assert.equal(raws.length,1);x.src='old';x.name='second';x.onMetaChanged();assert.equal(x.src,'');

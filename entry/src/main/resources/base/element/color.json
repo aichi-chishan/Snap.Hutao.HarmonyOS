@@ -113,6 +113,10 @@
       "value": "#E62E2E2E"
     },
     {
+      "name": "icon_placeholder",
+      "value": "#14000000"
+    },
+    {
       "name": "card_acrylic_tint",
       "value": "#D9F3F3F3"
     },
