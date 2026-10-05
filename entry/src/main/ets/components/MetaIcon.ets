@@ -16,7 +16,7 @@ import { Logger } from '../common/Logger';
 
 const META_TAG: string = 'MetaIcon';
 
-/** 进程内图标解析缓存：key = category/name → file:// 路径（'' 表示已知缺失，避免反复读包） */
+/** 进程内图标解析缓存：key = category/name → 沙盒路径；使用前确认文件仍在。 */
 const RAW_CACHE: Map<string, string> = new Map();
 
 @Component
@@ -61,6 +61,12 @@ export struct MetaIcon {
       this.src = '';
       return;
     }
+    if (this.name.startsWith('https://') || this.name.startsWith('http://') || this.name.startsWith('file://')) {
+      this.src = this.name;
+      return;
+    }
+    // Metadata names are path segments, never arbitrary relative filesystem paths.
+    if (!/^[A-Za-z0-9_-]+$/.test(this.category) || !/^[A-Za-z0-9_-]+$/.test(this.name)) { return; }
     // 1) 远端更新图标优先（GitHub 数据更新后即用新版，未下载时不命中）
     try {
       const remote: string = GameDataService.getInstance().readIcon(this.category, this.name);
@@ -70,11 +76,6 @@ export struct MetaIcon {
       }
     } catch (e) {
       Logger.warn(META_TAG, `readIcon fail: ${(e as Error).message}`);
-    }
-    // 2) 直接图片源（http/file:// 透传，供 side_icon URL 等使用）
-    if (this.name.startsWith('http') || this.name.startsWith('file://')) {
-      this.src = this.name;
-      return;
     }
     // 3) rawfile → 沙盒缓存文件
     this.loadRawfileCached(this.category, this.name, token).catch((e: Error) => {
@@ -110,21 +111,19 @@ export struct MetaIcon {
     const key: string = `${category}/${name}`;
     const cached: string | undefined = RAW_CACHE.get(key);
     if (cached !== undefined) {
-      if (this.attached && token === this.resolveToken) {
-        this.src = cached;
-        if (cached.length === 0 && this.remoteFallback) {
-          this.tryRemote(category, name, token).catch((error: Error) => {
-            Logger.warn(META_TAG, `remote icon failed: ${error.message}`);
-          });
+      try {
+        if (fileIo.accessSync(cached)) {
+          if (this.attached && token === this.resolveToken) { this.src = fileUri.getUriFromPath(cached); }
+          return;
         }
-      }
-      return;
+      } catch (_) { /* Evicted cache entries are retried below. */ }
+      RAW_CACHE.delete(key);
     }
     const dir: string = `${AppContextProvider.getCacheDir()}/rawicons/${category}`;
     const dest: string = `${dir}/${name}.png`;
     try {
       if (fileIo.accessSync(dest)) {
-        RAW_CACHE.set(key, fileUri.getUriFromPath(dest));
+        RAW_CACHE.set(key, dest);
         if (this.attached && token === this.resolveToken) {
           this.src = fileUri.getUriFromPath(dest);
         }
@@ -136,21 +135,22 @@ export struct MetaIcon {
     try {
       const rm = AppContextProvider.getResourceManager();
       const raw: Uint8Array = await rm.getRawFileContent(`icons/${category}/${name}.png`);
+      if (!this.attached || token !== this.resolveToken) { return; }
       await MetaIcon.ensureDirChain(dir);
+      if (!this.attached || token !== this.resolveToken) { return; }
       const file = fileIo.openSync(dest, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
       try {
-        fileIo.writeSync(file.fd, raw.buffer as ArrayBuffer);
+        fileIo.writeSync(file.fd, new Uint8Array(raw).buffer as ArrayBuffer);
       } finally {
         fileIo.closeSync(file);
       }
       const src: string = fileUri.getUriFromPath(dest);
-      RAW_CACHE.set(key, src);
+      RAW_CACHE.set(key, dest);
       if (this.attached && token === this.resolveToken) {
         this.src = src;
       }
     } catch (e) {
       Logger.warn(META_TAG, `rawfile ${category}/${name} fail: ${(e as Error).message}`);
-      RAW_CACHE.set(key, '');
       if (this.attached && token === this.resolveToken) {
         this.src = '';
       }
@@ -174,7 +174,7 @@ export struct MetaIcon {
     }
     if (found.length > 0) {
       const src: string = fileUri.getUriFromPath(found);
-      RAW_CACHE.set(`${category}/${name}`, src);
+      RAW_CACHE.set(`${category}/${name}`, found);
       if (this.attached && token === this.resolveToken) {
         this.src = src;
       }

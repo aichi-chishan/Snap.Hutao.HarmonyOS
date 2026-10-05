@@ -7,9 +7,9 @@
 @Component
 export struct AssetIcon {
   /** 素材名（media 文件名，可省略后缀） */
-  name: string = '';
+  @Prop name: string = '';
   /** 显示尺寸 */
-  iconSize: number = 24;
+  @Prop iconSize: number = 24;
 
   build() {
     Image(AssetIcon.resolve(this.name))

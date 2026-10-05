@@ -12,7 +12,7 @@ import { StandardIconService } from '../data/remote/StandardIconService';
 import { CharacterViewModel, AddPlanResult } from '../viewmodel/CharacterViewModel';
 import { CharacterDetail } from '../model/CharacterData';
 import { CultivationRepo, CultivateProject } from '../data/repo/CultivationRepo';
-import { fileIo } from '@kit.CoreFileKit';
+import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { AppContextProvider } from '../common/AppContext';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageBackdrop } from '../components/PageBackdrop';
@@ -35,13 +35,19 @@ const SPLASH_ICON_CATEGORY: string = 'GachaAvatarIcon';
  */
 @Component
 export struct SplashArtView {
-  @Prop icon: string = '';
+  @Prop @Watch('onIconChanged') icon: string = '';
   @State src: string = '';
   private resolveToken: number = 0;
+  private active: boolean = false;
 
   aboutToAppear(): void {
+    this.active = true;
     this.resolve();
   }
+
+  aboutToDisappear(): void { this.active = false; this.resolveToken++; }
+
+  private current(token: number): boolean { return this.active && token === this.resolveToken; }
 
   onIconChanged(): void {
     this.resolve();
@@ -49,37 +55,36 @@ export struct SplashArtView {
 
   private async resolve(): Promise<void> {
     const token: number = ++this.resolveToken;
-    const suffix: string = this.icon.replace('UI_AvatarIcon_', '');
-    if (suffix.length === 0 || suffix === this.icon) {
-      this.src = '';
-      return;
-    }
+    if (!this.active) { return; }
+    // A replaced avatar must not display the previous identity while its image is loading.
+    this.src = '';
+    if (!/^UI_AvatarIcon_[A-Za-z0-9_-]+$/.test(this.icon)) { return; }
+    const suffix: string = this.icon.substring('UI_AvatarIcon_'.length);
     // 1) 完整立绘（GachaAvatarImg，未预打包，走缓存→CDN）
-    const imgPath: string = await SplashArtView.cachedOrFetch(SPLASH_IMG_CATEGORY,
-      `UI_Gacha_AvatarImg_${suffix}`);
+    const imgPath: string = await this.cachedOrFetch(SPLASH_IMG_CATEGORY,
+      `UI_Gacha_AvatarImg_${suffix}`, token);
+    if (!this.current(token)) { return; }
     if (imgPath.length > 0) {
-      if (token === this.resolveToken) {
-        this.src = imgPath;
-      }
+      this.src = imgPath;
       return;
     }
     // 2) 竖版抠图兜底（GachaAvatarIcon，包内预打包 + CDN）
-    const iconPath: string = await SplashArtView.cachedOrFetch(SPLASH_ICON_CATEGORY,
-      `UI_Gacha_AvatarIcon_${suffix}`);
-    if (token === this.resolveToken) {
+    const iconPath: string = await this.cachedOrFetch(SPLASH_ICON_CATEGORY,
+      `UI_Gacha_AvatarIcon_${suffix}`, token);
+    if (this.current(token)) {
       this.src = iconPath;
-      Logger.info(AVATAR_PAGE_TAG, `splash ${suffix} -> ${iconPath.length > 0 ? 'fallback icon' : 'miss'}`);
     }
   }
 
   /** 单类目三级解析：沙盒缓存 → rawfile 预打包 → 静态 CDN（StandardIconService） */
-  private static async cachedOrFetch(category: string, name: string): Promise<string> {
+  private async cachedOrFetch(category: string, name: string, token: number): Promise<string> {
+    if (!this.current(token)) { return ''; }
     const dir: string = `${AppContextProvider.getCacheDir()}/rawicons/${category}`;
     const dest: string = `${dir}/${name}.png`;
     // 1) 沙盒缓存命中（含已从 rawfile 落盘过的）
     try {
       if (fileIo.accessSync(dest)) {
-        return `file://${dest}`;
+        return fileUri.getUriFromPath(dest);
       }
     } catch (e) {
       // 未缓存，继续
@@ -88,29 +93,31 @@ export struct SplashArtView {
     try {
       const raw: Uint8Array = await AppContextProvider.getResourceManager()
         .getRawFileContent(`icons/${category}/${name}.png`);
-      await SplashArtView.ensureDir(dir);
+      if (!this.current(token)) { return ''; }
+      SplashArtView.ensureDir(dir);
       const file = fileIo.openSync(dest, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
       try {
-        fileIo.writeSync(file.fd, raw.buffer as ArrayBuffer);
+        // The resource may be a subview; never write unrelated bytes from its backing buffer.
+        fileIo.writeSync(file.fd, new Uint8Array(raw).buffer as ArrayBuffer);
       } finally {
         fileIo.closeSync(file);
       }
-      Logger.info(AVATAR_PAGE_TAG, `splash ${name} -> rawfile`);
-      return `file://${dest}`;
+      return fileUri.getUriFromPath(dest);
     } catch (e) {
       // 包内无该图，继续
     }
     // 3) 静态 CDN 按需拉取
+    if (!this.current(token)) { return ''; }
     try {
       const path: string = await StandardIconService.ensure(category, name);
-      return path.length > 0 ? `file://${path}` : '';
+      return this.current(token) && path.length > 0 ? fileUri.getUriFromPath(path) : '';
     } catch (e) {
       return '';
     }
   }
 
   /** 逐级创建目录（fileIo.mkdirSync 非递归） */
-  private static async ensureDir(full: string): Promise<void> {
+  private static ensureDir(full: string): void {
     try {
       fileIo.mkdirSync(full);
       return;
@@ -118,12 +125,12 @@ export struct SplashArtView {
       // 已存在或父目录缺失：逐级创建
     }
     const segs: string[] = full.split('/');
-    let cur: string = '';
+    let cur: string = full.startsWith('/') ? '/' : '';
     for (const seg of segs) {
       if (seg.length === 0) {
         continue;
       }
-      cur += cur.length > 0 ? `/${seg}` : seg;
+      cur += cur.length > 0 && cur !== '/' ? `/${seg}` : seg;
       try {
         fileIo.mkdirSync(cur);
       } catch (e) {

@@ -36,8 +36,8 @@ export struct PageHeader {
         .fontSize($r('app.float.page_title_font_size'))
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary'))
-        .margin({ left: this.embedMode ? 0 : 10 })
-      Blank()
+        .margin({ left: this.embedMode ? 0 : 10, right: 12 })
+        .layoutWeight(1)
       this.actions()
     }
     .width('100%')

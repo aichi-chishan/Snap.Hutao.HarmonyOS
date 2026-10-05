@@ -7,9 +7,9 @@
 @Component
 export struct NavIcon {
   /** 图标名（对应 media/nav_{name}.png） */
-  name: string = '';
+  @Prop name: string = '';
   /** 显示尺寸（宽高一致） */
-  iconSize: number = 20;
+  @Prop iconSize: number = 20;
 
   build() {
     Image(NavIcon.resolve(this.name))

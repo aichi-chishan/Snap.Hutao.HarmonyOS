@@ -24,3 +24,15 @@ Official API evidence checked 2026-10-05:
 - [Custom component lifecycle](https://github.com/openharmony/docs/blob/master/en/application-dev/ui/state-management/arkts-page-custom-components-lifecycle.md): invalidate ordinary lifecycle fields on disappearance without changing decorated state
 
 The separate shared-control and splash-art changes are still being developed and are not part of checkpoint 1.
+
+## Checkpoint 2: native controls and resilient art loading
+
+- Nine shared controls now react to parent-provided values. Native button semantics replace clickable layout containers for the primary action and account card; actions have 44vp minimum targets and flexible text layouts. The back button uses a bundled theme-tinted SVG.
+- QTapButton suppresses pressed-state effects while disabled and exposes caller-controlled reduced motion. There is no restored system reduced-motion integration. Back accessibility text defaults to Chinese, with an overridable label; multilingual service infrastructure is still absent.
+- Existing SplashArtView now observes icon changes, clears old images immediately and fences detached/stale work before disk writes or further fallbacks. This baseline still has no costume selector/service; the historically named costume-art-lifecycle test covers existing splash handling only.
+- Metadata icon names are constrained to safe path segments. Detached raw reads no longer write cache files. Raw byte-array views in both icon and splash paths are copied with their exact offset/length. Native file URI conversion is used consistently.
+- Positive metadata cache entries are checked for eviction; transient failures are no longer permanently cached, and a late failed reader cannot replace a valid cached result with a negative entry.
+
+Fresh validation after the final edits: 12 host suites passed with pinned TypeScript5.9.3 and NODE_PATH cleared; `git diff --check` passed. The SVG was parsed and its rendered preview inspected. The new tests execute real component methods under native doubles and cover request replacement/detach, byte views, invalid names, failure races and cache eviction. Official SDK/lint/HAP/device, keyboard and screen-reader checks remain unrun.
+
+Additional official references: [Button](https://github.com/openharmony/docs/blob/master/en/application-dev/reference/apis-arkui/arkui-ts/ts-basic-components-button.md), [accessibility](https://github.com/openharmony/docs/blob/master/en/application-dev/reference/apis-arkui/arkui-ts/ts-universal-attributes-accessibility.md), [Prop synchronization](https://github.com/openharmony/docs/blob/master/en/application-dev/ui/state-management/arkts-prop.md).
