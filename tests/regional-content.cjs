@@ -14,7 +14,7 @@ const plain=value=>JSON.parse(JSON.stringify(value));
 function harness(){
  const state={sent:[],signatures:[],risk:[],refreshed:[],saved:[],closed:0,timestamp:100,signGate:null,tokenGate:null,
   response:async()=>({retcode:0,data:{}}),riskResult:async()=>'',codes:async()=>[],codeCalls:0};
- const prefs=new Map();
+ const prefs=new Map(),accountRows=new Map();
  const boundaries={
   '@kit.NetworkKit':{http:{RequestMethod:{GET:'GET',POST:'POST'},HttpDataType:{STRING:0},ResponseCode:{OK:200},createHttp:()=>({
    async request(url,options){state.sent.push({url,options:plain(options)});const result=await state.response(url,options);return{responseCode:200,result:JSON.stringify(result),header:{}};},destroy(){state.closed++;}})}},
@@ -24,7 +24,7 @@ function harness(){
   DsSigner:{DsSigner:{sortQuery:query=>Object.keys(query).sort().map(key=>`${key}=${query[key]}`).join('&'),nowTimestamp:()=>++state.timestamp,randomNumber:()=>String(state.timestamp),
    async signGen2(salt,time,nonce,body,query){state.signatures.push({salt,time,nonce,body,query});if(state.signGate)await state.signGate;return`${time},${nonce},fixture-signature`;}}},
   RiskVerifier:{RiskVerifier:{async tryResolveRisk(response,cookie,path){state.risk.push({response,cookie,path});return state.riskResult();}}},
-  UserRepo:{UserRepo:{async saveCookieFor(id,cookie){state.saved.push({id,cookie});}}},
+  UserRepo:{UserRepo:{async getUserById(id){return accountRows.get(id)?.clone();},async loadCookieFor(id){return accountRows.get(id)?.fullCookie()||'';},async saveCookieFor(id,cookie){state.saved.push({id,cookie});const row=accountRows.get(id);if(row)row.applyCookie(cookie);}}},
   DeviceFpApi:{DeviceFpApi:{}},DailyNoteReminderService:{DailyNoteReminderService:{}},
   MiyoliveService:{MiyoliveService:{getInstance:()=>({async fetchRedeemCodes(){state.codeCalls++;return state.codes();}})}},
  };
@@ -52,7 +52,7 @@ function harness(){
   const user=new User();user.id=id;user.mid=`fixture-mid-${id}`;user.aid=`fixture-aid-${id}`;
   user.accountId=String(id);user.cookieToken=`fixture-cookie-${id}`;user.ltuid=String(id);user.ltoken=`fixture-ltoken-${id}`;user.stuid=String(id);user.stoken=`fixture-stoken-${id}`;
   const region=load('common/Constants').RegionUtil.regionOfUid(uid);user.isOversea=region.startsWith('os_');
-  const role=Role.of(uid,region,'fixture',55);role.userId=id;user.roles=[role];users.currentUser=user;client.setCookie(user.fullCookie(),user.isOversea);return user;
+  const role=Role.of(uid,region,'fixture',55);role.userId=id;user.roles=[role];accountRows.set(id,user.clone());users.currentUser=user;users.advanceRevision();client.setCookie(user.fullCookie(),user.isOversea);return user;
  }
  users.completeTokenChainInner=async(user,force)=>{state.refreshed.push({user,force});if(state.tokenGate)await state.tokenGate;user.cookieToken='fixture-refreshed-cookie';};
  const LedgerVM=load('viewmodel/LedgerViewModel').LedgerViewModel,AnnVM=load('viewmodel/AnnouncementViewModel').AnnouncementViewModel;
@@ -119,7 +119,7 @@ test('account switch during signing, HTTP, refresh or risk waits prevents old re
   if(phase==='risk')h.state.riskResult=async()=>{waiting=true;await gate.promise;return'old-challenge';};
   const running=outcome(h.ledger.fetchMonth(10,'100000001'));
   while(!(phase==='sign'?h.state.signatures.length:phase==='refresh'?h.state.refreshed.length:waiting))await tick();
-  const newUser=h.select('800000001',2);gate.resolve();assert.match((await running).error.message,/已改变/);
+  const newUser=h.select('800000001',2);gate.resolve();assert.match((await running).error.message,/已改变|已变化/);
   assert.equal(h.client.getCurrentCookie(),newUser.fullCookie());assert.equal(h.state.sent.length,phase==='sign'?0:1);
  }
 });
@@ -140,7 +140,7 @@ test('account switch at the request-Promise handoff cannot start old risk UI or 
   const h=harness();h.select();h.state.response=async()=>({retcode,data:ledgerData('100000001','cn_gf01')});
   const request=h.ledger.request.bind(h.ledger);
   h.ledger.request=async(...args)=>{const response=await request(...args);h.select('800000001',2);return response;};
-  await assert.rejects(h.ledger.fetchMonth(10,'100000001'),/已改变/);
+  await assert.rejects(h.ledger.fetchMonth(10,'100000001'),/已改变|已变化/);
   assert.equal(h.state.risk.length,0);assert.equal(h.state.refreshed.length,0);assert.equal(h.state.sent.length,1);
  }
 });
@@ -159,10 +159,10 @@ test('ledger viewmodel keeps only latest month, clears account changes, labels s
 test('both token completion wrappers cannot republish cookies after switch, logout, or account-ID reuse',async()=>{
  for(const wrapper of ['completeTokenChainPublic','refreshCookieTokenForced'])for(const target of ['switch','logout','reuse']){
   const h=harness(),user=h.select(),gate=deferred();h.state.tokenGate=gate.promise;
-  const running=h.users[wrapper](user);while(!h.state.refreshed.length)await tick();
-  if(target==='logout'){h.users.currentUser=undefined;h.client.setCookie('');}
+  const running=outcome(h.users[wrapper](user));while(!h.state.refreshed.length)await tick();
+  if(target==='logout'){h.users.currentUser=undefined;h.users.advanceRevision();h.client.setCookie('');}
   else h.select('800000001',target==='reuse'?1:2);
-  const expected=h.client.getCurrentCookie();gate.resolve();await running;assert.equal(h.client.getCurrentCookie(),expected,wrapper+' '+target);
+  const expected=h.client.getCurrentCookie();gate.resolve();const result=await running;assert.match(result.error.message,/状态已变化/);assert.equal(h.client.getCurrentCookie(),expected,wrapper+' '+target);
  }
  const h=harness(),user=h.select();await h.users.completeTokenChainPublic(user);assert.ok(h.client.getCurrentCookie().includes('fixture-refreshed-cookie'));
 });
@@ -234,4 +234,28 @@ test('detail navigation carries item-owned context and never invents announcemen
  assert.equal(detail.includes('article/${this.annId}'),false);assert.ok(detail.includes('this.context.region, this.context.level, this.context.language'));
  assert.ok(detail.includes('generation !== this.generation'));assert.ok(detail.includes('.javaScriptAccess(false)'));
  const page=fs.readFileSync(path.join(root,'pages/AnnouncementPage.ets'),'utf8');for(const field of ['region: item.sourceRegion','language: item.sourceLanguage','level: item.sourceLevel'])assert.ok(page.includes(field));
+});
+
+test('typed announcement promises preserve list/body coalescing, rejection cleanup and replacement ownership', async () => {
+ for (const kind of ['lists', 'bodies']) {
+  const h = harness(), gate = deferred();
+  const context = h.Context.create('os_asia', 'en-us', 55), key = context.key();
+  const fetch = () => kind === 'lists' ? h.announcements.fetchGroups('os_asia', 55, 'en-us', true)
+    : h.announcements.fetchContent(42, 'os_asia', 55, 'en-us');
+  h.state.response = async () => { await gate.promise; throw new Error('fixture announced rejection'); };
+  const first = outcome(fetch()), second = outcome(fetch());
+  assert.equal(h.state.sent.length, 1, kind + ' shares one request');
+  assert.equal(h.announcements[kind].size, 1);
+  gate.resolve();
+  for (const result of await Promise.all([first, second])) assert.match(result.error.message, /网络异常|fixture announced rejection/);
+  assert.equal(h.announcements[kind].has(key), false, kind + ' failed request is removed');
+  const nextGate = deferred();
+  h.state.response = async () => { await nextGate.promise; return { retcode: 0, data: kind === 'lists' ? listData() : { list: [{ ann_id: 42, content: 'fixture body' }] } }; };
+  const retry = fetch();
+  assert.equal(h.state.sent.length, 2, kind + ' next call starts a fresh request');
+  const replacement = Promise.resolve(kind === 'lists' ? [] : new Map());
+  h.announcements[kind].set(key, replacement);
+  nextGate.resolve(); await retry;
+  assert.equal(h.announcements[kind].get(key), replacement, kind + ' older completion does not remove newer owner');
+ }
 });

@@ -1,0 +1,143 @@
+{
+  "locale": "en",
+  "articles": [
+    {
+      "id": "accounts",
+      "title": "Accounts, sign-in and verification",
+      "summary": "Check the account, server and game role first. Expired credentials require sign-in again; opening help reads no account data.",
+      "steps": [
+        "In Accounts and data, check the current account and default game role, then return and refresh the online page manually. Selecting an account here does not switch the game client account.",
+        "If a session expires, sign in again using a supported login-page method. Complete CAPTCHA or extra verification yourself in its verification screen; avoid rapid repeated retries.",
+        "If the server or role differs, select the correct role first. The region for public announcements is separate from the personal account.",
+        "Never include cookies, passwords, verification codes or authkey links in feedback. Diagnostics contain none of them."
+      ],
+      "keywords": "login account region UID cookie captcha 登录 登入 帳號 账号 验证 credentials contraseña şifre điện thoại",
+      "route": "pages/UserPage"
+    },
+    {
+      "id": "import",
+      "title": "Local archives and file imports",
+      "summary": "Wishes, achievements and inventory use different formats. Check format, destination and preview before approving a write.",
+      "steps": [
+        "Use UIGF for wishes, UIAF for achievements and UIIF v1.0 for inventory. Renaming an extension does not convert a file; preserve a copy of the original first.",
+        "For wishes, review the UID, record count and selected archives in the preview. An empty selection does not mean import everything; explicitly select the archives you need.",
+        "Inventory import replaces the chosen local archive. Check the preview and destination first. It does not read game memory or modify in-game items.",
+        "If a file is damaged or its format or size is unsupported, check the exporting tool and version and export a compatible file again. Raw files and error details may contain private information; do not publish them directly."
+      ],
+      "keywords": "UIGF UIAF UIIF JSON import export inventory wishes archive 导入 导出 匯入 匯出 背包 成就 祈愿 祈願",
+      "route": ""
+    },
+    {
+      "id": "data",
+      "title": "Game data updates and offline fallback",
+      "summary": "Bundled metadata is available offline. Updates activate only after validation; interruption or failure is not success.",
+      "steps": [
+        "Check the game-data update section in Settings, then start an update explicitly. On a network failure, keep the current usable data and retry after checking connectivity.",
+        "Download progress is not an activated version. Wait for completion; after cancellation, let the current operation finish before starting another.",
+        "If an icon or description is missing, check the data version and reopen the page. Do not delete the database or account credentials to repair a resource problem.",
+        "Help search is entirely offline. Its language setting covers help and integrated common messages only, not all pages or third-party game text; it never changes stable imported or exported IDs."
+      ],
+      "keywords": "metadata cache update offline rollback checksum 图鉴 圖鑑 数据 資料 更新 缓存 快取",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "backups",
+      "title": "Backups, restore and interrupted recovery",
+      "summary": "Full backups may contain login credentials and personal game data. They are different from account-free diagnostics.",
+      "steps": [
+        "Export a backup explicitly in Settings and keep it somewhere secure that you control. Never attach a full backup to a public issue; make a separately redacted copy before sharing.",
+        "Before restoring, export your current data and check the backup source, version and replacement warning. Restore changes local data and requires your confirmation.",
+        "If the backup comes from a newer version, update the app first. Do not lower the version number by hand; retrieve a damaged file again from a trusted backup.",
+        "If an interrupted restore needs recovery, restart the app so its startup recovery can process the journal. Do not clear the database or credentials manually. If it still fails, generate account-free diagnostics and describe the steps."
+      ],
+      "keywords": "backup restore recovery credentials password 备份 还原 恢复 備份 還原 復原",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "daily-note",
+      "title": "Daily notes, widgets and reminders",
+      "summary": "Widgets show the last saved snapshot, not guaranteed live data. Check the refresh time before relying on it.",
+      "steps": [
+        "Return to the app, check the current account and role, and refresh daily notes manually. Check the widget refresh time so an old snapshot is not mistaken for current game state.",
+        "Enable reminders only when needed in Settings and handle the system permission prompt. If access was denied, you decide whether to grant it later in system settings.",
+        "The system can restrict background refresh and reminder timing. Continuous background execution and second-exact reminders cannot be guaranteed by this app.",
+        "After switching accounts, wait for the new role to refresh successfully, then check the widget. A matching nickname alone does not identify the same game role."
+      ],
+      "keywords": "resin widget reminder background refresh daily note notification 便笺 便箋 桌面 卡片 提醒 树脂 樹脂",
+      "route": ""
+    },
+    {
+      "id": "devices",
+      "title": "Device limits and game entry points",
+      "summary": "Targets phones, tablets and 2-in-1 devices from API 24. Layout follows content width; some visual effects require a newer API.",
+      "steps": [
+        "After resizing or rotating, a narrow content area can remain single-column. Two columns depend on content width, not the device name. Theme and reduced motion are available in Settings.",
+        "To launch a game, configure a publicly documented vendor URI or Bundle/Ability entry. Verify its source and launch explicitly. The app does not scan arbitrary installed games.",
+        "A failed launch can mean an absent app, a changed entry or a private entry. It does not prove the game is uninstalled; verify using the vendor installation or launch method.",
+        "Use the official client for game installation, repair, pre-download and game-account switching. This toolbox does not inject processes or read game memory, and desktop-only features are not guaranteed on HarmonyOS."
+      ],
+      "keywords": "HarmonyOS API24 API26 phone tablet 2in1 launcher device launch 游戏 啟動 启动 设备 裝置",
+      "route": "pages/LaunchGamePage"
+    },
+    {
+      "id": "privacy",
+      "title": "Diagnostics, privacy and feedback",
+      "summary": "Review the preview before explicitly copying. Diagnostics never read credentials, UIDs, network account data or raw logs, and never upload automatically.",
+      "steps": [
+        "Select the relevant article and problem type, then choose Generate diagnostic preview. By default it contains fixed feature and outcome codes plus the generation time only.",
+        "You may include app version, API level, device category and theme. These allowlisted fields are read only when you generate a preview. Device serial numbers, full system identifiers and account data are excluded.",
+        "Check the preview before copying it to the clipboard. The system or other authorized apps may read the clipboard; this page never reads existing clipboard contents. Leaving the page discards the preview.",
+        "If you report a project issue, separately describe reproduction steps and expected and actual results. Check any text and screenshots you add; do not attach cookies, UIDs, backups or login links."
+      ],
+      "keywords": "diagnostics feedback clipboard privacy sanitized export cookie token 诊断 診斷 隐私 隱私 剪贴板 剪貼簿",
+      "route": ""
+    }
+  ],
+  "labels": {
+    "title": "Help and diagnostics",
+    "search": "Search a problem, feature or file format",
+    "scope": "Language applies to help and integrated common messages only. Other UI and game text retain their source language.",
+    "fallback": "Your system language is not supported yet. Help is shown in English.",
+    "system": "Follow system",
+    "language": "Help language",
+    "empty": "No articles found. Try a feature name or keywords such as UIGF or backup.",
+    "choose": "Select an article for actionable steps",
+    "back": "All articles",
+    "open": "Open related page",
+    "diagnostics": "Diagnostic preview",
+    "privacy": "Allowlisted fields only. No account, UID, credential, clipboard or log reads; no automatic upload.",
+    "environment": "Include version, API, device category and theme (read when generating)",
+    "generate": "Generate diagnostic preview",
+    "copy": "Copy reviewed preview",
+    "clear": "Discard preview",
+    "problem": "Select a problem type (no automatic fixes)",
+    "general": "Other operation failure",
+    "network": "Network unavailable",
+    "permission": "Permission issue",
+    "file": "Invalid file",
+    "login": "Session expired",
+    "unsupported": "Operation unavailable",
+    "readFirst": "Review first. Copying writes to the system clipboard; it does not submit feedback.",
+    "local": "Offline help on this device · No sign-in required"
+  },
+  "outcomes": {
+    "None": "",
+    "Preparing": "Preparing. Please wait.",
+    "Ready": "Ready. Review the preview before continuing.",
+    "Cancelled": "Cancelled. Check the current page state before retrying.",
+    "InvalidFile": "Invalid or unsupported file. Check its format, size and export version.",
+    "ImportFailed": "Import did not complete. Check the file and destination archive before retrying.",
+    "ImportComplete": "Import complete: {count} records added.",
+    "ExportFailed": "Export did not complete. Check write access to the destination and retry.",
+    "ExportComplete": "Export complete. Keep the file secure.",
+    "Busy": "An operation is in progress. Wait for it to finish or cancel it first.",
+    "NetworkUnavailable": "Network unavailable. Check your connection and retry manually.",
+    "PermissionRequired": "System permission is required. Review the prompt and decide whether to allow it.",
+    "LoginExpired": "The session may have expired. Check the account and server, then sign in again.",
+    "Unsupported": "This operation is currently unavailable. Check device limits and help.",
+    "CopyComplete": "Copied. Review the content again before sharing.",
+    "CopyFailed": "Could not copy. Check system clipboard access and retry.",
+    "Failed": "The operation did not complete. Check the related help and retry manually.",
+    "LocaleFailed": "The language setting was not applied. Please try again later."
+  }
+}

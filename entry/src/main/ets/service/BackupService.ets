@@ -163,6 +163,8 @@ export class BackupService {
     if (journal.marker.length === 0 || !Array.isArray(journal.oldUsers) || !Array.isArray(journal.newUsers)) {
       throw new Error('备份恢复日志无效');
     }
+    // Hold the account fence through journal repair, including all vault cleanup.
+    await UserService.getInstance().beginLocalSessionReplacement();
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.getStore().querySql(
       'SELECT marker FROM backup_recovery WHERE id=1');
     let committed: boolean = false;
@@ -170,6 +172,7 @@ export class BackupService {
     await PreferencesStore.replacePortable(committed ? journal.nextPreferences : journal.oldPreferences);
     for (const id of (committed ? journal.oldUsers : journal.newUsers)) { await TokenVault.removeCookie(id); }
     await PreferencesStore.saveBackupJournal('');
+    await UserService.getInstance().reloadLocalSession();
   }
 
   async restoreFromText(text: string): Promise<BackupResult> {
@@ -183,11 +186,11 @@ export class BackupService {
     let prefsChanged: boolean = false;
     let journalSaved: boolean = false;
     let committed: boolean = false;
+    let replacementRevision: number = -1;
     const daily: DailyNoteService = DailyNoteService.getInstance();
     const wasRunning: boolean = daily.isTimerRunning();
     daily.stopAutoRefresh();
     try {
-      oldPrefs = PreferencesStore.exportPortable();
       const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
       const parsed: Object = JSON.parse(text) as Object;
       if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) { throw new Error('无效备份'); }
@@ -203,6 +206,10 @@ export class BackupService {
         }
       }
       await this.validateDatabase(snapshot);
+      // Invalid input never changes the session. Once validated, drain all old-owner work
+      // before even capturing preferences or opening the account replacement transaction.
+      replacementRevision = await UserService.getInstance().beginLocalSessionReplacement();
+      oldPrefs = PreferencesStore.exportPortable();
       transaction = await store.createTransaction({ transactionType: relationalStore.TransactionType.IMMEDIATE });
       const oldUsers: BackupTable = this.readTable('user_accounts', await transaction.querySql('SELECT * FROM user_accounts'));
       const maxRs: relationalStore.ResultSet = await transaction.querySql(
@@ -252,7 +259,8 @@ export class BackupService {
       result.message = legacy ? '旧版备份已还原；已有养成、挑战历史和背包存档保留，请重启应用' :
         (snapshot.schemaVersion < 7 ? '备份已还原；已有背包存档保留，请重启应用' : '全部本地数据已还原，请重启应用');
     } catch (e) {
-      let recovered: boolean = true;
+      // A committed replacement with unfinished vault cleanup must retain its journal.
+      let recovered: boolean = !committed || !journalSaved;
       if (transaction !== undefined) {
         try { await transaction.rollback(); } catch (rollbackError) { recovered = false; }
       }
@@ -266,6 +274,9 @@ export class BackupService {
       }
       if (journalSaved && recovered) {
         try { await PreferencesStore.saveBackupJournal(''); } catch (journalError) { recovered = false; }
+      }
+      if (!committed && recovered && replacementRevision >= 0 && PreferencesStore.getBackupJournal().length === 0) {
+        UserService.getInstance().cancelLocalSessionReplacement(replacementRevision);
       }
       result.ok = committed;
       result.message = !recovered ? '还原恢复待完成，请重启应用后重试' : (committed ? '数据已还原，请重启应用刷新会话' : `未还原：${(e as Error).message}`);

@@ -1,0 +1,143 @@
+{
+  "locale": "vi",
+  "articles": [
+    {
+      "id": "accounts",
+      "title": "Tài khoản, đăng nhập và xác minh",
+      "summary": "Kiểm tra tài khoản, máy chủ và nhân vật trước. Thông tin xác thực hết hạn cần đăng nhập lại; mở trợ giúp không đọc dữ liệu tài khoản.",
+      "steps": [
+        "Trong Tài khoản và dữ liệu, kiểm tra tài khoản hiện tại và nhân vật mặc định, rồi quay lại làm mới trang trực tuyến bằng tay. Chọn tài khoản ở đây không đổi tài khoản trong ứng dụng trò chơi.",
+        "Nếu phiên hết hạn, đăng nhập lại bằng phương thức được trang đăng nhập hỗ trợ. Tự hoàn thành CAPTCHA hoặc xác minh bổ sung tại màn hình xác minh; tránh thử lại liên tục quá nhanh.",
+        "Nếu máy chủ hoặc nhân vật không khớp, chọn đúng nhân vật trước. Khu vực của thông báo công khai tách biệt với tài khoản cá nhân.",
+        "Không đưa cookie, mật khẩu, mã xác minh hoặc liên kết authkey vào phản hồi. Chẩn đoán không chứa các thông tin này."
+      ],
+      "keywords": "login account region UID cookie captcha 登录 登入 帳號 账号 验证 credentials contraseña şifre điện thoại",
+      "route": "pages/UserPage"
+    },
+    {
+      "id": "import",
+      "title": "Kho cục bộ và nhập tệp",
+      "summary": "Cầu nguyện, thành tựu và túi đồ dùng định dạng khác nhau. Kiểm tra định dạng, đích và bản xem trước rồi mới cho phép ghi.",
+      "steps": [
+        "Dùng UIGF cho cầu nguyện, UIAF cho thành tựu và UIIF v1.0 cho túi đồ. Đổi phần mở rộng không chuyển đổi tệp; hãy giữ một bản sao tệp gốc trước.",
+        "Khi nhập cầu nguyện, kiểm tra UID, số bản ghi và các kho đã chọn trong bản xem trước. Không chọn gì không có nghĩa là nhập tất cả; hãy chọn rõ các kho cần nhập.",
+        "Nhập túi đồ sẽ thay thế kho cục bộ đã chọn. Kiểm tra bản xem trước và đích trước. Việc này không đọc bộ nhớ trò chơi hay thay đổi vật phẩm trong game.",
+        "Nếu tệp hỏng hoặc định dạng hay kích thước không được hỗ trợ, kiểm tra công cụ và phiên bản xuất rồi xuất lại tệp tương thích. Tệp gốc và chi tiết lỗi có thể chứa thông tin riêng tư; không công khai trực tiếp."
+      ],
+      "keywords": "UIGF UIAF UIIF JSON import export inventory wishes archive 导入 导出 匯入 匯出 背包 成就 祈愿 祈願",
+      "route": ""
+    },
+    {
+      "id": "data",
+      "title": "Cập nhật dữ liệu và phương án ngoại tuyến",
+      "summary": "Siêu dữ liệu đi kèm dùng được ngoại tuyến. Cập nhật chỉ kích hoạt sau khi xác thực; gián đoạn hay thất bại không phải thành công.",
+      "steps": [
+        "Kiểm tra mục cập nhật dữ liệu trò chơi trong Cài đặt rồi chủ động bắt đầu. Khi lỗi mạng, giữ dữ liệu đang dùng được và thử lại sau khi kiểm tra kết nối.",
+        "Tiến độ tải không phải phiên bản đã kích hoạt. Chờ thông báo hoàn tất; sau khi hủy, đợi thao tác hiện tại kết thúc rồi mới bắt đầu thao tác khác.",
+        "Nếu thiếu biểu tượng hoặc mô tả, kiểm tra phiên bản dữ liệu và mở lại trang. Không xóa cơ sở dữ liệu hay thông tin xác thực để sửa tài nguyên bị thiếu.",
+        "Tìm kiếm trợ giúp hoàn toàn ngoại tuyến. Ngôn ngữ chỉ áp dụng cho trợ giúp và thông báo chung đã tích hợp, không phải mọi trang hay văn bản game bên thứ ba; không đổi ID ổn định khi nhập hoặc xuất."
+      ],
+      "keywords": "metadata cache update offline rollback checksum 图鉴 圖鑑 数据 資料 更新 缓存 快取",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "backups",
+      "title": "Sao lưu, khôi phục và xử lý gián đoạn",
+      "summary": "Bản sao lưu đầy đủ có thể chứa thông tin đăng nhập và dữ liệu trò chơi cá nhân. Nó khác với chẩn đoán không có dữ liệu tài khoản.",
+      "steps": [
+        "Chủ động xuất bản sao lưu trong Cài đặt và giữ ở nơi an toàn do bạn kiểm soát. Không đính kèm bản sao lưu đầy đủ vào báo cáo công khai; tạo bản riêng đã loại dữ liệu riêng tư trước khi chia sẻ.",
+        "Trước khi khôi phục, xuất dữ liệu hiện tại và kiểm tra nguồn, phiên bản cùng cảnh báo thay thế của bản sao lưu. Khôi phục thay đổi dữ liệu cục bộ và cần bạn xác nhận.",
+        "Nếu bản sao lưu đến từ phiên bản mới hơn, cập nhật ứng dụng trước. Không tự hạ số phiên bản trong tệp; lấy lại tệp hỏng từ bản sao lưu đáng tin cậy.",
+        "Nếu lần khôi phục bị gián đoạn cần phục hồi, khởi động lại ứng dụng để quy trình khôi phục lúc mở xử lý nhật ký. Không tự xóa cơ sở dữ liệu hay thông tin xác thực. Nếu vẫn lỗi, tạo chẩn đoán không có tài khoản và mô tả các bước."
+      ],
+      "keywords": "backup restore recovery credentials password 备份 还原 恢复 備份 還原 復原",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "daily-note",
+      "title": "Ghi chú thời gian thực, tiện ích và nhắc nhở",
+      "summary": "Tiện ích hiển thị bản chụp đã lưu gần nhất, không bảo đảm dữ liệu trực tiếp. Kiểm tra thời gian làm mới trước khi dựa vào đó.",
+      "steps": [
+        "Quay lại ứng dụng, kiểm tra tài khoản và nhân vật rồi làm mới ghi chú bằng tay. Xem thời gian làm mới tiện ích để tránh coi bản chụp cũ là trạng thái game hiện tại.",
+        "Bật nhắc nhở khi cần trong Cài đặt và xử lý yêu cầu quyền hệ thống. Nếu đã từ chối, bạn tự quyết định có cấp lại sau trong cài đặt hệ thống hay không.",
+        "Hệ thống có thể hạn chế làm mới nền và thời điểm nhắc nhở. Ứng dụng không bảo đảm chạy nền liên tục hay nhắc chính xác đến từng giây.",
+        "Sau khi đổi tài khoản, chờ nhân vật mới làm mới thành công rồi kiểm tra tiện ích. Chỉ trùng biệt danh không đủ để xác định cùng một nhân vật."
+      ],
+      "keywords": "resin widget reminder background refresh daily note notification 便笺 便箋 桌面 卡片 提醒 树脂 樹脂",
+      "route": ""
+    },
+    {
+      "id": "devices",
+      "title": "Giới hạn thiết bị và lối vào trò chơi",
+      "summary": "Dành cho điện thoại, máy tính bảng và thiết bị 2 trong 1 từ API 24. Bố cục theo độ rộng nội dung; một số hiệu ứng cần API mới hơn.",
+      "steps": [
+        "Sau khi đổi kích thước hoặc xoay, vùng nội dung hẹp có thể vẫn một cột. Hai cột phụ thuộc độ rộng nội dung, không phải tên thiết bị. Giao diện và giảm chuyển động có trong Cài đặt.",
+        "Để mở game, cấu hình URI hoặc lối vào Bundle/Ability được nhà cung cấp công khai tài liệu. Xác minh nguồn rồi chủ động mở. Ứng dụng không quét tùy ý các game đã cài.",
+        "Mở thất bại có thể do thiếu ứng dụng, lối vào đã đổi hoặc không công khai. Điều đó không chứng minh game chưa cài; xác minh bằng cách cài hoặc mở do nhà cung cấp đưa ra.",
+        "Dùng ứng dụng chính thức để cài, sửa, tải trước và đổi tài khoản game. Công cụ này không can thiệp tiến trình hay đọc bộ nhớ trò chơi; tính năng riêng của máy tính không được bảo đảm trên HarmonyOS."
+      ],
+      "keywords": "HarmonyOS API24 API26 phone tablet 2in1 launcher device launch 游戏 啟動 启动 设备 裝置",
+      "route": "pages/LaunchGamePage"
+    },
+    {
+      "id": "privacy",
+      "title": "Chẩn đoán, quyền riêng tư và phản hồi",
+      "summary": "Kiểm tra bản xem trước rồi chủ động sao chép. Chẩn đoán không đọc thông tin xác thực, UID, tài khoản mạng hay nhật ký thô và không tự tải lên.",
+      "steps": [
+        "Chọn bài viết và loại vấn đề rồi nhấn Tạo bản xem trước chẩn đoán. Mặc định chỉ chứa mã tính năng và kết quả cố định cùng thời gian tạo.",
+        "Có thể thêm phiên bản ứng dụng, cấp API, loại thiết bị và giao diện. Các trường được phép này chỉ được đọc khi tạo bản xem trước. Không bao gồm số sê-ri, mã định danh hệ thống đầy đủ hay dữ liệu tài khoản.",
+        "Kiểm tra trước khi sao chép vào bộ nhớ tạm. Hệ thống hoặc ứng dụng được cấp quyền khác có thể đọc bộ nhớ tạm; trang này không đọc nội dung có sẵn. Rời trang sẽ bỏ bản xem trước.",
+        "Nếu báo lỗi cho dự án, mô tả riêng các bước tái hiện cùng kết quả mong đợi và thực tế. Kiểm tra chữ và ảnh tự thêm; không đính kèm cookie, UID, bản sao lưu hay liên kết đăng nhập."
+      ],
+      "keywords": "diagnostics feedback clipboard privacy sanitized export cookie token 诊断 診斷 隐私 隱私 剪贴板 剪貼簿",
+      "route": ""
+    }
+  ],
+  "labels": {
+    "title": "Trợ giúp và chẩn đoán",
+    "search": "Tìm vấn đề, tính năng hoặc định dạng tệp",
+    "scope": "Ngôn ngữ chỉ áp dụng cho trợ giúp và thông báo chung đã tích hợp. Giao diện khác và văn bản game giữ ngôn ngữ gốc.",
+    "fallback": "Ngôn ngữ hệ thống chưa được hỗ trợ. Trợ giúp hiển thị bằng tiếng Anh.",
+    "system": "Theo hệ thống",
+    "language": "Ngôn ngữ trợ giúp",
+    "empty": "Không tìm thấy bài viết. Thử tên tính năng hoặc từ như UIGF hay sao lưu.",
+    "choose": "Chọn bài viết để xem các bước thao tác",
+    "back": "Tất cả bài viết",
+    "open": "Mở trang liên quan",
+    "diagnostics": "Bản xem trước chẩn đoán",
+    "privacy": "Chỉ trường được phép. Không đọc tài khoản, UID, thông tin xác thực, bộ nhớ tạm hoặc nhật ký; không tự tải lên.",
+    "environment": "Thêm phiên bản, API, loại thiết bị và giao diện (đọc lúc tạo)",
+    "generate": "Tạo bản xem trước chẩn đoán",
+    "copy": "Sao chép bản xem trước đã kiểm tra",
+    "clear": "Bỏ bản xem trước",
+    "problem": "Chọn loại vấn đề (không tự sửa)",
+    "general": "Lỗi thao tác khác",
+    "network": "Mạng không khả dụng",
+    "permission": "Vấn đề quyền truy cập",
+    "file": "Tệp không hợp lệ",
+    "login": "Phiên hết hạn",
+    "unsupported": "Thao tác không khả dụng",
+    "readFirst": "Kiểm tra trước. Sao chép sẽ ghi vào bộ nhớ tạm hệ thống, không gửi phản hồi.",
+    "local": "Trợ giúp ngoại tuyến trên thiết bị · Không cần đăng nhập"
+  },
+  "outcomes": {
+    "None": "",
+    "Preparing": "Đang chuẩn bị. Vui lòng chờ.",
+    "Ready": "Sẵn sàng. Kiểm tra bản xem trước trước khi tiếp tục.",
+    "Cancelled": "Đã hủy. Kiểm tra trạng thái trang trước khi thử lại.",
+    "InvalidFile": "Tệp không hợp lệ hoặc không được hỗ trợ. Kiểm tra định dạng, kích thước và phiên bản xuất.",
+    "ImportFailed": "Chưa nhập xong. Kiểm tra tệp và kho đích trước khi thử lại.",
+    "ImportComplete": "Nhập xong: đã thêm {count} bản ghi.",
+    "ExportFailed": "Chưa xuất xong. Kiểm tra quyền ghi tại đích rồi thử lại.",
+    "ExportComplete": "Xuất xong. Giữ tệp an toàn.",
+    "Busy": "Đang có thao tác chạy. Chờ hoàn tất hoặc hủy trước.",
+    "NetworkUnavailable": "Mạng không khả dụng. Kiểm tra kết nối rồi tự thử lại.",
+    "PermissionRequired": "Cần quyền hệ thống. Xem yêu cầu và quyết định có cho phép không.",
+    "LoginExpired": "Phiên có thể đã hết hạn. Kiểm tra tài khoản và máy chủ rồi đăng nhập lại.",
+    "Unsupported": "Thao tác hiện không khả dụng. Xem giới hạn thiết bị và trợ giúp.",
+    "CopyComplete": "Đã sao chép. Kiểm tra nội dung lần nữa trước khi chia sẻ.",
+    "CopyFailed": "Không sao chép được. Kiểm tra quyền truy cập bộ nhớ tạm rồi thử lại.",
+    "Failed": "Thao tác chưa hoàn tất. Xem trợ giúp liên quan rồi tự thử lại.",
+    "LocaleFailed": "Chưa áp dụng ngôn ngữ. Vui lòng thử lại sau."
+  }
+}

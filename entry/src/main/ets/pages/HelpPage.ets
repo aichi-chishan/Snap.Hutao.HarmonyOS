@@ -2,6 +2,7 @@ import { router } from '@kit.ArkUI';
 import { PageHeader } from '../components/PageHeader';
 import { HelpDocument } from '../model/HelpDocument';
 import { HelpText } from '../model/HelpText';
+import { LocalePolicy } from '../model/LocalePolicy';
 import { CommonOutcome, CommonOutcomeId } from '../model/CommonOutcome';
 import { AppLocaleService } from '../service/AppLocaleService';
 import { HelpViewModel } from '../viewmodel/HelpViewModel';
@@ -20,7 +21,7 @@ export struct HelpPage {
   @State isWide: boolean = false;
   private attached: boolean = false;
   private pageSequence: number = 0;
-  private localeKeys: string[] = ['system', 'zh-Hans', 'zh-Hant', 'en'];
+  private localeKeys: string[] = ['system'].concat(LocalePolicy.locales());
   private issues: CommonOutcomeId[] = [CommonOutcomeId.Failed, CommonOutcomeId.NetworkUnavailable,
     CommonOutcomeId.PermissionRequired, CommonOutcomeId.InvalidFile, CommonOutcomeId.LoginExpired, CommonOutcomeId.Unsupported];
 
@@ -44,7 +45,9 @@ export struct HelpPage {
   private sync(): void { this.selected = this.vm.selected(); this.previewText = this.vm.previewText(); }
   private label(key: string): string { return HelpText.text(key, this.vm.locale); }
   private locales(): SelectOption[] {
-    return [{ value: this.label('system') }, { value: '简体中文' }, { value: '繁體中文' }, { value: 'English' }];
+    const options: SelectOption[] = [{ value: this.label('system') }];
+    for (const locale of LocalePolicy.locales()) { options.push({ value: LocalePolicy.nativeName(locale) }); }
+    return options;
   }
   private issueOptions(): SelectOption[] {
     return [{ value: this.label('general') }, { value: this.label('network') }, { value: this.label('permission') },

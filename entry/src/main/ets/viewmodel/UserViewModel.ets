@@ -1,14 +1,7 @@
-/**
- * UserViewModel.ets
- * 账号管理页状态容器：账号列表、当前账号、角色绑定、切换/删除/刷新命令。
- */
+/** Account-page state. Only UserService owns selected account/UID publication. */
 import { UserService } from '../service/UserService';
 import { UserRepo } from '../data/repo/UserRepo';
 import { User } from '../model/User';
-import { UserGameRole } from '../model/UserGameRole';
-import { Logger } from '../common/Logger';
-
-const TAG: string = 'UserViewModel';
 
 @Observed
 export class UserViewModel {
@@ -17,88 +10,67 @@ export class UserViewModel {
   currentUid: string = '';
   loading: boolean = false;
   message: string = '';
+  private loadRevision: number = 0;
 
-  /** 加载账号列表与当前账号 */
   async load(): Promise<void> {
+    const request: number = ++this.loadRevision;
+    const service: UserService = UserService.getInstance();
+    const revision: number = service.sessionRevision();
     this.loading = true;
     try {
-      this.users = await UserRepo.getAllUsers();
-      const cur: User | undefined = this.currentUser;
-      if (cur !== undefined) {
-        this.currentUser = await UserRepo.getUserById(cur.id);
-      } else {
-        this.currentUser = await UserRepo.getCurrentUser();
-      }
-      this.currentUid = this.currentUser !== undefined ? await this.resolveDefaultUid(this.currentUser) : '';
+      const users: User[] = await UserRepo.getAllUsers();
+      if (request !== this.loadRevision || revision !== service.sessionRevision()) { return; }
+      this.users = users;
+      this.currentUser = service.getCurrentUser();
+      this.currentUid = this.defaultUid(this.currentUser);
     } catch (e) {
-      this.message = (e as Error).message;
+      if (request === this.loadRevision && revision === service.sessionRevision()) {
+        this.message = (e as Error).message;
+      }
     } finally {
-      this.loading = false;
+      if (request === this.loadRevision) { this.loading = false; }
     }
   }
 
-  /** 取默认 UID；未设置时自动绑定第一个角色并落库（对齐 Windows 首次进入即绑定） */
-  private async resolveDefaultUid(user: User): Promise<string> {
-    if (user.roles.length === 0) {
-      return '';
-    }
-    for (let i = 0; i < user.roles.length; i++) {
-      if (user.roles[i].isDefault) {
-        return user.roles[i].gameUid;
-      }
-    }
-    const auto: string = user.roles[0].gameUid;
-    try {
-      await UserRepo.setDefaultUid(user.id, auto);
-      user.roles[0].isDefault = true;
-      AppStorage.setOrCreate<string>('currentUid', auto);
-    } catch (e) {
-      Logger.warn(TAG, `auto bind default uid fail: ${(e as Error).message}`);
-    }
-    return auto;
+  /** Read-only: displaying an account list never changes global or durable selection. */
+  private defaultUid(user: User | undefined): string {
+    if (user === undefined) { return ''; }
+    for (const role of user.roles) { if (role.isDefault) { return role.gameUid; } }
+    return user.roles.length > 0 ? user.roles[0].gameUid : '';
   }
 
-  /** 选中某账号并同步全局态 */
   async switchUser(userId: number): Promise<void> {
+    this.loadRevision++;
     await UserService.getInstance().switchUser(userId);
-    this.currentUser = await UserRepo.getUserById(userId);
-    this.currentUid = this.currentUser !== undefined ? await this.resolveDefaultUid(this.currentUser) : '';
     await this.load();
   }
 
   async deleteUser(userId: number): Promise<void> {
+    this.loadRevision++;
     await UserService.getInstance().deleteUser(userId);
-    if (this.currentUser !== undefined && this.currentUser.id === userId) {
-      this.currentUser = undefined;
-      this.currentUid = '';
-    }
     await this.load();
   }
 
-  /** 刷新当前账号角色列表，返回拉取到的角色数（供 UI 判断提示） */
   async refreshRoles(): Promise<number> {
-    if (this.currentUser === undefined) {
-      return 0;
-    }
+    const service: UserService = UserService.getInstance();
+    const selected: User | undefined = service.getCurrentUser();
+    if (this.currentUser === undefined || selected === undefined || this.currentUser.id !== selected.id) { return 0; }
+    const request: number = ++this.loadRevision;
     this.loading = true;
     try {
-      const roles: UserGameRole[] = await UserService.getInstance().fetchAndStoreRoles(this.currentUser);
-      this.currentUser.roles = roles;
-      this.currentUid = await this.resolveDefaultUid(this.currentUser);
+      await service.refreshRolesOfCurrent();
       await this.load();
-      return roles.length;
+      return this.currentUser === undefined ? 0 : this.currentUser.roles.length;
     } finally {
-      this.loading = false;
+      if (request === this.loadRevision) { this.loading = false; }
     }
   }
 
-  /** 设置默认 UID */
   async setDefaultUid(uid: string): Promise<void> {
-    if (this.currentUser === undefined) {
-      return;
-    }
-    await UserService.getInstance().setDefaultUid(this.currentUser.id, uid);
-    this.currentUser.roles = await UserRepo.getRolesByUserId(this.currentUser.id);
-    this.currentUid = uid;
+    const user: User | undefined = this.currentUser;
+    if (user === undefined) { return; }
+    this.loadRevision++;
+    await UserService.getInstance().setDefaultUid(user.id, uid);
+    await this.load();
   }
 }

@@ -6,6 +6,9 @@
 import { formProvider, formBindingData, formInfo } from '@kit.FormKit';
 import { User } from '../model/User';
 import { UserRepo } from '../data/repo/UserRepo';
+import { UserGameRole } from '../model/UserGameRole';
+import { BackgroundTaskRepo } from '../data/repo/BackgroundTaskRepo';
+import { AppContextProvider } from '../common/AppContext';
 import { HoyolabEndpoints } from '../common/HoyolabEndpoints';
 import { ServerTime } from '../common/ServerTime';
 import { DailyNoteReminderService } from './DailyNoteReminderService';
@@ -15,13 +18,14 @@ import { ApiResponse } from '../model/ApiResponse';
 import { DailyNoteWebhookClient } from '../data/network/DailyNoteWebhookClient';
 import { DailyNoteRepo, DailyNoteRecord } from '../data/repo/DailyNoteRepo';
 import { NotificationHelper } from '../data/local/NotificationHelper';
-import { FormSnapshot } from '../data/local/FormSnapshot';
+import { FormSnapshot, FormSnapshotOwner } from '../data/local/FormSnapshot';
 import { DailyNote } from '../model/DailyNote';
 import { DAILY_NOTE_PATH } from '../data/network/CardVerifyApi';
 import { RiskVerifier } from '../data/network/RiskVerifier';
 import { RegionUtil, RetCodes } from '../common/Constants';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { Logger } from '../common/Logger';
+import { BackgroundTaskGuard, BackgroundTaskKind, BackgroundTaskPolicy, BackgroundTaskResult } from '../model/BackgroundTask';
 
 const TAG: string = 'DailyNoteService';
 
@@ -61,6 +65,18 @@ export class NotifyFlags {
 export const KEY_NOTE_VERSION: string = 'dailyNoteVersion';
 /** AppStorage 键：最近一次后台刷新失败原因（供页面提示；成功刷新后清空） */
 export const KEY_NOTE_ERROR: string = 'dailyNoteLastError';
+
+class ForegroundNotePresentationGuard implements BackgroundTaskGuard {
+  private user: User;
+  private uid: string;
+  private revision: number;
+  constructor(user: User, uid: string, revision: number) { this.user = user; this.uid = uid; this.revision = revision; }
+  async isActive(): Promise<boolean> {
+    return UserService.getInstance().sessionRevision() === this.revision &&
+      !UserService.getInstance().isSessionTransitionPending() && UserService.getInstance().getCurrentUser() === this.user &&
+      PreferencesStore.getCurrentUid() === this.uid && PreferencesStore.getBackupJournal().length === 0;
+  }
+}
 
 export class DailyNoteService {
   private static instance: DailyNoteService = new DailyNoteService();
@@ -104,16 +120,28 @@ export class DailyNoteService {
     }
   }
 
-  /** 桌面卡片手动刷新：带超时的刷新（命中需 UI 的风控时不无限挂起卡片进程） */
-  async refreshForCard(uid: string, timeoutMs: number): Promise<DailyNote> {
-    const work: Promise<DailyNote> = this.refresh(uid, undefined, false);
-    const limit: Promise<DailyNote> = new Promise<DailyNote>((resolve: (v: DailyNote) => void,
-      reject: (e: Error) => void) => {
-      setTimeout(() => {
-        reject(new Error('刷新超时'));
-      }, timeoutMs);
-    });
-    return Promise.race<DailyNote>([work, limit]);
+  /** Native deferred work: explicit owner, one request, no token exchange, verification, permission or webhook path. */
+  async refreshBackground(user: User, uid: string, region: string, guard: BackgroundTaskGuard): Promise<BackgroundTaskResult> {
+    if (!BackgroundTaskPolicy.owns(user, uid, region) || user.cookieToken.length === 0 || user.gameRecordCookie().length === 0) {
+      return BackgroundTaskResult.of('login_required', '请在应用内补齐登录凭据后重新排队');
+    }
+    if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
+    const extra: Record<string, string> = {};
+    const response: ApiResponse = await HoyolabClient.fetchDailyNote(uid, region, user.gameRecordCookie(), extra);
+    if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
+    const blocked: BackgroundTaskResult | undefined = BackgroundTaskPolicy.resultForResponse(response);
+    if (blocked !== undefined) { return blocked; }
+    if (response.data === undefined) { return BackgroundTaskResult.of('retry', '便笺响应为空，等待下次调度'); }
+    const note: DailyNote = DailyNote.fromJson(response.data);
+    note.refreshTime = Date.now();
+    if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
+    await DailyNoteRepo.upsert(user.id, uid, note, (): Promise<boolean> => guard.isActive());
+    if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
+    DailyNoteService.bumpVersion();
+    // Native work refreshes the current binding's form snapshot. Notifications/reminders are
+    // deliberately left to their already-authorized foreground flow; no permission UI can run here.
+    await this.updateCardSnapshot(note, user.displayName, user.id, uid, guard, true);
+    return BackgroundTaskResult.of('success', '后台便笺已刷新', BackgroundTaskPolicy.day(region));
   }
 
   /**
@@ -152,12 +180,14 @@ export class DailyNoteService {
 
   /** 实际刷新流程：网络拉取 → 落库 → 广播版本戳 → 卡片快照 → 阈值通知 */
   private async doRefresh(uid: string, challenge?: string, interactive: boolean = true, account?: User): Promise<DailyNote> {
+    const revision: number = UserService.getInstance().sessionRevision();
     const user: User | undefined = account ?? UserService.getInstance().getCurrentUser();
     if (user === undefined || !user.hasCookie()) {
       throw new Error('请先登录');
     }
     // 若缺 cookie_token/ltoken（旧账号），先用 SToken 补齐再拉取
     if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
+      if (!interactive) { throw new Error('请打开应用补齐登录凭据'); }
       await UserService.getInstance().completeTokenChainPublic(user);
     }
     const region: string = RegionUtil.regionOfUid(uid);
@@ -191,6 +221,7 @@ export class DailyNoteService {
     }
     // Cookie 鉴权失效（-100/10001）：强制换新凭证后重试一次（对齐 Windows CookieToken 刷新）
     if (!resp.success && UserService.isCookieAuthError(resp)) {
+      if (!interactive) { throw new Error('请打开应用重新登录'); }
       resp = await UserService.retryWithRefreshedCookie(user, (): Promise<ApiResponse> => {
         const retryExtra: Record<string, string> = {};
         for (const k of Object.keys(extra)) {
@@ -225,7 +256,8 @@ export class DailyNoteService {
     // 默认桌面卡绑定当前 UID；刷新追踪 UID 不能覆盖当前账号的卡片。
     const currentUser = UserService.getInstance().getCurrentUser();
     if (currentUser !== undefined && user.id === currentUser.id && uid === PreferencesStore.getCurrentUid()) {
-      await this.updateCardSnapshot(note, user.displayName);
+      await this.updateCardSnapshot(note, user.displayName, user.id, uid,
+        new ForegroundNotePresentationGuard(user, uid, revision));
     }
 
     await this.evalAndNotify(user.id, uid, note, prev);
@@ -249,7 +281,8 @@ export class DailyNoteService {
   }
 
   /** 刷新成功后更新桌面卡片快照并主动推送 formProvider */
-  private async updateCardSnapshot(note: DailyNote, nickname: string): Promise<void> {
+  private async updateCardSnapshot(note: DailyNote, nickname: string, userId: number, uid: string,
+    guard: BackgroundTaskGuard, strict: boolean = false): Promise<void> {
     try {
       let expText: string = '派遣 --';
       if (note.maxExpeditionNum > 0) {
@@ -261,27 +294,75 @@ export class DailyNoteService {
         : '每日 --';
       const homeCoin: string = note.maxHomeCoin > 0 ? `洞天宝钱 ${note.currentHomeCoin}/${note.maxHomeCoin}` : '';
       const resinRecovery: string = note.resinRecoveryText();
+      await BackgroundTaskRepo.init(AppContextProvider.getAppContext());
+      const epoch: number = (await BackgroundTaskRepo.get(BackgroundTaskKind.DAILY_NOTE)).epoch;
+      if (!await guard.isActive()) { return; }
       FormSnapshot.save(`${note.currentResin}`, `${note.maxResin}`, expText, daily, homeCoin, nickname,
-        note.refreshTime, resinRecovery);
-      await this.pushAllCards();
+        note.refreshTime, resinRecovery, userId, uid, epoch);
+      if (!await guard.isActive()) {
+        const owner: FormSnapshotOwner = FormSnapshot.owner();
+        if (owner.userId === userId && owner.uid === uid && owner.epoch === epoch) { FormSnapshot.clear(); }
+        return;
+      }
+      await this.pushAllCards(guard);
     } catch (e) {
-      Logger.warn(TAG, `updateCardSnapshot fail ${(e as Error).message}`);
+      if (strict) { throw new Error('卡片缓存更新未完成'); }
+      Logger.warn(TAG, 'card snapshot update failed');
     }
   }
 
-  /** 主动刷新全部本应用桌面卡片 */
-  private async pushAllCards(): Promise<void> {
-    const bindFormData: formBindingData.FormBindingData = formBindingData.createFormBindingData(FormSnapshot.load());
+  /** Local/session-transition hook: failure to clear durable snapshot is not swallowed. */
+  async clearCardSnapshot(): Promise<void> {
+    FormSnapshot.clear();
+    await this.pushAllCards(undefined, true);
+  }
+
+  /** Cached-only widget updates must validate the owner and operational epoch before displaying any data. */
+  async cardDataForCurrentOwner(): Promise<Record<string, string>> {
+    const empty: Record<string, string> = FormSnapshot.empty();
+    try {
+      if (UserService.getInstance().isSessionTransitionPending() || PreferencesStore.getBackupJournal().length > 0) { return empty; }
+      const owner: FormSnapshotOwner = FormSnapshot.owner();
+      if (owner.userId <= 0 || owner.uid.length === 0 || owner.epoch < 0) { return empty; }
+      if ((await BackgroundTaskRepo.get(BackgroundTaskKind.DAILY_NOTE)).epoch !== owner.epoch ||
+        await UserRepo.getSelectedUserId() !== owner.userId) { return empty; }
+      const user: User | undefined = await UserRepo.getUserById(owner.userId);
+      const role: UserGameRole | undefined = await UserRepo.getDefaultRole(owner.userId);
+      if (user === undefined || role === undefined || role.gameUid !== owner.uid ||
+        !BackgroundTaskPolicy.owns(user, owner.uid, role.region)) { return empty; }
+      const currentOwner: FormSnapshotOwner = FormSnapshot.owner();
+      if (currentOwner.userId !== owner.userId || currentOwner.uid !== owner.uid || currentOwner.epoch !== owner.epoch ||
+        (await BackgroundTaskRepo.get(BackgroundTaskKind.DAILY_NOTE)).epoch !== owner.epoch ||
+        await UserRepo.getSelectedUserId() !== owner.userId || UserService.getInstance().isSessionTransitionPending() ||
+        PreferencesStore.getBackupJournal().length > 0) { return empty; }
+      return FormSnapshot.load();
+    } catch (e) { return empty; }
+  }
+
+  /** Recheck after platform await so an in-flight old update is corrected after logout/reset. */
+  async publishCard(formId: string, tip: string = '', guard?: BackgroundTaskGuard): Promise<void> {
+    if (guard !== undefined && !await guard.isActive()) { return; }
+    const data: Record<string, string> = await this.cardDataForCurrentOwner();
+    if (guard !== undefined && !await guard.isActive()) { return; }
+    data['tipText'] = tip;
+    await formProvider.updateForm(formId, formBindingData.createFormBindingData(data));
+    const latest: Record<string, string> = await this.cardDataForCurrentOwner();
+    latest['tipText'] = guard !== undefined && !await guard.isActive() ? '' : tip;
+    if (JSON.stringify(latest) !== JSON.stringify(data)) {
+      await formProvider.updateForm(formId, formBindingData.createFormBindingData(latest));
+    }
+  }
+
+  private async pushAllCards(guard?: BackgroundTaskGuard, strict: boolean = false): Promise<void> {
     try {
       const forms: Array<formInfo.RunningFormInfo> = await formProvider.getPublishedRunningFormInfos();
-      for (let i = 0; i < forms.length; i++) {
-        const fid: string = forms[i].formId;
-        if (fid.length > 0) {
-          await formProvider.updateForm(fid, bindFormData);
-        }
+      for (const form of forms) {
+        if (guard !== undefined && !await guard.isActive()) { return; }
+        if (form.formId.length > 0) { await this.publishCard(form.formId, '', guard); }
       }
     } catch (e) {
-      Logger.warn(TAG, 'pushAllCards fail (可能未添加卡片)');
+      if (strict) { throw new Error('桌面卡片清理未完成，请重试'); }
+      Logger.warn(TAG, 'card update unavailable');
     }
   }
 

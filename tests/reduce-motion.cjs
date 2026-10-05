@@ -66,10 +66,11 @@ const mocks = {
     if (recoveryValue !== undefined) live.set('app.reduce_motion', recoveryValue);
   } }) } },
   GameDataService: { GameDataService: { initializeSnapshot: async () => {} } },
+  BackgroundTaskService: { BackgroundTaskService: { init: async () => {}, reconcile: async () => {}, reset: async () => {}, stopAndInvalidate: async () => true } },
   NotificationHelper: { NotificationHelper: { init: async () => {} } },
-  UserService: { UserService: { getInstance: () => ({ restoreSession: async () => {} }) } },
+  UserService: { UserService: { getInstance: () => ({ setSessionInvalidationHook() {}, restoreSession: async () => true }) } },
   AutoSignInService: { AutoSignInService: { getInstance: () => ({ bootstrapAutoSignIn: async () => {} }) } },
-  DailyNoteService: { DailyNoteService: { getInstance: () => ({ bootstrapAutoRefresh: async () => {} }) } },
+  DailyNoteService: { DailyNoteService: { getInstance: () => ({ bootstrapAutoRefresh: async () => {}, clearCardSnapshot: async () => {} }) } },
   RiskVerifyModal: {},
 };
 function compile(text, name, resolve) {
@@ -120,19 +121,23 @@ function load(name) {
   } };
   prefs.prefs = undefined;
   appValues.clear();
+  EntryAbility.runtimeInitialization = undefined; // A new process, not another window in the same runtime.
   await EntryAbility.bootstrap(ability, stage);
   assert.equal(startupValues.at(-1), true, 'persisted preference is restored before the first page loads');
   recoveryValue = false;
+  EntryAbility.runtimeInitialization = undefined; // A new process, not another window in the same runtime.
   await EntryAbility.bootstrap(ability, stage);
   assert.equal(startupValues.at(-1), false, 'interrupted backup recovery wins over the earlier preference');
   recoveryValue = undefined;
   live.set('app.reduce_motion', true);
   failDatabase = true;
+  EntryAbility.runtimeInitialization = undefined; // A new process, not another window in the same runtime.
   await EntryAbility.bootstrap(ability, stage);
   assert.equal(startupValues.at(-1), true, 'an unrelated database failure does not lose the preference');
   failDatabase = false;
   failInit = true;
   prefs.prefs = undefined;
+  EntryAbility.runtimeInitialization = undefined; // A new process, not another window in the same runtime.
   await EntryAbility.bootstrap(ability, stage);
   assert.equal(startupValues.at(-1), false, 'a missing preference store has a safe deterministic fallback');
   failInit = false;

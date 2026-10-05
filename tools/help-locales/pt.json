@@ -1,0 +1,143 @@
+{
+  "locale": "pt",
+  "articles": [
+    {
+      "id": "accounts",
+      "title": "Contas, início de sessão e verificação",
+      "summary": "Confirme primeiro a conta, o servidor e a personagem. Credenciais expiradas exigem novo início de sessão; abrir a ajuda não lê dados de contas.",
+      "steps": [
+        "Em Contas e dados, confirme a conta atual e a personagem predefinida; volte à página online e atualize manualmente. Selecionar uma conta aqui não muda a conta do cliente do jogo.",
+        "Se a sessão expirar, inicie sessão novamente com um método suportado na página de início de sessão. Complete pessoalmente CAPTCHA e verificações adicionais no respetivo ecrã; evite tentativas rápidas e repetidas.",
+        "Se o servidor ou a personagem não corresponder, selecione primeiro a personagem correta. A região dos anúncios públicos é independente da conta pessoal.",
+        "Nunca inclua cookies, palavras-passe, códigos de verificação ou ligações authkey em relatos. Os diagnósticos não contêm estes dados."
+      ],
+      "keywords": "login account region UID cookie captcha 登录 登入 帳號 账号 验证 credentials contraseña şifre điện thoại",
+      "route": "pages/UserPage"
+    },
+    {
+      "id": "import",
+      "title": "Arquivos locais e importação de ficheiros",
+      "summary": "Orações, conquistas e inventário usam formatos distintos. Confirme formato, destino e pré-visualização antes de autorizar a escrita.",
+      "steps": [
+        "Use UIGF para Orações, UIAF para conquistas e UIIF v1.0 para inventário. Mudar a extensão não converte um ficheiro; guarde primeiro uma cópia do original.",
+        "Para Orações, reveja UID, número de registos e arquivos selecionados na pré-visualização. Uma seleção vazia não significa importar tudo; selecione explicitamente os arquivos necessários.",
+        "A importação do inventário substitui o arquivo local escolhido. Confirme antes pré-visualização e destino. Não lê a memória do jogo nem altera objetos no jogo.",
+        "Se o ficheiro estiver danificado ou o formato ou tamanho não for suportado, confirme a ferramenta e versão de exportação e volte a exportar um ficheiro compatível. Ficheiros originais e erros podem conter dados privados; não os publique diretamente."
+      ],
+      "keywords": "UIGF UIAF UIIF JSON import export inventory wishes archive 导入 导出 匯入 匯出 背包 成就 祈愿 祈願",
+      "route": ""
+    },
+    {
+      "id": "data",
+      "title": "Atualização dos dados e alternativa offline",
+      "summary": "Os metadados incluídos estão disponíveis offline. As atualizações só são ativadas após validação; interrupções ou falhas não significam sucesso.",
+      "steps": [
+        "Consulte a secção de atualização dos dados do jogo nas Definições e inicie explicitamente a atualização. Se a rede falhar, mantenha os dados utilizáveis e confirme a ligação antes de repetir.",
+        "O progresso da transferência não é uma versão ativada. Aguarde a conclusão; após cancelar, deixe terminar a operação antes de iniciar outra.",
+        "Se faltar um ícone ou descrição, confirme a versão dos dados e reabra a página. Não apague a base de dados nem credenciais para resolver recursos em falta.",
+        "A pesquisa de ajuda é totalmente offline. O idioma cobre apenas ajuda e mensagens gerais integradas, não todas as páginas nem textos de jogo de terceiros; nunca altera ID estáveis importados ou exportados."
+      ],
+      "keywords": "metadata cache update offline rollback checksum 图鉴 圖鑑 数据 資料 更新 缓存 快取",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "backups",
+      "title": "Cópias de segurança, restauro e recuperação",
+      "summary": "As cópias completas podem conter credenciais e dados pessoais do jogo. São diferentes dos diagnósticos sem dados de contas.",
+      "steps": [
+        "Exporte explicitamente uma cópia nas Definições e guarde-a num local seguro que controle. Nunca anexe uma cópia completa a um relato público; prepare uma cópia separada sem dados privados antes de partilhar.",
+        "Antes de restaurar, exporte os dados atuais e confirme origem, versão e aviso de substituição da cópia. O restauro altera dados locais e requer a sua confirmação.",
+        "Se a cópia vier de uma versão mais recente, atualize primeiro a aplicação. Não reduza manualmente o número de versão; obtenha ficheiros danificados a partir de uma cópia fiável.",
+        "Se um restauro interrompido precisar de recuperação, reinicie a aplicação para o processo de arranque tratar o diário de recuperação. Não limpe manualmente a base de dados nem credenciais. Se continuar a falhar, gere diagnósticos sem dados de contas e descreva os passos."
+      ],
+      "keywords": "backup restore recovery credentials password 备份 还原 恢复 備份 還原 復原",
+      "route": "pages/SettingPage"
+    },
+    {
+      "id": "daily-note",
+      "title": "Notas em tempo real, widgets e lembretes",
+      "summary": "Os widgets mostram o último instantâneo guardado, sem garantir dados em direto. Confirme a hora da atualização antes de confiar neles.",
+      "steps": [
+        "Volte à aplicação, confirme conta e personagem e atualize as notas manualmente. Verifique a hora do widget para não confundir um instantâneo antigo com o estado atual do jogo.",
+        "Ative lembretes nas Definições conforme necessário e responda ao pedido de permissão. Se recusou o acesso, decide se o concede posteriormente nas definições do sistema.",
+        "O sistema pode limitar atualizações em segundo plano e horários dos lembretes. A aplicação não garante execução contínua em segundo plano nem precisão ao segundo.",
+        "Depois de mudar de conta, aguarde a atualização bem-sucedida da nova personagem e confirme o widget. Uma alcunha igual não identifica, por si só, a mesma personagem."
+      ],
+      "keywords": "resin widget reminder background refresh daily note notification 便笺 便箋 桌面 卡片 提醒 树脂 樹脂",
+      "route": ""
+    },
+    {
+      "id": "devices",
+      "title": "Limites dos dispositivos e acessos ao jogo",
+      "summary": "Para telemóveis, tablets e dispositivos 2 em 1 desde a API 24. A disposição depende da largura do conteúdo; alguns efeitos exigem uma API mais recente.",
+      "steps": [
+        "Após redimensionar ou rodar, uma área estreita pode continuar numa coluna. Duas colunas dependem da largura do conteúdo, não do nome do dispositivo. Tema e movimento reduzido estão nas Definições.",
+        "Para iniciar um jogo, configure uma URI ou entrada Bundle/Ability publicamente documentada pelo fornecedor. Verifique a origem e inicie explicitamente. A aplicação não procura arbitrariamente jogos instalados.",
+        "Uma falha ao iniciar pode indicar uma aplicação ausente, entrada alterada ou privada. Não prova que o jogo esteja desinstalado; confirme com o método de instalação ou início do fornecedor.",
+        "Use o cliente oficial para instalação, reparação, pré-transferência e mudança de conta do jogo. Esta ferramenta não injeta processos nem lê a memória do jogo; funções exclusivas de computador não são garantidas no HarmonyOS."
+      ],
+      "keywords": "HarmonyOS API24 API26 phone tablet 2in1 launcher device launch 游戏 啟動 启动 设备 裝置",
+      "route": "pages/LaunchGamePage"
+    },
+    {
+      "id": "privacy",
+      "title": "Diagnósticos, privacidade e relatos",
+      "summary": "Reveja a pré-visualização antes de copiar explicitamente. Os diagnósticos nunca leem credenciais, UID, contas de rede ou registos brutos e nunca são enviados automaticamente.",
+      "steps": [
+        "Selecione artigo e tipo de problema e escolha Gerar pré-visualização de diagnóstico. Por predefinição, inclui apenas códigos fixos da função e do resultado, além da hora de geração.",
+        "Pode incluir versão da aplicação, nível de API, categoria do dispositivo e tema. Estes campos permitidos são lidos apenas ao gerar. Números de série, identificadores completos do sistema e dados de contas são excluídos.",
+        "Confira a pré-visualização antes de a copiar para a área de transferência. O sistema ou outras aplicações autorizadas podem lê-la; esta página não lê conteúdos existentes. Sair da página descarta a pré-visualização.",
+        "Para relatar um problema ao projeto, descreva separadamente os passos de reprodução e resultados esperado e real. Reveja textos e capturas adicionados; não anexe cookies, UID, cópias de segurança nem ligações de início de sessão."
+      ],
+      "keywords": "diagnostics feedback clipboard privacy sanitized export cookie token 诊断 診斷 隐私 隱私 剪贴板 剪貼簿",
+      "route": ""
+    }
+  ],
+  "labels": {
+    "title": "Ajuda e diagnósticos",
+    "search": "Pesquisar problema, função ou formato de ficheiro",
+    "scope": "O idioma aplica-se apenas à ajuda e às mensagens gerais integradas. A restante interface e os textos do jogo mantêm o idioma original.",
+    "fallback": "O idioma do sistema ainda não é suportado. A ajuda é apresentada em inglês.",
+    "system": "Seguir o sistema",
+    "language": "Idioma da ajuda",
+    "empty": "Nenhum artigo encontrado. Experimente uma função ou termos como UIGF ou cópia de segurança.",
+    "choose": "Selecione um artigo para ver os passos",
+    "back": "Todos os artigos",
+    "open": "Abrir página relacionada",
+    "diagnostics": "Pré-visualização de diagnóstico",
+    "privacy": "Apenas campos permitidos. Sem leitura de contas, UID, credenciais, área de transferência ou registos; sem envio automático.",
+    "environment": "Incluir versão, API, categoria do dispositivo e tema (lidos ao gerar)",
+    "generate": "Gerar pré-visualização de diagnóstico",
+    "copy": "Copiar pré-visualização revista",
+    "clear": "Descartar pré-visualização",
+    "problem": "Selecionar tipo de problema (sem correções automáticas)",
+    "general": "Outra falha de operação",
+    "network": "Rede indisponível",
+    "permission": "Problema de permissão",
+    "file": "Ficheiro inválido",
+    "login": "Sessão expirada",
+    "unsupported": "Operação indisponível",
+    "readFirst": "Reveja primeiro. Copiar escreve na área de transferência do sistema; não envia relatos.",
+    "local": "Ajuda offline neste dispositivo · Sem início de sessão"
+  },
+  "outcomes": {
+    "None": "",
+    "Preparing": "A preparar. Aguarde.",
+    "Ready": "Pronto. Reveja a pré-visualização antes de continuar.",
+    "Cancelled": "Cancelado. Confira o estado atual da página antes de repetir.",
+    "InvalidFile": "Ficheiro inválido ou não suportado. Confira formato, tamanho e versão de exportação.",
+    "ImportFailed": "Importação incompleta. Confira ficheiro e arquivo de destino antes de repetir.",
+    "ImportComplete": "Importação concluída: {count} registos adicionados.",
+    "ExportFailed": "Exportação incompleta. Confira o acesso de escrita ao destino e repita.",
+    "ExportComplete": "Exportação concluída. Guarde o ficheiro em segurança.",
+    "Busy": "Há uma operação em curso. Aguarde a conclusão ou cancele-a primeiro.",
+    "NetworkUnavailable": "Rede indisponível. Confira a ligação e tente novamente manualmente.",
+    "PermissionRequired": "É necessária permissão do sistema. Reveja o pedido e decida se autoriza.",
+    "LoginExpired": "A sessão pode ter expirado. Confira conta e servidor e inicie sessão novamente.",
+    "Unsupported": "Esta operação está indisponível. Consulte os limites do dispositivo e a ajuda.",
+    "CopyComplete": "Copiado. Reveja novamente o conteúdo antes de partilhar.",
+    "CopyFailed": "Não foi possível copiar. Confira o acesso à área de transferência e repita.",
+    "Failed": "A operação não foi concluída. Consulte a ajuda relacionada e repita manualmente.",
+    "LocaleFailed": "O idioma não foi aplicado. Tente novamente mais tarde."
+  }
+}

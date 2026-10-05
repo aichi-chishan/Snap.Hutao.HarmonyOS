@@ -91,3 +91,20 @@ function strictCloudTypes(){
   const {state,service}=harness();await service.initialize();const gate=deferred();state.encryptGate=gate;const pending=service.authenticate('private-user@example.invalid','private-fixture-password','','login');const rejection=assert.rejects(pending,error=>{assert.equal(error.message,'云登录状态已变化，请重试');return true;});await flush();await service.forgetLocal();gate.resolve();await rejection;assert.equal(state.requests.length,0);
  });
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+test('typed refresh promise keeps shared rejection cleanup and subsequent retry ownership', async () => {
+  const {state, service} = harness(session('a@example.invalid', true));
+  await service.initialize(); const revision = service.getSessionRevision(), gate = deferred();
+  state.requestHook = request => request.endpoint.includes('/RefreshToken') ? gate.promise : {};
+  const first = assert.rejects(service.statistics('weaponDistribution'), /fixture refresh rejection/);
+  const second = assert.rejects(service.statistics('weaponDistribution'), /fixture refresh rejection/);
+  await flush(); assert.equal(state.requests.filter(row => row.endpoint.includes('/RefreshToken')).length, 1);
+  gate.reject(new Error('fixture refresh rejection')); await Promise.all([first, second]);
+  assert.equal(service.refreshTask, undefined); assert.equal(service.refreshRevision, -1);
+  assert.equal(service.getSessionRevision(), revision); assert.equal(state.saves, 0);
+  state.requestHook = request => request.endpoint.includes('/RefreshToken') ? accepted('retry') : {};
+  await service.statistics('weaponDistribution');
+  assert.equal(state.requests.filter(row => row.endpoint.includes('/RefreshToken')).length, 2);
+  assert.equal(state.saves, 1); assert.equal(service.getSessionRevision(), revision);
+  assert.equal(service.refreshTask, undefined); assert.equal(service.refreshRevision, -1);
+ });

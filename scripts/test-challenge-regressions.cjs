@@ -192,7 +192,7 @@ async function main() {
   assert.equal(scheduled[0].reminderReq.groupId, 'other-feature');
   mock('service/DailyNoteReminderService', { DailyNoteReminderService: { sync: async () => {} } });
   mock('data/repo/UserRepo', { UserRepo: { getAllUsers: async () => [] } });
-  mock('service/UserService', { UserService: { getInstance: () => ({ getCurrentUser: () => user }), isCookieAuthError: () => false } });
+  mock('service/UserService', { UserService: { getInstance: () => ({ getCurrentUser: () => user, sessionRevision: () => 0, isSessionTransitionPending: () => false }), isCookieAuthError: () => false } });
   mock('data/network/HoyolabClient', { HoyolabClient: { fetchDailyNote: async () => ({ success: true, data: notePayload, isRiskControl: () => false }) } });
   mock('data/network/RiskVerifier', { RiskVerifier: {} });
   mock('data/network/DailyNoteWebhookClient', { DailyNoteWebhookClient: { send: async () => {} } });

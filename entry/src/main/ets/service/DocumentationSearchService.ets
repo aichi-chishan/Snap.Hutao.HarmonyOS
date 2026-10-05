@@ -8,7 +8,7 @@ class HelpSearchEntry {
   constructor(document: HelpDocument, text: string) { this.document = document; this.text = text; }
 }
 
-/** Three bounded packaged indexes. Search performs no IO and every public result is detached. */
+/** At most fifteen normalized packaged indexes. Search performs no IO and every public result is detached. */
 export class DocumentationSearchService {
   static readonly MAX_QUERY: number = 120;
   static readonly MAX_TERMS: number = 12;
@@ -26,7 +26,7 @@ export class DocumentationSearchService {
     const cached: string | undefined = DocumentationSearchService.common.get(id);
     if (cached !== undefined) { return cached; }
     const parts: string[] = [];
-    for (const locale of ['zh-Hans', 'zh-Hant', 'en']) {
+    for (const locale of LocalePolicy.locales()) {
       const article: HelpDocument | undefined = OfflineHelpCatalog.articles(locale).find((doc: HelpDocument) => doc.id === id);
       if (article !== undefined) { parts.push(DocumentationSearchService.documentText(article)); }
     }

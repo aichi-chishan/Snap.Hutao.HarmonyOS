@@ -54,11 +54,23 @@ export class PreferencesStore {
   static readonly DEFAULT_DAILY_BG_ENABLED: boolean = true;
 
   private static prefs: preferences.Preferences | undefined = undefined;
+  private static initializing: Promise<void> | undefined = undefined;
 
   static async init(context: common.Context): Promise<void> {
     if (PreferencesStore.prefs !== undefined) {
       return;
     }
+    if (PreferencesStore.initializing === undefined) {
+      PreferencesStore.initializing = PreferencesStore.open(context);
+    }
+    const pending: Promise<void> = PreferencesStore.initializing;
+    try { await pending; }
+    finally {
+      if (PreferencesStore.initializing === pending) { PreferencesStore.initializing = undefined; }
+    }
+  }
+
+  private static async open(context: common.Context): Promise<void> {
     const p: preferences.Preferences = await preferences.getPreferences(context, PreferencesStore.PREFS_NAME);
     PreferencesStore.prefs = p;
     Logger.info(TAG, 'preferences initialized');

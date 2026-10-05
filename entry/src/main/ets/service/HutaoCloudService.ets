@@ -110,7 +110,8 @@ export class HutaoCloudService {
     if (this.session.refreshToken.length === 0 || (this.identityPending && !allowPending)) { throw new Error('请先登录胡桃通行证'); }
     if (this.session.expiresAt > Date.now() + 60000) { return this.session.accessToken; }
     if (this.refreshTask !== undefined && this.refreshRevision === revision) {
-      const token: string = await this.refreshTask;
+      const pending: Promise<string> = this.refreshTask;
+      const token: string = await pending;
       this.assertRevision(revision);
       return token;
     }

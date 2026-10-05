@@ -93,7 +93,7 @@ export class HoyolabClient {
       'x-rpc-tool_verison': 'v5.0.1-ys',
     };
     const mergedExtra: Record<string, string> = HoyolabClient.merge(headers, extraHeaders);
-    Logger.info(TAG, `fetchDailyNote uid=${uid}`);
+    Logger.info(TAG, 'fetchDailyNote request');
     return HoyolabClient.client.get(url, HoyolabClient.merge(HoyolabClient.baseHeaders(region), mergedExtra));
   }
 
@@ -122,7 +122,7 @@ export class HoyolabClient {
       (HoyolabEndpoints.isOverseaRegion(region) ? '?lang=zh-cn' : '');
     const headers: Record<string, string> = HoyolabClient.signHeaders(region, cookie, ds);
     const mergedExtra: Record<string, string> = extraHeaders ?? {};
-    Logger.info(TAG, `signIn uid=${uid} region=${region}`);
+    Logger.info(TAG, 'signIn request');
     return HoyolabClient.client.postJson(url, bodyJson, HoyolabClient.merge(HoyolabClient.baseHeaders(region),
       HoyolabClient.merge(headers, mergedExtra)));
   }

@@ -20,7 +20,8 @@ export class DailyNoteRecord {
 
 export class DailyNoteRepo {
   /** upsert（存在则更新数据+刷新时间，保留阈值/开关） */
-  static async upsert(userId: number, uid: string, note: DailyNote): Promise<void> {
+  static async upsert(userId: number, uid: string, note: DailyNote,
+    isCurrent?: () => Promise<boolean>): Promise<void> {
     const existing: DailyNoteRecord | undefined = await DailyNoteRepo.get(userId, uid);
     const flags: number = existing !== undefined ? existing.notifyFlags : 31;
     const resinTh: number = existing !== undefined ? existing.resinNotifyThreshold : 120;
@@ -61,6 +62,27 @@ export class DailyNoteRepo {
     } finally {
       rs.close();
     }
+    if (isCurrent !== undefined) {
+      if (!await isCurrent()) { return; }
+      // Serialize guarded native writes against account deletion/backup replacement in this DB.
+      const options: relationalStore.TransactionOptions = { transactionType: relationalStore.TransactionType.IMMEDIATE };
+      const transaction: relationalStore.Transaction = await RelationalStoreHelper.getStore().createTransaction(options);
+      try {
+        if (!await isCurrent()) { await transaction.rollback(); return; }
+        const current: relationalStore.ResultSet = await transaction.query(pred);
+        let exists: boolean = false;
+        try { exists = current.goToFirstRow(); } finally { current.close(); }
+        if (!await isCurrent()) { await transaction.rollback(); return; }
+        if (exists) { await transaction.update(values, pred); }
+        else { await transaction.insert('daily_notes', values); }
+        if (!await isCurrent()) { await transaction.rollback(); return; }
+        await transaction.commit();
+      } catch (e) {
+        await transaction.rollback();
+        throw new Error('便笺缓存写入未完成');
+      }
+      return;
+    }
     if (hasRow) {
       const up: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('daily_notes');
       up.equalTo('user_id', userId);
@@ -69,7 +91,7 @@ export class DailyNoteRepo {
     } else {
       await RelationalStoreHelper.insert('daily_notes', values);
     }
-    Logger.info(TAG, `upsert dailynote user=${userId} uid=${uid}`);
+    Logger.info(TAG, 'upsert daily note');
   }
 
   static async get(userId: number, uid: string): Promise<DailyNoteRecord | undefined> {
