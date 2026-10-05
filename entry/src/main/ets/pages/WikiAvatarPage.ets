@@ -95,13 +95,7 @@ export struct SplashArtView {
         .getRawFileContent(`icons/${category}/${name}.png`);
       if (!this.current(token)) { return ''; }
       SplashArtView.ensureDir(dir);
-      const file = fileIo.openSync(dest, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
-      try {
-        // The resource may be a subview; never write unrelated bytes from its backing buffer.
-        fileIo.writeSync(file.fd, new Uint8Array(raw).buffer as ArrayBuffer);
-      } finally {
-        fileIo.closeSync(file);
-      }
+      SplashArtView.writeCache(dest, raw);
       return fileUri.getUriFromPath(dest);
     } catch (e) {
       // 包内无该图，继续
@@ -136,6 +130,23 @@ export struct SplashArtView {
       } catch (e) {
         // 已存在
       }
+    }
+  }
+
+  /** Publish only a complete, closed write from an OS-unique staging directory. */
+  private static writeCache(dest: string, raw: Uint8Array): void {
+    const staging: string = fileIo.mkdtempSync(`${dest}.stage-XXXXXX`);
+    const temporary: string = `${staging}/image.png`;
+    try {
+      const file = fileIo.openSync(temporary, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
+      try {
+        const buffer: ArrayBuffer = new Uint8Array(raw).buffer as ArrayBuffer;
+        if (fileIo.writeSync(file.fd, buffer) !== buffer.byteLength) { throw new Error('Incomplete icon cache write'); }
+      } finally { fileIo.closeSync(file); }
+      fileIo.renameSync(temporary, dest);
+    } finally {
+      // The OS returned this directory to this operation; never remove the shared cache parent.
+      try { fileIo.rmdirSync(staging); } catch (_) { /* Cache cleanup is best effort. */ }
     }
   }
 

@@ -15,6 +15,7 @@ import { DailyNoteService } from '../service/DailyNoteService';
 import { GachaRepo } from '../data/repo/GachaRepo';
 import { GachaArchive } from '../model/GachaArchive';
 import { Logger } from '../common/Logger';
+import { Motion } from '../common/Motion';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageBackdrop } from '../components/PageBackdrop';
 import EntryAbility from '../entryability/EntryAbility';
@@ -51,6 +52,7 @@ export struct SettingPage {
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
   @State themeMode: string = 'system';
+  @StorageProp('reduceMotion') reduceMotion: boolean = false;
   @State mediaIndex: number = 0;
   @State mediaMuted: boolean = true;
   @State mediaLoop: boolean = true;
@@ -147,6 +149,7 @@ export struct SettingPage {
     this.mediaLoop = PreferencesStore.getBool(BackgroundMediaService.LOOP_KEY, true);
     this.firstWeekday = Math.max(0, Math.min(6, PreferencesStore.getNumber('calendar.first_day_of_week', 1)));
     this.themeMode = PreferencesStore.getThemeMode();
+    Motion.setReducedMotion(PreferencesStore.getReduceMotionEnabled());
     this.autoRefresh = PreferencesStore.getAutoRefreshEnabled();
     this.interval = PreferencesStore.getRefreshIntervalMinutes();
     // 三档映射：0=关，0.5/0.25=标准，1=增强
@@ -422,6 +425,11 @@ export struct SettingPage {
     } else {
       DailyNoteService.getInstance().stopAutoRefresh();
     }
+  }
+
+  private applyReduceMotion(enabled: boolean): void {
+    PreferencesStore.setReduceMotionEnabled(enabled);
+    Motion.setReducedMotion(enabled);
   }
 
   applyTheme(mode: string): void {
@@ -752,6 +760,31 @@ export struct SettingPage {
         Column({ space: 10 }) {
           this.sectionTitle('主题')
           this.themeSection()
+
+          Row({ space: 12 }) {
+            Column({ space: 4 }) {
+              Text('减少动态效果')
+                .fontSize(15)
+                .fontColor($r('app.color.text_primary'))
+              Text('减少统一页面过渡、弹簧与按钮按压动效；不改变系统设置')
+                .fontSize(11)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Toggle({ type: ToggleType.Switch, isOn: this.reduceMotion })
+              .constraintSize({ minWidth: 44, minHeight: 44 })
+              .hoverEffect(HoverEffect.Highlight)
+              .accessibilityText('减少动态效果')
+              .onChange((enabled: boolean) => {
+                this.applyReduceMotion(enabled);
+              })
+          }
+          .width('100%')
+          .padding(14)
+          .backgroundColor($r('app.color.card_surface'))
+          .border({ width: 1, color: $r('app.color.card_stroke') })
+          .borderRadius(12)
 
           this.sectionTitle('沉浸光感')
           Row({ space: 10 }) {

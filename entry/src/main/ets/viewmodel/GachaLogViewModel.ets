@@ -19,7 +19,14 @@ const TAG: string = 'GachaLogViewModel';
 export class GachaLogViewModel {
   archives: GachaArchive[] = [];
   currentArchiveId: number = 0;
+  /** 本地归档与登录账号是两个独立上下文。 */
   currentUid: string = '';
+  gameAccountUid: string = '';
+  isTransferring: boolean = false;
+  private loadGeneration: number = 0;
+  private statsGeneration: number = 0;
+  private itemsGeneration: number = 0;
+  private operationGeneration: number = 0;
   /** 当前池 */
   currentPoolType: number = GachaType.AVATAR_EVENT;
   stats: GachaStatistics = new GachaStatistics();
@@ -38,39 +45,71 @@ export class GachaLogViewModel {
   onProgressChanged: (() => void) = () => {
   };
 
-  /** 初始化：按 UID 装载归档（uid 恒为权威值，绝不回退到其它归档的 uid） */
-  async load(uid: string): Promise<void> {
-    this.currentUid = uid;
-    this.archives = await GachaRepo.getAllArchives();
-    if (uid.length === 0) {
-      // 未登录/未绑定默认 UID：只读展示既有归档，不创建、不覆盖
-      if (this.archives.length > 0) {
-        this.currentArchiveId = this.archives[0].id;
-      } else {
-        this.currentArchiveId = 0;
-        this.stats = new GachaStatistics();
-        this.items = [];
-        this.loaded = true;
-        return;
-      }
-    } else {
-      let found: boolean = false;
-      for (let i = 0; i < this.archives.length; i++) {
-        if (this.archives[i].uid === uid) {
-          this.currentArchiveId = this.archives[i].id;
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        const archive: GachaArchive = await GachaRepo.getOrCreateArchive(uid);
-        this.currentArchiveId = archive.id;
-        this.archives = await GachaRepo.getAllArchives();
-      }
+  /** 使旧页面/账号读取失效；网络任务仍占用忙碌锁，直到底层调用结束。 */
+  invalidateRequests(): void {
+    this.loadGeneration++;
+    this.statsGeneration++;
+    this.itemsGeneration++;
+    this.operationGeneration++;
+    if (this.isRefreshing) {
+      this.cancelRefresh();
+      // Service 会复用同一个进度对象；失效时断开引用，旧对象后续原地修改也不能泄漏到新页面。
+      this.progress = new RefreshProgress();
+      this.progress.reportText = '正在停止刷新，请稍后重试';
     }
+  }
+
+  /** 只读装载本地归档；登录/默认角色变更不会覆盖用户当前的离线选档。 */
+  async load(uid: string, preferredArchiveUid: string = ''): Promise<void> {
+    const accountUid: string = /^[1-9][0-9]{8,9}$/.test(uid) ? uid : '';
+    if (accountUid !== this.gameAccountUid) { this.invalidateRequests(); }
+    this.gameAccountUid = accountUid;
+    const generation: number = ++this.loadGeneration;
+    this.statsGeneration++;
+    this.itemsGeneration++;
+    const archives: GachaArchive[] = await GachaRepo.getAllArchives();
+    if (generation !== this.loadGeneration) { return; }
+    // 不展示历史版本留下的空 UID 归档，也不在只读装载时创建任何归档。
+    this.archives = archives.filter((archive: GachaArchive): boolean =>
+      archive.id > 0 && /^[1-9][0-9]{8,9}$/.test(archive.uid));
+    let selected: GachaArchive | undefined = this.archives.find((archive: GachaArchive): boolean =>
+      preferredArchiveUid.length > 0 && archive.uid === preferredArchiveUid);
+    if (selected === undefined) {
+      selected = this.archives.find((archive: GachaArchive): boolean => archive.id === this.currentArchiveId);
+    }
+    if (selected === undefined) {
+      selected = this.archives.find((archive: GachaArchive): boolean => archive.isSelected);
+    }
+    if (selected === undefined) {
+      selected = this.archives.find((archive: GachaArchive): boolean => archive.uid === accountUid);
+    }
+    if (selected === undefined && this.archives.length > 0) { selected = this.archives[0]; }
+    if (this.currentArchiveId !== (selected?.id ?? 0)) {
+      this.stats = new GachaStatistics();
+      this.items = [];
+    }
+    this.currentArchiveId = selected?.id ?? 0;
+    this.currentUid = selected?.uid ?? '';
     await this.reloadStats();
+    if (generation !== this.loadGeneration) { return; }
     await this.reloadItems();
-    this.loaded = true;
+    if (generation === this.loadGeneration) { this.loaded = true; }
+  }
+
+  /** 显式选档才更新本地选中标记；不改变网络账号，不创建归档。 */
+  async selectArchive(id: number): Promise<void> {
+    if (this.isRefreshing || this.isTransferring) { throw new Error('请等待当前操作完成'); }
+    const archive: GachaArchive | undefined = this.archives.find((item: GachaArchive): boolean => item.id === id);
+    if (archive === undefined) { throw new Error('所选祈愿档案不存在'); }
+    this.isTransferring = true;
+    const generation: number = ++this.loadGeneration;
+    this.statsGeneration++;
+    this.itemsGeneration++;
+    try {
+      await GachaRepo.selectArchive(id);
+      if (generation !== this.loadGeneration) { return; }
+      await this.load(this.gameAccountUid, archive.uid);
+    } finally { this.isTransferring = false; }
   }
 
   /** 切换池子：重算全池统计（保证六项统计随池切换刷新）并重载当前池记录 */
@@ -83,10 +122,12 @@ export class GachaLogViewModel {
 
   /** 重算统计 */
   async reloadStats(): Promise<void> {
+    const generation: number = ++this.statsGeneration;
+    const archiveId: number = this.currentArchiveId;
     const stats: GachaStatistics = new GachaStatistics();
     stats.uid = this.currentUid;
-    stats.archiveId = this.currentArchiveId;
-    if (this.currentArchiveId > 0) {
+    stats.archiveId = archiveId;
+    if (archiveId > 0) {
       const pools: PoolStatistics[] = [];
       let total: number = 0;
       // 常规池 + 千星奇域颂愿池一起聚合（颂愿卡片仅在颂愿模式展示）
@@ -94,7 +135,8 @@ export class GachaLogViewModel {
       for (let i = 0; i < allTypes.length; i++) {
         const type: number = allTypes[i];
         try {
-          const pool: PoolStatistics = await this.buildPoolStats(this.currentArchiveId, type);
+          const pool: PoolStatistics = await this.buildPoolStats(archiveId, type);
+          if (generation !== this.statsGeneration || archiveId !== this.currentArchiveId) { return; }
           if (GachaType.isStandard(type)) {
             total += pool.totalCount;
           }
@@ -113,16 +155,8 @@ export class GachaLogViewModel {
           `5star=${p.fiveStarCount} 4star=${p.fourStarCount} since=${p.sinceLastFive} ` +
           `avg=${p.averageOrangePull} min=${p.minOrangePull} max=${p.maxOrangePull} date=[${p.startDate}~${p.endDate}]`);
       }
-      // 填充全部统计用 uid
-      const archives: GachaArchive[] = await GachaRepo.getAllArchives();
-      for (let i = 0; i < archives.length; i++) {
-        if (archives[i].id === this.currentArchiveId) {
-          stats.uid = archives[i].uid;
-          break;
-        }
-      }
     }
-    this.stats = stats;
+    if (generation === this.statsGeneration && archiveId === this.currentArchiveId) { this.stats = stats; }
   }
 
   private static emptyPool(gachaType: number): PoolStatistics {
@@ -272,93 +306,86 @@ export class GachaLogViewModel {
     return undefined;
   }
 
-  /** 重载当前池历史（全部，倒序；UI 用 List LazyForEach 虚拟滚动） */
+  /** 重载当前池历史；旧选档/旧池结果不能覆盖新上下文。 */
   async reloadItems(): Promise<void> {
-    if (this.currentArchiveId <= 0) {
-      this.items = [];
-      return;
+    const generation: number = ++this.itemsGeneration;
+    const archiveId: number = this.currentArchiveId;
+    const pool: number = this.currentPoolType;
+    const items: GachaItem[] = archiveId > 0 ? await GachaRepo.getItems(archiveId, pool, 100000, 0) : [];
+    if (generation === this.itemsGeneration && archiveId === this.currentArchiveId && pool === this.currentPoolType) {
+      this.items = items;
     }
-    this.items = await GachaRepo.getItems(this.currentArchiveId, this.currentPoolType, 100000, 0);
   }
 
-  /** 一键刷新（SToken） */
+  /** 自动鉴权仅针对登录账号 UID，绝不借用离线选档 UID。 */
   async refresh(): Promise<boolean> {
-    if (this.isRefreshing) {
-      return false;
-    }
-    if (this.currentUid.length === 0) {
+    if (this.isRefreshing || this.isTransferring) { return false; }
+    if (this.gameAccountUid.length === 0) {
       this.message = '请先登录并选择默认 UID';
       return false;
     }
+    const uid: string = this.gameAccountUid;
+    const operation: number = ++this.operationGeneration;
     this.isRefreshing = true;
     this.progress = new RefreshProgress();
     try {
       const result: RefreshResult = await GachaLogService.getInstance()
-        .refreshByStoken(this.currentUid, (p: RefreshProgress) => {
+        .refreshByStoken(uid, (p: RefreshProgress) => {
+          if (operation !== this.operationGeneration) { return; }
           this.progress = p;
           this.onProgressChanged();
         }, this.fullRefresh);
+      // 已发生的持久化变更仍需通知其它页面，但不能恢复过期的页面状态。
+      if (result.ok) { AppStorage.setOrCreate<number>('gachaDataVersion', Date.now()); }
+      if (operation !== this.operationGeneration) { return false; }
       this.message = result.message;
-      if (result.uid.length > 0) {
-        await this.load(result.uid);
-      }
-      await this.reloadStats();
-      await this.reloadItems();
-      // 通知主页祈愿卡重新读库（AppStorage 版本戳 + @Watch）
-      if (result.ok) {
-        AppStorage.setOrCreate<number>('gachaDataVersion', Date.now());
-      }
-      return result.ok;
+      await this.load(this.gameAccountUid);
+      return operation === this.operationGeneration && result.ok;
     } catch (e) {
-      this.message = (e as Error).message;
-      Logger.warn(TAG, `refresh fail ${this.message}`);
+      if (operation === this.operationGeneration) {
+        this.message = (e as Error).message;
+        Logger.warn(TAG, `refresh fail ${this.message}`);
+      }
       return false;
-    } finally {
-      this.isRefreshing = false;
-    }
+    } finally { this.isRefreshing = false; }
   }
 
-  /** 手动 URL 导入 */
+  /** URL 自带鉴权；归属由服务端响应校验，不能借用选档或登录账号。 */
   async importByUrl(url: string): Promise<boolean> {
-    if (this.isRefreshing) {
-      return false;
-    }
+    if (this.isRefreshing || this.isTransferring) { return false; }
+    const operation: number = ++this.operationGeneration;
     this.isRefreshing = true;
     this.progress = new RefreshProgress();
     try {
       const result: RefreshResult = await GachaLogService.getInstance()
-        .importByUrl(url, this.currentUid, (p: RefreshProgress) => {
+        .importByUrl(url, '', (p: RefreshProgress) => {
+          if (operation !== this.operationGeneration) { return; }
           this.progress = p;
           this.onProgressChanged();
         }, this.fullRefresh);
+      if (result.ok) { AppStorage.setOrCreate<number>('gachaDataVersion', Date.now()); }
+      if (operation !== this.operationGeneration) { return false; }
       this.message = result.message;
-      if (result.uid.length > 0) {
-        await this.load(result.uid);
-      }
-      await this.reloadStats();
-      await this.reloadItems();
-      // 通知主页祈愿卡重新读库（AppStorage 版本戳 + @Watch）
-      if (result.ok) {
-        AppStorage.setOrCreate<number>('gachaDataVersion', Date.now());
-      }
-      return result.ok;
+      await this.load(this.gameAccountUid, result.uid);
+      return operation === this.operationGeneration && result.ok;
     } catch (e) {
-      this.message = (e as Error).message;
+      if (operation === this.operationGeneration) { this.message = (e as Error).message; }
       return false;
-    } finally {
-      this.isRefreshing = false;
-    }
+    } finally { this.isRefreshing = false; }
   }
 
-  /** 删除当前归档 */
+  /** 删除后的装载仍然只读；不因登录 UID 重新创建已删除归档。 */
   async deleteCurrentArchive(): Promise<void> {
-    if (this.currentArchiveId <= 0) {
-      return;
-    }
-    await GachaRepo.deleteArchive(this.currentArchiveId);
-    this.archives = await GachaRepo.getAllArchives();
-    this.stats = new GachaStatistics();
-    this.items = [];
-    this.currentArchiveId = 0;
+    if (this.isRefreshing || this.isTransferring) { throw new Error('请等待当前操作完成'); }
+    const archiveId: number = this.currentArchiveId;
+    if (archiveId <= 0) { return; }
+    const operation: number = ++this.operationGeneration;
+    this.isTransferring = true;
+    try {
+      await GachaRepo.deleteArchive(archiveId);
+      AppStorage.setOrCreate<number>('gachaDataVersion', Date.now());
+      if (operation !== this.operationGeneration) { return; }
+      await this.load(this.gameAccountUid);
+    } finally { this.isTransferring = false; }
   }
 }

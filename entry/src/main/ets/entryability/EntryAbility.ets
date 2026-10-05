@@ -10,6 +10,7 @@ import { NotificationHelper } from '../data/local/NotificationHelper';
 import { DailyNoteService } from '../service/DailyNoteService';
 import { AutoSignInService } from '../service/AutoSignInService';
 import { AppContextProvider } from '../common/AppContext';
+import { Motion } from '../common/Motion';
 import { buildRiskVerifyOverlay } from '../components/RiskVerifyModal';
 
 const DOMAIN = 0x4E50;
@@ -220,6 +221,13 @@ export default class EntryAbility extends UIAbility {
       });
     } catch (e) {
       hilog.error(DOMAIN, TAG, 'init fail: %{public}s', JSON.stringify(e));
+    }
+    try {
+      // 恢复流程可能替换偏好；首次创建页面前读取最终值，避免首帧播放旧动效。
+      Motion.setReducedMotion(PreferencesStore.getReduceMotionEnabled());
+    } catch (e) {
+      Motion.setReducedMotion(false);
+      hilog.warn(DOMAIN, TAG, 'restore reduce motion preference fail');
     }
     try {
       const mode: string = PreferencesStore.getThemeMode();

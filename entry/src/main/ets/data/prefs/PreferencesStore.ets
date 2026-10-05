@@ -18,6 +18,8 @@ export class PreferencesStore {
   static readonly KEY_REFRESH_INTERVAL: string = 'dailynote.refresh_interval_minutes';
   static readonly KEY_AUTO_REFRESH: string = 'dailynote.auto_refresh_enabled';
   static readonly KEY_THEME_MODE: string = 'theme.mode';
+  /** 应用内减少动态效果；不代表操作系统辅助功能设置。 */
+  static readonly KEY_REDUCE_MOTION: string = 'app.reduce_motion';
   static readonly KEY_DEVICE_ID: string = 'app.device_id';
   static readonly KEY_BBS_DEVICE_ID: string = 'app.bbs_device_id';
   static readonly KEY_AMBIENT_STRENGTH: string = 'app.ambient_strength';
@@ -46,6 +48,7 @@ export class PreferencesStore {
   static readonly DEFAULT_REFRESH_INTERVAL: number = 30;
   static readonly DEFAULT_AUTO_REFRESH: boolean = true;
   static readonly DEFAULT_THEME_MODE: string = 'system';
+  static readonly DEFAULT_REDUCE_MOTION: boolean = false;
   /** 沉浸光感强度 0~1（0=关闭），默认 0.25 */
   static readonly DEFAULT_AMBIENT_STRENGTH: number = 0.25;
   static readonly DEFAULT_DAILY_BG_ENABLED: boolean = true;
@@ -189,6 +192,15 @@ export class PreferencesStore {
 
   static setThemeMode(mode: string): void {
     PreferencesStore.setString(PreferencesStore.KEY_THEME_MODE, mode);
+  }
+
+  static getReduceMotionEnabled(): boolean {
+    return PreferencesStore.getBool(PreferencesStore.KEY_REDUCE_MOTION,
+      PreferencesStore.DEFAULT_REDUCE_MOTION) === true;
+  }
+
+  static setReduceMotionEnabled(enabled: boolean): void {
+    PreferencesStore.setBool(PreferencesStore.KEY_REDUCE_MOTION, enabled);
   }
 
   static getDeviceId(): string {

@@ -10,6 +10,15 @@ import { curves } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
 
 export class Motion {
+  /** 应用内偏好，由启动恢复与设置页发布；不是系统辅助功能状态。 */
+  static isReducedMotion(): boolean {
+    return AppStorage.get<boolean>('reduceMotion') === true;
+  }
+
+  static setReducedMotion(enabled: boolean): void {
+    AppStorage.setOrCreate<boolean>('reduceMotion', enabled);
+  }
+
   /** API 26 沉浸光感可用性（运行时门控，失败回退） */
   static detectImmersive(): boolean {
     try {
@@ -21,29 +30,42 @@ export class Motion {
 
   /** 常规弹性（卡片按压/选择态切换） */
   static spring(): curves.ICurve {
+    if (Motion.isReducedMotion()) {
+      // API 9：单步起点跳变，不保留位移/缩放过程或弹簧过冲。
+      return curves.stepsCurve(1, false);
+    }
     return curves.springMotion(0.34, 0.86);
   }
 
   /** 稍快弹性（小元素） */
   static springFast(): curves.ICurve {
+    if (Motion.isReducedMotion()) {
+      return curves.stepsCurve(1, false);
+    }
     return curves.springMotion(0.28, 0.9);
   }
 
   /** 柔和弹性（大面板/页面级） */
   static springSoft(): curves.ICurve {
+    if (Motion.isReducedMotion()) {
+      return curves.stepsCurve(1, false);
+    }
     return curves.springMotion(0.42, 0.82);
   }
 
   /** 标准缓出（非弹性的确定动画，如蒙层渐变） */
   static easeOut(duration: number): AnimateParam {
-    return { duration: duration, curve: Curve.Friction };
+    return { duration: Motion.isReducedMotion() ? 0 : duration, curve: Curve.Friction };
   }
 
   /**
    * 内嵌内容页切换转场：进场 = 上浮 12vp + 渐显 + 0.98→1 缩放（springSoft）；
    * 出场 = 渐隐 + 轻缩放（快）。用于 wideContent if/else 分支的容器。
    */
-  static pageSwitch(): TransitionEffect {
+  static pageSwitch(reduceMotion: boolean = Motion.isReducedMotion()): TransitionEffect {
+    if (reduceMotion || Motion.isReducedMotion()) {
+      return TransitionEffect.IDENTITY.animation({ duration: 0 });
+    }
     return TransitionEffect.asymmetric(
       TransitionEffect.translate({ y: 14 })
         .combine(TransitionEffect.scale({ x: 0.985, y: 0.985 }))
@@ -60,6 +82,9 @@ export class Motion {
    * repeat 标记 false 时首次进场后不再触发（if 挂载驱动）。
    */
   static riseIn(offsetVp: number = 18): TransitionEffect {
+    if (Motion.isReducedMotion()) {
+      return TransitionEffect.IDENTITY.animation({ duration: 0 });
+    }
     return TransitionEffect.asymmetric(
       TransitionEffect.translate({ y: offsetVp })
         .combine(TransitionEffect.OPACITY)
@@ -70,6 +95,9 @@ export class Motion {
 
   /** 错峰进场延迟（ms）：index 从 0 起，步进 40ms，封顶 320ms */
   static staggerDelay(index: number, stepMs: number = 40, capMs: number = 320): number {
+    if (Motion.isReducedMotion()) {
+      return 0;
+    }
     return Math.min(capMs, Math.max(0, index) * stepMs);
   }
 }
