@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');const ts=require(process.env.TYPESCRIPT_PATH||'../ci/node_modules/typescript');
+const base=path.resolve('entry/src/main/ets');const modules=new Map();const calls=[];let response={Distribution:[{Pull:80,Count:10}]},fail=false;
+function load(name){if(modules.has(name))return modules.get(name);if(name==='service/HutaoCloudService'){return {HutaoCloudService:{getInstance:()=>({statistics:async k=>{calls.push(k);if(fail)throw Error('secret');return response}})}}}const file=path.join(base,name+'.ets');const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});assert.equal(code.diagnostics.length,0);const m={exports:{}};vm.runInNewContext(`(function(require,module,exports){${code.outputText}\n})`)(id=>load(path.posix.normalize(path.posix.join(path.posix.dirname(name),id))),m,m.exports);modules.set(name,m.exports);return m.exports}
+const {GachaPoolRules:R}=load('model/GachaPoolRules');const {GachaPredictionService:S}=load('service/GachaPredictionService');
+(async()=>{
+ assert.equal(R.fiveStarThreshold(302),80);assert.equal(R.fiveStarThreshold(301),90);assert.equal(R.fiveStarThreshold(1000),0);assert.equal(R.fourStarThreshold(1000),90);assert.equal(R.fiveStarThreshold(999),0);
+ const d={Distribution:[{Pull:1,Count:10},{Pull:2,Count:20},{Pull:3,Count:20},{Pull:90,Count:50}]};const p=S.fromDistribution(301,1,d,123);
+ assert.equal(p.available,true);assert.equal(p.sampleEvents,100);assert.equal(p.remainingEvents,90);assert.equal(p.nextProbability,20/90);assert.equal(p.predictedRemaining,89);assert.equal(p.predictedProbability,50/90);assert.equal(S.within(p,2),40/90);assert.equal(S.within(p,90),1);assert.equal(p.retrievedAt,123);
+ const tie=S.fromDistribution(301,0,{distribution:[{pull:2,count:2},{pull:3,count:2}]});assert.equal(tie.predictedRemaining,2);
+ for(const [type,pity,threshold] of [[302,79,80],[301,89,90]]){const x=S.fromDistribution(type,pity,{Distribution:[{Pull:threshold,Count:1}]});assert.equal(x.nextProbability,1);assert.equal(x.predictedRemaining,1);}
+ assert.equal(S.fromDistribution(1000,0,d).available,false);assert.equal(S.fromDistribution(999,0,d).available,false);assert.equal(S.fromDistribution(301,NaN,d).available,false);
+ for(const rows of [[],[{Pull:1,Count:0}],[{Pull:91,Count:1}],[{Pull:1,Count:-1}],[{Pull:1,Count:1},{Pull:1,Count:2}],[{Pull:1,Count:Number.MAX_SAFE_INTEGER},{Pull:2,Count:1}],[{Pull:1,Count:'2'}],[null]])assert.equal(S.fromDistribution(301,0,{Distribution:rows}).available,false);
+ assert.equal(S.fromDistribution(301,1,{Distribution:[{Pull:1,Count:1}]}).available,false);
+ const fetched=await S.fetch(302,79);assert.equal(fetched.available,true);assert.equal(calls.at(-1),'weaponDistribution');fail=true;const unavailable=await S.fetch(301,0);assert.equal(unavailable.available,false);assert(!unavailable.message.includes('secret'));const count=calls.length;await S.fetch(1000,0);assert.equal(calls.length,count);
+ console.log('PASS: bounded per-pool rules and Windows-equivalent conditional sample prediction; unavailable/invalid/safe-integer cases');
+})().catch(e=>{console.error(e);process.exitCode=1});

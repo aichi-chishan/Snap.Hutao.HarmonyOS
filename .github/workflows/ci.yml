@@ -58,10 +58,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Install pinned AST gate compiler
+        run: npm ci --prefix ci --ignore-scripts
       - name: Install verified Command Line Tools
         run: bash ci/install-clt.sh "$RUNNER_TEMP/harmonyos-clt"
         env:
           DEVECO_CLT_URL: ${{ vars.DEVECO_CLT_URL }}
+      - name: Verify native ArkTS AST gate fixtures
+        run: node tests/dynamic-delete-gate.cjs && node tests/lint-report-gate.cjs
       - name: Prepare unsigned CI build profile
         run: test -f build-profile.json5 || cp ci/build-profile.ci.json5 build-profile.json5
       - name: Install project dependencies

@@ -16,6 +16,9 @@
     "plugin:@typescript-eslint/recommended"
   ],
   "rules": {
+    // CLT 6.0.240 crashes on class-field initializers in this matcher.
+    // Equivalent AST enforcement is mandatory in ci/run-native-lint.cjs before native lint.
+    "@typescript-eslint/no-dynamic-delete": "off",
     "@security/no-unsafe-aes": "error",
     "@security/no-unsafe-hash": "error",
     "@security/no-unsafe-mac": "warn",
