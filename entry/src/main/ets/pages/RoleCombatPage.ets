@@ -209,7 +209,12 @@ export struct RoleCombatPage {
               .fontColor($r('app.color.text_secondary'))
             ForEach(this.scheduleMeta!.elements, (e: number) => {
               Row({ space: 4 }) {
-                MetaIcon({ category: 'IconElement', name: WikiMetaService.elementIconById(e), iconSize: 16 })
+                // Canonical element artwork is a white glyph; a themed backplate preserves contrast.
+                Stack() {
+                  MetaIcon({ category: 'IconElement', name: WikiMetaService.elementIconById(e), iconSize: 16 })
+                }.width(24).height(24).borderRadius(12)
+                  .backgroundColor($r('app.color.element_icon_background'))
+                  .accessibilityLevel('no')
                 Text(WikiMetaService.elementNameById(e))
                   .fontSize(12)
                   .fontColor($r('app.color.text_primary'))

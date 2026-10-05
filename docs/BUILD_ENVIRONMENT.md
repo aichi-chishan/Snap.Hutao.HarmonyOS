@@ -97,3 +97,21 @@ codelinter --exit-on error -c code-linter.json5 -f json -o lint-report.json .
 检查报告必须确认实际扫描了源码，并统计 JSON 报告中的 error 项；本版工具出现过报告含 error 而进程退出 0 的情况，不能只依赖退出码。DevEco CLI 1.3.4 对空报告曾显示 `Files checked: 0`，应结合原生 CodeLinter 场景日志中的 `File count` 和违规探针判断，不能单凭该汇总宣称完整检查通过。API 26 材质、枚举和设备能力调用必须检查运行时门控，并在 API 24 设备验证回退。未经运行验证的设备能力应在验收记录中明确标记，不能由编译结果推断成功。
 
 仓库未跟踪的官方开发说明可以通过 `devecocli skills add --skill <名称> --path <独立工具目录>` 获取；本次获取了 `hmos-arkts-syntax-checker`、`hmos-arkui-develop-skill`、`hmos-arkui-mvvm-pattern`，按官方 OpenHarmony skill API 的 SHA-256 校验后放在工具目录，不写入仓库的 `skills/` 或修改 AI 工具配置。
+
+## 2026-10-05：恢复环境与 fail-closed CI 门禁
+
+对固定提交 `77304749bbb605108d05cf8c6f99f84d96ebdd2e` 的隔离快照，以同一 CLT 26.0.0.821 和已安装的 OpenJDK 21.0.12.1 完成了实际 clean + Hvigor 构建：退出码 0，33 个任务全部执行，23.540 秒。该结果验证 Java 21 可用于此次构建，不表示复现了历史 JDK 17 环境。实际 HAP 最低/目标 API 仍为 `60101024` / `260000026`，设备类型仍为 phone/tablet/2in1。真机、模拟器、签名和账号流程没有因此获得运行验收。
+
+原生 lint JSON 返回 0 个 error、45 个 warn、1 个 suggestion，日志记录 182 个源码文件；但进一步审查发现 36 个文件检查发生 `getDeclaringMethod` 内部异常，因此**完整 lint 验证不通过**。独立官方 MD5 探针确实触发安全错误，工具仍返回 0；正数文件计数、完成提示、部分规则结果和进程退出码均不能掩盖扫描器内部异常。没有删除规则或忽略受影响源码来制造通过结果。
+
+本次补充的 CI 工具：
+
+- `ci/install-clt.sh` 只接受本节上方已经审核的 release 的完整 `clt-part-00` URL；不会从任意用户配置字符串盲目推导第二个分片 URL。其他来源或版本必须重新审核固定值
+- 两个分片大小固定为 `1992294400` / `355587885` 字节，SHA-256 沿用上方记录；顺序拼接后实际核验的 ZIP SHA-256 为 `58da7359019e9360a8bb82da0cd1d3b3b26fedc338379f257849f2162e3ac1fc`。`ci/verify-clt.py` 在执行工具前核对大小、哈希、ZIP CRC、安全路径、包内符号链接及提取后 CRC
+- `ci/run-native-lint.cjs <全新证据目录>` 直接运行原生 CodeLinter，隔离旧日志，并为当前项目与源码数量创建时间标记；`ci/check-lint-report.cjs` 拒绝缺失、空白、畸形、过期、其他项目、扫描不足、内部错误以及含 error 的报告。性能警告和建议本身不阻断
+- `ci/check-hap.py` 拒绝缺失、空文件、损坏 ZIP 或最低 API、目标 API、设备类型不符的产物；构建直接使用 OHPM 与 Hvigor，不再依赖 DevEco CLI 包装器的返回码
+- CI 的 lint/build 仍按 `DEVECO_CLT_URL` 配置选择性启用；未配置时跳过，不能把这种跳过称为原生验证通过。这里仅修改工作流源码，没有触发远程 Actions
+
+`tests/lint-report-gate.cjs` 包含伪造成功退出码的错误报告、内部扫描异常、空/坏/旧报告及固定下载来源等回归；这些离线测试不替代真实原生扫描。
+
+当前门禁保守拒绝空 findings 数组，包括实际上可能没有任何问题的工程；这是为避免把本版工具的不可靠空报告误判为通过。未来若要允许真正的零 findings，必须先增加与同次检查绑定的成功安全探针和完整扫描证据；不能仅放宽为空数组就通过。该限制不会改变内部检查异常必须阻断的规则。

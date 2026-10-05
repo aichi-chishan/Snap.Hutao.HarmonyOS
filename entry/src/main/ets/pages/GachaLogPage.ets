@@ -22,6 +22,7 @@ import { GachaLogViewModel } from '../viewmodel/GachaLogViewModel';
 import { GachaType } from '../model/GachaType';
 import { GachaItem } from '../model/GachaItem';
 import { GachaArchive } from '../model/GachaArchive';
+import { UigfArchivePreview } from '../model/UigfImportPreparation';
 import { RecentGachaItem } from '../model/RefreshProgress';
 import { PoolStatistics, FiveStarDetail } from '../model/GachaStatistics';
 import { SimpleDataSource } from '../components/SimpleDataSource';
@@ -149,6 +150,8 @@ export struct GachaLogPage {
   private historyGeneration: number = 0;
   @State vm: GachaLogViewModel = new GachaLogViewModel();
   @State showUrlInput: boolean = false;
+  @State showImportPreview: boolean = false;
+  @State showExportOptions: boolean = false;
   @State urlInput: string = '';
   @State initialized: boolean = false;
   /** 池卡片快照（整体替换驱动渲染） */
@@ -206,6 +209,8 @@ export struct GachaLogPage {
     this.pageActive = false;
     this.pageEpoch++;
     this.historyGeneration++;
+    this.showImportPreview = false;
+    this.showExportOptions = false;
     this.vm.invalidateRequests();
     this.vm.onProgressChanged = () => {};
   }
@@ -214,12 +219,20 @@ export struct GachaLogPage {
   onLoginStateChanged(): void {
     this.urlInput = '';
     this.showUrlInput = false;
+    this.showImportPreview = false;
+    this.showExportOptions = false;
+    this.vm.clearImport();
+    this.vm.exportUids = [];
     if (this.pageActive) { this.reloadData(); }
   }
 
   onUidChanged(): void {
     this.urlInput = '';
     this.showUrlInput = false;
+    this.showImportPreview = false;
+    this.showExportOptions = false;
+    this.vm.clearImport();
+    this.vm.exportUids = [];
     if (this.pageActive) { this.reloadData(); }
   }
 
@@ -265,6 +278,8 @@ export struct GachaLogPage {
   private async chooseLocalArchive(id: number): Promise<void> {
     if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
     const epoch: number = ++this.pageEpoch;
+    this.showImportPreview = false;
+    this.showExportOptions = false;
     this.resetLocalView();
     try {
       await this.vm.selectArchive(id);
@@ -1550,7 +1565,7 @@ export struct GachaLogPage {
           .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
           .hoverEffect(HoverEffect.Highlight)
           .fontSize(11)
-          .height(26)
+          .constraintSize({ minHeight: 44 })
           .margin({ right: 4 })
           .backgroundColor($r('app.color.card_surface'))
           .fontColor($r('app.color.text_primary'))
@@ -1561,7 +1576,7 @@ export struct GachaLogPage {
           .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
           .hoverEffect(HoverEffect.Highlight)
           .fontSize(11)
-          .height(26)
+          .constraintSize({ minHeight: 44 })
           .margin({ right: 4 })
           .backgroundColor($r('app.color.card_surface'))
           .fontColor($r('app.color.text_primary'))
@@ -1572,18 +1587,18 @@ export struct GachaLogPage {
           .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
           .hoverEffect(HoverEffect.Highlight)
           .fontSize(11)
-          .height(26)
+          .constraintSize({ minHeight: 44 })
           .margin({ right: 4 })
           .backgroundColor($r('app.color.card_surface'))
           .fontColor($r('app.color.text_primary'))
           .onClick(() => {
-            this.uigfExport();
+            this.prepareUigfExport();
           })
         Button('手动 URL')
           .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
           .hoverEffect(HoverEffect.Highlight)
           .fontSize(11)
-          .height(26)
+          .constraintSize({ minHeight: 44 })
           .backgroundColor($r('app.color.app_primary_bg'))
           .fontColor($r('app.color.app_primary'))
           .onClick(() => {
@@ -1761,6 +1776,9 @@ export struct GachaLogPage {
     if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
     const epoch: number = this.pageEpoch;
     this.vm.isTransferring = true;
+    this.vm.clearImport();
+    this.showImportPreview = false;
+    this.showExportOptions = false;
     try {
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker();
       const opts: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
@@ -1781,32 +1799,27 @@ export struct GachaLogPage {
         if (read !== stat.size) { throw new Error('UIGF 文件读取不完整，请重新选择文件'); }
         if (fileIo.statSync(file.fd).size !== stat.size) { throw new Error('读取期间 UIGF 文件大小发生变化'); }
         const text: string = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
-        const result = await UigfService.getInstance().importFromText(text);
-        if (result.ok) { AppStorage.setOrCreate<number>('gachaDataVersion', Date.now()); }
-        if (!this.pageActive || epoch !== this.pageEpoch) { return; }
-        this.toast(result.ok ? result.message : `导入失败：${result.message}`);
-        if (result.ok) {
-          this.resetLocalView();
-          await this.vm.load(this.vm.gameAccountUid, result.uid);
-          if (!this.pageActive || epoch !== this.pageEpoch) { return; }
-          this.syncAll();
-          if (this.pivotIndex === 1) { this.loadHistoryWishes(); }
-        }
+        this.vm.prepareImport(text);
+        this.showImportPreview = true;
       } finally {
         fileIo.closeSync(file);
       }
     } catch (e) {
-      if (this.pageActive && epoch === this.pageEpoch) { this.toast(`导入失败：${(e as Error).message}`); }
+      if (this.pageActive && epoch === this.pageEpoch) {
+        this.vm.clearImport();
+        this.showImportPreview = false;
+        this.toast(`导入失败：${(e as Error).message}`);
+      }
     } finally { this.vm.isTransferring = false; }
   }
 
-  /** 导出全部祈愿数据为 UIGF v4.2 文件（含千星奇域） */
+  /** 用户确认所选 UID 后导出 UIGF v4.2（含千星奇域）。 */
   async uigfExport(): Promise<void> {
     if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring || this.vm.archives.length === 0) { return; }
     const epoch: number = this.pageEpoch;
     this.vm.isTransferring = true;
     try {
-      const json: string = await UigfService.getInstance().buildExportJson();
+      const json: string = await UigfService.getInstance().buildExportJson(this.vm.exportUids.slice());
       if (!this.pageActive || epoch !== this.pageEpoch) { return; }
       if (json.length > UIGF_MAX_BYTES) { throw new Error('UIGF 导出超过 32 MiB 限制'); }
       const bytes: Uint8Array = util.TextEncoder.create().encodeInto(json);
@@ -1825,10 +1838,93 @@ export struct GachaLogPage {
       } finally {
         fileIo.closeSync(file);
       }
+      this.showExportOptions = false;
       this.toast('导出成功（UIGF v4.2）');
     } catch (e) {
       if (this.pageActive && epoch === this.pageEpoch) { this.toast(`导出失败：${(e as Error).message}`); }
     } finally { this.vm.isTransferring = false; }
+  }
+
+  private async confirmUigfImport(): Promise<void> {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
+    const epoch: number = this.pageEpoch;
+    try {
+      const result = await this.vm.confirmImport();
+      if (!this.pageActive || epoch !== this.pageEpoch) { return; }
+      this.toast(result.message);
+      if (result.ok) {
+        this.showImportPreview = false;
+        this.resetLocalView();
+        this.syncAll();
+        if (this.pivotIndex === 1) { this.loadHistoryWishes(); }
+      }
+    } catch (e) {
+      if (this.pageActive && epoch === this.pageEpoch) { this.toast(`导入失败：${(e as Error).message}`); }
+    }
+  }
+
+  private prepareUigfExport(): void {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
+    this.vm.clearImport();
+    this.showImportPreview = false;
+    this.vm.exportUids = this.vm.archives.map((archive: GachaArchive): string => archive.uid);
+    this.showExportOptions = true;
+  }
+
+  private changeUigfSelection(uid: string, selected: boolean, importing: boolean): void {
+    if (this.vm.isTransferring || this.vm.isRefreshing) { return; }
+    const source: string[] = importing ? this.vm.importUids : this.vm.exportUids;
+    const next: string[] = source.filter((value: string): boolean => value !== uid);
+    if (selected) { next.push(uid); }
+    if (importing) { this.vm.importUids = next; } else { this.vm.exportUids = next; }
+  }
+
+  @Builder
+  importPreviewPanel() {
+    Column({ space: 8 }) {
+      Text(`UIGF ${this.vm.importPreview.version} · ${this.vm.importPreview.totalCount} 条唯一记录`)
+        .fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+      Text('已检查全部归档。只合并勾选的 UID；已有记录跳过，所选归档在一个事务中提交，失败全部回滚。')
+        .fontSize(12).fontColor($r('app.color.text_secondary'))
+      ForEach(this.vm.importPreview.archives, (archive: UigfArchivePreview) => {
+        Row({ space: 8 }) {
+          Checkbox({ name: `uigf_import_${archive.uid}` }).select(this.vm.importUids.indexOf(archive.uid) >= 0)
+            .width(44).height(44).accessibilityText(`导入 UID ${archive.uid}，${archive.totalCount} 条记录`)
+            .enabled(!this.vm.isTransferring).onChange((selected: boolean) => this.changeUigfSelection(archive.uid, selected, true))
+          Text(`${archive.uid} · ${archive.totalCount} 条（颂愿 ${archive.beyondCount}）`).fontSize(12).fontColor($r('app.color.text_primary'))
+        }.width('100%').constraintSize({ minHeight: 44 })
+      }, (archive: UigfArchivePreview) => archive.uid)
+      Flex({ wrap: FlexWrap.Wrap }) {
+        Button('取消').constraintSize({ minHeight: 44 }).margin({ right: 8, bottom: 4 }).enabled(!this.vm.isTransferring).hoverEffect(HoverEffect.Highlight)
+          .onClick(() => { this.vm.clearImport(); this.showImportPreview = false; })
+        Button('确认导入所选 UID').constraintSize({ minHeight: 44 }).margin({ right: 8, bottom: 4 }).enabled(this.vm.importUids.length > 0 && !this.vm.isTransferring && !this.vm.isRefreshing)
+          .hoverEffect(HoverEffect.Highlight).onClick(() => this.confirmUigfImport())
+      }
+    }.width('100%').alignItems(HorizontalAlign.Start).padding(12)
+      .borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
+  }
+
+  @Builder
+  exportOptionsPanel() {
+    Column({ space: 8 }) {
+      Text('选择导出 UID · UIGF v4.2').fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+      Text('保留常规池与颂愿；本轮仅提供 v4.2 导出，不执行有损降级。').fontSize(12).fontColor($r('app.color.text_secondary'))
+      ForEach(this.vm.archives, (archive: GachaArchive) => {
+        Row({ space: 8 }) {
+          Checkbox({ name: `uigf_export_${archive.uid}` }).select(this.vm.exportUids.indexOf(archive.uid) >= 0)
+            .width(44).height(44).accessibilityText(`导出 UID ${archive.uid}`)
+            .enabled(!this.vm.isTransferring).onChange((selected: boolean) => this.changeUigfSelection(archive.uid, selected, false))
+          Text(archive.uid).fontSize(12).fontColor($r('app.color.text_primary'))
+        }.width('100%').constraintSize({ minHeight: 44 })
+      }, (archive: GachaArchive) => archive.uid)
+      Flex({ wrap: FlexWrap.Wrap }) {
+        Button('取消').constraintSize({ minHeight: 44 }).margin({ right: 8, bottom: 4 }).enabled(!this.vm.isTransferring).hoverEffect(HoverEffect.Highlight)
+          .onClick(() => { this.vm.exportUids = []; this.showExportOptions = false; })
+        Button('导出所选 UID').constraintSize({ minHeight: 44 }).margin({ right: 8, bottom: 4 }).enabled(this.vm.exportUids.length > 0 && !this.vm.isTransferring && !this.vm.isRefreshing)
+          .hoverEffect(HoverEffect.Highlight).onClick(() => this.uigfExport())
+      }
+    }.width('100%').alignItems(HorizontalAlign.Start).padding(12)
+      .borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
   }
 
   @Builder
@@ -1838,6 +1934,7 @@ export struct GachaLogPage {
         Row({ space: 8 }) {
           Text('本地归档').fontSize(13).fontColor($r('app.color.text_secondary'))
           Select(this.archiveOptions()).selected(this.currentArchiveIndex()).value(this.vm.currentUid)
+            .constraintSize({ minHeight: 44 }).accessibilityText('选择本地祈愿归档')
             .layoutWeight(1).enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
             .onSelect((index: number) => {
               if (index >= 0 && index < this.vm.archives.length) { this.chooseLocalArchive(this.vm.archives[index].id); }
@@ -1847,14 +1944,14 @@ export struct GachaLogPage {
         Text('暂无本地归档，可直接导入 UIGF 文件').fontSize(13).fontColor($r('app.color.text_secondary'))
       }
       Flex({ wrap: FlexWrap.Wrap }) {
-        Button('导入 UIGF').fontSize(12).height(32).margin({ right: 8, bottom: 4 }).hoverEffect(HoverEffect.Highlight)
+        Button('导入 UIGF').fontSize(12).constraintSize({ minHeight: 44 }).margin({ right: 8, bottom: 4 }).hoverEffect(HoverEffect.Highlight)
           .enabled(!this.vm.isRefreshing && !this.vm.isTransferring).onClick(() => this.uigfImport())
-        Button('导出全部归档').fontSize(12).height(32).margin({ right: 8, bottom: 4 }).hoverEffect(HoverEffect.Highlight)
-          .enabled(this.vm.archives.length > 0 && !this.vm.isRefreshing && !this.vm.isTransferring).onClick(() => this.uigfExport())
-        Button('手动 URL').fontSize(12).height(32).margin({ right: 8, bottom: 4 }).hoverEffect(HoverEffect.Highlight)
+        Button('选择性导出').fontSize(12).constraintSize({ minHeight: 44 }).margin({ right: 8, bottom: 4 }).hoverEffect(HoverEffect.Highlight)
+          .enabled(this.vm.archives.length > 0 && !this.vm.isRefreshing && !this.vm.isTransferring).onClick(() => this.prepareUigfExport())
+        Button('手动 URL').fontSize(12).constraintSize({ minHeight: 44 }).margin({ right: 8, bottom: 4 }).hoverEffect(HoverEffect.Highlight)
           .enabled(!this.vm.isRefreshing && !this.vm.isTransferring).onClick(() => { this.showUrlInput = !this.showUrlInput; })
         if (!this.isLoggedIn) {
-          Button('登录以在线刷新').fontSize(12).height(32).hoverEffect(HoverEffect.Highlight)
+          Button('登录以在线刷新').fontSize(12).constraintSize({ minHeight: 44 }).hoverEffect(HoverEffect.Highlight)
             .onClick(() => router.pushUrl({ url: 'pages/LoginPage' }))
         }
       }.width('100%')
@@ -1922,13 +2019,13 @@ export struct GachaLogPage {
           }
           Button(this.vm.fullRefresh ? '全量' : '增量')
             .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
-            .fontSize(11).height(28).hoverEffect(HoverEffect.Highlight)
+            .fontSize(11).constraintSize({ minHeight: 44 }).hoverEffect(HoverEffect.Highlight)
             .onClick(() => this.vm.fullRefresh = !this.vm.fullRefresh)
           Button('刷新')
             .enabled(this.isLoggedIn && this.vm.gameAccountUid.length > 0 && !this.vm.isRefreshing && !this.vm.isTransferring)
             .hoverEffect(HoverEffect.Highlight)
             .fontSize(13)
-            .height(32)
+            .constraintSize({ minHeight: 44 })
             .backgroundColor($r('app.color.app_primary'))
             .fontColor(Color.White)
             .onClick(() => {
@@ -1962,6 +2059,8 @@ export struct GachaLogPage {
         Scroll() {
           Column({ space: 10 }) {
             this.localArchiveControls()
+            if (this.showImportPreview) { this.importPreviewPanel() }
+            if (this.showExportOptions) { this.exportOptionsPanel() }
             if (this.vm.isRefreshing) {
               this.progressPanel()
             }

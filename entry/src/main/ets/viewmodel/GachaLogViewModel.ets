@@ -10,7 +10,8 @@ import { GachaItem } from '../model/GachaItem';
 import { GachaStatistics, PoolStatistics, FiveStarDetail } from '../model/GachaStatistics';
 import { RefreshProgress } from '../model/RefreshProgress';
 import { WikiMetaService, GachaEventMeta } from '../service/WikiMetaService';
-import { UigfService } from '../service/UigfService';
+import { UigfService, UigfImportResult } from '../service/UigfService';
+import { UigfImportPreparation, UigfImportPreview } from '../model/UigfImportPreparation';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'GachaLogViewModel';
@@ -23,6 +24,11 @@ export class GachaLogViewModel {
   currentUid: string = '';
   gameAccountUid: string = '';
   isTransferring: boolean = false;
+  importPreview: UigfImportPreview = new UigfImportPreview();
+  importUids: string[] = [];
+  exportUids: string[] = [];
+  private preparedImport: UigfImportPreparation | undefined = undefined;
+  private importGeneration: number = 0;
   private loadGeneration: number = 0;
   private statsGeneration: number = 0;
   private itemsGeneration: number = 0;
@@ -47,6 +53,8 @@ export class GachaLogViewModel {
 
   /** 使旧页面/账号读取失效；网络任务仍占用忙碌锁，直到底层调用结束。 */
   invalidateRequests(): void {
+    this.clearImport();
+    this.exportUids = [];
     this.loadGeneration++;
     this.statsGeneration++;
     this.itemsGeneration++;
@@ -101,6 +109,8 @@ export class GachaLogViewModel {
     if (this.isRefreshing || this.isTransferring) { throw new Error('请等待当前操作完成'); }
     const archive: GachaArchive | undefined = this.archives.find((item: GachaArchive): boolean => item.id === id);
     if (archive === undefined) { throw new Error('所选祈愿档案不存在'); }
+    this.clearImport();
+    this.exportUids = [];
     this.isTransferring = true;
     const generation: number = ++this.loadGeneration;
     this.statsGeneration++;
@@ -109,6 +119,51 @@ export class GachaLogViewModel {
       await GachaRepo.selectArchive(id);
       if (generation !== this.loadGeneration) { return; }
       await this.load(this.gameAccountUid, archive.uid);
+    } finally { this.isTransferring = false; }
+  }
+
+  /** 文件只解析一次；这里只保存有界的已验证记录，不保存原始文件副本。 */
+  prepareImport(text: string): void {
+    this.clearImport();
+    const prepared: UigfImportPreparation = UigfService.getInstance().prepareImport(text);
+    this.preparedImport = prepared;
+    this.importPreview = prepared.preview();
+    this.importUids = this.importPreview.uids.slice();
+  }
+
+  clearImport(): void {
+    this.importGeneration++;
+    this.preparedImport?.dispose();
+    this.preparedImport = undefined;
+    this.importPreview = new UigfImportPreview();
+    this.importUids = [];
+  }
+
+  async confirmImport(): Promise<UigfImportResult> {
+    if (this.isRefreshing || this.isTransferring) { throw new Error('请等待当前操作完成'); }
+    const prepared: UigfImportPreparation | undefined = this.preparedImport;
+    if (prepared === undefined) { throw new Error('请先选择并预览 UIGF 文件'); }
+    const generation: number = this.importGeneration;
+    const operation: number = this.operationGeneration;
+    const selection: string[] = this.importUids.slice();
+    this.isTransferring = true;
+    try {
+      const result: UigfImportResult = await UigfService.getInstance().importPrepared(prepared, selection, () => {
+        if (generation !== this.importGeneration || operation !== this.operationGeneration || prepared !== this.preparedImport) {
+          throw new Error('UIGF 预览已失效，未写入数据');
+        }
+      });
+      if (result.ok) {
+        AppStorage.setOrCreate<number>('gachaDataVersion', Date.now());
+        if (generation !== this.importGeneration || operation !== this.operationGeneration) { return result; }
+        this.clearImport();
+        try { await this.load(this.gameAccountUid, result.uid); }
+        catch (e) {
+          Logger.warn(TAG, `import committed; view reload failed: ${(e as Error).message}`);
+          result.message += '；请重新打开页面刷新本地视图';
+        }
+      }
+      return result;
     } finally { this.isTransferring = false; }
   }
 

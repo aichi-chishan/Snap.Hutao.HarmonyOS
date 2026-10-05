@@ -2,7 +2,8 @@ name: CI
 
 # HarmonyOS lint/build 依赖华为 Command Line Tools（华为开发者站需登录下载，无公开直链）。
 # 在仓库 Settings → Secrets and variables → Actions → Variables 配置
-#   DEVECO_CLT_URL = CLT zip 直链（如 DevEco-Command-Line-Tools-linux-x64.zip 的下载地址）
+#   DEVECO_CLT_URL = https://github.com/aichi-chishan/snap-hutao-data/releases/download/clt-26.0.0.821/clt-part-00
+# 仅接受此已审核版本；更换来源/版本必须先审核并更新固定大小与 SHA-256。
 # 后本工作流自动启用；未配置时两个 job 跳过（不阻塞 PR）。
 on:
   push:
@@ -56,31 +57,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - name: Install DevEco CLI
-        run: npm install -g @deveco/deveco-cli
-      - name: Install Command Line Tools
-        run: |
-          # CLT zip 超 GitHub 单文件 2GiB 限制，拆为 part-00/part-01 两段发布，下载后拼接
-          curl -L --fail --retry 3 -o clt-part-00 "$DEVECO_CLT_URL"
-          curl -L --fail --retry 3 -o clt-part-01 "${DEVECO_CLT_URL%00}01"
-          cat clt-part-00 clt-part-01 > clt.zip
-          unzip -q clt.zip -d clt
-          clt_dir=$(find clt -maxdepth 2 -type d -name 'command-line-tools' | head -1)
-          if [ -z "$clt_dir" ]; then clt_dir=$(find clt -maxdepth 2 -mindepth 1 -type d | head -1); fi
-          echo "DEVECO_CLI_CLT_PATH=$(pwd)/$clt_dir" >> "$GITHUB_ENV"
+          node-version: '24'
+      - name: Install verified Command Line Tools
+        run: bash ci/install-clt.sh "$RUNNER_TEMP/harmonyos-clt"
         env:
           DEVECO_CLT_URL: ${{ vars.DEVECO_CLT_URL }}
-      - name: Prepare CI build profile
-        run: cp ci/build-profile.ci.json5 build-profile.json5
-      - name: Lint
-        run: |
-          set -o pipefail
-          devecocli check lint | tee lint_report.txt
-          if grep -E "Errors:[[:space:]]*[1-9]" lint_report.txt; then
-            echo "::error::Lint finished with errors (see report above)"
-            exit 1
-          fi
+      - name: Prepare unsigned CI build profile
+        run: test -f build-profile.json5 || cp ci/build-profile.ci.json5 build-profile.json5
+      - name: Install project dependencies
+        run: ohpm install --all --cache "$OHPM_CACHE"
+      - name: Native lint with fresh fail-closed evidence
+        run: node ci/run-native-lint.cjs "$RUNNER_TEMP/native-lint"
+      - name: Upload lint evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-evidence
+          path: |
+            ${{ runner.temp }}/native-lint/
+            ${{ runner.temp }}/harmonyos-clt/evidence/
+          if-no-files-found: error
+          retention-days: 7
 
   build:
     name: Build unsigned debug HAP
@@ -88,31 +85,39 @@ jobs:
     if: ${{ vars.DEVECO_CLT_URL != '' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-java@v4
         with:
-          node-version: '22'
-      - name: Install DevEco CLI
-        run: npm install -g @deveco/deveco-cli
-      - name: Install Command Line Tools
-        run: |
-          # CLT zip 超 GitHub 单文件 2GiB 限制，拆为 part-00/part-01 两段发布，下载后拼接
-          curl -L --fail --retry 3 -o clt-part-00 "$DEVECO_CLT_URL"
-          curl -L --fail --retry 3 -o clt-part-01 "${DEVECO_CLT_URL%00}01"
-          cat clt-part-00 clt-part-01 > clt.zip
-          unzip -q clt.zip -d clt
-          clt_dir=$(find clt -maxdepth 2 -type d -name 'command-line-tools' | head -1)
-          if [ -z "$clt_dir" ]; then clt_dir=$(find clt -maxdepth 2 -mindepth 1 -type d | head -1); fi
-          echo "DEVECO_CLI_CLT_PATH=$(pwd)/$clt_dir" >> "$GITHUB_ENV"
+          distribution: temurin
+          java-version: '21'
+      - name: Install verified Command Line Tools
+        run: bash ci/install-clt.sh "$RUNNER_TEMP/harmonyos-clt"
         env:
           DEVECO_CLT_URL: ${{ vars.DEVECO_CLT_URL }}
-      - name: Prepare CI build profile
-        run: cp ci/build-profile.ci.json5 build-profile.json5
-      - name: Build
-        run: devecocli build --product default --modules entry@default --build-mode debug
+      - name: Prepare unsigned CI build profile
+        run: test -f build-profile.json5 || cp ci/build-profile.ci.json5 build-profile.json5
+      - name: Clean and build with direct Hvigor
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/native-build"
+          ohpm install --all --cache "$OHPM_CACHE" 2>&1 | tee "$RUNNER_TEMP/native-build/ohpm.log"
+          hvigorw clean --no-daemon 2>&1 | tee "$RUNNER_TEMP/native-build/clean.log"
+          hvigorw assembleHap --mode module -p module=entry@default -p product=default --no-daemon 2>&1 | tee "$RUNNER_TEMP/native-build/build.log"
+          grep -q 'BUILD SUCCESSFUL' "$RUNNER_TEMP/native-build/build.log"
+          python3 ci/check-hap.py entry/build/default/outputs/default/entry-default-unsigned.hap > "$RUNNER_TEMP/native-build/hap.json"
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-evidence
+          path: |
+            ${{ runner.temp }}/native-build/
+            ${{ runner.temp }}/harmonyos-clt/evidence/
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload unsigned HAP
         uses: actions/upload-artifact@v4
         with:
           name: entry-unsigned-hap
-          path: entry/build/default/outputs/default/*.hap
-          if-no-files-found: warn
+          path: entry/build/default/outputs/default/entry-default-unsigned.hap
+          if-no-files-found: error
           retention-days: 7

@@ -21,10 +21,26 @@ const gachaRepo={
   async getOrCreateArchive(uid){gachaWrites++;let archive=archives.find(a=>a.uid===uid);if(!archive){archive={id:archives.length+1,uid};archives.push(archive);}return archive;},
   async getItemsByArchive(id){return gachaRows.filter(row=>row.archiveId===id);},
   async insertItems(items){gachaWrites++;gachaRows.push(...items);return items.length;},
+  async importArchives(pending){
+    let inserted=0;
+    for(const [uid,items] of pending){
+      const archive=await this.getOrCreateArchive(uid);
+      const key=item=>`${[1000,2000].includes(item.gachaType)?'b':'s'}:${item.gachaId}`;
+      const known=new Set((await this.getItemsByArchive(archive.id)).map(key));
+      const fresh=items.filter(item=>{const value=key(item);if(known.has(value))return false;known.add(value);return true;});
+      inserted+=await this.insertItems(fresh.map(item=>Object.assign(Object.create(Object.getPrototypeOf(item)),item,{archiveId:archive.id})));
+    }
+    return inserted;
+  },
 };
 globalThis.__dataPort={gachaRepo};
+const gachaItemUrl=await ets('model/GachaItem.ets');
+const gachaTypeUrl=await ets('model/GachaType.ets');
+const preparationUrl=await ets('model/UigfImportPreparation.ets',{'./GachaItem':gachaItemUrl,'./GachaType':gachaTypeUrl});
 const {UigfService}=await import(await ets('service/UigfService.ets',{
   '../data/repo/GachaRepo':url('export const GachaRepo=globalThis.__dataPort.gachaRepo;'),
+  '../model/GachaArchive':await ets('model/GachaArchive.ets'),
+  '../model/UigfImportPreparation':preparationUrl,
   '../model/GachaItem':await ets('model/GachaItem.ets'),
   '../model/GachaType':await ets('model/GachaType.ets'),
   '../common/Logger':logger,

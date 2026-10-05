@@ -213,3 +213,6 @@ const wikiMotionSource = require('node:fs').readFileSync(require('node:path').re
 assert.match(wikiMotionSource, /@StorageProp\('reduceMotion'\) reduceMotion/);
 assert.match(wikiMotionSource, /\.duration\(this\.reduceMotion \? 0 : 240\)/);
 assert.match(wikiMotionSource, /\.curve\(this\.reduceMotion \? Curve\.Linear : Curve\.Ease\)/);
+
+assert.match(wikiMotionSource, /\.effectMode\(this\.reduceMotion \? EdgeEffect\.None : EdgeEffect\.Spring\)/);
+assert.doesNotMatch(wikiMotionSource, /\.edgeEffect\(this\.reduceMotion/);
