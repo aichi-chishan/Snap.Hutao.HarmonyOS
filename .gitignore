@@ -50,6 +50,11 @@ shot_*.jpeg
 shot_*.png
 layout*.json
 
+# ===== 本地差异包（非源码；导入后可自行删除）=====
+/Hutao-cumulative-*.zip
+/*.patch
+/*.bundle
+
 # ===== 临时文件 / 备份 =====
 .tmp_*
 *.bak

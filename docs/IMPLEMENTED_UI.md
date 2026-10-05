@@ -43,4 +43,3 @@ TYPESCRIPT_PATH=<TypeScript模块路径> node tests/ui-platform-contracts.cjs
 - 没有厂商已确认的原神 HarmonyOS Bundle/公开 Ability/URI，故默认不填写虚构目标。用户可以填写实际已知入口，待厂商资料或设备确认后才可添加内置预设。
 - 无可用API24/26设备、模拟器与签名，无法声称安装运行、全屏视频解码、桌面交互和系统拉起已实测。
 - 普通HAP无法读取其他应用私有数据、控制其进程、改Windows注册表、执行exe或覆盖游戏安装资源；这些属于非注入平台差异，须在总功能矩阵单列。
-
