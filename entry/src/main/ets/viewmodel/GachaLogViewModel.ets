@@ -10,6 +10,7 @@ import { GachaItem } from '../model/GachaItem';
 import { GachaStatistics, PoolStatistics, FiveStarDetail } from '../model/GachaStatistics';
 import { RefreshProgress } from '../model/RefreshProgress';
 import { WikiMetaService, GachaEventMeta } from '../service/WikiMetaService';
+import { UigfImportJob } from '../service/UigfImportJob';
 import { UigfService, UigfImportResult } from '../service/UigfService';
 import { UigfImportPreparation, UigfImportPreview } from '../model/UigfImportPreparation';
 import { Logger } from '../common/Logger';
@@ -27,6 +28,9 @@ export class GachaLogViewModel {
   importPreview: UigfImportPreview = new UigfImportPreview();
   importUids: string[] = [];
   exportUids: string[] = [];
+  exportVersion: string = 'v4.2';
+  isPreparingImport: boolean = false;
+  private importJob: UigfImportJob | undefined = undefined;
   private preparedImport: UigfImportPreparation | undefined = undefined;
   private importGeneration: number = 0;
   private loadGeneration: number = 0;
@@ -122,17 +126,44 @@ export class GachaLogViewModel {
     } finally { this.isTransferring = false; }
   }
 
-  /** 文件只解析一次；这里只保存有界的已验证记录，不保存原始文件副本。 */
-  prepareImport(text: string): void {
+  /** Native preparation is cancellable and never adopts a stale owner's worker result. */
+  async prepareImport(text: string): Promise<boolean> { return await this.prepareImportSource(text, false); }
+
+  async prepareImportFile(uri: string): Promise<boolean> { return await this.prepareImportSource(uri, true); }
+
+  private async prepareImportSource(source: string, isFile: boolean): Promise<boolean> {
     this.clearImport();
-    const prepared: UigfImportPreparation = UigfService.getInstance().prepareImport(text);
-    this.preparedImport = prepared;
-    this.importPreview = prepared.preview();
-    this.importUids = this.importPreview.uids.slice();
+    const generation: number = this.importGeneration;
+    const operation: number = this.operationGeneration;
+    const job: UigfImportJob = new UigfImportJob();
+    this.importJob = job;
+    this.isPreparingImport = true;
+    let prepared: UigfImportPreparation | undefined = undefined;
+    try {
+      prepared = await job.prepare(source, isFile, () => {
+        if (generation !== this.importGeneration || operation !== this.operationGeneration) { throw new Error('UIGF 预览已失效'); }
+      });
+      if (generation !== this.importGeneration || operation !== this.operationGeneration) { return false; }
+      this.preparedImport = prepared;
+      this.importPreview = prepared.preview();
+      this.importUids = this.importPreview.uids.slice();
+      prepared = undefined;
+      return true;
+    } catch (e) {
+      if (generation !== this.importGeneration || operation !== this.operationGeneration) { return false; }
+      if (e instanceof Error) { throw e; }
+      throw new Error('UIGF 处理失败，请重新选择文件');
+    } finally {
+      prepared?.dispose();
+      if (this.importJob === job) { this.importJob = undefined; this.isPreparingImport = false; }
+    }
   }
 
   clearImport(): void {
     this.importGeneration++;
+    this.importJob?.cancel();
+    this.importJob = undefined;
+    this.isPreparingImport = false;
     this.preparedImport?.dispose();
     this.preparedImport = undefined;
     this.importPreview = new UigfImportPreview();

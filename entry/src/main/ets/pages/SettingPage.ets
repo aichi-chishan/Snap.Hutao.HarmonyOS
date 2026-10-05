@@ -1416,10 +1416,8 @@ export struct SettingPage {
           })
 
           this.sectionTitle('反馈与诊断')
-          this.rowItem('复制诊断信息', '应用版本、系统版本、API、设备类型与主题', () => {
-            SupportService.copyDiagnostics().then(() => {
-              this.toast('诊断信息已复制，可补充问题描述后提交反馈');
-            }).catch(() => { this.toast('复制失败，请重试'); });
+          this.rowItem('离线帮助与诊断预览', '操作说明 / 帮助语言 / 确认内容后再复制', () => {
+            router.pushUrl({ url: 'pages/HelpPage' });
           })
           this.rowItem('提交问题反馈', '打开本项目 GitHub Issues', () => {
             SupportService.openIssues().catch(() => { this.toast('暂时无法打开反馈页面'); });
