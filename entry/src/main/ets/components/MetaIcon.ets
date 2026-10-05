@@ -7,7 +7,7 @@
  * 因此 rawfile 图标通过 resourceManager.getRawFileContent 读入后落盘 cacheDir/rawicons/，
  * Image 以 file:// 引用；同一图标进程内缓存，避免重复读包。
  */
-import { fileIo } from '@kit.CoreFileKit';
+import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { ResourcePackService } from '../data/remote/ResourcePackService';
 import { StandardIconService } from '../data/remote/StandardIconService';
 import { GameDataService } from '../service/GameDataService';
@@ -30,14 +30,22 @@ export struct MetaIcon {
   /** true 时按圆形裁剪（头像场景，objectFit Cover） */
   @Prop circular: boolean = false;
   /** true 时 rawfile 缺失走云端资源包缓存通道 */
-  @Prop remoteFallback: boolean = false;
+  @Prop @Watch('onMetaChanged') remoteFallback: boolean = false;
   /** 当前图源 */
   @State src: string = '';
   /** 异步解析令牌：name/category 变化后丢弃过期结果 */
   private resolveToken: number = 0;
 
+  private attached: boolean = false;
+
   aboutToAppear(): void {
+    this.attached = true;
     this.resolve();
+  }
+
+  aboutToDisappear(): void {
+    this.attached = false;
+    this.resolveToken++;
   }
 
   /** @Prop 变化（切换角色/物品）时重新解析图源 */
@@ -46,17 +54,16 @@ export struct MetaIcon {
   }
 
   resolve(): void {
+    if (!this.attached) { return; }
     const token: number = ++this.resolveToken;
+    this.src = '';
     if (this.name.length === 0) {
-      Logger.info(META_TAG, `resolve skip: name empty`);
       this.src = '';
       return;
     }
-    Logger.info(META_TAG, `resolve begin category=${this.category} name=${this.name}`);
     // 1) 远端更新图标优先（GitHub 数据更新后即用新版，未下载时不命中）
     try {
       const remote: string = GameDataService.getInstance().readIcon(this.category, this.name);
-      Logger.info(META_TAG, `readIcon -> '${remote}'`);
       if (remote.length > 0) {
         this.src = remote;
         return;
@@ -70,7 +77,6 @@ export struct MetaIcon {
       return;
     }
     // 3) rawfile → 沙盒缓存文件
-    Logger.info(META_TAG, `resolve -> loadRawfileCached`);
     this.loadRawfileCached(this.category, this.name, token).catch((e: Error) => {
       Logger.error(META_TAG, `loadRawfileCached rejected: ${e.message}`);
     });
@@ -85,12 +91,12 @@ export struct MetaIcon {
       // 已存在或父目录缺失：逐级创建
     }
     const segs: string[] = full.split('/');
-    let cur: string = '';
+    let cur: string = full.startsWith('/') ? '/' : '';
     for (let i = 0; i < segs.length; i++) {
       if (segs[i].length === 0) {
         continue;
       }
-      cur += (cur.length > 0 ? '/' : '') + segs[i];
+      cur += (cur.length > 0 && !cur.endsWith('/') ? '/' : '') + segs[i];
       try {
         fileIo.mkdirSync(cur);
       } catch (e) {
@@ -104,36 +110,32 @@ export struct MetaIcon {
     const key: string = `${category}/${name}`;
     const cached: string | undefined = RAW_CACHE.get(key);
     if (cached !== undefined) {
-      Logger.info(META_TAG, `cache hit ${key} -> '${cached}'`);
-      if (token === this.resolveToken) {
+      if (this.attached && token === this.resolveToken) {
         this.src = cached;
         if (cached.length === 0 && this.remoteFallback) {
-          this.tryRemote(category, name, token);
+          this.tryRemote(category, name, token).catch((error: Error) => {
+            Logger.warn(META_TAG, `remote icon failed: ${error.message}`);
+          });
         }
       }
       return;
     }
     const dir: string = `${AppContextProvider.getCacheDir()}/rawicons/${category}`;
     const dest: string = `${dir}/${name}.png`;
-    Logger.info(META_TAG, `cache miss ${key}; dest=${dest}`);
     try {
       if (fileIo.accessSync(dest)) {
-        Logger.info(META_TAG, `dest exists ${dest}`);
-        RAW_CACHE.set(key, `file://${dest}`);
-        if (token === this.resolveToken) {
-          this.src = `file://${dest}`;
+        RAW_CACHE.set(key, fileUri.getUriFromPath(dest));
+        if (this.attached && token === this.resolveToken) {
+          this.src = fileUri.getUriFromPath(dest);
         }
         return;
       }
     } catch (e) {
-      Logger.info(META_TAG, `accessSync miss ${key}: ${(e as Error).message}`);
       // 未缓存，继续
     }
     try {
       const rm = AppContextProvider.getResourceManager();
-      Logger.info(META_TAG, `reading rawfile icons/${category}/${name}.png...`);
       const raw: Uint8Array = await rm.getRawFileContent(`icons/${category}/${name}.png`);
-      Logger.info(META_TAG, `rawfile read ok bytes=${raw.byteLength}`);
       await MetaIcon.ensureDirChain(dir);
       const file = fileIo.openSync(dest, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
       try {
@@ -141,37 +143,39 @@ export struct MetaIcon {
       } finally {
         fileIo.closeSync(file);
       }
-      const src: string = `file://${dest}`;
+      const src: string = fileUri.getUriFromPath(dest);
       RAW_CACHE.set(key, src);
-      Logger.info(META_TAG, `rawfile cached ${key} -> ${dest}`);
-      if (token === this.resolveToken) {
+      if (this.attached && token === this.resolveToken) {
         this.src = src;
       }
     } catch (e) {
       Logger.warn(META_TAG, `rawfile ${category}/${name} fail: ${(e as Error).message}`);
       RAW_CACHE.set(key, '');
-      if (token === this.resolveToken) {
+      if (this.attached && token === this.resolveToken) {
         this.src = '';
       }
       if (this.remoteFallback) {
-        this.tryRemote(category, name, token);
+        this.tryRemote(category, name, token).catch((error: Error) => {
+            Logger.warn(META_TAG, `remote icon failed: ${error.message}`);
+          });
       }
     }
   }
 
 /** rawfile 缺失时从远端拉取（幂等）：标准图标静态 CDN 优先，云端资源包清单次之 */
   private async tryRemote(category: string, name: string, token: number): Promise<void> {
-    if (!this.remoteFallback || name.length === 0) {
+    if (!this.attached || token !== this.resolveToken || !this.remoteFallback || name.length === 0) {
       return;
     }
     let found: string = await StandardIconService.ensure(category, name);
+    if (!this.attached || token !== this.resolveToken || !this.remoteFallback) { return; }
     if (found.length === 0) {
       found = await ResourcePackService.ensure(category, name);
     }
     if (found.length > 0) {
-      const src: string = `file://${found}`;
+      const src: string = fileUri.getUriFromPath(found);
       RAW_CACHE.set(`${category}/${name}`, src);
-      if (token === this.resolveToken) {
+      if (this.attached && token === this.resolveToken) {
         this.src = src;
       }
     }
