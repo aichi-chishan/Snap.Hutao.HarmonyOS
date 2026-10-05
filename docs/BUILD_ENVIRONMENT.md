@@ -125,3 +125,7 @@ codelinter --exit-on error -c code-linter.json5 -f json -o lint-report.json .
 离线测试会明确跳过仅依赖原生 parser 的成功案例，并验证缺少 parser 时生产门禁确实拒绝；启用 CLT 的 lint job 会实际运行这些原生语法案例。有效/无效删除、类字段初始化、嵌套 UI 回调、畸形语法、字面量变动态键的变异以及真实 runner 的阻断链均有回归。
 
 这个替代方案**尚未恢复完整原生 lint 覆盖**：移除第一个 matcher 的阻塞后，下一个 `NoUnsafeAssignmentCheck` 也出现相同 CFG 解引用错误。该规则和其他原生规则没有被关闭；内部错误门禁仍会失败。不得把补充 AST 检查通过或 JSON 的 0 error 写成完整 lint 通过。
+
+### Reconstruction checkpoint 12 native recheck
+
+The 2026-10-05 frozen checkpoint12 run checks 231 production files. The mandatory ArkTS dynamic-delete AST gate reports zero violations. Full native lint still fails closed: 41 distinct file-check failures plus 18 invalid configured security-rule occurrences (59 internal/configuration errors). This is not a lint pass despite successful ArkTS/HAP compilation. The invalid rule identifiers are being audited against the official installed registry; no extra rule or file has been suppressed.

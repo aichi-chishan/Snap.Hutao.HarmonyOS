@@ -1798,7 +1798,7 @@ export struct GachaLogPage {
     }
   }
 
-  /** 选择文件导入 UIGF（v4.2 / v4.0 / v3.x） */
+  /** 选择 UIGF 文件；文档读取、UTF-8 解码及全文件校验在 taskpool 完成。 */
   async uigfImport(): Promise<void> {
     if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
     const epoch: number = this.pageEpoch;
@@ -1815,22 +1815,9 @@ export struct GachaLogPage {
       if (!this.pageActive || epoch !== this.pageEpoch || uris.length === 0) {
         return;
       }
-      const file: fileIo.File = fileIo.openSync(uris[0], fileIo.OpenMode.READ_ONLY);
-      try {
-        const stat: fileIo.Stat = fileIo.statSync(file.fd);
-        if (!Number.isSafeInteger(stat.size) || stat.size <= 0 || stat.size > UIGF_MAX_BYTES) {
-          throw new Error('UIGF 文件为空或超过 32 MiB 限制');
-        }
-        const buf: ArrayBuffer = new ArrayBuffer(stat.size);
-        const read: number = fileIo.readSync(file.fd, buf);
-        if (read !== stat.size) { throw new Error('UIGF 文件读取不完整，请重新选择文件'); }
-        if (fileIo.statSync(file.fd).size !== stat.size) { throw new Error('读取期间 UIGF 文件大小发生变化'); }
-        const text: string = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
-        this.vm.prepareImport(text);
-        this.showImportPreview = true;
-      } finally {
-        fileIo.closeSync(file);
-      }
+      const ready: boolean = await this.vm.prepareImportFile(uris[0]);
+      if (!this.pageActive || epoch !== this.pageEpoch || !ready) { return; }
+      this.showImportPreview = true;
     } catch (e) {
       if (this.pageActive && epoch === this.pageEpoch) {
         this.vm.clearImport();
@@ -1840,13 +1827,13 @@ export struct GachaLogPage {
     } finally { this.vm.isTransferring = false; }
   }
 
-  /** 用户确认所选 UID 后导出 UIGF v4.2（含千星奇域）。 */
+  /** 用户选择目标版本和 UID 后导出；不能表示的数据会明确拒绝。 */
   async uigfExport(): Promise<void> {
     if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring || this.vm.archives.length === 0) { return; }
     const epoch: number = this.pageEpoch;
     this.vm.isTransferring = true;
     try {
-      const json: string = await UigfService.getInstance().buildExportJson(this.vm.exportUids.slice());
+      const json: string = await UigfService.getInstance().buildExportJson(this.vm.exportUids.slice(), this.vm.exportVersion);
       if (!this.pageActive || epoch !== this.pageEpoch) { return; }
       if (json.length > UIGF_MAX_BYTES) { throw new Error('UIGF 导出超过 32 MiB 限制'); }
       const bytes: Uint8Array = util.TextEncoder.create().encodeInto(json);
@@ -1866,7 +1853,7 @@ export struct GachaLogPage {
         fileIo.closeSync(file);
       }
       this.showExportOptions = false;
-      this.toast('导出成功（UIGF v4.2）');
+      this.toast(`导出成功（UIGF ${this.vm.exportVersion}）`);
     } catch (e) {
       if (this.pageActive && epoch === this.pageEpoch) { this.toast(`导出失败：${(e as Error).message}`); }
     } finally { this.vm.isTransferring = false; }
@@ -1911,7 +1898,7 @@ export struct GachaLogPage {
     Column({ space: 8 }) {
       Text(`UIGF ${this.vm.importPreview.version} · ${this.vm.importPreview.totalCount} 条唯一记录`)
         .fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
-      Text('已检查全部归档。只合并勾选的 UID；已有记录跳过，所选归档在一个事务中提交，失败全部回滚。')
+      Text('已在后台检查全部归档。只合并所选 UID 的已知原神记录字段（非原文件备份）；已有记录跳过，所选归档一起提交，失败全部回滚。')
         .fontSize(12).fontColor($r('app.color.text_secondary'))
       ForEach(this.vm.importPreview.archives, (archive: UigfArchivePreview) => {
         Row({ space: 8 }) {
@@ -1934,8 +1921,12 @@ export struct GachaLogPage {
   @Builder
   exportOptionsPanel() {
     Column({ space: 8 }) {
-      Text('选择导出 UID · UIGF v4.2').fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
-      Text('保留常规池与颂愿；本轮仅提供 v4.2 导出，不执行有损降级。').fontSize(12).fontColor($r('app.color.text_secondary'))
+      Text(`选择导出 UID · UIGF ${this.vm.exportVersion}`).fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+      Select([{ value: 'v4.2' }, { value: 'v4.1' }, { value: 'v4.0' }, { value: 'v3.0' }, { value: 'v2.4' }, { value: 'v2.3' }, { value: 'v2.2' }])
+        .value(this.vm.exportVersion).constraintSize({ minHeight: 44 }).accessibilityText('UIGF 导出版本')
+        .enabled(!this.vm.isTransferring).onSelect((index: number, value: string) => { this.vm.exportVersion = value; })
+      Text('旧版仅支持单个 UID；颂愿需 v4.2，集录需 v3.0 以上。不支持的字段、语言或时间会停止导出，不会静默丢弃。')
+        .fontSize(12).fontColor($r('app.color.text_secondary'))
       ForEach(this.vm.archives, (archive: GachaArchive) => {
         Row({ space: 8 }) {
           Checkbox({ name: `uigf_export_${archive.uid}` }).select(this.vm.exportUids.indexOf(archive.uid) >= 0)
@@ -1969,6 +1960,13 @@ export struct GachaLogPage {
         }.width('100%')
       } else {
         Text('暂无本地归档，可直接导入 UIGF 文件').fontSize(13).fontColor($r('app.color.text_secondary'))
+      }
+      if (this.vm.isPreparingImport) {
+        Row({ space: 8 }) {
+          Text('正在后台读取、校验 UIGF…').fontSize(12).fontColor($r('app.color.text_secondary'))
+          Button('取消解析').constraintSize({ minHeight: 44 }).hoverEffect(HoverEffect.Highlight)
+            .onClick(() => { this.vm.clearImport(); this.showImportPreview = false; })
+        }.width('100%')
       }
       Flex({ wrap: FlexWrap.Wrap }) {
         Button('导入 UIGF').fontSize(12).constraintSize({ minHeight: 44 }).margin({ right: 8, bottom: 4 }).hoverEffect(HoverEffect.Highlight)

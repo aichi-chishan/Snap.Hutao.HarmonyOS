@@ -29,6 +29,7 @@ function method(name) {
 function harness(initial=[{id:1,uid:A,isSelected:false},{id:2,uid:B,isSelected:true}]) {
   const state={parseCalls:0,importCalls:0,archives:initial.map(row=>({...row})),rows:[],created:[],selected:[],deleted:[],refreshCalls:[],urlCalls:[],changes:[],cancelled:0,
     reads:0,opens:0,closes:0,writes:[],writeLengths:[],allocations:[],statCalls:0,closeError:false,statSize:undefined,afterSize:undefined,shortRead:false,shortWrite:false,pickerCalls:0,text:'',nextArchives:undefined,nextItems:undefined,nextSelect:undefined,nextRefresh:undefined,nextUrl:undefined,nextPicker:undefined,nextHistory:undefined};
+  const sdk=require('./helpers/uigf-sdk-double.cjs')(state);
   const modules=new Map();
   const repo={
     async getAllArchives(){state.reads++;if(state.nextArchives){const gate=state.nextArchives;state.nextArchives=undefined;return gate.promise;}return state.archives.map(row=>({...row}));},
@@ -47,14 +48,16 @@ function harness(initial=[{id:1,uid:A,isSelected:false},{id:2,uid:B,isSelected:t
     async refreshByStoken(uid,progress,full){state.refreshCalls.push({uid,progress,full});if(state.nextRefresh){const gate=state.nextRefresh;state.nextRefresh=undefined;return gate.promise;}return {ok:true,uid,message:'refreshed',fetchedCount:0};},
     async importByUrl(url,uid,progress,full){state.urlCalls.push({url,uid,progress,full});if(state.nextUrl){const gate=state.nextUrl;state.nextUrl=undefined;return gate.promise;}return {ok:true,uid:C,message:'imported',fetchedCount:0};}
   };
-  const globals={Error,Date,JSON:{parse:(...args)=>{state.parseCalls++;return JSON.parse(...args);},stringify:JSON.stringify},AppStorage:{setOrCreate:(key,value)=>state.changes.push([key,value])},Observed:value=>value};
+  const globals={...sdk.globals,Error,Date,JSON:{parse:(...args)=>{state.parseCalls++;return JSON.parse(...args);},stringify:JSON.stringify},AppStorage:{setOrCreate:(key,value)=>state.changes.push([key,value])},Observed:value=>value};
   const metadata={ensureIconMaps:async()=>{},getGachaEvents:async()=>[]};
   function load(name){
     if(modules.has(name))return modules.get(name);
-    const compiled=ts.transpileModule(fs.readFileSync(path.join(root,name+'.ets'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,experimentalDecorators:true},reportDiagnostics:true});
+    const compiled=ts.transpileModule(fs.readFileSync(path.join(root,name+'.ets'),'utf8').replace(/^@Concurrent\s*$/gm,''),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,experimentalDecorators:true},reportDiagnostics:true});
     assert.equal(compiled.diagnostics.length,0,name);
     const module={exports:{}};
     vm.runInNewContext(`(function(require,module,exports){${compiled.outputText}\n})`,globals,{filename:name+'.ets'})(id=>{
+      if(id==='@kit.ArkTS')return sdk.arkTS;
+      if(id==='@kit.CoreFileKit')return sdk.files;
       if(id.endsWith('/GachaRepo'))return {GachaRepo:repo};
       if(id.endsWith('/GachaLogService'))return {GachaLogService:{getInstance:()=>network},RefreshResult:class{}};
       if(id.endsWith('/WikiMetaService'))return {WikiMetaService:metadata};
@@ -87,16 +90,17 @@ function harness(initial=[{id:1,uid:A,isSelected:false},{id:2,uid:B,isSelected:t
     toast:message=>toasts.push(message),loadPoolViewModes(){},syncs:0,syncAll(){this.syncs++;},syncProgress(){},preloadHistoryBanners(){}});return {target,toasts};}
   return {state,repo,model,Model,page};
 }
-const uigfFile=uid=>JSON.stringify({info:{version:'v4.2'},hk4e:[{uid,timezone:8,list:[{id:'184467440737095516151234',gacha_type:400,uigf_gacha_type:301,item_id:10000001,rank_type:5,time:'2026-10-05 10:00:00',name:'试验🔥',item_type:'角色',count:1}]}]});
+const uigfFile=uid=>JSON.stringify({info:{version:'v4.2'},hk4e:[{uid,timezone:8,list:[{id:'1844674407370955161',gacha_type:400,uigf_gacha_type:301,item_id:10000001,rank_type:5,time:'2026-10-05 10:00:00',name:'试验🔥',item_type:'角色',count:1}]}]});
 function strictModelTypes() {
   // In-memory TypeScript host: validates the production VM/model graph, not HarmonyOS SDK declarations.
   const virtualRoot='/offline-gacha-types',files=new Map();
   const put=(name,text)=>files.set(virtualRoot+'/'+name+'.ts',text);
-  for(const name of ['viewmodel/GachaLogViewModel','model/GachaArchive','model/GachaItem','model/GachaType','model/GachaStatistics','model/RefreshProgress','model/UigfImportPreparation'])put(name,fs.readFileSync(path.join(root,name+'.ets'),'utf8'));
+  for(const name of ['viewmodel/GachaLogViewModel','model/GachaArchive','model/GachaItem','model/GachaType','model/GachaStatistics','model/RefreshProgress','model/UigfImportPreparation','model/UigfError'])put(name,fs.readFileSync(path.join(root,name+'.ets'),'utf8'));
   put('common/Logger',`export class Logger{static info(tag:string,message:string):void{} static warn(tag:string,message:string):void{}}`);
   put('service/UigfService',`import {UigfImportPreparation} from '../model/UigfImportPreparation';export class UigfImportResult{ok=false;uid='';message='';inserted=0;archiveCount=0;}
     export class UigfService{static getInstance():UigfService{return new UigfService();}static timezoneOfUid(uid:string):number{return 8;}static normalizeTime(value:string,from:number,to:number):string{return value;}
       prepareImport(text:string):UigfImportPreparation{return new UigfImportPreparation('v4.2',new Map());}async importPrepared(prepared:UigfImportPreparation,selected?:string[],checkCurrent?:()=>void):Promise<UigfImportResult>{return new UigfImportResult();}}`);
+  put('service/UigfImportJob',`import {UigfImportPreparation} from '../model/UigfImportPreparation';export class UigfImportJob{cancel():void{}async prepare(source:string,isFile:boolean,checkCurrent:()=>void):Promise<UigfImportPreparation>{throw Error();}}`);
   put('service/WikiMetaService',`export class GachaEventMeta{type=0;from=0;to=0;upOrange:number[]=[];}export class WikiMetaService{static async getGachaEvents():Promise<GachaEventMeta[]>{return [];}}`);
   put('service/GachaLogService',`import {RefreshProgress} from '../model/RefreshProgress';export class RefreshResult{ok=false;uid='';message='';fetchedCount=0;}
     export class GachaLogService{static getInstance():GachaLogService{return new GachaLogService();}cancelRefresh():void{}
@@ -166,8 +170,8 @@ function strictModelTypes() {
   });
   await test('offline UIGF import/export use the production service and imported UID never gains login authority',async()=>{
     const {state,model,page}=harness([]);const {target}=page();state.text=uigfFile(C);target.reloadData();await flush();
-    await target.uigfImport();assert.equal(state.created.length,0);assert.equal(state.parseCalls,1);assert.equal(target.showImportPreview,true);await target.confirmUigfImport();assert.equal(state.parseCalls,1,'confirmation does not parse the original file again');assert.equal(model.currentUid,C);assert.equal(model.gameAccountUid,'');assert.deepEqual(state.created,[C]);assert.equal(state.rows[0].gachaId,'184467440737095516151234');assert.equal(model.isTransferring,false);
-    target.prepareUigfExport();await target.uigfExport();assert.equal(state.writes.length,1);const exported=JSON.parse(state.writes[0]);assert.equal(String(exported.hk4e[0].uid),C);assert.equal(exported.hk4e[0].list[0].id,'184467440737095516151234');assert.equal(state.opens,state.closes);assert.equal(state.writeLengths[0],Buffer.byteLength(state.writes[0]));assert.ok(state.writeLengths[0]>state.writes[0].length,'UTF-8 bytes, not string length, are checked');
+    await target.uigfImport();assert.equal(state.created.length,0);assert.equal(state.parseCalls,1);assert.equal(target.showImportPreview,true);await target.confirmUigfImport();assert.equal(state.parseCalls,1,'confirmation does not parse the original file again');assert.equal(model.currentUid,C);assert.equal(model.gameAccountUid,'');assert.deepEqual(state.created,[C]);assert.equal(state.rows[0].gachaId,'1844674407370955161');assert.equal(model.isTransferring,false);
+    target.prepareUigfExport();await target.uigfExport();assert.equal(state.writes.length,1);const exported=JSON.parse(state.writes[0]);assert.equal(String(exported.hk4e[0].uid),C);assert.equal(exported.hk4e[0].list[0].id,'1844674407370955161');assert.equal(state.opens,state.closes);assert.equal(state.writeLengths[0],Buffer.byteLength(state.writes[0]));assert.ok(state.writeLengths[0]>state.writes[0].length,'UTF-8 bytes, not string length, are checked');
     await target.refreshAccount();assert.equal(state.refreshCalls.length,0);
   });
   await test('file-picker cancellation/unmount and duplicate commands cannot start unintended reads or imports',async()=>{
@@ -216,14 +220,14 @@ function strictModelTypes() {
   });
   await test('an input close failure clears its prepared confirmation instead of leaving a failed import armed',async()=>{
     const {state,model,page}=harness([]);const {target,toasts}=page();state.text=uigfFile(C);state.closeError=true;await target.uigfImport();
-    assert.equal(state.created.length,0);assert.equal(model.importPreview.archiveCount,0);assert.equal(target.showImportPreview,false);assert.equal(model.isTransferring,false);assert.match(toasts[0],/close failed/);
+    assert.equal(state.created.length,0);assert.equal(model.importPreview.archiveCount,0);assert.equal(target.showImportPreview,false);assert.equal(model.isTransferring,false);assert.match(toasts[0],/无法读取或后台解析失败/);
   });
   await test('page exposes local controls without a login branch and binds refresh to the separate account',()=>{
     assert.doesNotMatch(pageSource,/loginGuide\(/);
     const build=method('build');assert.match(build,/this\.localArchiveControls\(\)/);assert.doesNotMatch(build,/if \(!this\.isLoggedIn\)/);
     assert.match(build,/\.enabled\(this\.isLoggedIn && this\.vm\.gameAccountUid\.length > 0/);
     assert.match(pageSource,/Select\(this\.archiveOptions\(\)\)/);
-    assert.match(method('uigfImport'),/this\.vm\.prepareImport\(text\)/);assert.match(fs.readFileSync(path.join(root,'viewmodel/GachaLogViewModel.ets'),'utf8'),/this\.load\(this\.gameAccountUid, result\.uid\)/);
+    assert.match(method('uigfImport'),/await this\.vm\.prepareImportFile\(uris\[0\]\)/);assert.match(fs.readFileSync(path.join(root,'viewmodel/GachaLogViewModel.ets'),'utf8'),/this\.load\(this\.gameAccountUid, result\.uid\)/);
     assert.doesNotMatch(fs.readFileSync(path.join(root,'viewmodel/GachaLogViewModel.ets'),'utf8'),/getOrCreateArchive/);
   });
 })().catch(error=>{console.error(error);process.exitCode=1;});

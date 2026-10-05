@@ -36,11 +36,16 @@ const gachaRepo={
 globalThis.__dataPort={gachaRepo};
 const gachaItemUrl=await ets('model/GachaItem.ets');
 const gachaTypeUrl=await ets('model/GachaType.ets');
-const preparationUrl=await ets('model/UigfImportPreparation.ets',{'./GachaItem':gachaItemUrl,'./GachaType':gachaTypeUrl});
+const uigfErrorUrl=await ets('model/UigfError.ets');
+const preparationUrl=await ets('model/UigfImportPreparation.ets',{'./GachaItem':gachaItemUrl,'./GachaType':gachaTypeUrl,'./UigfError':uigfErrorUrl});
+const uigfBoundsUrl=await ets('model/UigfBounds.ets',{'./UigfError':uigfErrorUrl});
+const uigfCodecUrl=await ets('service/UigfCodec.ets',{'../model/GachaItem':gachaItemUrl,'../model/GachaType':gachaTypeUrl,'../model/UigfImportPreparation':preparationUrl,'../model/UigfBounds':uigfBoundsUrl,'../model/UigfError':uigfErrorUrl});
+const uigfExportUrl=await ets('service/UigfExportCodec.ets',{'../model/GachaItem':gachaItemUrl,'../model/GachaType':gachaTypeUrl,'../model/UigfBounds':uigfBoundsUrl,'./UigfCodec':uigfCodecUrl});
 const {UigfService}=await import(await ets('service/UigfService.ets',{
   '../data/repo/GachaRepo':url('export const GachaRepo=globalThis.__dataPort.gachaRepo;'),
   '../model/GachaArchive':await ets('model/GachaArchive.ets'),
   '../model/UigfImportPreparation':preparationUrl,
+  './UigfCodec':uigfCodecUrl, './UigfExportCodec':uigfExportUrl,
   '../model/GachaItem':await ets('model/GachaItem.ets'),
   '../model/GachaType':await ets('model/GachaType.ets'),
   '../common/Logger':logger,
@@ -59,7 +64,7 @@ await test('UIGF normalizes China, Europe, America and explicit ISO offsets with
   assert.throws(()=>UigfService.normalizeTime('2025-02-29 10:00:00',8,8));
 });
 await test('UIGF multiple UIDs retain huge string IDs and 400 while exporting normalized type 301',async()=>{
-  const big='184467440737095516151234';
+  const big='1844674407370955161';
   const result=await uigf.importFromText(file([
     {uid:100000001,timezone:8,list:[wish(big),wish(big)]},
     {uid:700000001,timezone:8,list:[wish(big)]},
@@ -92,7 +97,7 @@ await test('UIGF v4.2 permits UGC-only archives and keeps standard/UGC equal IDs
   }]}]});
   const result=await uigf.importFromText(text);assert.equal(result.ok,true);assert.equal(result.inserted,1);
   const exported=JSON.parse(await uigf.buildExportJson());
-  assert.equal(exported.hk4e_ugc[0].list[0].schedule_id,101);
+  assert.equal(exported.hk4e_ugc[0].list[0].schedule_id,'101');
   assert.equal(exported.hk4e_ugc[0].list[0].op_gacha_type,'1000');
   assert.equal((await uigf.importFromText(text)).inserted,0);
 });
