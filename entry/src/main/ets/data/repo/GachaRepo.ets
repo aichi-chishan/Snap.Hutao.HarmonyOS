@@ -6,6 +6,7 @@ import { relationalStore } from '@kit.ArkData';
 import { RelationalStoreHelper } from '../db/RelationalStoreHelper';
 import { GachaArchive } from '../../model/GachaArchive';
 import { GachaItem } from '../../model/GachaItem';
+import { GachaType } from '../../model/GachaType';
 import { Logger } from '../../common/Logger';
 
 const TAG: string = 'GachaRepo';
@@ -139,6 +140,65 @@ export class GachaRepo {
       inserted += affected;
     }
     return inserted;
+  }
+
+  /** 全文件预检后，一次同步事务提交全部所选 UID；不在事务中 await，也不修改输入记录。 */
+  static async importArchives(pending: Map<string, GachaItem[]>): Promise<number> {
+    if (pending.size === 0) { throw new Error('请至少选择一个 UID'); }
+    const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
+    let inserted: number = 0;
+    store.beginTransaction();
+    try {
+      for (const uid of pending.keys()) {
+        if (!/^[1-9][0-9]{8,9}$/.test(uid)) { throw new Error('无效的祈愿 UID'); }
+        const archivePred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('gacha_archives');
+        archivePred.equalTo('uid', uid);
+        const archiveRs: relationalStore.ResultSet = store.querySync(archivePred);
+        let archiveId: number = 0;
+        try {
+          if (archiveRs.goToFirstRow()) { archiveId = archiveRs.getLong(archiveRs.getColumnIndex('id')); }
+        } finally { archiveRs.close(); }
+        if (archiveId <= 0) {
+          const values: relationalStore.ValuesBucket = { 'uid': uid, 'is_selected': 0 };
+          archiveId = store.insertSync('gacha_archives', values);
+          if (archiveId <= 0) { throw new Error('创建祈愿档案失败'); }
+        }
+        const itemPred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('gacha_items');
+        itemPred.equalTo('archive_id', archiveId);
+        const existing: GachaItem[] = GachaRepo.readItems(store.querySync(itemPred));
+        const known: Set<string> = new Set<string>();
+        for (const item of existing) { known.add(GachaRepo.importKey(item)); }
+        const batch: relationalStore.ValuesBucket[] = [];
+        for (const item of pending.get(uid) ?? []) {
+          if (!(GachaType.isValid(item.gachaType) || item.gachaType === 400) || !/^[0-9]+$/.test(item.gachaId) ||
+            (item.uid.length > 0 && item.uid !== uid)) { throw new Error('祈愿记录包含无效 UID、卡池或 ID'); }
+          const key: string = GachaRepo.importKey(item);
+          if (known.has(key)) { continue; }
+          const values: relationalStore.ValuesBucket = GachaRepo.valuesOf(item);
+          values['archive_id'] = archiveId;
+          batch.push(values);
+          known.add(key);
+          if (batch.length === 500) {
+            if (store.batchInsertSync('gacha_items', batch) !== batch.length) { throw new Error('祈愿记录未完整写入'); }
+            inserted += batch.length;
+            batch.length = 0;
+          }
+        }
+        if (batch.length > 0) {
+          if (store.batchInsertSync('gacha_items', batch) !== batch.length) { throw new Error('祈愿记录未完整写入'); }
+          inserted += batch.length;
+        }
+      }
+      store.commit();
+      return inserted;
+    } catch (e) {
+      store.rollBack();
+      throw new Error(e instanceof Error ? e.message : '导入祈愿记录失败，全部变更已回滚');
+    }
+  }
+
+  private static importKey(item: GachaItem): string {
+    return `${GachaType.isBeyond(item.gachaType) ? 'b' : 's'}:${item.gachaId}`;
   }
 
   /** 全量刷新仅替换服务器实际返回窗口，较早的本地历史保留。 */

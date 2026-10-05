@@ -863,7 +863,7 @@ export struct WikiAvatarPage {
         .indicator(false)
         .duration(this.reduceMotion ? 0 : 240)
         .curve(this.reduceMotion ? Curve.Linear : Curve.Ease)
-        .edgeEffect(this.reduceMotion ? EdgeEffect.None : EdgeEffect.Spring)
+        .effectMode(this.reduceMotion ? EdgeEffect.None : EdgeEffect.Spring)
         .cachedCount(1)
         .onChange((idx: number) => {
           const target: WikiAvatarMeta | undefined = this.avatars[idx];

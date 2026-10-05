@@ -159,6 +159,10 @@
     {
       "name": "risk_modal_tint",
       "value": "#801E1E22"
+    },
+    {
+      "name": "element_icon_background",
+      "value": "#FF343E4D"
     }
   ]
 }
