@@ -98,7 +98,7 @@ export struct HomeLaunchCard {
           Text(this.launching ? '启动中...' : (this.detected ? '启动游戏' : '配置入口'))
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Color.White)
+            .fontColor($r('app.color.on_accent'))
         }
         .width('100%')
         .height(44)

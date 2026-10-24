@@ -29,7 +29,7 @@ export struct HomeAnnouncementCard {
       if (this.onRedeem !== undefined) {
         Text('兑换码')
           .fontSize(11)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
           .borderRadius(9)
           .backgroundColor($r('app.color.app_primary_bg'))
@@ -42,7 +42,7 @@ export struct HomeAnnouncementCard {
       }
       Text('查看全部 ›')
         .fontSize(12)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .onClick(() => {
           this.onTapMore()
         })
@@ -73,7 +73,7 @@ export struct HomeAnnouncementCard {
       } else {
         Text(item.typeName)
           .fontSize(9)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .padding({ left: 6, right: 6 })
           .textAlign(TextAlign.Center)
           .borderRadius(8)
@@ -91,7 +91,7 @@ export struct HomeAnnouncementCard {
         Row({ space: 6 }) {
           Text(item.typeName)
             .fontSize(10)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
           Text(HomeAnnouncementCard.formatDate(item.startTime))
             .fontSize(11)
             .fontColor($r('app.color.text_secondary'))

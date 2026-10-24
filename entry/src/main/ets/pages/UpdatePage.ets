@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { PageHeader } from '../components/PageHeader';
 import { AppRelease, UpdateChannel, UpdateStatus } from '../model/AppUpdate';
 import { UpdateViewModel } from '../viewmodel/UpdateViewModel';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 
 @Entry
 @Component
@@ -10,13 +11,26 @@ export struct UpdatePage {
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
   @State vm: UpdateViewModel = new UpdateViewModel();
   @State isWide: boolean = false;
+  /** 跳过此版本（对齐 Windows ViewTitleUpdatePackageSkipVersion：被跳过的 tag 不再提示，出现更新版本后自动恢复） */
+  @State skippedTag: string = '';
   private attached: boolean = false;
   aboutToAppear(): void { this.activate(); }
   onPageShow(): void { this.activate(); }
   onPageHide(): void { this.detach(); }
   aboutToDisappear(): void { this.detach(); }
-  private activate(): void { if (!this.attached) { this.attached = true; this.vm.activate(); } }
+  private activate(): void {
+    if (!this.attached) {
+      this.attached = true;
+      this.skippedTag = PreferencesStore.getString('app.update.skipped', '');
+      this.vm.activate();
+    }
+  }
   private detach(): void { this.attached = false; this.vm.invalidate(); }
+  private releaseSkipped(): boolean {
+    const release: AppRelease | undefined = this.vm.result.release;
+    return this.vm.result.status === UpdateStatus.Newer && release !== undefined
+      && release.tag.length > 0 && release.tag === this.skippedTag;
+  }
   private async open(project: boolean): Promise<void> {
     if (!this.attached) { return; }
     const context: common.Context | undefined = this.getUIContext().getHostContext();
@@ -27,7 +41,9 @@ export struct UpdatePage {
     switch (this.vm.result.status) {
       case UpdateStatus.Idle: return '手动检查公开发布版本';
       case UpdateStatus.Checking: return '正在读取项目发布信息…';
-      case UpdateStatus.Newer: return '发现较新的发布版本';
+      case UpdateStatus.Newer: return this.releaseSkipped()
+        ? `已跳过 ${this.skippedTag}；出现更新的发布版本时会再次提示`
+        : '发现较新的发布版本';
       case UpdateStatus.Equal: return '公开发布版本与本机版本相同';
       case UpdateStatus.LocalNewer: return '本机版本高于此通道的公开发布版本，无需降级';
       case UpdateStatus.NoRelease: return '项目尚无可用的公开发布版本';
@@ -85,11 +101,11 @@ export struct UpdatePage {
       Text(this.status()).fontSize(15).fontColor($r('app.color.text_primary')).width('100%')
       if (this.vm.busy) {
         Button('取消检查').width('100%').height(44).hoverEffect(HoverEffect.Highlight)
-          .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
           .onClick(() => { this.vm.cancel(); })
       } else {
         Button('检查更新').width('100%').height(44).hoverEffect(HoverEffect.Highlight)
-          .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
           .onClick(() => { this.vm.check(); })
       }
       if (this.vm.result.checkedAt > 0) {
@@ -109,7 +125,7 @@ export struct UpdatePage {
       Text('当前未配置经验证的鸿蒙分发渠道。发布页仅供阅读说明；安装请通过维护者确认的合法渠道，并由系统检查签名及确认')
         .fontSize(13).fontColor($r('app.color.text_secondary'))
       Button('打开项目发布列表').width('100%').height(44).enabled(!this.vm.busy && !this.vm.opening)
-        .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+        .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
         .hoverEffect(HoverEffect.Highlight).onClick(() => { this.open(true); })
       if (this.vm.openFailed) {
         Text('无法打开发布页面，请稍后重试').fontSize(13).fontColor($r('app.color.text_secondary'))
@@ -126,8 +142,31 @@ export struct UpdatePage {
         Text(this.apiAdvice()).fontSize(14).fontColor($r('app.color.text_primary'))
         Text(this.packageAdvice()).fontSize(13).fontColor($r('app.color.text_secondary'))
         Button('阅读此版本发布说明').width('100%').height(44).enabled(!this.vm.busy && !this.vm.opening)
-          .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
           .hoverEffect(HoverEffect.Highlight).onClick(() => { this.open(false); })
+        if (this.vm.result.status === UpdateStatus.Newer) {
+          if (this.releaseSkipped()) {
+            Text(`已跳过 ${this.skippedTag}；出现更新的发布版本时会再次提示`)
+              .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+            Button('取消跳过此版本').width('100%').height(44).enabled(!this.vm.busy)
+              .fontColor($r('app.color.text_primary')).backgroundColor($r('app.color.card_surface'))
+              .hoverEffect(HoverEffect.Highlight)
+              .onClick(() => {
+                this.skippedTag = '';
+                PreferencesStore.setString('app.update.skipped', '');
+              })
+          } else {
+            Button('跳过此版本').width('100%').height(44).enabled(!this.vm.busy)
+              .fontColor($r('app.color.text_secondary')).backgroundColor($r('app.color.card_surface'))
+              .hoverEffect(HoverEffect.Highlight)
+              .accessibilityText('跳过此版本，出现更新版本前不再提示')
+              .onClick(() => {
+                const release: AppRelease | undefined = this.release();
+                this.skippedTag = release !== undefined ? release.tag : '';
+                PreferencesStore.setString('app.update.skipped', this.skippedTag);
+              })
+          }
+        }
         Text('下方为项目发布说明（最多显示 8,000 字符），其中外部链接不会自动打开')
           .fontSize(12).fontColor($r('app.color.text_secondary'))
         Text(this.releaseNotes()).fontSize(14).fontColor($r('app.color.text_primary')).width('100%')

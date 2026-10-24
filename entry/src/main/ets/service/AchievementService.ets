@@ -29,6 +29,9 @@ export class UiafImportResult {
   fileCount: number = 0;
   mergedDone: number = 0;
   mergedTotal: number = 0;
+  added: number = 0;
+  updated: number = 0;
+  removed: number = 0;
   ok: boolean = false;
   message: string = '';
 }
@@ -355,8 +358,19 @@ export class AchievementService {
     result.fileCount = incoming.length;
     result.mergedTotal = records.length;
     result.mergedDone = records.filter((record: AchievementRecord) => AchievementRecord.isDone(record)).length;
-    result.message = `导入成功：${result.mergedDone} 项完成，共保留 ${result.mergedTotal} 项记录`;
-    Logger.info(TAG, `import uiaf: file=${result.fileCount} total=${result.mergedTotal} done=${result.mergedDone}`);
+    // 摘要对齐 Windows ServiceAchievementImportSummary：新增/更新/移除
+    const kept: Set<number> = new Set<number>();
+    for (const record of records) { kept.add(record.achId); }
+    existing.forEach((prev: AchievementRecord): void => {
+      if (!kept.has(prev.achId)) { result.removed++; }
+    });
+    for (const record of records) {
+      const prev: AchievementRecord | undefined = existing.get(record.achId);
+      if (prev === undefined) { result.added++; }
+      else if (prev.current !== record.current || prev.status !== record.status || prev.timestamp !== record.timestamp) { result.updated++; }
+    }
+    result.message = `当前存档已完成 ${result.mergedDone} 项成就。导入记录：新增 ${result.added}，更新 ${result.updated}，移除 ${result.removed}`;
+    Logger.info(TAG, `import uiaf: file=${result.fileCount} total=${result.mergedTotal} done=${result.mergedDone} add=${result.added} upd=${result.updated} del=${result.removed}`);
     return result;
   }
 }

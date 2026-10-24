@@ -170,7 +170,7 @@ export struct DailyNotePage {
         .fontColor($r('app.color.text_secondary'))
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -195,14 +195,15 @@ export struct DailyNotePage {
     return '通知设置';
   }
 
+  /** 顶栏图标：返回 NavIcon 可识别的系统符号名（替代 emoji，随主题色且不随字体漂移） */
   private barGlyph(slot: number): string {
     if (slot === DailyNotePage.BAR_VERIFY) {
-      return '✓';
+      return 'Check';
     }
     if (slot === DailyNotePage.BAR_ADD) {
-      return '＋';
+      return 'Setting';
     }
-    return '⚙';
+    return 'Setting';
   }
 
   private onBarAction(slot: number): void {
@@ -235,9 +236,7 @@ export struct DailyNotePage {
       if (slot === DailyNotePage.BAR_REFRESH) {
         NavIcon({ name: 'DailyNote', iconSize: 16 })
       } else {
-        Text(this.barGlyph(slot))
-          .fontSize(15)
-          .fontColor($r('app.color.text_secondary'))
+        NavIcon({ name: this.barGlyph(slot), iconSize: 15, symbolColor: $r('app.color.text_secondary') })
       }
       Text(this.barLabel(slot))
         .fontSize(13)
@@ -286,7 +285,7 @@ export struct DailyNotePage {
         .maxLines(2)
       Text('立即刷新')
         .fontSize(11)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           this.vm.refresh(this.currentUid).then((ok: boolean) => {
@@ -317,7 +316,7 @@ export struct DailyNotePage {
           .fontSize(14)
           .height(40)
           .backgroundColor($r('app.color.app_primary'))
-          .fontColor(Color.White)
+          .fontColor($r('app.color.on_accent'))
           .onClick(() => {
             this.goGeetest();
           })
@@ -455,12 +454,11 @@ export struct DailyNotePage {
           // 接口返回哈希命名（本地/CDN 无此图标）：直接用接口 URL，加载失败落中性占位
           MetaIcon({ category: 'AvatarIcon', name: item.avatarUrl, iconSize: 32 })
         } else {
-          Text('✈')
-            .fontSize(14)
-            .fontColor($r('app.color.text_secondary'))
-            .width(32)
-            .height(32)
-            .textAlign(TextAlign.Center)
+          Stack({ alignContent: Alignment.Center }) {
+            NavIcon({ name: 'Airplane', iconSize: 15, symbolColor: $r('app.color.text_secondary') })
+          }
+          .width(32)
+          .height(32)
         }
         Text(item.text)
           .fontSize(14)
@@ -545,26 +543,28 @@ export struct DailyNotePage {
           .layoutWeight(1)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text('✕')
-          .fontSize(16)
-          .fontColor($r('app.color.text_secondary'))
-          .width(40)
-          .height(40)
-          .textAlign(TextAlign.Center)
-          .hoverEffect(HoverEffect.Highlight)
-          .onClick(() => {
-            this.onCardRemove(entry);
-          })
-        Text('⚙')
-          .fontSize(16)
-          .fontColor($r('app.color.text_secondary'))
-          .width(40)
-          .height(40)
-          .textAlign(TextAlign.Center)
-          .hoverEffect(HoverEffect.Highlight)
-          .onClick(() => {
-            this.onCardNotify(entry);
-          })
+        Stack({ alignContent: Alignment.Center }) {
+          NavIcon({ name: 'Close', iconSize: 16, symbolColor: $r('app.color.text_secondary') })
+        }
+        .width(40)
+        .height(40)
+        .hoverEffect(HoverEffect.Highlight)
+        .accessibilityText('移除该便笺追踪')
+        .accessibilityLevel('yes')
+        .onClick(() => {
+          this.onCardRemove(entry);
+        })
+        Stack({ alignContent: Alignment.Center }) {
+          NavIcon({ name: 'Setting', iconSize: 17, symbolColor: $r('app.color.text_secondary') })
+        }
+        .width(40)
+        .height(40)
+        .hoverEffect(HoverEffect.Highlight)
+        .accessibilityText('该角色的通知设置')
+        .accessibilityLevel('yes')
+        .onClick(() => {
+          this.onCardNotify(entry);
+        })
       }
       .width('100%')
       .height(40)
@@ -701,7 +701,7 @@ export struct DailyNotePage {
             .fontSize(12)
             .height(26)
             .backgroundColor($r('app.color.app_primary'))
-            .fontColor(Color.White)
+            .fontColor($r('app.color.on_accent'))
             .onClick(() => {
               const host = this.getUIContext().getHostContext();
               if (host === undefined) {
@@ -746,7 +746,7 @@ export struct DailyNotePage {
         ForEach([80, 120, 160] as number[], (th: number) => {
           Text(`${th}`)
             .fontSize(13)
-            .fontColor(this.vm.settingsResinThreshold === th ? Color.White : $r('app.color.text_primary'))
+            .fontColor(this.vm.settingsResinThreshold === th ? $r('app.color.on_accent') : $r('app.color.text_primary'))
             .padding({ left: 12, right: 12, top: 5, bottom: 5 })
             .borderRadius(12)
             .backgroundColor(this.vm.settingsResinThreshold === th
@@ -767,7 +767,7 @@ export struct DailyNotePage {
         ForEach([1200, 1800, 2400] as number[], (th: number) => {
           Text(`${th}`)
             .fontSize(13)
-            .fontColor(this.vm.settingsHomeThreshold === th ? Color.White : $r('app.color.text_primary'))
+            .fontColor(this.vm.settingsHomeThreshold === th ? $r('app.color.on_accent') : $r('app.color.text_primary'))
             .padding({ left: 12, right: 12, top: 5, bottom: 5 })
             .borderRadius(12)
             .backgroundColor(this.vm.settingsHomeThreshold === th
@@ -825,7 +825,7 @@ export struct DailyNotePage {
             if (this.noteInterval === min) {
               Text('✓')
                 .fontSize(13)
-                .fontColor($r('app.color.app_primary'))
+                .fontColor($r('app.color.app_primary_text'))
             }
           }
           .width('100%')
@@ -902,7 +902,7 @@ export struct DailyNotePage {
               .fontColor($r('app.color.text_primary'))
             Button('去「账号与数据」选择')
               .backgroundColor($r('app.color.app_primary'))
-              .fontColor(Color.White)
+              .fontColor($r('app.color.on_accent'))
               .onClick(() => {
                 router.pushUrl({ url: 'pages/UserPage' });
               })

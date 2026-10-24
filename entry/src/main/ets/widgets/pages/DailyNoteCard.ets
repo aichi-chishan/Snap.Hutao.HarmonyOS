@@ -77,7 +77,7 @@ struct DailyNoteCard {
         // 手动刷新按钮（对齐系统卡片交互：点击触发提供方拉取最新数据）
         Text('⟳')
           .fontSize(13)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .width(22)
           .height(22)
           .textAlign(TextAlign.Center)
@@ -110,7 +110,7 @@ struct DailyNoteCard {
           }
           Text(this.resinRecoveryText)
             .fontSize(12)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .maxLines(1)
         }
         .alignItems(HorizontalAlign.Start)
@@ -148,7 +148,7 @@ struct DailyNoteCard {
         if (this.tipText.length > 0) {
           Text(this.tipText)
             .fontSize(11)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .layoutWeight(1)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })

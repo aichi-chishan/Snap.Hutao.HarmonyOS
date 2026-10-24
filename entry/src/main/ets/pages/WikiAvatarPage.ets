@@ -10,7 +10,7 @@ import { CultivationDraftEditor } from '../components/CultivationDraftEditor';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { router } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
-import { WikiMetaService, WikiAvatarMeta, MetaSkill, MetaText, MetaMaterial } from '../service/WikiMetaService';
+import { WikiMetaService, WikiAvatarMeta, AvatarCostumeMeta, MetaSkill, MetaText, MetaMaterial } from '../service/WikiMetaService';
 import { StandardIconService } from '../data/remote/StandardIconService';
 import { CharacterViewModel, AddPlanResult } from '../viewmodel/CharacterViewModel';
 import { CharacterDetail } from '../model/CharacterData';
@@ -29,16 +29,22 @@ const AVATAR_PAGE_TAG: string = 'WikiAvatarPage';
 const SPLASH_IMG_CATEGORY: string = 'GachaAvatarImg';
 /** 角色抠图类目（320×1024 竖版；完整立绘缺失时回退，包内已预打包） */
 const SPLASH_ICON_CATEGORY: string = 'GachaAvatarIcon';
+/** 皮肤立绘类目（对齐 Windows CostumeConverter：官方静态 CDN Costumes 全身立绘） */
+const COSTUME_ART_CATEGORY: string = 'Costume';
 
 /**
  * 单张角色立绘（按需拉取 + 沙盒缓存）：
  * 首选 GachaAvatarImg（UI_Gacha_AvatarImg_{icon 去掉 UI_AvatarIcon_ 前缀}，对齐 Windows
  * GachaAvatarImgConverter，2048×1024 横版完整立绘，容器按 2:1 呈现）；
  * 旅行者等 CDN 缺失时回退 GachaAvatarIcon 竖版抠图，均缺失显示占位。
+ * costumeFrontIcon 非空（皮肤 FrontIcon，UI_AvatarIcon_XxxCostumeYyy）时改取
+ * Costume/UI_Costume_X 皮肤立绘（同一套缓存→rawfile→CDN 三级解析）。
  */
 @Component
 export struct SplashArtView {
   @Prop @Watch('onIconChanged') icon: string = '';
+  /** 皮肤立绘覆盖（非默认服装的 FrontIcon；空串=默认立绘） */
+  @Prop @Watch('onIconChanged') costumeFrontIcon: string = '';
   @State src: string = '';
   private resolveToken: number = 0;
   private active: boolean = false;
@@ -61,6 +67,15 @@ export struct SplashArtView {
     if (!this.active) { return; }
     // A replaced avatar must not display the previous identity while its image is loading.
     this.src = '';
+    if (/^UI_AvatarIcon_[A-Za-z0-9_-]+$/.test(this.costumeFrontIcon)) {
+      // 皮肤立绘（Costume 类目，包内不预打包；缓存 → rawfile → CDN 三级解析）
+      const artName: string = `UI_Costume_${this.costumeFrontIcon.substring('UI_AvatarIcon_'.length)}`;
+      const artPath: string = await this.cachedOrFetch(COSTUME_ART_CATEGORY, artName, token);
+      if (this.current(token)) {
+        this.src = artPath;
+      }
+      return;
+    }
     if (!/^UI_AvatarIcon_[A-Za-z0-9_-]+$/.test(this.icon)) { return; }
     const suffix: string = this.icon.substring('UI_AvatarIcon_'.length);
     // 1) 完整立绘（GachaAvatarImg，未预打包，走缓存→CDN）
@@ -205,6 +220,11 @@ export struct WikiAvatarPage {
   @State weaponFilter: number = 0;
   private elementValues: string[] = ['', '火', '水', '风', '雷', '草', '冰', '岩'];
   private weaponValues: number[] = [0, 1, 11, 13, 10, 12];
+  /** 体型筛选（对齐 Windows AvatarFilter SearchTokenKind.BodyType：1 少年/2 少女/3 成女/4 成男/5 萝莉） */
+  private bodyValues: number[] = [0, 1, 2, 3, 4, 5];
+  @State bodyFilter: number = 0;
+  private bodyOptions: SelectOption[] = [{ value: '全部体型' }, { value: '少年' }, { value: '少女' },
+    { value: '成女' }, { value: '成男' }, { value: '萝莉' }];
   private elementOptions: SelectOption[] = [{ value: '全部元素' }, { value: '火' }, { value: '水' },
     { value: '风' }, { value: '雷' }, { value: '草' }, { value: '冰' }, { value: '岩' }];
   private weaponOptions: SelectOption[] = [{ value: '全部武器' }, { value: '单手剑' }, { value: '双手剑' },
@@ -226,6 +246,8 @@ export struct WikiAvatarPage {
   @State ncDesc: string = '';
   /** 当前角色在列表中的位置（立绘 Swiper 翻页联动） */
   @State curIdx: number = 0;
+  /** 当前角色的服装选择（0=默认款；对齐 Windows CostumesView 翻页，切换角色时复位） */
+  @State costumeIdx: number = 0;
   /** 基础属性计算请求序号（拖动滑条连发时丢弃过期异步结果） */
   private calcSeq: number = 0;
   /** 该角色无基础属性元数据（旅行者等，官方数据不含其成长曲线） */
@@ -322,19 +344,24 @@ export struct WikiAvatarPage {
     this.routeMessage = '';
     this.selectedId = a.id;
     this.current = a;
+    this.costumeIdx = 0;
     this.syncCurIdx();
     this.onAvatarSelected();
   }
 
   /** 同步当前角色在列表中的下标（立绘 Swiper 用） */
   private syncCurIdx(): void {
-    for (let i = 0; i < this.avatars.length; i++) {
-      if (this.avatars[i].id === this.selectedId) {
-        this.curIdx = i;
-        return;
+    // 循环内只读局部快照，状态只写一次（lint: 避免循环里反复读写状态变量）
+    const avatars: WikiAvatarMeta[] = this.avatars;
+    const selectedId: number = this.selectedId;
+    let found: number = -1;
+    for (let i = 0; i < avatars.length; i++) {
+      if (avatars[i].id === selectedId) {
+        found = i;
+        break;
       }
     }
-    this.curIdx = 0;
+    this.curIdx = found >= 0 ? found : 0;
   }
 
   /** 重置滑条并重算基础属性（切换角色时） */
@@ -482,17 +509,29 @@ export struct WikiAvatarPage {
 
   filtered(): WikiAvatarMeta[] {
     const out: WikiAvatarMeta[] = [];
+    // 循环内只读局部快照（lint: 避免循环里反复读状态变量）
+    const qualityFilter: number = this.qualityFilter;
+    const elementFilter: number = this.elementFilter;
+    const weaponFilter: number = this.weaponFilter;
+    const bodyFilter: number = this.bodyFilter;
+    const keyword: string = this.keyword;
+    const elementValue: string = elementFilter > 0 ? this.elementValues[elementFilter] : '';
+    const weaponValue: number = weaponFilter > 0 ? this.weaponValues[weaponFilter] : 0;
+    const bodyValue: number = bodyFilter > 0 ? this.bodyValues[bodyFilter] : 0;
     for (const a of this.avatars) {
-      if (this.qualityFilter > 0 && a.quality !== this.qualityFilter) {
+      if (qualityFilter > 0 && a.quality !== qualityFilter) {
         continue;
       }
-      if (this.elementFilter > 0 && WikiMetaService.elementName(a.vision) !== this.elementValues[this.elementFilter]) {
+      if (elementFilter > 0 && WikiMetaService.elementName(a.vision) !== elementValue) {
         continue;
       }
-      if (this.weaponFilter > 0 && a.weapon !== this.weaponValues[this.weaponFilter]) {
+      if (weaponFilter > 0 && a.weapon !== weaponValue) {
         continue;
       }
-      if (this.keyword.length > 0 && !a.name.includes(this.keyword) && !a.title.includes(this.keyword)) {
+      if (bodyFilter > 0 && a.body !== bodyValue) {
+        continue;
+      }
+      if (keyword.length > 0 && !a.name.includes(keyword) && !a.title.includes(keyword)) {
         continue;
       }
       out.push(a);
@@ -671,6 +710,13 @@ export struct WikiAvatarPage {
           .hoverEffect(HoverEffect.Highlight)
       }.width('100%')
 
+      Select(this.bodyOptions).selected(this.bodyFilter)
+        .value(this.bodyOptions[this.bodyFilter].value)
+        .onSelect((index: number) => { this.bodyFilter = index; this.applyFilter(); })
+        .hoverEffect(HoverEffect.Highlight)
+        .width('100%')
+        .accessibilityText('按体型筛选角色')
+
       Button(this.gridMode ? '切换列表视图' : '切换网格视图')
         .fontSize(12).height(30).hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
@@ -792,6 +838,22 @@ export struct WikiAvatarPage {
     }
   }
 
+  /** 当前选中皮肤 FrontIcon（默认款或无图标返回空串 → 显示默认立绘 Swiper） */
+  private costumeFrontIconOf(): string {
+    const c: AvatarCostumeMeta | undefined = this.current?.costumes[this.costumeIdx];
+    return c !== undefined && !c.isDefault ? c.frontIcon : '';
+  }
+
+  /** 当前选中服装描述（详情立绘卡脚注） */
+  private costumeDescOf(): string {
+    const c: AvatarCostumeMeta | undefined = this.current?.costumes[this.costumeIdx];
+    return c !== undefined ? c.description : '';
+  }
+
+  private costumeChipLabel(c: AvatarCostumeMeta): string {
+    return c.isDefault ? '默认' : c.name;
+  }
+
   /** 立绘卡（FlipView 式翻页：Swiper 左右滑动切换相邻角色立绘，仅渲染当前±1 页控制内存） */
   @Builder
   splashCard() {
@@ -812,34 +874,76 @@ export struct WikiAvatarPage {
         }
         .width('100%')
 
-        Swiper() {
-          LazyForEach(this.splashSource, (a: WikiAvatarMeta) => {
-            Column() {
-              SplashArtView({ icon: a.icon })
-            }
-            .width('100%')
-            .height('100%')
-          }, (a: WikiAvatarMeta) => `sp_${a.id}`)
+        // 服装切换（对齐 Windows CostumesView：默认款居首，皮肤按期次排列）
+        if (this.current.costumes.length > 1) {
+          Row({ space: 6 }) {
+            ForEach(this.current.costumes, (c: AvatarCostumeMeta, idx: number) => {
+              Text(this.costumeChipLabel(c))
+                .fontSize(11)
+                .fontColor(this.costumeIdx === idx ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+                .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+                .borderRadius(10)
+                .backgroundColor(this.costumeIdx === idx ? $r('app.color.app_primary_bg') : Color.Transparent)
+                .hoverEffect(HoverEffect.Highlight)
+                .accessibilityText(`切换到${this.costumeChipLabel(c)}`)
+                .onClick(() => { this.costumeIdx = idx; })
+            }, (c: AvatarCostumeMeta) => `${this.current?.id ?? 0}_${c.id}`)
+          }.width('100%')
         }
-        .index(this.curIdx)
-        .loop(false)
-        .indicator(false)
-        .duration(this.reduceMotion ? 0 : 240)
-        .curve(this.reduceMotion ? Curve.Linear : Curve.Ease)
-        .effectMode(this.reduceMotion ? EdgeEffect.None : EdgeEffect.Spring)
-        .cachedCount(1)
-        .onChange((idx: number) => {
-          const target: WikiAvatarMeta | undefined = this.avatars[idx];
-          if (target !== undefined && target.id !== this.selectedId) {
-            this.select(target);
+
+        if (this.costumeFrontIconOf().length > 0) {
+          // 皮肤立绘（Costume 类目，与默认立绘同容器比例）
+          Column() {
+            SplashArtView({ icon: this.current!.icon, costumeFrontIcon: this.costumeFrontIconOf() })
           }
-        })
-        .width('100%')
-        // 2:1 比例（对齐 Windows ConstrainedBox AspectRatio 2048:1024）：完整立绘铺满不裁切
-        .aspectRatio(2)
-        .constraintSize({ minHeight: 170, maxHeight: 460 })
-        .borderRadius($r('app.float.card_radius'))
-        .clip(true)
+          .width('100%')
+          .aspectRatio(2)
+          .constraintSize({ minHeight: 170, maxHeight: 460 })
+          .borderRadius($r('app.float.card_radius'))
+          .clip(true)
+
+          Text(this.costumeDescOf())
+            .fontSize(10)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+        } else {
+          Swiper() {
+            LazyForEach(this.splashSource, (a: WikiAvatarMeta) => {
+              Column() {
+                SplashArtView({ icon: a.icon })
+              }
+              .width('100%')
+              .height('100%')
+            }, (a: WikiAvatarMeta) => `sp_${a.id}`)
+          }
+          .index(this.curIdx)
+          .loop(false)
+          .indicator(false)
+          .duration(this.reduceMotion ? 0 : 240)
+          .curve(this.reduceMotion ? Curve.Linear : Curve.Ease)
+          .effectMode(this.reduceMotion ? EdgeEffect.None : EdgeEffect.Spring)
+          .cachedCount(1)
+          // 翻页动画开始即切换详情（对齐 Windows 相邻立绘预取：滑动过程中详情就开始加载，
+          // 不等动画结束；lint: 用 onAnimationStart 做预加载而非只依赖 onChange）
+          .onAnimationStart((idx: number, targetIndex: number, extraInfo: SwiperAnimationEvent) => {
+            const upcoming: WikiAvatarMeta | undefined = this.avatars[targetIndex];
+            if (upcoming !== undefined && upcoming.id !== this.selectedId) {
+              this.select(upcoming);
+            }
+          })
+          .onChange((idx: number) => {
+            const target: WikiAvatarMeta | undefined = this.avatars[idx];
+            if (target !== undefined && target.id !== this.selectedId) {
+              this.select(target);
+            }
+          })
+          .width('100%')
+          // 2:1 比例（对齐 Windows ConstrainedBox AspectRatio 2048:1024）：完整立绘铺满不裁切
+          .aspectRatio(2)
+          .constraintSize({ minHeight: 170, maxHeight: 460 })
+          .borderRadius($r('app.float.card_radius'))
+          .clip(true)
+        }
       }
       .width('100%')
       .padding(14)
@@ -867,7 +971,7 @@ export struct WikiAvatarPage {
           Text(this.curBonusText)
             .fontSize(13)
             .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
         }
       }
       .width('100%')
@@ -888,9 +992,9 @@ export struct WikiAvatarPage {
         })
 
       Row({ space: 12 }) {
-        this.propCell('生命值', this.curHp)
-        this.propCell('攻击力', this.curAtk)
-        this.propCell('防御力', this.curDef)
+        this.propCell('生命值')
+        this.propCell('攻击力')
+        this.propCell('防御力')
       }
       .width('100%')
 
@@ -920,13 +1024,17 @@ export struct WikiAvatarPage {
     .backgroundColor($r('app.color.card_surface'))
   }
 
+  /**
+   * 基础属性单元（单参 @Builder：参数只放常量标签，数值在渲染期读组件状态）。
+   * ArkUI 规则：两参及以上 @Builder 内部 UI 不随状态刷新，故数值不得作为参数传入。
+   */
   @Builder
-  propCell(label: string, value: number) {
+  propCell(label: string) {
     Column({ space: 2 }) {
       Text(label)
         .fontSize(11)
         .fontColor($r('app.color.text_secondary'))
-      Text(`${value}`)
+      Text(`${this.propValueOf(label)}`)
         .fontSize(16)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary'))
@@ -935,11 +1043,18 @@ export struct WikiAvatarPage {
     .alignItems(HorizontalAlign.Center)
   }
 
+  /** 基础属性数值（渲染期读取，避免多参 @Builder 值快照不刷新） */
+  private propValueOf(label: string): number {
+    if (label === '生命值') { return this.curHp; }
+    if (label === '攻击力') { return this.curAtk; }
+    return this.curDef;
+  }
+
   @Builder
   infoChip(text: string) {
     Text(text)
       .fontSize(11)
-      .fontColor($r('app.color.app_primary'))
+      .fontColor($r('app.color.app_primary_text'))
       .padding({ left: 8, right: 8, top: 3, bottom: 3 })
       .margin({ right: 6, bottom: 4 })
       .borderRadius(9)
@@ -1068,7 +1183,7 @@ export struct WikiAvatarPage {
                 .fontColor($r('app.color.text_primary'))
               Text(WikiAvatarPage.kindLabel(s.k))
                 .fontSize(9)
-                .fontColor($r('app.color.app_primary'))
+                .fontColor($r('app.color.app_primary_text'))
                 .padding({ left: 6, right: 6, top: 1, bottom: 1 })
                 .borderRadius(7)
                 .backgroundColor($r('app.color.app_primary_bg'))
@@ -1109,7 +1224,7 @@ export struct WikiAvatarPage {
           Text(`${idx + 1}`)
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .width(20)
             .textAlign(TextAlign.Center)
           Row() {
@@ -1294,7 +1409,7 @@ export struct WikiAvatarPage {
         .height(36)
         .layoutWeight(1)
         .backgroundColor($r('app.color.app_primary_bg'))
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           this.confirmAddPlan();
@@ -1330,7 +1445,7 @@ export struct WikiAvatarPage {
   strategyChip(label: string, target: string) {
     Text(label)
       .fontSize(13)
-      .fontColor($r('app.color.app_primary'))
+      .fontColor($r('app.color.app_primary_text'))
       .padding({ left: 16, right: 16, top: 8, bottom: 8 })
       .borderRadius(10)
       .border({ width: 1, color: $r('app.color.app_primary') })

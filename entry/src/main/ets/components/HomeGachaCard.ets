@@ -41,8 +41,11 @@ export struct HomeGachaCard {
   }
 
   private initialIndex(): number {
-    for (let i = 0; i < this.pages.length; i++) {
-      if (this.pages[i].uid === this.uid) {
+    // 循环内只读局部快照（lint: 避免循环里反复读状态变量）
+    const pages: GachaArchiveStatPage[] = this.pages;
+    const uid: string = this.uid;
+    for (let i = 0; i < pages.length; i++) {
+      if (pages[i].uid === uid) {
         return i;
       }
     }
@@ -275,7 +278,7 @@ export struct HomeGachaCard {
             .layoutWeight(1)
           Text(this.headerUid())
             .fontSize(12)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
         }
         .width('100%')
         .height(24)

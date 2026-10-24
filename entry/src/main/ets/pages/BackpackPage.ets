@@ -333,7 +333,7 @@ export struct BackpackPage {
       Column({ space: 5 }) {
         Text(item.name).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
         if (item.kind === 'reliquary') {
-          Text(BackpackScoring.label(item.score)).fontSize(12).fontColor($r('app.color.app_primary')).maxLines(2)
+          Text(BackpackScoring.label(item.score)).fontSize(12).fontColor($r('app.color.app_primary_text')).maxLines(2)
         }
         Text(BackpackCatalog.detail(item)).fontSize(12).fontColor($r('app.color.text_secondary')).maxLines(2)
         Text(`${BackpackCatalog.CATEGORY_NAMES[item.category]} · #${item.itemId}${item.isLocked === true ? ' · 已锁定' : ''}`)
@@ -357,7 +357,7 @@ export struct BackpackPage {
         if (this.selected.kind === 'reliquary') {
           Text(`副词条原始 ID（含重复强化记录）：\n${this.selected.appendPropIds.length > 0 ? this.selected.appendPropIds.join('、') : '无记录'}`)
             .fontSize(13).fontColor($r('app.color.text_secondary'))
-          Text(BackpackScoring.label(this.selected.score)).fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.app_primary'))
+          Text(BackpackScoring.label(this.selected.score)).fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.app_primary_text'))
           ForEach(this.selected.score.stats, (stat: BackpackSubStat) => {
             Text(BackpackScoring.statLabel(stat)).fontSize(13).fontColor($r('app.color.text_primary'))
           }, (stat: BackpackSubStat) => `${stat.property}:${stat.rawValue}:${stat.rolls}`)
@@ -518,7 +518,7 @@ export struct BackpackPage {
               List({ space: 8 }) {
                 LazyForEach(this.source, (item: BackpackItem) => { ListItem() { this.itemRow(item) } },
                   (item: BackpackItem): string => `${this.vm.currentId}:${item.instanceId}:${item.count}:${item.level}:${item.category}:${item.score.available}:${item.score.value}:${this.vm.scoreSettings.revision}`)
-              }.layoutWeight(1).height('100%').padding({ bottom: 24 })
+              }.layoutWeight(1).height('100%').padding({ bottom: 24 }).cachedCount(5)
             }
             if (this.isWide) {
               Scroll() { this.details() }.width(340).height('100%').backgroundColor($r('app.color.card_surface')).borderRadius(12)

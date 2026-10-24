@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.example.snaphutaoharmonyos",
     "vendor": "example",
-    "versionCode": 1002100,
-    "versionName": "1.21.0",
+    "versionCode": 2000200,
+    "versionName": "2.0.2",
     "buildVersion": "1",
     "icon": "$media:layered_image",
     "label": "$string:app_name"

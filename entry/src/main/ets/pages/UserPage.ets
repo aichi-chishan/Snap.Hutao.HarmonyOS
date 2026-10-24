@@ -157,7 +157,7 @@ export struct UserPage {
         .textAlign(TextAlign.Center)
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           this.goLogin();
         })
@@ -181,7 +181,7 @@ export struct UserPage {
       } else {
         Text(user.displayName.length > 0 ? user.displayName.substring(0, 1) : '?')
           .fontSize(20)
-          .fontColor(Color.White)
+          .fontColor($r('app.color.on_accent'))
           .width(44)
           .height(44)
           .textAlign(TextAlign.Center)
@@ -205,7 +205,7 @@ export struct UserPage {
       if (user.isSelected) {
         Text('当前')
           .fontSize(11)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .borderRadius(8)
           .backgroundColor($r('app.color.app_primary_bg'))
@@ -214,7 +214,7 @@ export struct UserPage {
           .fontSize(12)
           .height(28)
           .backgroundColor($r('app.color.app_primary'))
-          .fontColor(Color.White)
+          .fontColor($r('app.color.on_accent'))
           .onClick(() => {
             this.vm.switchUser(user.id).then(() => {
               this.syncSnap();
@@ -277,7 +277,7 @@ export struct UserPage {
           .height(26)
           .margin({ right: 8 })
           .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .onClick(() => {
             const user: User | undefined = this.vm.currentUser;
             if (user === undefined) {
@@ -294,7 +294,7 @@ export struct UserPage {
           .height(26)
           .margin({ right: 8 })
           .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .onClick(() => {
             this.copyCookie();
           })
@@ -302,7 +302,7 @@ export struct UserPage {
           .fontSize(12)
           .height(26)
           .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .onClick(() => {
             this.vm.refreshRoles().then((count: number) => {
               this.syncSnap();
@@ -343,7 +343,7 @@ export struct UserPage {
           if (role.isDefault) {
             Text('默认')
               .fontSize(11)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
           }
         }
         .width('100%')
@@ -388,7 +388,7 @@ export struct UserPage {
               } else {
                 Text(this.snapDisplayName.length > 0 ? this.snapDisplayName.substring(0, 1) : '?')
                   .fontSize(22)
-                  .fontColor(Color.White)
+                  .fontColor($r('app.color.on_accent'))
                   .width(52)
                   .height(52)
                   .textAlign(TextAlign.Center)
@@ -464,7 +464,7 @@ export struct UserPage {
           .fontSize(12)
           .height(28)
           .backgroundColor($r('app.color.app_primary'))
-          .fontColor(Color.White)
+          .fontColor($r('app.color.on_accent'))
           .onClick(() => {
             this.goLogin();
           })

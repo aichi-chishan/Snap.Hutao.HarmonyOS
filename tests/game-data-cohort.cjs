@@ -83,8 +83,29 @@ const pause = () => new Promise(done => setTimeout(done, 15));
 const pointerBytes = env => { const file = path.join(env.directory, 'gamedata/cohort-v1/active.json'); return fs.existsSync(file) ? fs.readFileSync(file) : undefined; };
 const isItemUrl = url => url.includes('/metadata/') || url.includes('/icons/');
 const sandboxes = [];
+// Windows forbids file symlinks without elevation; directory junctions need none and lstat
+// still reports them as symlinks, which is the property these cases must exercise.
+const hasFileSymlinks = (() => {
+  const probe = fs.mkdtempSync(path.join(os.tmpdir(), 'hutao-symlink-probe-'));
+  try {
+    fs.symlinkSync(path.join(probe, 'a'), path.join(probe, 'b'), 'file');
+    return true;
+  } catch (error) {
+    if (error.code === 'EPERM' || error.code === 'EACCES') return false;
+    throw error;
+  } finally {
+    fs.rmSync(probe, { recursive: true, force: true });
+  }
+})();
+function linkDirectory(target, at) {
+  try { fs.symlinkSync(target, at, process.platform === 'win32' ? 'junction' : 'dir'); return true; }
+  catch (error) { if (error.code === 'EPERM' || error.code === 'EACCES') return false; throw error; }
+}
 function environment() {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hutao-cohort-')); sandboxes.push(directory);
+  // The production adapter receives POSIX-style sandbox paths; on Windows the temp root uses '\\',
+  // which its guard (correctly) rejects. Normalize into '/'-space so the adapter sees the same shape
+  // as on Linux, while host fs calls below keep working.
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hutao-cohort-')).replaceAll('\\', '/'); sandboxes.push(directory);
   const state = { directory, prefs: new Map(), revision: A, version: 'one', schema: 1, files: new Map(raw), requests: [],
     free: 10 * 1024 ** 3, failUrl: '', requestGate: null, requestHook: null, workerFailure: '', workerGate: null,
     workerHook: null, workerResultHook: null, late: null, ioHook: null, uriCalls: [],
@@ -390,11 +411,18 @@ function environment() {
   });
   await test('symlink pointer temporary files and staging ancestors never clobber unrelated sandbox bytes', async () => {
     const env = environment(), U = await env.updater(); const outside = path.join(env.directory, 'keep.txt'); fs.writeFileSync(outside, 'keep');
-    const next = path.join(env.directory, 'gamedata/cohort-v1/active.json.next');
-    env.workerResultHook = (result, task) => { if (task.args[1] === 'stage') fs.symlinkSync(outside, next); return result; };
-    await assert.rejects(U.update()); assert.equal(fs.readFileSync(outside, 'utf8'), 'keep'); assert.equal(U.localVersion(), '');
-    fs.unlinkSync(next); env.workerResultHook = null; const staging = path.join(env.directory, 'gamedata/cohort-v1/staging');
-    fs.renameSync(staging, staging + '-retained'); fs.symlinkSync(env.directory, staging);
+    if (hasFileSymlinks) {
+      const next = path.join(env.directory, 'gamedata/cohort-v1/active.json.next');
+      env.workerResultHook = (result, task) => { if (task.args[1] === 'stage') fs.symlinkSync(outside, next, 'file'); return result; };
+      await assert.rejects(U.update()); assert.equal(fs.readFileSync(outside, 'utf8'), 'keep'); assert.equal(U.localVersion(), '');
+      fs.unlinkSync(next); env.workerResultHook = null;
+    }
+    const staging = path.join(env.directory, 'gamedata/cohort-v1/staging');
+    // The rejected update above creates this staging directory; when the host forbade file
+    // symlinks that update was skipped, so materialize the same shape explicitly.
+    fs.mkdirSync(staging, { recursive: true });
+    fs.renameSync(staging, staging + '-retained');
+    assert.ok(linkDirectory(env.directory, staging), 'directory junction/symlink must be creatable');
     await assert.rejects(U.update(), /不安全/); assert.equal(fs.readFileSync(outside, 'utf8'), 'keep');
   });
   await test('reset and rollback are next-launch choices and all existing files remain present', async () => {

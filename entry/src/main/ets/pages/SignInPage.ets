@@ -63,7 +63,7 @@ export struct SignInPage {
         .fontColor($r('app.color.text_primary'))
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -79,7 +79,7 @@ export struct SignInPage {
         Text(`${info.signedDays}`)
           .fontSize(34)
           .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
         Text('本月已签')
           .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
@@ -143,7 +143,7 @@ export struct SignInPage {
         .height(38)
         .fontSize(14)
         .backgroundColor(resign.canResign() ? $r('app.color.app_primary') : $r('app.color.card_background'))
-        .fontColor(resign.canResign() ? Color.White : $r('app.color.text_secondary'))
+        .fontColor(resign.canResign() ? $r('app.color.on_accent') : $r('app.color.text_secondary'))
         .borderRadius(10)
         .border({ width: 1, color: $r('app.color.divider') })
         .enabled(resign.canResign() && !this.vm.resigning)
@@ -244,7 +244,7 @@ export struct SignInPage {
             .fontColor($r('app.color.text_secondary'))
           Button('前往')
             .backgroundColor($r('app.color.app_primary'))
-            .fontColor(Color.White)
+            .fontColor($r('app.color.on_accent'))
             .onClick(() => {
               router.pushUrl({ url: 'pages/UserPage' });
             })
@@ -272,7 +272,7 @@ export struct SignInPage {
                 Button('重试')
                   .fontSize(13)
                   .backgroundColor($r('app.color.app_primary'))
-                  .fontColor(Color.White)
+                  .fontColor($r('app.color.on_accent'))
                   .onClick(() => {
                     this.loadData();
                   })

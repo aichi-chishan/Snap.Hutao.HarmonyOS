@@ -64,7 +64,7 @@ export struct HomeAchievementCard {
           Text(`${this.stats.percent()}%`)
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
         }
         .width('100%')
         .height(24)

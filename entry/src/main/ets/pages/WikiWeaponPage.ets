@@ -189,13 +189,20 @@ export struct WikiWeaponPage {
 
   filtered(): WikiWeaponMeta[] {
     const out: WikiWeaponMeta[] = [];
+    // 循环内只读局部快照（lint: 避免循环里反复读状态变量）
+    const rankFilter: number = this.rankFilter;
+    const typeFilter: number = this.typeFilter;
+    const propertyFilter: number = this.propertyFilter;
+    const keyword: string = this.keyword;
+    const typeValue: number = typeFilter > 0 ? this.weaponValues[typeFilter] : 0;
+    const propertyValue: number = propertyFilter > 0 ? this.propertyValues[propertyFilter] : 0;
     for (const w of this.weapons) {
-      if (this.rankFilter > 0 && w.rankLevel !== this.rankFilter) {
+      if (rankFilter > 0 && w.rankLevel !== rankFilter) {
         continue;
       }
-      if (this.typeFilter > 0 && w.weaponType !== this.weaponValues[this.typeFilter]) { continue; }
-      if (this.propertyFilter > 0 && w.secondaryProperty !== this.propertyValues[this.propertyFilter]) { continue; }
-      if (this.keyword.length > 0 && !w.name.includes(this.keyword)) {
+      if (typeFilter > 0 && w.weaponType !== typeValue) { continue; }
+      if (propertyFilter > 0 && w.secondaryProperty !== propertyValue) { continue; }
+      if (keyword.length > 0 && !w.name.includes(keyword)) {
         continue;
       }
       out.push(w);
@@ -490,7 +497,7 @@ export struct WikiWeaponPage {
                   Text(`精炼 ${idx + 1} 阶`)
                     .fontSize(11)
                     .fontWeight(FontWeight.Medium)
-                    .fontColor($r('app.color.app_primary'))
+                    .fontColor($r('app.color.app_primary_text'))
                     .width('100%')
                   Text(d)
                     .fontSize(11)
@@ -564,7 +571,7 @@ export struct WikiWeaponPage {
         .height(36)
         .layoutWeight(1)
         .backgroundColor($r('app.color.app_primary_bg'))
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           this.confirmAddPlan();
@@ -591,7 +598,7 @@ export struct WikiWeaponPage {
         Text(`攻击力 ${this.curAttack}`)
           .fontSize(15)
           .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
       }
       .width('100%')
 

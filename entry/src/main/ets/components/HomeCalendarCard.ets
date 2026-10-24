@@ -155,7 +155,7 @@ export struct HomeCalendarCard {
             .layoutWeight(1)
           Text('查看全部 ›')
             .fontSize(12)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
         }
         .width('100%')
         .height(24)
@@ -250,7 +250,7 @@ export struct HomeCalendarCard {
               Scroll() {
                 Text(`今日活动：${this.todayActs.join(' / ')}`)
                   .fontSize(12)
-                  .fontColor($r('app.color.app_primary'))
+                  .fontColor($r('app.color.app_primary_text'))
                   .maxLines(1)
               }
               .scrollable(ScrollDirection.Horizontal)

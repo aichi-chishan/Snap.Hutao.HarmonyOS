@@ -108,6 +108,7 @@ export class WishHistoryService {
         pool.name = event.name;
         pool.version = event.version;
         pool.order = event.order;
+        pool.banner = event.banner;
         occurrence.pools.push(pool);
       }
     }

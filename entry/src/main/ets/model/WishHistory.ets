@@ -17,6 +17,8 @@ export class WishHistoryPool {
   version: string = '';
   order: number = 0;
   type: number = 0;
+  /** 卡池横幅图 URL（对齐 Windows CountdownHistory.Banner；旧元数据无此字段为空串） */
+  banner: string = '';
 }
 
 export class WishHistoryOccurrence {

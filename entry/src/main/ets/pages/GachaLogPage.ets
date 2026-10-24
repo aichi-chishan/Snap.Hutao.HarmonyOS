@@ -547,11 +547,13 @@ export struct GachaLogPage {
         key += `|${card.key}`;
       }
       row.key = key;
+      // 循环内只读局部快照（lint: 避免循环里反复读状态变量）
+      const measuredRows: PoolRowData[] = this.poolRows;
       for (let j = 0; j < row.cells.length; j++) {
         row.cells[j].rowKey = key;
       }
       // 内容标识未变的行沿用已测高度，并把该高度下发到各单元（避免重复测量导致的闪动）
-      row.height = GachaLogPage.findRowHeight(this.poolRows, key);
+      row.height = GachaLogPage.findRowHeight(measuredRows, key);
       for (let j = 0; j < row.cells.length; j++) {
         row.cells[j].height = row.height;
       }
@@ -846,7 +848,7 @@ export struct GachaLogPage {
         ForEach(this.beyondMode ? GachaType.BEYOND_ORDER : GachaType.QUERY_ORDER, (type: number) => {
           Text(GachaType.nameOf(type))
             .fontSize(12)
-            .fontColor(this.vm.currentPoolType === type ? Color.White : $r('app.color.text_primary'))
+            .fontColor(this.vm.currentPoolType === type ? $r('app.color.on_accent') : $r('app.color.text_primary'))
             .padding({ left: 12, right: 12, top: 6, bottom: 6 })
             .borderRadius(14)
             .backgroundColor(this.vm.currentPoolType === type ? $r('app.color.app_primary') : $r('app.color.card_surface'))
@@ -875,7 +877,7 @@ export struct GachaLogPage {
       .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
       .fontSize(12)
       .fontWeight(this.beyondMode ? FontWeight.Bold : FontWeight.Normal)
-      .fontColor(this.beyondMode ? Color.White : $r('app.color.text_secondary'))
+      .fontColor(this.beyondMode ? $r('app.color.on_accent') : $r('app.color.text_secondary'))
       .padding({ left: 12, right: 12, top: 6, bottom: 6 })
       .borderRadius(14)
       .backgroundColor(this.beyondMode ? $r('app.color.app_primary') : $r('app.color.card_surface'))
@@ -1012,7 +1014,7 @@ export struct GachaLogPage {
     Text(label)
       .fontSize(12)
       .fontWeight(this.countStatMode === isCount ? FontWeight.Bold : FontWeight.Normal)
-      .fontColor(this.countStatMode === isCount ? Color.White : $r('app.color.text_secondary'))
+      .fontColor(this.countStatMode === isCount ? $r('app.color.on_accent') : $r('app.color.text_secondary'))
       .textAlign(TextAlign.Center)
       .padding({ top: 5, bottom: 5 })
       .layoutWeight(1)
@@ -1580,6 +1582,18 @@ export struct GachaLogPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
         Blank()
+        Button('洞察')
+          .hoverEffect(HoverEffect.Highlight)
+          .fontSize(11)
+          .constraintSize({ minHeight: 44 })
+          .margin({ right: 4 })
+          .backgroundColor($r('app.color.card_surface'))
+          .fontColor($r('app.color.text_primary'))
+          .accessibilityText('打开账号洞察')
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/AccountInsightsPage' }).catch(() => {
+            });
+          })
         Button('剪贴板')
           .enabled(!this.vm.isRefreshing && !this.vm.isTransferring)
           .hoverEffect(HoverEffect.Highlight)
@@ -1619,7 +1633,7 @@ export struct GachaLogPage {
           .fontSize(11)
           .constraintSize({ minHeight: 44 })
           .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .onClick(() => {
             this.showUrlInput = !this.showUrlInput;
           })
@@ -1675,7 +1689,7 @@ export struct GachaLogPage {
           .onClick(() => this.vm.cancelRefresh())
         Text(this.showProgressDetail ? '收起 ‹' : '详情 ›')
           .fontSize(11)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .onClick(() => {
             this.showProgressDetail = !this.showProgressDetail;
           })
@@ -1697,7 +1711,7 @@ export struct GachaLogPage {
             Text('最新抽到')
               .fontSize(11)
               .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .width('100%')
               .margin({ top: 2 })
             Scroll() {
@@ -2003,7 +2017,7 @@ export struct GachaLogPage {
         Button('导入')
           .layoutWeight(1)
           .backgroundColor($r('app.color.app_primary'))
-          .fontColor(Color.White)
+          .fontColor($r('app.color.on_accent'))
           .fontSize(14)
           .onClick(() => {
             this.submitUrlImport();
@@ -2031,7 +2045,7 @@ export struct GachaLogPage {
           if (this.vm.currentUid.length > 0) {
             Text(this.vm.currentUid)
               .fontSize(12)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .margin({ right: 10 })
           }
           Button(this.vm.fullRefresh ? '全量' : '增量')
@@ -2044,7 +2058,7 @@ export struct GachaLogPage {
             .fontSize(13)
             .constraintSize({ minHeight: 44 })
             .backgroundColor($r('app.color.app_primary'))
-            .fontColor(Color.White)
+            .fontColor($r('app.color.on_accent'))
             .onClick(() => {
               this.refreshAccount();
             })
@@ -2096,9 +2110,9 @@ export struct GachaLogPage {
               this.historyWishSection()
               this.recentSection()
             } else if (this.pivotIndex === 2) {
-              this.avatarSection(this.charCounts, true)
+              this.avatarSection(true)
             } else if (this.pivotIndex === 3) {
-              this.avatarSection(this.weaponCounts, false)
+              this.avatarSection(false)
             } else {
               this.countdownSection()
             }
@@ -2128,7 +2142,7 @@ export struct GachaLogPage {
     Text(label)
       .fontSize(13)
       .fontWeight(this.pivotIndex === index ? FontWeight.Bold : FontWeight.Normal)
-      .fontColor(this.pivotIndex === index ? Color.White : $r('app.color.text_primary'))
+      .fontColor(this.pivotIndex === index ? $r('app.color.on_accent') : $r('app.color.text_primary'))
       .padding({ left: 14, right: 14, top: 7, bottom: 7 })
       .borderRadius(16)
       .backgroundColor(this.pivotIndex === index ? $r('app.color.app_primary') : $r('app.color.card_surface'))
@@ -2181,27 +2195,38 @@ export struct GachaLogPage {
     for (const k of this.bannerPaths) {
       known.add(k.url);
     }
-    const jobs: Promise<void>[] = [];
+    const jobs: Promise<GachaBannerPath | undefined>[] = [];
     for (const v of views) {
       if (v.banner.length === 0 || known.has(v.banner)) {
         continue;
       }
       known.add(v.banner);
       const url: string = v.banner;
-      jobs.push(CachedImageService.fetchToCache(url).then((p: string) => {
+      // 循环内不触碰 @State：只收集异步结果（lint: 避免循环内反复访问状态变量）
+      jobs.push(CachedImageService.fetchToCache(url).then((p: string): GachaBannerPath | undefined => {
         if (!this.pageActive || epoch !== this.pageEpoch || archiveId !== this.vm.currentArchiveId || p.length === 0) {
-          return;
+          return undefined;
         }
         const hit: GachaBannerPath = new GachaBannerPath();
         hit.url = url;
         hit.path = p;
-        this.bannerPaths.push(hit);
-        // @State 数组 push 不触发深层级刷新，重赋值确保渲染
-        this.bannerPaths = this.bannerPaths.slice();
+        return hit;
       }));
     }
     if (jobs.length > 0) {
-      Promise.all(jobs).catch(() => {
+      // 全部下载收敛后一次性重赋值 @State（@State 数组 push 不触发深层级刷新）
+      Promise.all(jobs).then((loaded: (GachaBannerPath | undefined)[]) => {
+        const snapshot: GachaBannerPath[] = this.bannerPaths.slice();
+        let added: number = 0;
+        for (const item of loaded) {
+          if (item !== undefined) {
+            snapshot.push(item);
+            added++;
+          }
+        }
+        if (added === 0) { return; }
+        this.bannerPaths = snapshot;
+      }).catch(() => {
       });
     }
   }
@@ -2369,10 +2394,14 @@ export struct GachaLogPage {
     .width('100%')
   }
 
-  /** 角色/武器头像网格区（按星级分组） */
+  /**
+   * 角色/武器头像网格区（按星级分组）。
+   * 单参 @Builder：参数只放常量类别（是否角色），会变的条目列表在渲染期读组件状态——
+   * ArkUI 规则：参数里带会变字段时 @Builder 内部 UI 不随状态刷新（见 AGENTS.md）。
+   */
   @Builder
-  avatarSection(entries: ItemCountEntry[], isChar: boolean) {
-    if (entries.length === 0) {
+  avatarSection(isChar: boolean) {
+    if (this.countsFor(isChar).length === 0) {
       Text('暂无数据，点击右上角「刷新」拉取')
         .fontSize(13)
         .fontColor($r('app.color.text_secondary'))
@@ -2381,18 +2410,23 @@ export struct GachaLogPage {
         .textAlign(TextAlign.Center)
     } else {
       Column({ space: 10 }) {
-        if (entries.filter((e: ItemCountEntry) => e.rankType === 5).length > 0) {
-          this.rankGroup(entries.filter((e: ItemCountEntry) => e.rankType === 5), '五星', $r('app.color.five_star'))
+        if (this.countsFor(isChar).filter((e: ItemCountEntry) => e.rankType === 5).length > 0) {
+          this.rankGroup(this.countsFor(isChar).filter((e: ItemCountEntry) => e.rankType === 5), '五星', $r('app.color.five_star'))
         }
-        if (entries.filter((e: ItemCountEntry) => e.rankType === 4).length > 0) {
-          this.rankGroup(entries.filter((e: ItemCountEntry) => e.rankType === 4), '四星', $r('app.color.four_star'))
+        if (this.countsFor(isChar).filter((e: ItemCountEntry) => e.rankType === 4).length > 0) {
+          this.rankGroup(this.countsFor(isChar).filter((e: ItemCountEntry) => e.rankType === 4), '四星', $r('app.color.four_star'))
         }
-        if (!isChar && entries.filter((e: ItemCountEntry) => e.rankType === 3).length > 0) {
-          this.rankGroup(entries.filter((e: ItemCountEntry) => e.rankType === 3), '三星', $r('app.color.text_secondary'))
+        if (!isChar && this.countsFor(isChar).filter((e: ItemCountEntry) => e.rankType === 3).length > 0) {
+          this.rankGroup(this.countsFor(isChar).filter((e: ItemCountEntry) => e.rankType === 3), '三星', $r('app.color.text_secondary'))
         }
       }
       .width('100%')
     }
+  }
+
+  /** 头像网格条目（渲染期读取：角色/武器分列） */
+  private countsFor(isChar: boolean): ItemCountEntry[] {
+    return isChar ? this.charCounts : this.weaponCounts;
   }
 
   @Builder

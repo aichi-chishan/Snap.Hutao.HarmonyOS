@@ -8,6 +8,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { RiskVerifier, GeetestValidateInput } from '../data/network/RiskVerifier';
 import { UserService } from '../service/UserService';
 import { Logger } from '../common/Logger';
+import { NavIcon } from './NavIcon';
 
 const TAG: string = 'RiskVerifyDialog';
 
@@ -152,10 +153,10 @@ export struct RiskVerifyDialog {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
         Blank()
-        Text('✕')
-          .fontSize(18)
-          .fontColor($r('app.color.text_secondary'))
+        NavIcon({ name: 'Close', iconSize: 18, symbolColor: $r('app.color.text_secondary') })
           .padding(8)
+          .accessibilityText('取消验证')
+          .accessibilityLevel('yes')
           .onClick(() => {
             this.cancel();
           })

@@ -181,6 +181,8 @@ ${c}
         Text('‹')
           .fontSize(26)
           .fontColor($r('app.color.text_primary'))
+          .accessibilityText('返回')
+          .accessibilityLevel('yes')
           .onClick(() => {
             router.back();
           })
@@ -195,7 +197,7 @@ ${c}
         if (this.officialUrl.length > 0) {
           Text('打开原文')
             .fontSize(13)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .onClick(() => {
               this.openOfficial();
             })

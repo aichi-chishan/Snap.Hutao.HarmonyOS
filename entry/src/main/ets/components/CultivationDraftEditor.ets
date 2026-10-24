@@ -92,7 +92,7 @@ export struct CultivationDraftEditor {
                 ForEach(this.vm.projects, (project: CultivateProject) => {
                   Button(project.name).height(44).margin({ right: 8, bottom: 8 })
                     .backgroundColor(this.vm.projectId === project.id ? $r('app.color.app_primary') : $r('app.color.app_primary_bg'))
-                    .fontColor(this.vm.projectId === project.id ? Color.White : $r('app.color.app_primary'))
+                    .fontColor(this.vm.projectId === project.id ? $r('app.color.on_accent') : $r('app.color.app_primary_text'))
                     .hoverEffect(HoverEffect.Highlight).enabled(!this.vm.busy && this.vm.drafts[0]?.entryId === 0)
                     .onClick(() => { this.vm.projectId = project.id; })
                 }, (project: CultivateProject) => `${project.id}_${this.vm.projectId}`)
@@ -131,7 +131,7 @@ export struct CultivationDraftEditor {
         Row({ space: 8 }) {
           Button('计算预览').height(44).layoutWeight(1).enabled(!this.vm.busy && this.vm.drafts.length > 0)
             .hoverEffect(HoverEffect.Highlight).onClick(() => this.vm.calculate())
-          Button('确认保存').height(44).layoutWeight(1).backgroundColor($r('app.color.app_primary')).fontColor(Color.White)
+          Button('确认保存').height(44).layoutWeight(1).backgroundColor($r('app.color.app_primary')).fontColor($r('app.color.on_accent'))
             .enabled(!this.vm.busy && this.vm.preview.length > 0).hoverEffect(HoverEffect.Highlight)
             .onClick(() => { this.vm.save().then((saved: boolean) => { if (saved) { this.onSaved(); } }); })
         }.width('100%')

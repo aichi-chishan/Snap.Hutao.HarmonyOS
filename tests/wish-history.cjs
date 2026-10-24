@@ -28,6 +28,7 @@ function harness() {
   function load(name) {
     if(modules.has(name))return modules.get(name);
     if(name==='service/WikiMetaService')return metadata;
+    if(name==='service/CachedImageService')return {CachedImageService:{fetchToCache:async()=>''}};
     if(name==='@kit.ArkUI')return {router:{pushUrl:async args=>{state.routes.push(args);}}};
     if(name==='components/SimpleDataSource')return {SimpleDataSource:class {constructor(items){this.items=items;this.reloads=0;}notifyDataReload(items){this.items=items;this.reloads++;}}};
     if(name.startsWith('components/'))return {};
@@ -44,13 +45,13 @@ function harness() {
   const Model=load('viewmodel/WishHistoryViewModel').WishHistoryViewModel;
   return {state,model,service,Model,page:()=>new (load('pages/WishHistoryPage').WishHistoryPage)()};
 }
-function event(extra={}) { return {name:'测试祈愿',version:'6.0',order:1,type:301,from:NOW-20*DAY,to:NOW-10*DAY,upOrange:[10000022],upPurple:[],...extra}; }
+function event(extra={}) { return {name:'测试祈愿',version:'6.0',order:1,type:301,from:NOW-20*DAY,to:NOW-10*DAY,banner:'https://example.com/banner.png',upOrange:[10000022],upPurple:[],...extra}; }
 function meta(id,name='已知物品') { return {id,name,icon:`icon_${id}`}; }
 function strictTypes() {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hutao-wish-history-'));
   const names=['model/WishHistory','service/WishHistoryService','viewmodel/WishHistoryViewModel'];
   for(const name of names){const file=path.join(dir,name+'.ts');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,fs.readFileSync(path.join(root,name+'.ets'),'utf8'));}
-  fs.writeFileSync(path.join(dir,'service/WikiMetaService.ts'),`export class GachaEventMeta {name='';version='';order=0;type=0;from=0;to=0;upOrange:number[]=[];upPurple:number[]=[];}\nexport class WikiAvatarMeta {id=0;name='';icon='';}\nexport class WikiWeaponMeta {id=0;name='';icon='';}\nexport class WikiMetaService {static async getGachaEvents():Promise<GachaEventMeta[]>{return [];}static async getAvatars():Promise<WikiAvatarMeta[]>{return [];}static async getWeapons():Promise<WikiWeaponMeta[]>{return [];}}`);
+  fs.writeFileSync(path.join(dir,'service/WikiMetaService.ts'),`export class GachaEventMeta {name='';version='';order=0;type=0;from=0;to=0;banner='';upOrange:number[]=[];upPurple:number[]=[];}\nexport class WikiAvatarMeta {id=0;name='';icon='';}\nexport class WikiWeaponMeta {id=0;name='';icon='';}\nexport class WikiMetaService {static async getGachaEvents():Promise<GachaEventMeta[]>{return [];}static async getAvatars():Promise<WikiAvatarMeta[]>{return [];}static async getWeapons():Promise<WikiWeaponMeta[]>{return [];}}`);
   fs.writeFileSync(path.join(dir,'globals.d.ts'),'declare function Observed<T extends new (...args: never[]) => object>(value:T):T;');
   const program=ts.createProgram([...names.map(name=>path.join(dir,name+'.ts')),path.join(dir,'globals.d.ts')],{strict:true,noEmit:true,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true,skipLibCheck:true});
   const errors=ts.getPreEmitDiagnostics(program).filter(d=>d.category===ts.DiagnosticCategory.Error);
@@ -95,6 +96,7 @@ function strictTypes() {
     const r=S.build([older,b,a,a],[],[],NOW);const item=r.items.find(x=>x.id===10000014);
     assert.equal(item.histories.length,2);assert.equal(item.histories[0].pools.length,2);
     assert.deepEqual(plain(item.histories[0].pools.map(x=>x.type)),[301,400]);assert.equal(item.lastTime,a.to);
+    assert(item.histories[0].pools.every(x=>x.banner==='https://example.com/banner.png'),'banner propagates to every pool detail');
     const different=S.build([a,event({...a,to:a.to+1})],[],[],NOW);assert.equal(different.items.find(x=>x.id===10000014).histories.length,2);
   });
   await test('oldest-last-UP ordering and ties are stable and input arrays are untouched',()=>{

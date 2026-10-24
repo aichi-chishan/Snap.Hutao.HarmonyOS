@@ -80,7 +80,7 @@ export struct CalendarPage {
         .fontSize(12)
         .height(28)
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           this.loadData();
         })
@@ -100,7 +100,7 @@ export struct CalendarPage {
         .fontColor($r('app.color.text_primary'))
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -115,7 +115,7 @@ export struct CalendarPage {
       Column() {
         Text(entry.typeName)
           .fontSize(11)
-          .fontColor(Color.White)
+          .fontColor($r('app.color.on_accent'))
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .borderRadius(8)
           .backgroundColor(entry.type === ActCalendarType.CARD_POOL ? $r('app.color.app_primary') : $r('app.color.notice_on'))
@@ -137,7 +137,7 @@ export struct CalendarPage {
         if (entry.type === ActCalendarType.CARD_POOL && entry.versionName.length > 0) {
           Text(entry.versionName)
             .fontSize(11)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
         }
         Text(`${DateUtil.formatMonthDay(entry.startTime)} ~ ${DateUtil.formatMonthDay(entry.endTime)}`)
           .fontSize(12)
@@ -225,7 +225,7 @@ export struct CalendarPage {
         Text(b.name.substring(0, 1))
           .fontSize(14)
           .fontWeight(FontWeight.Bold)
-          .fontColor(Color.White)
+          .fontColor($r('app.color.on_accent'))
           .width(36)
           .height(36)
           .textAlign(TextAlign.Center)
@@ -329,7 +329,7 @@ export struct CalendarPage {
           if (this.selectedMat !== undefined && this.selectedMat.highlighted) {
             Text('当前养成计划所需')
               .fontSize(11)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
           }
         }
         .alignItems(HorizontalAlign.Start)
@@ -461,7 +461,7 @@ export struct CalendarPage {
             .fontColor($r('app.color.text_secondary'))
           Button('前往')
             .backgroundColor($r('app.color.app_primary'))
-            .fontColor(Color.White)
+            .fontColor($r('app.color.on_accent'))
             .onClick(() => {
               router.pushUrl({ url: 'pages/UserPage' });
             })

@@ -72,7 +72,7 @@ export struct HomeTravelersDiaryCard {
               Text(`◆ ${HomeTravelersDiaryCard.fmt(this.vm.ledger.monthData.currentPrimogems)}`)
                 .fontSize(16)
                 .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.app_primary'))
+                .fontColor($r('app.color.app_primary_text'))
               Text('当月原石')
                 .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))

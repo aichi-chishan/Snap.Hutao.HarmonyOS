@@ -87,8 +87,10 @@ class DashCardSpec {
     @StorageProp('bottomAvoidVp') bottomAvoidVp: number = 0;
     @StorageProp('isDarkMode') isDark: boolean = false;
     @StorageProp('reduceMotion') reduceMotion: boolean = false;
-    /** 当前选中页签（窄屏 0-3 / 宽屏 0-7） */
+    /** 当前选中页（宽屏 canonical 索引；手机页签索引独立存放于 phoneTab，跨断点互不串页） */
     @State currentIndex: number = 0;
+    /** 手机底部页签索引（0=首页 1=祈愿 2=便笺 3=我的）；与 currentIndex 分离，避免跨 720vp 断点时错页 */
+    @State phoneTab: number = 0;
     /** 宽屏侧边栏（>=840vp 平板/PC 显示） */
     @State isWide: boolean = false;
     /** 沉浸光感材质等级：-1=关闭；0=自适应(ADAPTIVE)；1=精细；2=柔和；3=平滑 */
@@ -238,7 +240,7 @@ class DashCardSpec {
                       .layoutWeight(1)
                       Text('复制')
                         .fontSize(12)
-                        .fontColor($r('app.color.app_primary'))
+                        .fontColor($r('app.color.app_primary_text'))
                         .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                         .borderRadius(10)
                         .border({ width: 1, color: $r('app.color.app_primary') })
@@ -463,7 +465,39 @@ class DashCardSpec {
     return cfg;
   }
 
-  /** 宽屏内容切换（统一入口）：animateTo 驱动 geometryTransition 指示条与页面转场 */
+  /**
+   * 手机底部页签 → 宽屏 canonical 索引。
+   * 手机页签语义固定为 0=首页 1=祈愿 2=便笺 3=我的；宽屏索引是页面标识。
+   * 二者不再共用一个数字，跨 720vp 断点切换不会错页（对齐 Windows：窗口尺寸不改变业务页面）。
+   */
+  private static phoneTabToIndex(tab: number): number {
+    if (tab === 0) { return 0; }
+    if (tab === 1) { return 1; }
+    if (tab === 2) { return 3; }
+    return -1;
+  }
+
+  /** 宽屏 canonical 索引 → 手机底部页签（-1 = 手机无对应页签，例如宽屏独有的图鉴/挑战页） */
+  private static indexToPhoneTab(index: number): number {
+    if (index === 0) { return 0; }
+    if (index === 1) { return 1; }
+    if (index === 3) { return 2; }
+    return -1;
+  }
+
+  /** 断点切换后把手机页签对齐到当前业务页面，避免宽→窄时停留在上一次的页签 */
+  private syncPhoneTabForCurrentPage(): void {
+    if (this.isWide) {
+      return;
+    }
+    const tab: number = Index.indexToPhoneTab(this.currentIndex);
+    if (tab >= 0 && tab !== this.phoneTab) {
+      this.phoneTab = tab;
+      this.controller.changeIndex(tab);
+    }
+  }
+
+  /** 内容切换（统一入口）：animateTo 驱动 geometryTransition 指示条与页面转场 */
   private switchTo(index: number): void {
     if (this.reduceMotion) {
       this.currentIndex = index;
@@ -474,6 +508,22 @@ class DashCardSpec {
     }
     // 切回主页自动拉新数据（对齐 Windows；替代下拉刷新——模拟器 Refresh+Scroll 嵌套渲染异常）
     if (index === 0) {
+      this.reloadHome();
+    }
+  }
+
+  /**
+   * 窄屏切页：底部页签与业务页面必须一起变，二者索引语义不同（见 phoneTabToIndex）。
+   * 宽屏走 switchTo；此处是手机唯一入口，避免两套索引各自漂移。
+   */
+  private switchPhoneTab(tab: number): void {
+    this.phoneTab = tab;
+    const mapped: number = Index.phoneTabToIndex(tab);
+    if (mapped >= 0) {
+      this.currentIndex = mapped;
+    }
+    this.controller.changeIndex(tab);
+    if (mapped === 0) {
       this.reloadHome();
     }
   }
@@ -531,7 +581,15 @@ class DashCardSpec {
       .vertical(false)
       .barPosition(BarPosition.End)
       .onChange((index: number) => {
-        this.currentIndex = index;
+        // 手机页签索引独立记录；同时把 canonical 索引映射为对应业务页面，
+        // 保证切回宽屏时仍是同一个业务页面（此前两者共用一个数字导致跨断点错页）
+        this.phoneTab = index;
+        // 「我的」是手机独有页签，无宽屏对应页：此时保留上一个业务页面，
+        // 避免把 canonical 索引置为无效值导致切回宽屏后落到错误页面。
+        const mapped: number = Index.phoneTabToIndex(index);
+        if (mapped >= 0) {
+          this.currentIndex = mapped;
+        }
       })
       .barFloatingStyle({
         barBottomMargin: 20,
@@ -551,7 +609,11 @@ class DashCardSpec {
       .backgroundColor(Color.Transparent)
       .onAreaChange((oldValue: Area, newValue: Area) => {
         const w: number = newValue.width as number;
+        const wasWide: boolean = this.isWide;
         this.isWide = w >= Index.WIDE_VP;
+        if (wasWide !== this.isWide) {
+          this.syncPhoneTabForCurrentPage();
+        }
         // 窗口不足平板宽（<840）时自动折叠侧栏（图标态）给内容让位；用户此后可手动展开，
         // 仅在宽度变化跨越时触发，不与手动操作打架
         if (w > 0 && w < 840) {
@@ -599,7 +661,11 @@ class DashCardSpec {
     .onAreaChange((oldValue: Area, newValue: Area) => {
       // 与 phoneShell 同阈值：窗口缩到 <720vp 时切回窄屏（2in1 旋转/缩放）
       const w: number = newValue.width as number;
+      const wasWide: boolean = this.isWide;
       this.isWide = w >= Index.WIDE_VP;
+      if (wasWide !== this.isWide) {
+        this.syncPhoneTabForCurrentPage();
+      }
       // 窗口不足平板宽（<840）时自动折叠侧栏（图标态）给内容让位；用户此后可手动展开，
       // 仅在宽度变化跨越时触发，不与手动操作打架
       if (w > 0 && w < 840) {
@@ -623,6 +689,8 @@ class DashCardSpec {
       .height(36)
       .borderRadius(8)
       .hoverEffect(HoverEffect.Highlight)
+      .accessibilityText('返回')
+      .accessibilityLevel('yes')
       .onClick(() => {
         const state = router.getState();
         const idx: number = state !== undefined ? state.index : 1;
@@ -635,16 +703,16 @@ class DashCardSpec {
         }
       })
 
-      // 三条杠（折叠侧栏：仅图标 / 图标+文字）
+      // 三条杠（折叠侧栏：仅图标 / 图标+文字）；用系统符号替代 emoji，跟随主题色
       Stack({ alignContent: Alignment.Center }) {
-        Text('☰')
-          .fontSize(20)
-          .fontColor($r('app.color.text_primary'))
+        NavIcon({ name: 'Menu', iconSize: 22, symbolColor: $r('app.color.text_primary') })
       }
       .width(36)
       .height(36)
       .borderRadius(8)
       .hoverEffect(HoverEffect.Highlight)
+      .accessibilityText(this.sidebarFold ? '展开导航栏' : '收起导航栏')
+      .accessibilityLevel('yes')
       .onClick(() => {
         this.toggleSidebar();
       })
@@ -711,7 +779,7 @@ class DashCardSpec {
         this.navSectionTitle('系统')
         this.navItem(16, 'Passport', '胡桃通行证与云')
         this.navItem(12, 'Passport', '账号与数据')
-        this.navItem(13, '⚙️', '设置')
+        this.navItem(13, 'Setting', '设置')
 
         Blank()
           .layoutWeight(1)
@@ -952,7 +1020,7 @@ class DashCardSpec {
                   loaded: this.homeVm.gachaLoaded,
                   pages: this.gachaPages,
                   onTap: () => {
-                    if (this.isWide) { this.switchTo(1); } else { this.controller.changeIndex(1); }
+                    if (this.isWide) { this.switchTo(1); } else { this.switchPhoneTab(1); }
                   },
                 })
               } else if (key === 'achievement') {
@@ -970,7 +1038,7 @@ class DashCardSpec {
                   refreshTime: this.homeVm.noteRefreshTime,
                   loaded: this.homeVm.noteLoaded,
                   onTap: () => {
-                    if (this.isWide) { this.switchTo(3); } else { this.controller.changeIndex(2); }
+                    if (this.isWide) { this.switchTo(3); } else { this.switchPhoneTab(2); }
                   },
                 })
               } else if (key === 'ledger') {
@@ -1037,7 +1105,7 @@ class DashCardSpec {
               .layoutWeight(1)
             Text('查看日历 ›')
               .fontSize(12)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .onClick(() => {
                 router.pushUrl({ url: 'pages/CalendarPage' });
               })
@@ -1096,7 +1164,7 @@ class DashCardSpec {
                 if (this.isWide) {
                   this.switchTo(1);
                 } else {
-                  this.controller.changeIndex(1);
+                  this.switchPhoneTab(1);
                 }
               })
             }
@@ -1105,7 +1173,7 @@ class DashCardSpec {
                 if (this.isWide) {
                   this.switchTo(3);
                 } else {
-                  this.controller.changeIndex(2);
+                  this.switchPhoneTab(2);
                 }
               })
             }
@@ -1148,7 +1216,7 @@ class DashCardSpec {
               })
             }
             GridItem() {
-              this.entryTile('⚙️', '设置', '主题 / 刷新 / 账号', () => {
+              this.entryTile('Setting', '设置', '主题 / 刷新 / 账号', () => {
                 router.pushUrl({ url: 'pages/SettingPage' });
               })
             }
@@ -1450,7 +1518,7 @@ class DashCardSpec {
     Column({ space: 6 }) {
       Text('◆')
         .fontSize(12)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
       Text(title)
         .fontSize(13)
         .fontWeight(FontWeight.Medium)
@@ -1611,18 +1679,40 @@ class DashCardSpec {
 
         LoginStatusBar()
 
-        this.entryCard('Cultivation', '养成计划', '角色养成 / 材料计算', () => {
-          router.pushUrl({ url: 'pages/CultivationPage' });
-        })
-        this.entryCard('GachaLog', 'UP 历史', '角色与武器历次 UP / 距上次结束时长', () => {
-          router.pushUrl({ url: 'pages/WishHistoryPage' });
-        })
-        this.entryCard('Backpack', '离线背包', 'UIIF 导入导出 / 库存与装备', () => {
-          router.pushUrl({ url: 'pages/BackpackPage' });
+        // 分组与宽屏侧栏一致（对齐 Windows NavigationView：工具 / 周期 / 数据 / 系统），
+        // 手机「我的」即全功能目录；祈愿/便笺已是底部页签，不再重复列出。
+        this.navSectionTitle('工具')
+        this.entryCard('LaunchGame', '启动游戏', '配置公开启动入口', () => {
+          router.pushUrl({ url: 'pages/LaunchGamePage' });
         })
         this.entryCard('Achievement', '成就管理', '进度统计 / UIAF 导入导出', () => {
           router.pushUrl({ url: 'pages/AchievementPage' });
         })
+        this.entryCard('AvatarProperty', '我的角色', '角色列表 / 详情 / 圣遗物', () => {
+          router.pushUrl({ url: 'pages/CharacterPage' });
+        })
+        this.entryCard('Cultivation', '养成计划', '角色养成 / 材料计算', () => {
+          router.pushUrl({ url: 'pages/CultivationPage' });
+        })
+        this.entryCard('Backpack', '离线背包', 'UIIF 导入导出 / 库存与装备', () => {
+          router.pushUrl({ url: 'pages/BackpackPage' });
+        })
+        this.entryCard('GachaLog', 'UP 历史', '角色与武器历次 UP / 距上次结束时长', () => {
+          router.pushUrl({ url: 'pages/WishHistoryPage' });
+        })
+
+        this.navSectionTitle('周期')
+        this.entryCard('SpiralAbyss', '深境螺旋', '当期/上期战绩与出战角色', () => {
+          router.pushUrl({ url: 'pages/SpiralAbyssPage' });
+        })
+        this.entryCard('RoleCombat', '幻想真境剧诗', '回合/奖章/候补角色', () => {
+          router.pushUrl({ url: 'pages/RoleCombatPage' });
+        })
+        this.entryCard('HardChallenge', '幽境危战', '单挑/多人/最佳成绩', () => {
+          router.pushUrl({ url: 'pages/HardChallengePage' });
+        })
+
+        this.navSectionTitle('数据')
         this.entryCard('WikiAvatar', '角色资料', '全角色资料 / 元素 / 描述', () => {
           router.pushUrl({ url: 'pages/WikiAvatarPage' });
         })
@@ -1632,27 +1722,11 @@ class DashCardSpec {
         this.entryCard('WikiMonster', '怪物资料', '全怪物资料 / 元素 / 阵营', () => {
           router.pushUrl({ url: 'pages/WikiMonsterPage' });
         })
-        this.entryCard('Passport', '胡桃通行证与云', '通行证 / 云服务', () => {
-          router.pushUrl({ url: 'pages/HutaoCloudPage' });
+        this.entryCard('TravelersDiary', '旅行者札记', '原石 / 摩拉月度收支', () => {
+          router.pushUrl({ url: 'pages/LedgerPage' });
         })
-        this.entryCard('LaunchGame', '启动游戏', '配置公开启动入口', () => {
-          router.pushUrl({ url: 'pages/LaunchGamePage' });
-        })
-        this.entryCard('Passport', '账号与数据', '多账号管理与角色绑定', () => {
-          router.pushUrl({ url: 'pages/UserPage' });
-        })
-        this.entryCard('AvatarProperty', '我的角色', '角色列表 / 详情 / 圣遗物', () => {
-          router.pushUrl({ url: 'pages/CharacterPage' });
-        })
-        this.entryCard('SpiralAbyss', '深境螺旋', '当期/上期战绩与出战角色', () => {
-          router.pushUrl({ url: 'pages/SpiralAbyssPage' });
-        })
-        this.entryCard('RoleCombat', '幻想真境剧诗', '回合/奖章/候补角色', () => {
-          router.pushUrl({ url: 'pages/RoleCombatPage' });
-        })
-        this.entryCard('HardChallenge', '强敌挑战', '单挑/多人/最佳成绩', () => {
-          router.pushUrl({ url: 'pages/HardChallengePage' });
-        })
+
+        this.navSectionTitle('日常')
         this.entryCard('CheckIn', '每日签到', '米游社每日签到与奖励', () => {
           router.pushUrl({ url: 'pages/SignInPage' });
         })
@@ -1662,7 +1736,15 @@ class DashCardSpec {
         this.entryCard('Announcement', '游戏公告', '版本更新 / 活动 / 新闻', () => {
           router.pushUrl({ url: 'pages/AnnouncementPage' });
         })
-        this.entryCard('⚙️', '设置', '主题 / 刷新 / 账号', () => {
+
+        this.navSectionTitle('系统')
+        this.entryCard('Passport', '胡桃通行证与云', '通行证 / 云服务', () => {
+          router.pushUrl({ url: 'pages/HutaoCloudPage' });
+        })
+        this.entryCard('Passport', '账号与数据', '多账号管理与角色绑定', () => {
+          router.pushUrl({ url: 'pages/UserPage' });
+        })
+        this.entryCard('Setting', '设置', '主题 / 刷新 / 账号', () => {
           router.pushUrl({ url: 'pages/SettingPage' });
         })
       }

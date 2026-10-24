@@ -179,7 +179,7 @@ export struct HomeSignInCard {
           if (this.uid.length > 0) {
             Text(this.uid)
               .fontSize(12)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
           }
         }
         .width('100%')
@@ -233,7 +233,7 @@ export struct HomeSignInCard {
               .hoverEffect(HoverEffect.Highlight)
               .layoutWeight(1)
               .backgroundColor($r('app.color.app_primary_bg'))
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .onClick(() => {
                 this.onResignIn()
               })
