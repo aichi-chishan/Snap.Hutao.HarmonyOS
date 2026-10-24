@@ -16,8 +16,28 @@ import { Logger } from '../common/Logger';
 
 const META_TAG: string = 'MetaIcon';
 
-/** 进程内图标解析缓存：key = category/name → 沙盒路径；使用前确认文件仍在。 */
+/**
+ * 进程内图标解析缓存：key = category/name → 沙盒路径；使用前确认文件仍在。
+ * 有界 LRU：长会话翻图鉴/祈愿会累计上千条目，无上限的 Map 会持续占用内存。
+ * 只淘汰「记住的路径」，磁盘缓存文件保留，重新访问时命中 accessSync 分支即可，不重复读包。
+ */
+const RAW_CACHE_LIMIT: number = 512;
 const RAW_CACHE: Map<string, string> = new Map();
+
+/** 写入并维护 LRU 顺序（Map 迭代序 = 插入序，重设键即移到最新）。 */
+function cachePut(key: string, path: string): void {
+  if (RAW_CACHE.has(key)) {
+    RAW_CACHE.delete(key);
+  }
+  RAW_CACHE.set(key, path);
+  while (RAW_CACHE.size > RAW_CACHE_LIMIT) {
+    const oldest: string | undefined = RAW_CACHE.keys().next().value;
+    if (oldest === undefined) {
+      break;
+    }
+    RAW_CACHE.delete(oldest);
+  }
+}
 
 /** One immutable native Image request; source equality alone cannot identify retries. */
 class MetaIconFrame {
@@ -149,6 +169,7 @@ export struct MetaIcon {
     if (cached !== undefined) {
       try {
         if (fileIo.accessSync(cached)) {
+          cachePut(key, cached); // 命中即刷新 LRU 位置，使最近访问的图标不被淘汰
           if (this.attached && token === this.resolveToken) { this.publishSource(fileUri.getUriFromPath(cached)); }
           return;
         }
@@ -159,7 +180,7 @@ export struct MetaIcon {
     const dest: string = `${dir}/${name}.png`;
     try {
       if (fileIo.accessSync(dest)) {
-        RAW_CACHE.set(key, dest);
+        cachePut(key, dest);
         if (this.attached && token === this.resolveToken) {
           this.publishSource(fileUri.getUriFromPath(dest));
         }
@@ -176,7 +197,7 @@ export struct MetaIcon {
       if (!this.attached || token !== this.resolveToken) { return; }
       MetaIcon.writeCache(dest, raw);
       const src: string = fileUri.getUriFromPath(dest);
-      RAW_CACHE.set(key, dest);
+      cachePut(key, dest);
       if (this.attached && token === this.resolveToken) {
         this.publishSource(src);
       }
@@ -205,7 +226,7 @@ export struct MetaIcon {
     }
     if (found.length > 0) {
       const src: string = fileUri.getUriFromPath(found);
-      RAW_CACHE.set(`${category}/${name}`, found);
+      cachePut(`${category}/${name}`, found);
       if (this.attached && token === this.resolveToken) {
         this.publishSource(src);
       }

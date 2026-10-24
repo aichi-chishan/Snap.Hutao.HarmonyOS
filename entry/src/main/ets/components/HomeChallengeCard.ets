@@ -33,7 +33,7 @@ export struct HomeChallengeCard {
             .layoutWeight(1)
           Text('点击进入 ›')
             .fontSize(12)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
         }
         .width('100%')
 
@@ -129,7 +129,7 @@ export struct HomeChallengeCard {
       Text(this.slotValue(slot))
         .fontSize(12)
         .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .width('100%')

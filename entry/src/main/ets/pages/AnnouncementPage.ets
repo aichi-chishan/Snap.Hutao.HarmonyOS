@@ -89,7 +89,7 @@ export struct AnnouncementPage {
               .layoutWeight(1)
               Text('复制')
                 .fontSize(12)
-                .fontColor($r('app.color.app_primary'))
+                .fontColor($r('app.color.app_primary_text'))
                 .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                 .borderRadius(10)
                 .border({ width: 1, color: $r('app.color.app_primary') })
@@ -144,7 +144,7 @@ export struct AnnouncementPage {
           .height(44)
           .margin({ right: 8 })
           .backgroundColor(this.showCodeSheet ? $r('app.color.app_primary') : $r('app.color.card_surface'))
-          .fontColor(this.showCodeSheet ? Color.White : $r('app.color.app_primary'))
+          .fontColor(this.showCodeSheet ? $r('app.color.on_accent') : $r('app.color.app_primary_text'))
           .border({ width: 1, color: $r('app.color.app_primary') })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
@@ -155,7 +155,7 @@ export struct AnnouncementPage {
         .fontSize(12)
         .height(44)
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           this.vm.load(this.vm.context, true).then(() => {
           });
@@ -173,7 +173,7 @@ export struct AnnouncementPage {
         ForEach(this.vm.groups, (g: AnnouncementGroup, idx: number) => {
           Text(g.label)
             .fontSize(13)
-            .fontColor(this.vm.currentIndex === idx ? Color.White : $r('app.color.text_primary'))
+            .fontColor(this.vm.currentIndex === idx ? $r('app.color.on_accent') : $r('app.color.text_primary'))
             .padding({ left: 16, right: 16, top: 6, bottom: 6 })
             .borderRadius(12)
             .backgroundColor(this.vm.currentIndex === idx ? $r('app.color.app_primary') : $r('app.color.card_surface'))
@@ -259,7 +259,7 @@ export struct AnnouncementPage {
             .fontColor(this.remainColor(item))
             .padding({ left: 8, right: 8, top: 4, bottom: 4 })
             .borderRadius({ topLeft: 0, bottomLeft: 6, bottomRight: 0, topRight: 6 })
-            .backgroundColor('#66000000')
+            .backgroundColor($r('app.color.image_scrim_soft'))
         }
         // 类型徽章
         if (item.typeName.length > 0) {

@@ -63,11 +63,22 @@ export struct SpiralAbyssPage {
   @Builder
   header() {
     PageHeader({ title: '深境螺旋', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
+      Button('洞察')
+        .fontSize(12)
+        .height(28)
+        .backgroundColor($r('app.color.app_primary_bg'))
+        .fontColor($r('app.color.app_primary_text'))
+        .hoverEffect(HoverEffect.Highlight)
+        .accessibilityText('打开账号洞察')
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/AccountInsightsPage' }).catch(() => {
+          });
+        })
       Button('刷新')
         .fontSize(12)
         .height(28)
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           this.reload();
         })
@@ -84,7 +95,7 @@ export struct SpiralAbyssPage {
         .fontColor($r('app.color.text_primary'))
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -122,7 +133,7 @@ export struct SpiralAbyssPage {
       Text(value)
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
       Text(label)
         .fontSize(11)
         .fontColor($r('app.color.text_secondary'))
@@ -151,7 +162,7 @@ export struct SpiralAbyssPage {
         Row({ space: 6 }) {
           Text('地脉')
             .fontSize(9)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .padding({ left: 5, right: 5, top: 2, bottom: 2 })
             .borderRadius(6)
             .backgroundColor($r('app.color.app_primary_bg'))
@@ -180,7 +191,7 @@ export struct SpiralAbyssPage {
             Row({ space: 8 }) {
               Text(battle.index === 1 ? '上半' : '下半')
                 .fontSize(11)
-                .fontColor(Color.White)
+                .fontColor($r('app.color.on_accent'))
                 .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                 .borderRadius(6)
                 .backgroundColor($r('app.color.app_primary'))
@@ -228,7 +239,7 @@ export struct SpiralAbyssPage {
                               .fontColor(Color.White)
                               .padding({ left: 3, right: 3 })
                               .borderRadius(5)
-                              .backgroundColor('#99000000')
+                              .backgroundColor($r('app.color.image_scrim'))
                           }
                         }
                       }, (mo: TowerMonsterView, mi: number) => `tw_${wi}_${mi}_${mo.name}`)
@@ -440,7 +451,7 @@ export struct SpiralAbyssPage {
               if (this.vm.fromHistory) {
                 Text('⟲ 实时')
                   .fontSize(12)
-                  .fontColor($r('app.color.app_primary'))
+                  .fontColor($r('app.color.app_primary_text'))
                   .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                   .borderRadius(14)
                   .backgroundColor($r('app.color.app_primary_bg'))
@@ -504,7 +515,7 @@ export struct SpiralAbyssPage {
                 Button('重试')
                   .fontSize(14)
                   .backgroundColor($r('app.color.app_primary'))
-                  .fontColor(Color.White)
+                  .fontColor($r('app.color.on_accent'))
                   .onClick(() => {
                     this.reload();
                   })
@@ -526,7 +537,7 @@ export struct SpiralAbyssPage {
                 Row({ space: 8 }) {
                   Text('◆')
                     .fontSize(13)
-                    .fontColor($r('app.color.app_primary'))
+                    .fontColor($r('app.color.app_primary_text'))
                   Text(this.abyssBuff().name)
                     .fontSize(15)
                     .fontWeight(FontWeight.Medium)
@@ -583,7 +594,7 @@ export struct SpiralAbyssPage {
   scheduleChip(type: number, label: string) {
     Text(label)
       .fontSize(13)
-      .fontColor(this.vm.scheduleType === type ? Color.White : $r('app.color.text_primary'))
+      .fontColor(this.vm.scheduleType === type ? $r('app.color.on_accent') : $r('app.color.text_primary'))
       .padding({ left: 16, right: 16, top: 6, bottom: 6 })
       .borderRadius(12)
       .backgroundColor(this.vm.scheduleType === type ? $r('app.color.app_primary') : $r('app.color.card_surface'))

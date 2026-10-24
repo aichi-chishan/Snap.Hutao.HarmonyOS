@@ -22,6 +22,7 @@ import EntryAbility from '../entryability/EntryAbility';
 import { GameDataService, GameDataUpdateStatus } from '../service/GameDataService';
 import { GameDataUpdater } from '../data/remote/GameDataUpdater';
 import { RiskVerifyService } from '../service/RiskVerifyService';
+import { AiAnalysisService, AiCustomConfig, AiProvider } from '../service/AiAnalysisService';
 import { BackupService } from '../service/BackupService';
 import { SupportService } from '../service/SupportService';
 import { BackgroundMediaService } from '../service/BackgroundMediaService';
@@ -98,6 +99,12 @@ export struct SettingPage {
   /** 极验自定义组合接口编辑弹窗（对齐 Windows 无感验证 GeetestCustomUrlDialog） */
   @State showGeetestEdit: boolean = false;
   @State geetestInput: string = '';
+  /** AI 分析（账号洞察）：通道与自定义 API 配置（对齐 Windows 2.0 AI 设置，双通道） */
+  @State aiProvider: number = 0;
+  @State aiBaseUrl: string = '';
+  @State aiModel: string = '';
+  @State aiKey: string = '';
+  @State aiSavedHint: string = '';
   /** 应用版本与更新检查（GitHub Releases） */
   @State appVersion: string = '';
   @State backgroundControlsActive: boolean = false;
@@ -165,6 +172,11 @@ export struct SettingPage {
     this.mediaLoop = PreferencesStore.getBool(BackgroundMediaService.LOOP_KEY, true);
     this.firstWeekday = Math.max(0, Math.min(6, PreferencesStore.getNumber('calendar.first_day_of_week', 1)));
     this.themeMode = PreferencesStore.getThemeMode();
+    this.aiProvider = AiAnalysisService.provider();
+    const aiConfig: AiCustomConfig = AiAnalysisService.customConfig();
+    this.aiBaseUrl = aiConfig.baseUrl;
+    this.aiModel = aiConfig.model;
+    this.aiKey = aiConfig.apiKey;
     Motion.setReducedMotion(PreferencesStore.getReduceMotionEnabled());
     this.autoRefresh = PreferencesStore.getAutoRefreshEnabled();
     this.interval = PreferencesStore.getRefreshIntervalMinutes();
@@ -463,6 +475,24 @@ export struct SettingPage {
       .margin({ top: 14, bottom: 6 })
   }
 
+  /**
+   * 分组标题（对齐 Windows 设置页的分组导航：外观 / 数据 / 账号 / 其它）。
+   * 只做视觉分层，不改动各 section 自身的读写逻辑。
+   */
+  @Builder
+  groupTitle(title: string) {
+    Row({ space: 8 }) {
+      Divider().vertical(true).height(14).color($r('app.color.app_primary')).strokeWidth(3)
+      Text(title)
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.text_primary'))
+    }
+    .width('100%')
+    .margin({ top: 18, bottom: 2 })
+    .alignItems(VerticalAlign.Center)
+  }
+
   @Builder
   themeSection() {
     Row({ space: 10 }) {
@@ -473,11 +503,104 @@ export struct SettingPage {
     .width('100%')
   }
 
+  /** AI 分析通道 chip（双通道：系统 AI=端侧模型；自定义 API=OpenAI 兼容端点） */
+  @Builder
+  aiProviderChip(value: number, label: string) {
+    Text(label)
+      .fontSize(12)
+      .fontColor(this.aiProvider === value ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+      .borderRadius(12)
+      .backgroundColor(this.aiProvider === value ? $r('app.color.app_primary_bg') : Color.Transparent)
+      .hoverEffect(HoverEffect.Highlight)
+      .accessibilityText(`AI 分析通道切换为${label}`)
+      .onClick(() => {
+        this.aiProvider = value;
+        AiAnalysisService.setProvider(value === 1 ? AiProvider.Custom : AiProvider.System);
+      })
+  }
+
+  /** AI 分析分组（对齐 Windows 2.0 Agent 设置；密钥仅存本机偏好，不写日志） */
+  @Builder
+  aiSection() {
+    Column({ space: 10 }) {
+      Row({ space: 10 }) {
+        this.aiProviderChip(0, '系统 AI（端侧）')
+        this.aiProviderChip(1, '自定义 API')
+      }
+      .width('100%')
+
+      Text(this.aiProvider === 1
+        ? 'OpenAI 兼容接口：POST {接口地址}/chat/completions，携带 Bearer 密钥；密钥仅保存在本机。'
+        : '使用鸿蒙端侧问答模型（DataAugmentationKit），离线可用、无需密钥；部分设备不支持时可在分析页切换。')
+        .fontSize(11)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+
+      if (this.aiProvider === 1) {
+        Column({ space: 8 }) {
+          TextInput({ placeholder: '接口地址，如 https://api.example.com/v1', text: this.aiBaseUrl })
+            .fontSize(12)
+            .height(40)
+            .width('100%')
+            .onChange((v: string) => {
+              this.aiBaseUrl = v;
+            })
+          TextInput({ placeholder: '模型名称，如 gpt-4o-mini', text: this.aiModel })
+            .fontSize(12)
+            .height(40)
+            .width('100%')
+            .onChange((v: string) => {
+              this.aiModel = v;
+            })
+          TextInput({ placeholder: 'API 密钥（仅保存在本机）', text: this.aiKey })
+            .fontSize(12)
+            .height(40)
+            .width('100%')
+            .type(InputType.Password)
+            .onChange((v: string) => {
+              this.aiKey = v;
+            })
+          Button('保存自定义 API 配置')
+            .fontSize(13)
+            .height(38)
+            .width('100%')
+            .backgroundColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.on_accent'))
+            .hoverEffect(HoverEffect.Highlight)
+            .accessibilityText('保存自定义 API 配置')
+            .onClick(() => {
+              const config: AiCustomConfig = new AiCustomConfig();
+              config.baseUrl = this.aiBaseUrl;
+              config.model = this.aiModel;
+              config.apiKey = this.aiKey;
+              AiAnalysisService.saveCustomConfig(config);
+              this.aiSavedHint = this.aiBaseUrl.trim().length > 0 && this.aiModel.trim().length > 0
+                && this.aiKey.trim().length > 0 ? '已保存（密钥仅存本机）' : '已保存，但配置不完整时将无法使用自定义通道';
+            })
+          if (this.aiSavedHint.length > 0) {
+            Text(this.aiSavedHint)
+              .fontSize(11)
+              .fontColor($r('app.color.text_secondary'))
+              .width('100%')
+          }
+        }
+        .width('100%')
+        .padding(12)
+        .borderRadius(12)
+        .backgroundColor($r('app.color.card_surface'))
+        .border({ width: 1, color: $r('app.color.card_stroke') })
+        .alignItems(HorizontalAlign.Start)
+      }
+    }
+    .width('100%')
+  }
+
   @Builder
   bgTypeChip(value: string, label: string) {
     Text(label)
       .fontSize(12)
-      .fontColor(this.bgType === value ? Color.White : $r('app.color.text_primary'))
+      .fontColor(this.bgType === value ? $r('app.color.on_accent') : $r('app.color.text_primary'))
       .padding({ left: 12, right: 12, top: 8, bottom: 8 })
       .borderRadius(10)
       .backgroundColor(this.bgType === value ? $r('app.color.app_primary') : Color.Transparent)
@@ -755,7 +878,7 @@ export struct SettingPage {
   themeChip(mode: string, label: string) {
     Text(label)
       .fontSize(14)
-      .fontColor(this.themeMode === mode ? Color.White : $r('app.color.text_primary'))
+      .fontColor(this.themeMode === mode ? $r('app.color.on_accent') : $r('app.color.text_primary'))
       .padding({ left: 18, right: 18, top: 8, bottom: 8 })
       .borderRadius(12)
       .backgroundColor(this.themeMode === mode ? $r('app.color.app_primary') : $r('app.color.card_surface'))
@@ -771,7 +894,7 @@ export struct SettingPage {
   ambientChip(level: number, label: string) {
     Text(label)
       .fontSize(14)
-      .fontColor(this.ambientLevel === level ? Color.White : $r('app.color.text_primary'))
+      .fontColor(this.ambientLevel === level ? $r('app.color.on_accent') : $r('app.color.text_primary'))
       .padding({ left: 18, right: 18, top: 8, bottom: 8 })
       .borderRadius(12)
       .backgroundColor(this.ambientLevel === level ? $r('app.color.app_primary') : $r('app.color.card_surface'))
@@ -824,6 +947,7 @@ export struct SettingPage {
       this.header()
       Scroll() {
         Column({ space: 10 }) {
+          this.groupTitle('外观')
           this.sectionTitle('主题')
           this.themeSection()
 
@@ -863,6 +987,11 @@ export struct SettingPage {
           .backgroundColor($r('app.color.card_surface'))
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
+          Text('对应 Windows「材质」选项：关闭=默认材质；标准/增强=液态玻璃（沉浸光感）两档强度')
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+            .padding({ left: 14, right: 14, bottom: 2 })
 
           this.backgroundMediaSection()
           this.sectionTitle('背景图片')
@@ -901,7 +1030,7 @@ export struct SettingPage {
                 .layoutWeight(1)
                 Text('选择')
                   .fontSize(12)
-                  .fontColor($r('app.color.app_primary'))
+                  .fontColor($r('app.color.app_primary_text'))
                   .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                   .borderRadius(10)
                   .backgroundColor($r('app.color.app_primary_bg'))
@@ -924,6 +1053,7 @@ export struct SettingPage {
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
 
+          this.groupTitle('存储')
           this.sectionTitle('游戏数据完整更新（重启生效）')
           Row() {
             Column({ space: 2 }) {
@@ -959,7 +1089,7 @@ export struct SettingPage {
               .enabled(!this.dataBusy && !this.dataChecking)
               .constraintSize({ minHeight: 44 })
               .fontSize(12)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .padding({ left: 10 })
               .onClick(() => {
                 this.urlInput = this.dataUrl;
@@ -984,7 +1114,7 @@ export struct SettingPage {
               .fontSize(13)
               .constraintSize({ minHeight: 44 })
               .backgroundColor($r('app.color.app_primary_bg'))
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .margin({ right: 10 })
               .onClick(() => {
                 this.checkDataUpdate();
@@ -994,7 +1124,7 @@ export struct SettingPage {
               .fontSize(13)
               .constraintSize({ minHeight: 44 })
               .backgroundColor($r('app.color.app_primary'))
-              .fontColor(Color.White)
+              .fontColor($r('app.color.on_accent'))
               .onClick(() => {
                 this.updateGameData();
               })
@@ -1004,7 +1134,7 @@ export struct SettingPage {
                 .fontSize(13)
                 .constraintSize({ minHeight: 44 })
                 .backgroundColor($r('app.color.app_primary_bg'))
-                .fontColor($r('app.color.app_primary'))
+                .fontColor($r('app.color.app_primary_text'))
                 .margin({ left: 8 })
                 .hoverEffect(HoverEffect.Highlight)
                 .onClick(() => { this.cancelGameData(); })
@@ -1108,6 +1238,7 @@ export struct SettingPage {
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
 
+          this.groupTitle('极验验证')
           this.sectionTitle('无感验证')
           Row() {
             Column({ space: 2 }) {
@@ -1124,7 +1255,7 @@ export struct SettingPage {
             .layoutWeight(1)
             Text(this.geetestInput.length > 0 ? '已配置' : '配置')
               .fontSize(12)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .padding({ left: 12, right: 12, top: 6, bottom: 6 })
               .borderRadius(10)
               .border({ width: 1, color: $r('app.color.app_primary') })
@@ -1140,9 +1271,17 @@ export struct SettingPage {
             this.showGeetestEdit = true;
           })
 
+          this.groupTitle('AI 分析')
+          this.sectionTitle('AI 分析')
+          this.aiSection()
+
+          this.groupTitle('账号')
           this.sectionTitle('账号')
           this.rowItem('账号与数据', '多账号管理与角色绑定', () => {
             router.pushUrl({ url: 'pages/UserPage' });
+          })
+          this.rowItem('账号洞察', '祈愿/深渊/剧诗/幽战历史图表与 AI 分析', () => {
+            router.pushUrl({ url: 'pages/AccountInsightsPage' });
           })
           if (this.isLoggedIn) {
             Row() {
@@ -1193,6 +1332,7 @@ export struct SettingPage {
 
           BackgroundTaskSettings({ active: this.backgroundControlsActive })
 
+          this.groupTitle('主页')
           this.sectionTitle('主页卡片')
           Text('控制主页仪表板各卡片的显示与排列顺序（对齐 Windows 主页卡片设置）')
             .fontSize(11)
@@ -1300,6 +1440,7 @@ export struct SettingPage {
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
 
+          this.groupTitle('其它')
           this.sectionTitle('备份与还原')
           Row() {
             Column({ space: 2 }) {
@@ -1314,7 +1455,7 @@ export struct SettingPage {
             .layoutWeight(1)
             Text('导出')
               .fontSize(12)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .padding({ left: 12, right: 12, top: 6, bottom: 6 })
               .borderRadius(10)
               .border({ width: 1, color: $r('app.color.app_primary') })
@@ -1381,7 +1522,7 @@ export struct SettingPage {
             .layoutWeight(1)
             Text('查看')
               .fontSize(12)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .padding({ left: 12, right: 12, top: 6, bottom: 6 })
               .borderRadius(10)
               .border({ width: 1, color: $r('app.color.app_primary') })
@@ -1438,7 +1579,7 @@ export struct SettingPage {
                 .constraintSize({ minHeight: 44 })
                 .layoutWeight(1)
                 .backgroundColor($r('app.color.app_primary'))
-                .fontColor(Color.White)
+                .fontColor($r('app.color.on_accent'))
                 .onClick(() => {
                   this.applyDataUrl();
                 })
@@ -1489,7 +1630,7 @@ export struct SettingPage {
                 .height(34)
                 .layoutWeight(1)
                 .backgroundColor($r('app.color.app_primary'))
-                .fontColor(Color.White)
+                .fontColor($r('app.color.on_accent'))
                 .onClick(() => {
                   this.applyGeetestUrl();
                 })

@@ -266,7 +266,7 @@ export struct HomeDailyNoteCard {
               .layoutWeight(1)
             Text('查看详情 ›')
               .fontSize(12)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .hoverEffect(HoverEffect.Highlight)
               .onClick(() => this.onTap())
           }

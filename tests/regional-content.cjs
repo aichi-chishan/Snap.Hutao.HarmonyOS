@@ -29,10 +29,13 @@ function harness(){
   MiyoliveService:{MiyoliveService:{getInstance:()=>({async fetchRedeemCodes(){state.codeCalls++;return state.codes();}})}},
  };
  const cache=new Map();
+  // path.resolve yields '\' separators on Windows; the structural check below is written in
+  // '/'-space, so compare a normalized copy instead of weakening the assertion.
+  const posix=value=>String(value).replaceAll('\\','/');
  function load(relative){
   const file=path.resolve(root,relative.endsWith('.ets')?relative:relative+'.ets');if(cache.has(file))return cache.get(file);
   let source=fs.readFileSync(file,'utf8').replace(/^@Observed\s*$/gm,'');
-  if(file.endsWith('/components/HomeTravelersDiaryCard.ets')){
+  if(posix(file).endsWith('/components/HomeTravelersDiaryCard.ets')){
    // Execute real lifecycle methods; leave native build()/UI rendering to the SDK/device checks.
    source=source.slice(0,source.indexOf('  build() {'))+'\n}';
    source=source.replace(/@\w+(?:\([^)]*\))?\s*/g,'').replace('export struct ','export class ')

@@ -87,7 +87,7 @@ export struct LedgerPage {
         .fontColor($r('app.color.text_secondary'))
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -136,7 +136,7 @@ export struct LedgerPage {
             .fontColor($r('app.color.text_primary'))
           Button('去「账号与数据」选择')
             .backgroundColor($r('app.color.app_primary'))
-            .fontColor(Color.White)
+            .fontColor($r('app.color.on_accent'))
             .onClick(() => {
               router.pushUrl({ url: 'pages/UserPage' });
             })
@@ -177,7 +177,7 @@ export struct LedgerPage {
                   (m: number) => {
                     Text(`${m} 月`)
                       .fontSize(12)
-                      .fontColor(this.vm.month === m ? Color.White : $r('app.color.text_primary'))
+                      .fontColor(this.vm.month === m ? $r('app.color.on_accent') : $r('app.color.text_primary'))
                       .padding({ left: 14, right: 14, top: 12, bottom: 12 })
                       .hoverEffect(HoverEffect.Highlight)
                       .borderRadius(14)
@@ -203,7 +203,7 @@ export struct LedgerPage {
                 Text(`◆ ${LedgerPage.fmt(this.vm.ledger.dayData.currentPrimogems)}`)
                   .fontSize(16)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor($r('app.color.app_primary'))
+                  .fontColor($r('app.color.app_primary_text'))
               }
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
@@ -231,7 +231,7 @@ export struct LedgerPage {
                 Text('◆ 当月原石')
                   .fontSize(14)
                   .fontWeight(FontWeight.Medium)
-                  .fontColor($r('app.color.app_primary'))
+                  .fontColor($r('app.color.app_primary_text'))
                 Blank()
                 Text(this.rateText(this.vm.ledger.monthData.primogemsRate))
                   .fontSize(12)
@@ -243,6 +243,13 @@ export struct LedgerPage {
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.text_primary'))
                 .width('100%')
+              if (this.vm.ledger.monthData.currentPrimogems === 0) {
+                // 对齐 Windows ViewTravelersDiaryNoIncomeSourceHint
+                Text('本月暂无原石收入记录')
+                  .fontSize(11)
+                  .fontColor($r('app.color.text_secondary'))
+                  .width('100%')
+              }
               Text(`上月 ${LedgerPage.fmt(this.vm.ledger.monthData.lastPrimogems)} · 等级 ${this.vm.ledger.monthData.currentPrimogemsLevel}`)
                 .fontSize(11)
                 .fontColor($r('app.color.text_secondary'))

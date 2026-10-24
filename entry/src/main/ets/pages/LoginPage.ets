@@ -11,6 +11,7 @@ import { PassportClient, QrLogin, QrLoginResult, LoginSession, MobileCaptcha } f
 import { RetCodes } from '../common/Constants';
 import { Logger } from '../common/Logger';
 import { QTapButton } from '../components/QTapButton';
+import { NavIcon } from '../components/NavIcon';
 
 const TAG: string = 'LoginPage';
 
@@ -301,9 +302,9 @@ struct LoginPage {
   @Builder
   headerBar() {
     Row() {
-      Text('✕')
-        .fontSize(20)
-        .fontColor($r('app.color.text_secondary'))
+      NavIcon({ name: 'Close', iconSize: 20, symbolColor: $r('app.color.text_secondary') })
+        .accessibilityText('关闭登录页')
+        .accessibilityLevel('yes')
         .onClick(() => {
           this.shouldStopQr = true;
           router.back();
@@ -316,7 +317,7 @@ struct LoginPage {
       Blank()
       Text('关闭')
         .fontSize(15)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .onClick(() => {
           this.shouldStopQr = true;
           router.back();
@@ -407,7 +408,7 @@ struct LoginPage {
         .fontSize(13)
         .height(34)
         .backgroundColor($r('app.color.app_primary_bg'))
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .onClick(() => {
           this.refreshQr();
         })
@@ -439,7 +440,7 @@ struct LoginPage {
           .fontSize(13)
           .height(34)
           .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .enabled(this.countdown === 0 && !this.busy)
           .onClick(() => {
             this.sendCaptcha();
@@ -511,7 +512,7 @@ struct LoginPage {
       Row({ space: 12 }) {
         Text('账号地区').fontColor($r('app.color.text_secondary')).fontSize(13)
         Button(this.isOversea ? '国际服 HoYoLAB' : '国服 米游社')
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .backgroundColor($r('app.color.app_primary_bg'))
           .enabled(!this.busy)
           .hoverEffect(HoverEffect.Highlight)

@@ -10,6 +10,7 @@ import { CharacterViewModel, AddPlanResult } from '../viewmodel/CharacterViewMod
 import { CharacterListItem, CharacterDetail, Reliquary, RelicProperty, BaseProperty, Constellation, avatarIconUrl } from '../model/CharacterData';
 import { ReliquaryScore } from '../common/ReliquaryScore';
 import { RiskUiHelper, RiskVerifyParams } from '../common/RiskUiHelper';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { PageHeader } from '../components/PageHeader';
@@ -41,6 +42,8 @@ export struct CharacterPage {
   @State showVerify: boolean = false;
   /** 当前选中角色详情（页面 @State 驱动刷新；VM 内 @Observed 深属性不触发刷新） */
   @State currentDetail: CharacterDetail | undefined = undefined;
+  /** 评分口径（0=米游社推荐权重，1=双爆分；按角色记忆，对齐 Windows AvatarReliquaryScoreSetting） */
+  @State scoreAlgorithm: number = 0;
   /** 当前选中角色 id（页面态） */
   @State selectedId: number = 0;
   /** 角色列表搜索关键字（名称包含，对齐 Windows AutoSuggestTokenBox 的名称过滤） */
@@ -92,6 +95,8 @@ export struct CharacterPage {
   syncDetail(): void {
     this.selectedId = this.vm.selectedId;
     this.currentDetail = this.vm.detailOfSelected();
+    // 评分口径按角色记忆（对齐 Windows AvatarReliquaryScoreSetting；SavedConfig 属背包注入域不移植）
+    this.scoreAlgorithm = PreferencesStore.getNumber(`relic.score.algorithm.${this.currentDetail?.id ?? 0}`, 0);
     Logger.info(TAG, `syncDetail id=${this.selectedId} detail=${this.currentDetail?.name ?? 'undefined'}`);
   }
 
@@ -130,11 +135,13 @@ export struct CharacterPage {
   private filteredItems(): CharacterListItem[] {
     const kw: string = this.charKeyword.trim();
     const out: CharacterListItem[] = [];
+    // 循环内只读局部快照（lint: 避免循环里反复读状态变量）
+    const element: string = this.charElement;
     for (const c of this.vm.items) {
       if (kw.length > 0 && !c.name.includes(kw)) {
         continue;
       }
-      if (this.charElement.length > 0 && c.element !== this.charElement) {
+      if (element.length > 0 && c.element !== element) {
         continue;
       }
       out.push(c);
@@ -168,7 +175,7 @@ export struct CharacterPage {
           })
         Text(this.charSortLabel())
           .fontSize(11)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .padding({ left: 8, right: 8, top: 5, bottom: 5 })
           .borderRadius(8)
           .backgroundColor($r('app.color.app_primary_bg'))
@@ -217,7 +224,7 @@ export struct CharacterPage {
   elementChip(element: string, label: string) {
     Text(label)
       .fontSize(11)
-      .fontColor(this.charElement === element ? Color.White : $r('app.color.text_secondary'))
+      .fontColor(this.charElement === element ? $r('app.color.on_accent') : $r('app.color.text_secondary'))
       .padding({ left: 10, right: 10, top: 4, bottom: 4 })
       .borderRadius(10)
       .backgroundColor(this.charElement === element ? $r('app.color.app_primary') : $r('app.color.card_surface'))
@@ -235,7 +242,7 @@ export struct CharacterPage {
         .fontSize(12)
         .height(28)
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           this.reload();
         })
@@ -252,7 +259,7 @@ export struct CharacterPage {
         .fontColor($r('app.color.text_primary'))
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -298,7 +305,7 @@ export struct CharacterPage {
       if (this.selectedId === c.id) {
         Text('▣')
           .fontSize(12)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
       }
     }
     .width('100%')
@@ -356,7 +363,7 @@ export struct CharacterPage {
             .height(44)
             .layoutWeight(1)
             .backgroundColor($r('app.color.app_primary_bg'))
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .onClick(() => {
               this.openStrategy('mys');
             })
@@ -365,7 +372,7 @@ export struct CharacterPage {
             .height(44)
             .layoutWeight(1)
             .backgroundColor($r('app.color.app_primary_bg'))
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .onClick(() => {
               this.openStrategy('bili');
             })
@@ -402,7 +409,7 @@ export struct CharacterPage {
                       if (sk.k.length > 0) {
                         Text(CharacterPage.kindLabel(SkillLevelService.kindOfMetaSkill(this.currentDetail!, sk)))
                           .fontSize(10)
-                          .fontColor($r('app.color.app_primary'))
+                          .fontColor($r('app.color.app_primary_text'))
                       }
                       // 战斗天赋等级徽章（对齐 Windows SkillView.Level：普攻/战技/爆发三行 Lv.x）
                       this.skillLevelBadge(this.currentDetail!.name, idx)
@@ -487,11 +494,29 @@ export struct CharacterPage {
                 .fontWeight(FontWeight.Medium)
                 .fontColor($r('app.color.text_primary'))
                 .layoutWeight(1)
-              Text('双爆分 = 暴击率×2 + 暴击伤害×1')
+              // 评分口径切换（对齐 Windows AvatarPropertyPage ScoreAlgorithm 选择器）
+              Text('评分')
                 .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))
+              Text(this.scoreAlgorithm === 0 ? '米游社推荐' : '双爆分')
+                .fontSize(10)
+                .fontColor($r('app.color.app_primary'))
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .borderRadius(9)
+                .backgroundColor($r('app.color.app_primary_bg'))
+                .hoverEffect(HoverEffect.Highlight)
+                .accessibilityText('切换评分口径')
+                .onClick(() => {
+                  this.setScoreAlgorithm(this.scoreAlgorithm === 0 ? 1 : 0);
+                })
             }
             .width('100%')
+            Text(this.scoreAlgorithm === 0
+              ? '米游社推荐：按角色推荐副属性加权（无推荐回退双爆分）'
+              : '双爆分 = 暴击率×2 + 暴击伤害×1')
+              .fontSize(10)
+              .fontColor($r('app.color.text_secondary'))
+              .width('100%')
             ForEach(this.currentDetail.reliquaries, (r: Reliquary, i: number) => {
               Column({ space: 5 }) {
                 Row({ space: 8 }) {
@@ -507,11 +532,11 @@ export struct CharacterPage {
                     Text(`★${r.rarity} +${r.level}`)
                       .fontSize(11)
                       .fontColor($r('app.color.text_secondary'))
-                    // 圣遗物评分徽章（Windows ReliquaryScoreCalculator：推荐词条加权；无推荐回退双爆分）
-                    Text(`${CharacterPage.relicScore(r, this.currentDetail)} 分 · ${ReliquaryScore.grade(CharacterPage.relicScore(r, this.currentDetail))}`)
+                    // 圣遗物评分徽章（评分口径随上方切换；子词条着色对齐 ReliquarySubStatState）
+                    Text(`${this.relicScoreOf(r)} 分 · ${ReliquaryScore.grade(this.relicScoreOf(r))}`)
                       .fontSize(10)
                       .fontWeight(FontWeight.Medium)
-                      .fontColor($r('app.color.app_primary'))
+                      .fontColor($r('app.color.app_primary_text'))
                       .padding({ left: 8, right: 8, top: 3, bottom: 3 })
                       .borderRadius(9)
                       .backgroundColor($r('app.color.app_primary_bg'))
@@ -538,8 +563,7 @@ export struct CharacterPage {
                     ForEach(r.subProperties, (sp: RelicProperty, j: number) => {
                       Text(`${CharacterPage.propLabel(sp.propertyType)} +${sp.value}`)
                         .fontSize(10)
-                        .fontColor(sp.propertyType === 'FIGHT_PROP_CRITICAL' || sp.propertyType === 'FIGHT_PROP_CRITICAL_HURT'
-                          ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+                        .fontColor(this.subStatColor(sp))
                         .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                         .margin({ right: 4, bottom: 4 })
                         .borderRadius(7)
@@ -678,21 +702,21 @@ export struct CharacterPage {
         .height(44)
         .layoutWeight(1)
         .backgroundColor($r('app.color.app_primary_bg'))
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           this.exportDetailText();
         })
       Button('全部导出')
         .fontSize(12).height(44).layoutWeight(1)
-        .backgroundColor($r('app.color.app_primary_bg')).fontColor($r('app.color.app_primary'))
+        .backgroundColor($r('app.color.app_primary_bg')).fontColor($r('app.color.app_primary_text'))
         .hoverEffect(HoverEffect.Highlight).onClick(() => this.exportAllText())
       Button('规划角色')
         .fontSize(this.isWide ? 13 : 12)
         .height(44)
         .layoutWeight(1)
         .backgroundColor($r('app.color.app_primary_bg'))
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           this.addCurrentToPlan();
@@ -791,7 +815,7 @@ export struct CharacterPage {
       Text(this.skillLevelAt(name, idx))
         .fontSize(10)
         .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .padding({ left: 6, right: 6, top: 1, bottom: 1 })
         .borderRadius(7)
         .backgroundColor($r('app.color.app_primary_bg'))
@@ -838,6 +862,44 @@ export struct CharacterPage {
   static relicScore(r: Reliquary, d: CharacterDetail): number {
     return Math.round(ReliquaryScore.calculate(r.subProperties, d.recommend.subProperties,
       d.recommend.energyType, ReliquaryScore.isCritEffective(d.id)) * 10) / 10;
+  }
+
+  /** 当前评分口径下的分值：0=米游社推荐权重（默认）；1=双爆分 */
+  private relicScoreOf(r: Reliquary): number {
+    const d: CharacterDetail | undefined = this.currentDetail;
+    if (d === undefined) {
+      return 0;
+    }
+    if (this.scoreAlgorithm === 1) {
+      return ReliquaryScore.doubleCritScore(r, ReliquaryScore.isCritEffective(d.id));
+    }
+    return CharacterPage.relicScore(r, d);
+  }
+
+  /**
+   * 子词条状态色（对齐 Windows ReliquarySubStatState + 颜色转换器）：
+   * 双爆词条（角色可暴击）=主色强调；推荐词条=正常；其余=无效弱化。
+   */
+  private subStatColor(sp: RelicProperty): Resource {
+    const d: CharacterDetail | undefined = this.currentDetail;
+    if (d === undefined) {
+      return $r('app.color.text_secondary');
+    }
+    const isCrit: boolean = sp.propertyType === 'FIGHT_PROP_CRITICAL'
+      || sp.propertyType === 'FIGHT_PROP_CRITICAL_HURT';
+    if (isCrit && ReliquaryScore.isCritEffective(d.id)) {
+      return $r('app.color.app_primary');
+    }
+    if (d.recommend.subProperties.indexOf(sp.propertyType) >= 0) {
+      return $r('app.color.text_primary');
+    }
+    return $r('app.color.text_hint');
+  }
+
+  /** 切换当前角色的评分口径（0=米游社推荐权重 / 1=双爆分） */
+  private setScoreAlgorithm(value: number): void {
+    this.scoreAlgorithm = value;
+    PreferencesStore.setNumber(`relic.score.algorithm.${this.currentDetail?.id ?? 0}`, value);
   }
 
   /** 属性类型 → 中文标签（兼容：字符串 FIGHT_PROP_* 与数字 FightProperty 枚举） */
@@ -940,7 +1002,7 @@ export struct CharacterPage {
               } else if (this.vm.message.length > 0) {
                 Text(this.vm.message).fontSize(13).fontColor($r('app.color.text_secondary'))
                 Button('重试').fontSize(13).backgroundColor($r('app.color.app_primary'))
-                  .fontColor(Color.White).onClick(() => {
+                  .fontColor($r('app.color.on_accent')).onClick(() => {
                     this.reload();
                   })
               } else if (this.vm.items.length === 0) {

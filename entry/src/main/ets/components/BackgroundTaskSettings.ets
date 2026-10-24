@@ -57,14 +57,14 @@ export struct BackgroundTaskSettings {
       Text(this.history(kind)).fontSize(12).fontColor($r('app.color.text_secondary'))
       if (this.state(kind).enabled) {
         Button('重新排队').width('100%').height(44).enabled(!this.vm.busy)
-          .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
           .hoverEffect(HoverEffect.Highlight).onClick(() => { this.vm.retry(kind); })
         Button('关闭后台任务').width('100%').height(44).enabled(!this.vm.busy)
           .fontColor($r('app.color.text_primary')).backgroundColor($r('app.color.card_surface'))
           .hoverEffect(HoverEffect.Highlight).onClick(() => { this.vm.disable(kind); })
       } else {
         Button('查看说明并开启').width('100%').height(44).enabled(!this.vm.busy)
-          .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
           .hoverEffect(HoverEffect.Highlight).onClick(() => { this.enable(kind); })
       }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(14).borderRadius(12)
@@ -86,7 +86,7 @@ export struct BackgroundTaskSettings {
         this.taskCard(BackgroundTaskKind.SIGN_IN)
       }
       Button('重试当前 UID 签到').width('100%').height(44).enabled(!this.vm.busy)
-        .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+        .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
         .hoverEffect(HoverEffect.Highlight).onClick(() => { this.vm.retryCurrentSignIn(); })
       Text('手动重试不会弹出验证窗口。若需要验证或重新登录，请先前往签到或账号页面处理，再重试。')
         .fontSize(12).fontColor($r('app.color.text_secondary'))

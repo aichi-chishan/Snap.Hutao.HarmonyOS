@@ -120,7 +120,7 @@ export struct CultivationPage {
         .fontSize(13)
         .height(44)
         .backgroundColor($r('app.color.app_primary_bg'))
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .onClick(() => {
           this.loadData();
         })
@@ -137,7 +137,7 @@ export struct CultivationPage {
         .fontColor($r('app.color.text_primary'))
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
@@ -183,7 +183,7 @@ export struct CultivationPage {
           Text(target.name.length > 0 ? target.name.substring(0, 1) : '◇')
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Color.White)
+            .fontColor($r('app.color.on_accent'))
             .width(52)
             .height(52)
             .textAlign(TextAlign.Center)
@@ -211,7 +211,7 @@ export struct CultivationPage {
           Text(`${target.targetLevel}`)
             .fontSize(13)
             .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
           Text('级')
             .fontSize(10)
             .fontColor($r('app.color.text_secondary'))
@@ -245,7 +245,7 @@ export struct CultivationPage {
       ForEach([60, 70, 80, 90, 95, 100], (lv: number) => {
         Text(`${lv}`)
           .fontSize(11)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .padding({ left: 10, right: 10, top: 4, bottom: 4 })
           .borderRadius(9)
           .backgroundColor($r('app.color.app_primary_bg'))
@@ -284,7 +284,7 @@ export struct CultivationPage {
       Text(`× ${item.num}`)
         .fontSize(12)
         .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
     }
     .width('100%')
     .padding({ top: 5, bottom: 5 })
@@ -299,7 +299,7 @@ export struct CultivationPage {
         .height(44)
         .fontSize(14)
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .borderRadius(10)
         .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
@@ -319,7 +319,7 @@ export struct CultivationPage {
           ForEach(this.vm.projects, (p: CultivateProject) => {
             Text(p.name)
               .fontSize(12)
-              .fontColor(this.vm.currentProjectId === p.id ? Color.White : $r('app.color.text_primary'))
+              .fontColor(this.vm.currentProjectId === p.id ? $r('app.color.on_accent') : $r('app.color.text_primary'))
               .padding({ left: 12, right: 12, top: 6, bottom: 6 })
               .borderRadius(14)
               .backgroundColor(this.vm.currentProjectId === p.id
@@ -339,13 +339,15 @@ export struct CultivationPage {
       .layoutWeight(1)
       Text('＋')
         .fontSize(16)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .width(30)
         .height(44)
         .textAlign(TextAlign.Center)
         .borderRadius(15)
         .backgroundColor($r('app.color.app_primary_bg'))
         .hoverEffect(HoverEffect.Highlight)
+        .accessibilityText('新建养成计划')
+        .accessibilityLevel('yes')
         .onClick(() => {
           const name: string = `计划 ${this.vm.projects.length + 1}`;
           this.vm.createProject(name).then(() => {
@@ -353,15 +355,14 @@ export struct CultivationPage {
           });
         })
       if (this.vm.projects.length > 1) {
-        Text('🗑')
-          .fontSize(14)
-          .fontColor($r('app.color.danger'))
+        NavIcon({ name: 'Delete', iconSize: 16, symbolColor: $r('app.color.danger') })
           .width(30)
           .height(44)
-          .textAlign(TextAlign.Center)
           .borderRadius(15)
           .backgroundColor($r('app.color.card_inner_tint'))
           .hoverEffect(HoverEffect.Highlight)
+          .accessibilityText('删除当前养成计划')
+          .accessibilityLevel('yes')
           .onClick(() => {
             this.confirmDeleteProject();
           })
@@ -460,7 +461,7 @@ export struct CultivationPage {
             Text(entry.name.length > 0 ? entry.name.substring(0, 1) : '◇')
               .fontSize(16)
               .fontWeight(FontWeight.Bold)
-              .fontColor(Color.White)
+              .fontColor($r('app.color.on_accent'))
               .width(40)
               .height(40)
               .textAlign(TextAlign.Center)
@@ -562,7 +563,7 @@ export struct CultivationPage {
       Text(`${row.totalResin}`)
         .fontSize(13)
         .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
         .width(58)
         .textAlign(TextAlign.Center)
       Text(row.fragileResin > 0 ? `${row.fragileResin}` : '—')
@@ -596,7 +597,7 @@ export struct CultivationPage {
         ForEach([5, 6, 7, 8, 9], (lv: number) => {
           Text(`${lv}`)
             .fontSize(10)
-            .fontColor(this.vm.resinWorldLevel === lv ? Color.White : $r('app.color.text_secondary'))
+            .fontColor(this.vm.resinWorldLevel === lv ? $r('app.color.on_accent') : $r('app.color.text_secondary'))
             .width(24)
             .height(20)
             .textAlign(TextAlign.Center)
@@ -618,7 +619,7 @@ export struct CultivationPage {
           Text(`共需树脂 ${this.resinTotalResin()}`)
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
           Text(`脆弱 ×${this.resinTotalFragile()}`)
             .fontSize(11)
             .fontColor($r('app.color.text_secondary'))
@@ -806,7 +807,7 @@ export struct CultivationPage {
         .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
       Button(`编辑目标并预览 · 已选 ${this.vm.selectedCount}`).height(44).width('100%')
         .enabled(this.vm.selectedCount > 0 && !this.draftVm.busy).hoverEffect(HoverEffect.Highlight)
-        .backgroundColor($r('app.color.app_primary')).fontColor(Color.White)
+        .backgroundColor($r('app.color.app_primary')).fontColor($r('app.color.on_accent'))
         .onClick(() => this.editSelected())
     }.width('100%').padding(14).borderRadius(12).backgroundColor($r('app.color.card_surface'))
 

@@ -13,6 +13,22 @@
       "value": "#33FF6B35"
     },
     {
+      "name": "app_primary_text",
+      "value": "#FF9C6E"
+    },
+    {
+      "name": "on_accent",
+      "value": "#2B1206"
+    },
+    {
+      "name": "image_scrim",
+      "value": "#99000000"
+    },
+    {
+      "name": "image_scrim_soft",
+      "value": "#66000000"
+    },
+    {
       "name": "page_background",
       "value": "#0B0B0D"
     },

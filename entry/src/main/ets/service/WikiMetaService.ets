@@ -56,6 +56,20 @@ export class WikiAvatarMeta {
   cook: Record<string, number> | null = null;
   fetters: MetaText[] = [];
   stories: MetaText[] = [];
+  /** 体型（BodyType：0 未知/1 少年/2 少女/3 成女/4 成男/5 萝莉；旧元数据缺省为 0） */
+  body: number = 0;
+  /** 服装（默认款在前；默认款无 frontIcon，用默认立绘呈现） */
+  costumes: AvatarCostumeMeta[] = [];
+}
+
+/** 角色服装（对齐 Snap.Metadata Avatar.Costumes） */
+export class AvatarCostumeMeta {
+  id: number = 0;
+  name: string = '';
+  description: string = '';
+  isDefault: boolean = false;
+  /** 皮肤正面图标名（UI_AvatarIcon_XxxCostumeYyy；默认款为空串） */
+  frontIcon: string = '';
 }
 
 /** 武器元数据 */
@@ -207,6 +221,21 @@ export class WikiMetaService {
         a.cook = (o['cook'] as Record<string, number>) ?? null;
         a.fetters = WikiMetaService.readTexts(o['fetters']);
         a.stories = WikiMetaService.readTexts(o['stories']);
+        a.body = Number(o['body'] ?? 0);
+        const costumes = (o['costumes'] as Object[]) ?? [];
+        for (const c of costumes) {
+          const co = c as Record<string, Object>;
+          const cm: AvatarCostumeMeta = new AvatarCostumeMeta();
+          cm.id = Number(co['id'] ?? 0);
+          cm.name = String(co['name'] ?? '');
+          cm.description = WikiMetaService.cleanText(String(co['description'] ?? ''));
+          cm.isDefault = co['isDefault'] === true;
+          cm.frontIcon = String(co['frontIcon'] ?? '');
+          a.costumes.push(cm);
+        }
+        // 默认款在前、皮肤按 id 升序（对齐 Windows CostumesView 默认页居首）
+        a.costumes.sort((x: AvatarCostumeMeta, y: AvatarCostumeMeta): number =>
+          (Number(x.isDefault === true) - Number(y.isDefault === true)) * -1 || x.id - y.id);
         list.push(a);
       }
       WikiMetaService.avatars = list;
@@ -521,6 +550,24 @@ export class WikiMetaService {
   }
 
   /** 角色中文名 → 头像图标名（未命中返回空；容忍全角空格/首尾空白） */
+  /** 体型中文名（对齐 Windows BodyType 本地化：少年/少女/成女/成男/萝莉） */
+  static bodyTypeName(body: number): string {
+    if (body === 1) { return '少年'; }
+    if (body === 2) { return '少女'; }
+    if (body === 3) { return '成女'; }
+    if (body === 4) { return '成男'; }
+    if (body === 5) { return '萝莉'; }
+    return '未知体型';
+  }
+
+  /** 皮肤立绘 CDN 图名：FrontIcon(UI_AvatarIcon_X) → Costume 类目 UI_Costume_X（对齐 Windows CostumeConverter） */
+  static costumeArtName(frontIcon: string): string {
+    if (frontIcon.startsWith('UI_AvatarIcon_')) {
+      return `UI_Costume_${frontIcon.slice('UI_AvatarIcon_'.length)}`;
+    }
+    return '';
+  }
+
   static iconOfAvatarName(name: string): string {
     if (name.length === 0) {
       return '';

@@ -90,11 +90,22 @@ export struct HardChallengePage {
   @Builder
   header() {
     PageHeader({ title: '幽境危战', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
+      Button('洞察')
+        .fontSize(13)
+        .height(32)
+        .backgroundColor($r('app.color.app_primary_bg'))
+        .fontColor($r('app.color.app_primary_text'))
+        .hoverEffect(HoverEffect.Highlight)
+        .accessibilityText('打开账号洞察')
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/AccountInsightsPage' }).catch(() => {
+          });
+        })
       Button('刷新')
         .fontSize(13)
         .height(32)
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           this.vm.load(this.currentUid).then(() => {
             this.syncEntry();
@@ -114,7 +125,7 @@ export struct HardChallengePage {
         .fontColor($r('app.color.text_primary'))
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -149,7 +160,7 @@ export struct HardChallengePage {
         Text(avatar.name.length > 0 ? avatar.name.substring(0, 1) : '★')
           .fontSize(13)
           .fontWeight(FontWeight.Bold)
-          .fontColor(Color.White)
+          .fontColor($r('app.color.on_accent'))
           .width(38)
           .height(38)
           .textAlign(TextAlign.Center)
@@ -163,12 +174,12 @@ export struct HardChallengePage {
             .fontColor(Color.White)
             .padding({ left: 4, right: 4 })
             .borderRadius(6)
-            .backgroundColor('#99000000')
+            .backgroundColor($r('app.color.image_scrim'))
             .translate({ x: -1, y: -1 })
         } else if (avatar.rank >= 6) {
           Text('6命')
             .fontSize(8)
-            .fontColor(Color.White)
+            .fontColor($r('app.color.on_accent'))
             .padding({ left: 4, right: 4 })
             .borderRadius(6)
             .backgroundColor($r('app.color.app_primary'))
@@ -197,7 +208,7 @@ export struct HardChallengePage {
         Text(HardChallengePage.formatSeconds(challenge.second))
           .fontSize(12)
           .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
       }
       .width('100%')
 
@@ -254,7 +265,7 @@ export struct HardChallengePage {
             Text(`${best.value}`)
               .fontSize(13)
               .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
           }
           .width('100%')
           .padding({ top: 2, bottom: 2 })
@@ -332,7 +343,7 @@ export struct HardChallengePage {
         if (this.vm.fromHistory) {
           Text('历史存档')
             .fontSize(10)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
             .borderRadius(6)
             .backgroundColor($r('app.color.app_primary_bg'))
@@ -340,7 +351,7 @@ export struct HardChallengePage {
         if (this.currentEntry.best.second > 0) {
           Text(`最佳 ${HardChallengePage.formatSeconds(this.currentEntry.best.second)}`)
             .fontSize(11)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
         }
       }
       .width('100%')
@@ -418,7 +429,7 @@ export struct HardChallengePage {
                   if (this.vm.fromHistory) {
                     Text('⟲ 实时')
                       .fontSize(12)
-                      .fontColor($r('app.color.app_primary'))
+                      .fontColor($r('app.color.app_primary_text'))
                       .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                       .borderRadius(14)
                       .backgroundColor($r('app.color.app_primary_bg'))
@@ -501,7 +512,7 @@ export struct HardChallengePage {
                 Text('单挑')
                   .fontSize(13)
                   .fontWeight(this.modeIndex === 0 ? FontWeight.Bold : FontWeight.Normal)
-                  .fontColor(this.modeIndex === 0 ? Color.White : $r('app.color.text_primary'))
+                  .fontColor(this.modeIndex === 0 ? $r('app.color.on_accent') : $r('app.color.text_primary'))
                   .padding({ left: 14, right: 14, top: 7, bottom: 7 })
                   .borderRadius(16)
                   .backgroundColor(this.modeIndex === 0 ? $r('app.color.app_primary') : $r('app.color.card_surface'))
@@ -512,7 +523,7 @@ export struct HardChallengePage {
                 Text('联机')
                   .fontSize(13)
                   .fontWeight(this.modeIndex === 1 ? FontWeight.Bold : FontWeight.Normal)
-                  .fontColor(this.modeIndex === 1 ? Color.White : $r('app.color.text_primary'))
+                  .fontColor(this.modeIndex === 1 ? $r('app.color.on_accent') : $r('app.color.text_primary'))
                   .padding({ left: 14, right: 14, top: 7, bottom: 7 })
                   .borderRadius(16)
                   .backgroundColor(this.modeIndex === 1 ? $r('app.color.app_primary') : $r('app.color.card_surface'))

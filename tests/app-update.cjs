@@ -19,9 +19,12 @@ function harness(){
   '@kit.AbilityKit':{bundleManager:{BundleFlag:{GET_BUNDLE_INFO_DEFAULT:0},getBundleInfoForSelfSync:()=>{state.reads++;return state.client;}}},
   '@kit.BasicServicesKit':{deviceInfo:{get sdkApiVersion(){return state.api;}}}
  };
+ // UpdatePage 的「跳过此版本」读本机偏好；测试侧桩为空值（默认未跳过）。
+ const prefs={getString:()=>'',setString:()=>{},getNumber:()=>0,setNumber:()=>{},getBool:()=>false,setBool:()=>{}};
  const cache=new Map();
- function load(name){
-  if(kits[name])return kits[name];if(cache.has(name))return cache.get(name);if(name.startsWith('components/'))return {};
+  function load(name){
+   if(kits[name])return kits[name];if(cache.has(name))return cache.get(name);if(name.startsWith('components/'))return {};
+   if(name==='data/prefs/PreferencesStore')return {PreferencesStore:prefs};
   let source=read(name);if(name==='pages/UpdatePage')source=source.slice(0,source.indexOf('  @Builder'))+'}';source=source.replace('export struct UpdatePage','export class UpdatePage');
   const out=ts.transpileModule(source,{reportDiagnostics:true,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}});assert.equal(out.diagnostics.length,0,name);
   const module={exports:{}};vm.runInNewContext(`(function(require,module,exports){${out.outputText}\n})`,{Observed:v=>v,Entry:v=>v,Component:v=>v,Prop:()=>{},State:()=>{},StorageProp:()=>()=>{}})(id=>load(id.startsWith('@')?id:path.posix.normalize(path.posix.join(path.posix.dirname(name),id))),module,module.exports);cache.set(name,module.exports);return module.exports;

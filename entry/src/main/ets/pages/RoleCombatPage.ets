@@ -101,11 +101,22 @@ export struct RoleCombatPage {
   @Builder
   header() {
     PageHeader({ title: '幻想真境剧诗', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
+      Button('洞察')
+        .fontSize(13)
+        .height(32)
+        .backgroundColor($r('app.color.app_primary_bg'))
+        .fontColor($r('app.color.app_primary_text'))
+        .hoverEffect(HoverEffect.Highlight)
+        .accessibilityText('打开账号洞察')
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/AccountInsightsPage' }).catch(() => {
+          });
+        })
       Button('刷新')
         .fontSize(13)
         .height(32)
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           this.vm.load(this.currentUid).then(() => {
             this.syncScheduleMeta();
@@ -125,7 +136,7 @@ export struct RoleCombatPage {
         .fontColor($r('app.color.text_primary'))
       Button('去登录')
         .backgroundColor($r('app.color.app_primary'))
-        .fontColor(Color.White)
+        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -155,7 +166,7 @@ export struct RoleCombatPage {
       Text(value)
         .fontSize(22)
         .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.app_primary_text'))
       Text(label)
         .fontSize(11)
         .fontColor($r('app.color.text_secondary'))
@@ -177,7 +188,7 @@ export struct RoleCombatPage {
         if (this.vm.fromHistory) {
           Text('历史存档')
             .fontSize(10)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
             .borderRadius(6)
             .backgroundColor($r('app.color.app_primary_bg'))
@@ -265,7 +276,7 @@ export struct RoleCombatPage {
   staticRoundTag(roundId: number, isMedal: boolean) {
     Text(`回合 ${roundId}`)
       .fontSize(11)
-      .fontColor(isMedal ? Color.White : $r('app.color.app_primary'))
+      .fontColor(isMedal ? $r('app.color.on_accent') : $r('app.color.app_primary'))
       .padding({ left: 8, right: 8, top: 4, bottom: 4 })
       .borderRadius(10)
       .backgroundColor(isMedal ? $r('app.color.app_primary') : $r('app.color.app_primary_bg'))
@@ -316,7 +327,7 @@ export struct RoleCombatPage {
             NavIcon({ name: 'RoleCombat', iconSize: 14 })
             Text('获得奖章')
               .fontSize(10)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
           }
           .padding({ left: 6, right: 6, top: 2, bottom: 2 })
           .borderRadius(6)
@@ -366,7 +377,7 @@ export struct RoleCombatPage {
                 Text(avatar.name.length > 0 ? avatar.name.substring(0, 1) : '★')
                   .fontSize(13)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor(Color.White)
+                  .fontColor($r('app.color.on_accent'))
                   .width(36)
                   .height(36)
                   .textAlign(TextAlign.Center)
@@ -377,7 +388,7 @@ export struct RoleCombatPage {
               if (avatar.avatarType === 2 || avatar.avatarType === 3) {
                 Text(avatar.avatarType === 2 ? '试用' : '声援')
                   .fontSize(8)
-                  .fontColor(Color.White)
+                  .fontColor($r('app.color.on_accent'))
                   .padding({ left: 4, right: 4 })
                   .borderRadius(6)
                   .backgroundColor(avatar.avatarType === 2 ? $r('app.color.app_primary') : $r('app.color.four_star'))
@@ -459,13 +470,13 @@ export struct RoleCombatPage {
                       .fontColor(Color.White)
                       .padding({ left: 4, right: 4 })
                       .borderRadius(6)
-                      .backgroundColor('#99000000')
+                      .backgroundColor($r('app.color.image_scrim'))
                   }
                 }
               } else {
                 Text('◆')
                   .fontSize(11)
-                  .fontColor($r('app.color.app_primary'))
+                  .fontColor($r('app.color.app_primary_text'))
                   .width(28)
                   .height(28)
                   .textAlign(TextAlign.Center)
@@ -512,7 +523,7 @@ export struct RoleCombatPage {
             } else {
               Text('◆')
                 .fontSize(11)
-                .fontColor($r('app.color.app_primary'))
+                .fontColor($r('app.color.app_primary_text'))
                 .width(28)
                 .height(28)
                 .textAlign(TextAlign.Center)
@@ -582,7 +593,7 @@ export struct RoleCombatPage {
                 Text(avatar.name.length > 0 ? avatar.name.substring(0, 1) : '★')
                   .fontSize(13)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor(Color.White)
+                  .fontColor($r('app.color.on_accent'))
                   .width(38)
                   .height(38)
                   .textAlign(TextAlign.Center)
@@ -633,7 +644,7 @@ export struct RoleCombatPage {
                   if (this.vm.fromHistory) {
                     Text('⟲ 实时')
                       .fontSize(12)
-                      .fontColor($r('app.color.app_primary'))
+                      .fontColor($r('app.color.app_primary_text'))
                       .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                       .borderRadius(14)
                       .backgroundColor($r('app.color.app_primary_bg'))
@@ -688,7 +699,7 @@ export struct RoleCombatPage {
                     ForEach(this.vm.dataItems, (item: RoleCombatDataItem, idx: number) => {
                       Text(`第 ${idx + 1} 期`)
                         .fontSize(12)
-                        .fontColor(this.vm.currentIndex === idx ? Color.White : $r('app.color.text_primary'))
+                        .fontColor(this.vm.currentIndex === idx ? $r('app.color.on_accent') : $r('app.color.text_primary'))
                         .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                         .borderRadius(14)
                         .backgroundColor(this.vm.currentIndex === idx ? $r('app.color.app_primary') : $r('app.color.card_surface'))
@@ -800,7 +811,7 @@ export struct RoleCombatPage {
           if (cur.stat.maxRoundId > 0) {
             Text(`已抵达成第 ${cur.stat.maxRoundId} 幕 圣牌 ${cur.stat.heraldry}`)
               .fontSize(11)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .padding({ left: 8, right: 8, top: 4, bottom: 4 })
               .borderRadius(8)
               .backgroundColor($r('app.color.app_primary_bg'))

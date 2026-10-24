@@ -13,6 +13,22 @@
       "value": "#1AFF6B35"
     },
     {
+      "name": "app_primary_text",
+      "value": "#C2410C"
+    },
+    {
+      "name": "on_accent",
+      "value": "#2B1206"
+    },
+    {
+      "name": "image_scrim",
+      "value": "#99000000"
+    },
+    {
+      "name": "image_scrim_soft",
+      "value": "#66000000"
+    },
+    {
       "name": "page_background",
       "value": "#F5F5F6"
     },
@@ -26,7 +42,7 @@
     },
     {
       "name": "text_secondary",
-      "value": "#8A8A90"
+      "value": "#6B6B75"
     },
     {
       "name": "divider",

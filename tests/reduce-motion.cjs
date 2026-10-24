@@ -90,7 +90,10 @@ function load(name) {
     const key = id.split('/').at(-1);
     if (mocks[id]) return mocks[id];
     if (mocks[key]) return mocks[key];
-    return load(path.relative(base, path.resolve(base, path.dirname(name), id)));
+    // Normalize to '/': path.relative returns '\\'-separated paths on Windows, which would key
+    // the same module twice and hand EntryAbility a different PreferencesStore than the test mutates.
+    const relative = path.relative(base, path.resolve(base, path.dirname(name), id)).replaceAll('\\', '/');
+    return load(relative);
   });
   modules.set(name, result);
   return result;

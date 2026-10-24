@@ -1,6 +1,7 @@
 {
   "src": [
     "pages/AchievementPage",
+    "pages/AccountInsightsPage",
     "pages/BackpackPage",
     "pages/AnnouncementDetailPage",
     "pages/AnnouncementPage",

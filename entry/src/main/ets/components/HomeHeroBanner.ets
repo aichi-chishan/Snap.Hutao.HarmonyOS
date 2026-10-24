@@ -12,7 +12,7 @@ export struct HomeHeroBanner {
       Row({ space: 8 }) {
         Text('◆')
           .fontSize(12)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
         Text(this.title)
           .fontSize(26)
           .fontWeight(FontWeight.Bold)

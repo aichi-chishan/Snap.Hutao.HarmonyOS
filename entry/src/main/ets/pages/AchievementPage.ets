@@ -144,16 +144,20 @@ export struct AchievementPage {
   /** 按当前筛选条件构建分组展示行 */
   rebuildGroups(): void {
     const out: DisplayGroup[] = [];
+    // 循环内只读局部快照（lint: 避免循环里反复读状态变量）
+    const categoryFilter: number = this.categoryFilter;
+    const dailyQuestOnly: boolean = this.dailyQuestOnly;
+    const statusFilter: number = this.statusFilter;
     for (const cs of this.catStats) {
       const cat: AchievementCategory = cs.category;
-      if (this.categoryFilter >= 0 && cat.id !== this.categoryFilter) {
+      if (categoryFilter >= 0 && cat.id !== categoryFilter) {
         continue;
       }
       // 按 groupKey 聚合（保持元数据顺序）
       const grouped: Map<string, DisplayGroup> = new Map();
       const descByEntry: Map<number, string> = new Map();
       for (const e of cat.entries) {
-        if (this.dailyQuestOnly && !e.isDailyQuest) {
+        if (dailyQuestOnly && !e.isDailyQuest) {
           continue;
         }
         let g: DisplayGroup | undefined = grouped.get(e.groupKey);
@@ -190,10 +194,10 @@ export struct AchievementPage {
         g.desc = desc !== undefined ? desc : '';
         // 组内最近完成时间（排序与展示共用）
         g.latestTime = this.groupLatestTime(g);
-        if (this.statusFilter === 1 && achieved === 0) {
+        if (statusFilter === 1 && achieved === 0) {
           return;
         }
-        if (this.statusFilter === 2 && achieved >= g.total) {
+        if (statusFilter === 2 && achieved >= g.total) {
           return;
         }
         // 搜索三态（对齐 Windows UpdateAchievementsFilterBySearch）：
@@ -287,10 +291,12 @@ export struct AchievementPage {
       return;
     }
     this.busy = true;
+    // 循环内只读局部快照（lint: 避免循环里反复读状态变量）
+    const archiveId: number = this.currentArchiveId;
     try {
       if (g.achieved >= g.ids.length) {
         for (const id of g.ids) {
-          await AchievementRepo.setRecord(this.currentArchiveId, id, false, 0);
+          await AchievementRepo.setRecord(archiveId, id, false, 0);
         }
       } else {
         const nextId: number = g.ids.find((id: number) => !this.doneMap.has(id)) ?? g.ids[0];
@@ -324,8 +330,11 @@ export struct AchievementPage {
   }
 
   currentName(): string {
-    for (const a of this.archives) {
-      if (a.id === this.currentArchiveId) {
+    // 循环内只读局部快照（lint: 避免循环里反复读状态变量）
+    const archives: AchievementArchive[] = this.archives;
+    const currentId: number = this.currentArchiveId;
+    for (const a of archives) {
+      if (a.id === currentId) {
         return a.name;
       }
     }
@@ -539,7 +548,7 @@ export struct AchievementPage {
           .fontSize(12)
           .height(30)
           .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .onClick(() => {
             this.importUiafFromClipboard();
           })
@@ -548,7 +557,7 @@ export struct AchievementPage {
           .height(30)
           .margin({ left: 6 })
           .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .onClick(() => {
             this.importUiaf();
           })
@@ -557,7 +566,7 @@ export struct AchievementPage {
           .height(30)
           .margin({ left: 6 })
           .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
           .onClick(() => {
             this.exportUiaf();
           })
@@ -600,7 +609,7 @@ export struct AchievementPage {
           }, (a: AchievementArchive) => `ach_${a.id}_${a.id === this.currentArchiveId}`)
           Text('＋ 新建档案')
             .fontSize(12)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .padding({ left: 12, right: 12, top: 6, bottom: 6 })
             .borderRadius(14)
             .backgroundColor($r('app.color.card_surface'))
@@ -638,7 +647,7 @@ export struct AchievementPage {
             .fontSize(12)
             .height(32)
             .backgroundColor($r('app.color.app_primary'))
-            .fontColor(Color.White)
+            .fontColor($r('app.color.on_accent'))
             .onClick(() => {
               this.createArchive();
             })
@@ -661,7 +670,7 @@ export struct AchievementPage {
         Text(`${this.stats.done} / ${this.stats.total}`)
           .fontSize(14)
           .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.app_primary'))
+          .fontColor($r('app.color.app_primary_text'))
       }
       .width('100%')
       Progress({ value: this.stats.done, total: this.stats.total, type: ProgressType.Linear })
@@ -850,7 +859,7 @@ export struct AchievementPage {
           if (g.total > 1) {
             Text(`${g.achieved}/${g.total} 阶段`)
               .fontSize(10)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
               .padding({ left: 6, right: 6, top: 2, bottom: 2 })
               .borderRadius(8)
               .backgroundColor($r('app.color.app_primary_bg'))
@@ -863,7 +872,7 @@ export struct AchievementPage {
           if (g.isDailyQuest) {
             Text('委托')
               .fontSize(10)
-              .fontColor($r('app.color.app_primary'))
+              .fontColor($r('app.color.app_primary_text'))
           }
         }
         .width('100%')
@@ -880,7 +889,7 @@ export struct AchievementPage {
         if (g.progressCurrent >= 0) {
           Text(`当前进度 ${g.progressCurrent}`)
             .fontSize(10)
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .width('100%')
         }
         // 最近完成时间（对齐 Windows AchievementView.Time：yyyy.MM.dd HH:mm:ss）
@@ -895,7 +904,7 @@ export struct AchievementPage {
             .fontSize(10)
             .height(26)
             .backgroundColor($r('app.color.card_surface'))
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
               this.copyAchievementIds(g);
@@ -904,7 +913,7 @@ export struct AchievementPage {
             .fontSize(10)
             .height(26)
             .backgroundColor($r('app.color.card_surface'))
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
               this.openAchievementGuide(g, false);
@@ -913,7 +922,7 @@ export struct AchievementPage {
             .fontSize(10)
             .height(26)
             .backgroundColor($r('app.color.card_surface'))
-            .fontColor($r('app.color.app_primary'))
+            .fontColor($r('app.color.app_primary_text'))
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
               this.openAchievementGuide(g, true);

@@ -186,8 +186,10 @@ export struct WikiMonsterPage {
 
   filtered(): WikiMonsterMeta[] {
     const out: WikiMonsterMeta[] = [];
+    // 循环内只读局部快照（lint: 避免循环里反复读状态变量）
+    const keyword: string = this.keyword;
     for (const m of this.monsters) {
-      if (this.keyword.length > 0 && !m.name.includes(this.keyword) && !m.title.includes(this.keyword)) {
+      if (keyword.length > 0 && !m.name.includes(keyword) && !m.title.includes(keyword)) {
         continue;
       }
       out.push(m);
@@ -388,7 +390,7 @@ export struct WikiMonsterPage {
                 ForEach(this.current!.affixes, (aff: string) => {
                   Text(aff)
                     .fontSize(10)
-                    .fontColor($r('app.color.app_primary'))
+                    .fontColor($r('app.color.app_primary_text'))
                     .padding({ left: 7, right: 7, top: 2, bottom: 2 })
                     .margin({ right: 5, bottom: 4 })
                     .borderRadius(8)
@@ -411,9 +413,9 @@ export struct WikiMonsterPage {
                 .fontWeight(FontWeight.Medium)
                 .fontColor($r('app.color.text_primary'))
                 .width('100%')
-              this.monStat('生命值', this.current!.hpBase)
-              this.monStat('攻击力', this.current!.attackBase)
-              this.monStat('防御力', this.current!.defenseBase)
+              this.monStat('生命值')
+              this.monStat('攻击力')
+              this.monStat('防御力')
             }
             .width('100%')
             .padding(14)
@@ -508,18 +510,30 @@ export struct WikiMonsterPage {
     }
   }
 
+  /**
+   * 基础数值单元（单参 @Builder：参数只放常量标签，数值在渲染期读组件状态）。
+   * ArkUI 规则：两参及以上 @Builder 内部 UI 不随状态刷新，故数值不得作为参数传入。
+   */
   @Builder
-  monStat(label: string, value: number) {
+  monStat(label: string) {
     Row({ space: 6 }) {
       Text(label)
         .fontSize(12)
         .fontColor($r('app.color.text_secondary'))
         .layoutWeight(1)
-      Text(`${value}`)
+      Text(`${this.monStatValueOf(label)}`)
         .fontSize(13)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
     }
     .width('100%')
+  }
+
+  /** 基础数值（渲染期读取，避免多参 @Builder 值快照不刷新） */
+  private monStatValueOf(label: string): number {
+    if (this.current === undefined) { return 0; }
+    if (label === '生命值') { return this.current.hpBase; }
+    if (label === '攻击力') { return this.current.attackBase; }
+    return this.current.defenseBase;
   }
 }

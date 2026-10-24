@@ -141,13 +141,13 @@ export struct HelpPage {
           .accessibilityText(this.label('environment')).onChange((value: boolean) => { this.vm.setEnvironment(value); this.sync(); })
       }.width('100%').constraintSize({ minHeight: 44 })
       Button(this.label('generate')).height(44).width('100%').enabled(!this.vm.busy)
-        .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+        .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
         .hoverEffect(HoverEffect.Highlight).onClick(() => { this.generate(); })
       if (this.previewText.length > 0) {
         Text(this.label('readFirst')).fontSize(12).fontColor($r('app.color.text_secondary'))
         Text(this.previewText).fontSize(12).fontColor($r('app.color.text_primary')).width('100%')
         Button(this.label('copy')).height(44).width('100%').enabled(!this.vm.busy)
-          .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+          .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
           .hoverEffect(HoverEffect.Highlight).onClick(() => { this.copy(); })
         Button(this.label('clear')).height(44).width('100%')
           .fontColor($r('app.color.text_secondary')).backgroundColor($r('app.color.card_surface'))
@@ -167,7 +167,7 @@ export struct HelpPage {
         if (this.selected !== undefined) {
           if (!this.isWide) {
             Button(this.label('back')).height(44).width('100%')
-              .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+              .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
               .hoverEffect(HoverEffect.Highlight).onClick(() => { this.select(''); })
           }
           Text(this.selected.title).fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
@@ -177,7 +177,7 @@ export struct HelpPage {
           }, (step: string) => `${this.vm.locale}_${step}`)
           if (this.vm.route().length > 0) {
             Button(this.label('open')).height(44).width('100%')
-              .fontColor($r('app.color.app_primary')).backgroundColor($r('app.color.app_primary_bg'))
+              .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
               .hoverEffect(HoverEffect.Highlight).onClick(() => { this.openRelated(); })
           }
           this.diagnostics()

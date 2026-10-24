@@ -22,6 +22,7 @@ import { curves, uiMaterial } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { RiskVerifyService, RiskVerifyRequest, KEY_RISK_SHOW, KEY_RISK_REQ } from '../service/RiskVerifyService';
 import { Logger } from '../common/Logger';
+import { NavIcon } from './NavIcon';
 
 const TAG: string = 'RiskVerifyModal';
 
@@ -377,11 +378,11 @@ export struct RiskVerifyModal {
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.text_primary'))
             Blank()
-            Text('✕')
-              .fontSize(16)
-              .fontColor($r('app.color.text_secondary'))
+            NavIcon({ name: 'Close', iconSize: 16, symbolColor: $r('app.color.text_secondary') })
               .padding(10)
               .borderRadius(12)
+              .accessibilityText('取消验证')
+              .accessibilityLevel('yes')
               .onClick(() => {
                 RiskVerifyService.getInstance().cancel();
               })
@@ -404,7 +405,7 @@ export struct RiskVerifyModal {
                 .fontSize(12)
                 .height(28)
                 .backgroundColor($r('app.color.app_primary_bg'))
-                .fontColor($r('app.color.app_primary'))
+                .fontColor($r('app.color.app_primary_text'))
                 .onClick(() => {
                   this.retry();
                 })

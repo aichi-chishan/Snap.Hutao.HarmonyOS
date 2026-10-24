@@ -8,6 +8,24 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
 const ts = require(process.env.TYPESCRIPT_PATH || '../ci/node_modules/typescript');
+const slash = value => String(value).replaceAll('\\', '/');
+// Directory symlinks need no elevation on Windows when created as junctions; file symlinks do.
+// When the host forbids the operation we skip that single case with a reason instead of
+// reporting a pass — the production contract stays asserted wherever the OS permits it.
+function symlinkDirectory(target, at) {
+  try { fs.symlinkSync(target, at, process.platform === 'win32' ? 'junction' : 'dir'); return true; }
+  catch (error) { if (error.code === 'EPERM' || error.code === 'EACCES' || error.code === 'UNKNOWN') return false; throw error; }
+}
+function symlinkFileOrSkip(t, target, at) {
+  try { fs.symlinkSync(target, at, 'file'); return true; }
+  catch (error) {
+    if (error.code === 'EPERM' || error.code === 'EACCES' || error.code === 'UNKNOWN') {
+      t.skip('host forbids file symlinks (needs elevation/developer mode): ' + error.code);
+      return false;
+    }
+    throw error;
+  }
+}
 const file = path.resolve(__dirname, '../entry/src/main/ets/data/remote/StandardIconService.ets');
 const source = fs.readFileSync(file, 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: {
@@ -42,7 +60,8 @@ function harness() {
     fsyncSync: fd => { if (state.fail === 'sync') throw Error('sync failed'); fs.fsyncSync(fd); },
     mkdtempSync: prefix => { assert.ok(prefix.endsWith('XXXXXX')); const p = fs.mkdtempSync(prefix.slice(0, -6)); temps.push(p); return p; },
     renameSync: (from, to) => { if (state.fail === 'rename') throw Error('rename failed');
-      assert.ok(temps.some(tmp => from === path.join(tmp, 'image.png'))); assert.equal(handles.size, 0, 'close staged file before publication');
+      // Normalize separators: production builds POSIX-style paths; path.join uses '\' on Windows.
+      assert.ok(temps.some(tmp => slash(from) === slash(path.join(tmp, 'image.png')))); assert.equal(handles.size, 0, 'close staged file before publication');
       renames.push({ from, to }); fs.renameSync(from, to); },
     rmdirSync: p => {
       assert.ok(temps.includes(p), 'cleanup must target only an OS-created directory owned by this invocation');
@@ -113,10 +132,11 @@ for (const failure of ['http', 'network', 'create']) {
   }));
 }
 
-test('a blocked parent can recover; symlink directories are never followed', () => withHarness(async h => {
+test('a blocked parent can recover; symlink directories are never followed', t => withHarness(async h => {
   const remote = path.join(h.cache, 'remote'); fs.writeFileSync(remote, 'blocked');
   assert.equal(await ensure(h), ''); assert.equal(h.requests.length, 0); fs.unlinkSync(remote);
-  const outside = path.join(h.root, 'outside'); fs.mkdirSync(outside); fs.symlinkSync(outside, remote);
+  const outside = path.join(h.root, 'outside'); fs.mkdirSync(outside);
+  if (!symlinkDirectory(outside, remote)) { t.skip('host forbids directory symlinks'); return; }
   assert.equal(await ensure(h), ''); assert.equal(h.requests.length, 0); assert.deepEqual(fs.readdirSync(outside), []);
   fs.unlinkSync(remote); const p = ensure(h); h.requests[0].resolve(success()); assert.equal(await p, destination(h));
 }));
@@ -148,8 +168,9 @@ for (const failure of ['open', 'write', 'short', 'sync', 'close', 'rename']) {
   }));
 }
 
-test('invalid/symlink cached files are replaced without writing through a link', () => withHarness(async h => {
-  prepare(h); const outside = path.join(h.root, 'foreign.png'); fs.writeFileSync(outside, 'must survive'); fs.symlinkSync(outside, destination(h));
+test('invalid/symlink cached files are replaced without writing through a link', t => withHarness(async h => {
+  prepare(h); const outside = path.join(h.root, 'foreign.png'); fs.writeFileSync(outside, 'must survive');
+  if (!symlinkFileOrSkip(t, outside, destination(h))) return;
   const p = ensure(h); h.requests[0].resolve(success()); assert.equal(await p, destination(h));
   assert.equal(fs.lstatSync(destination(h)).isSymbolicLink(), false); assert.equal(fs.readFileSync(outside, 'utf8'), 'must survive');
 }));
