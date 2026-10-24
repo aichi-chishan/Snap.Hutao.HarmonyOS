@@ -149,3 +149,13 @@ Windows 结构：CommandBar(列表/网格切换+多条件搜索+加入养成计�
 | 极验自定义组合接口 | 设置→无感验证→设定验证请求接口；{0}=gt {1}=challenge 模板 GET，成功用返回的新 challenge 重放；触发风控时前置自动尝试 | `GeetestService.TryVerifyGtChallengeAsync` + `CustomGeetestClient` + `GeetestCustomCompositeUrl` |
 | 前瞻直播兑换码 | 公告页"兑换码"入口：miyoushe home/new 定位直播（lives[0].live_url 或 navigator 直播兑换码/前瞻直播）→ act_id 提取 → miyolive refreshCode（x-rpc-act_id 头）→ code_list 弹层+复制 | `AnnouncementViewModel` 直播兑换码链路 + `MiyoliveClient.RefreshCodeAsync` |
 | 五星明细归类 | 祈愿出金历史 item_type 改用服务端实际记录（常驻/颂愿池混有武器，不再按池名猜） | 对齐 Windows 角色/武器类型判定 |
+
+---
+
+## 十、基线推进（2026-10-24，对照 Remastered main `3b7475e` = 2.0.2.0）
+
+- 参考源码仓已迁入工作区 `Snap.Hutao.Remastered-latest/`（git 独立、.gitignore 忽略；shallow 拉取 tags 1.20.2/v1.20.3/1.20.4/2.0.1 + main）。
+- 数据仓已迁入工作区 `snap-hutao-data/`（git 独立、.gitignore 忽略）。
+- 差距清单与实施批次（7A 祈愿期次历史+1.20.2/3 遗漏项、7B Wiki 皮肤立绘/G9、7C 账号洞察+AI 分析双通道+液态玻璃映射+评分算法）见 **[docs/GAP_2026-10-24.md](docs/GAP_2026-10-24.md)**。
+- compatibleSdkVersion 已升 26.0.0；API 26 运行时门控保留为防御性回退。
+- 本文第一至九节的历史结论在 v1.20.3 基线下仍有效，后续以 GAP 文档为准。

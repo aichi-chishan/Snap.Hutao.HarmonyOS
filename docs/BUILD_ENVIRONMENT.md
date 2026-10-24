@@ -1,5 +1,7 @@
 # Linux 构建环境与 API 24 兼容基线
 
+> **2026-10-24 注记**：经用户决策，compatibleSdkVersion 已从 6.1.1(24) 升至 **26.0.0**（`ci/check-hap.py` 门禁与 `tests/lint-report-gate.cjs` 夹具已同步为 minAPIVersion=260000026）。本文以下关于"最低运行版本为 API 24、运行时门控回退"的表述为 2026-10-02 时点的历史记录；当前 API 26 运行时门控仅作防御性回退保留，模拟器验收需 API 26 镜像。
+
 本次验证日期：2026-10-02。工程采用 API 26 SDK 编译，最低运行版本为 **HarmonyOS 6.1.1（API 24）**，并不是 Android API 24。
 
 ## 固定版本
