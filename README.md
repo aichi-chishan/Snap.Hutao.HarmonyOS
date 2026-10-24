@@ -2,11 +2,11 @@
 
 > 胡桃工具箱（Snap.Hutao）的鸿蒙（HarmonyOS）移植版 · 原神玩家的一站式工具箱
 
-把 Windows 版 [Snap.Hutao](https://github.com/DGP-Studio/Snap.Hutao)（胡桃启动器）移植到
-HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），手机 / 平板 / PC（2in1）
-三端自适应布局。本轮按 Windows Remastered **v1.20.3** 对照补齐非注入功能，支持国服与 HoYoLAB 区域路由。
+把 Windows 版胡桃工具箱（对齐上游为社区重制版 [Snap.Hutao.Remastered](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered)，参考源码在工作区 `Snap.Hutao.Remastered-latest/`）移植到
+HarmonyOS（**compatibleSdkVersion = targetSdkVersion = 26.0.0**），手机 / 平板 / PC（2in1）
+三端自适应布局。本轮按 Windows Remastered **v2.0.2** 对照补齐非注入功能，支持国服与 HoYoLAB 区域路由。
 
-源码基线、差距、实施顺序与验证边界见 [API24_PORT_PLAN.md](docs/API24_PORT_PLAN.md)。编译通过不代表所有功能已在真机和真实账号上验收。
+源码基线、差距、实施顺序与验证边界见 [GAP_2026-10-24.md](docs/GAP_2026-10-24.md)（2.0.2 差距清单）。编译通过不代表所有功能已在真机和真实账号上验收。
 
 2026-10-02 UI/UX 专项调研（待实施）：[Windows 工作流对齐与优化清单](docs/UI_UX_RESEARCH_2026-10-02.md)、[API24+ 鸿蒙视觉与交互规格](docs/UI_UX_SPEC_API24_PLUS.md)、[源码及官方 API 证据](docs/UI_UX_EVIDENCE_2026-10-02.md)。包含 18 项优化、分批计划与 24 个验收场景。
 
@@ -58,7 +58,7 @@ HarmonyOS（**compatibleSdkVersion 6.1.1(24)** / targetSdkVersion 26.0.0），�
 ### 多端适配
 - 手机：底部 HdsTabs 悬浮页签（沉浸光感材质）
 - 平板 / PC：侧边栏导航 + 双栏内容，自由窗口最小尺寸保护，窗口自适应断点（720 / 840 / 1200）
-- 沉浸光感（systemMaterial / ImmersiveMaterial，API 26 运行时门控自动回退）
+- 沉浸光感（systemMaterial / ImmersiveMaterial；compatibleSdk 已为 26，运行时门控仅作防御性回退）
 
 ---
 
@@ -82,8 +82,8 @@ Settings → Secrets and variables → Actions → Variables 配置 `DEVECO_CLT_
 |---|---|
 | [DevEco Studio](https://developer.huawei.com/consumer/cn/deveco-studio/) | 26.0.0（5.1.x 及以上需自行验证） |
 | HarmonyOS SDK | 26.0.0（API 26 编译） |
-| compatibleSdkVersion | 6.1.1(24) |
-| 真机 / 模拟器 | HarmonyOS 6.1.1(24)+ |
+| compatibleSdkVersion | 26.0.0 |
+| 真机 / 模拟器 | HarmonyOS 26（API 26）+ |
 
 ### 步骤
 
@@ -93,12 +93,12 @@ git clone https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS.git
 
 1. 用 DevEco Studio 打开工程
 2. `build-profile.json5` **不入库**（含本地签名）：首次构建前在 DevEco 中
-   File → Project Structure → Signing Configs 勾选 Automatically generate，并把 compatibleSdkVersion 配为 `6.1.1(24)`
+   File → Project Structure → Signing Configs 勾选 Automatically generate，并把 compatibleSdkVersion / targetSdkVersion 配为 `26.0.0`
 3. 构建：`hvigorw.bat assembleHap --mode module -p module=entry@default -p product=default --no-daemon`
 4. 真机安装：`hdc file send entry/build/default/outputs/default/entry-default-signed.hap /data/local/tmp/entry.hap`
    → `hdc shell bm install -p /data/local/tmp/entry.hap`
 
-> 模拟器注意：仅 HarmonyOS 6.1.1(24) 及以上镜像能安装本包（API 23 镜像装不上 compatibleSdkVersion 24 的包）。
+> 模拟器注意：本包 compatibleSdkVersion=26.0.0，需 **API 26 镜像**才能安装（API 23/24 镜像装不上）。
 > Git Bash 下 `hdc file send` 的源路径须为裸文件名，`bm install` 前加 `MSYS_NO_PATHCONV=1`。
 
 ---
@@ -108,7 +108,7 @@ git clone https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS.git
 - 元数据（角色 / 武器 / 怪物 / 成就 / 曲线，17 个 JSON）与图标（**3754 张 PNG，约 233MB**）**全部内置安装包**，离线可用
 - 素材来源：[Snap.Metadata](https://github.com/DGP-Studio/Snap.Metadata)（精简提取）+ 胡桃静态 CDN
 - 角色立绘（`GachaAvatarIcon`，58MB / 118 张）虽已内置，但按需场景优先走静态 CDN + 沙盒缓存
-- 更新管线：独立数据仓库 [aichi-chishan/snap-hutao-data](https://github.com/aichi-chishan/snap-hutao-data)：`python fetch-assets.py` 增量拉素材 → `gen-manifest.ps1` 重出清单（改 channelVersion）→ push；APP 设置 → 游戏数据更新即热更，**无需整包更新**
+- 更新管线：独立数据仓库 [aichi-chishan/snap-hutao-data](https://github.com/aichi-chishan/snap-hutao-data)（本地克隆在工作区 `snap-hutao-data/`，git 独立、不入本库）：`python fetch-assets.py` 增量拉素材 → `gen-manifest.ps1` 重出清单（改 channelVersion）→ push；APP 设置 → 游戏数据更新即热更，**无需整包更新**
 - 云端热更：默认清单已指向 `aichi-chishan/snap-hutao-data`，设置页可改数据源地址
 
 ---

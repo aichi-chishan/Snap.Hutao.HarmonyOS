@@ -3,21 +3,23 @@
 这是把 Windows 版胡桃启动器（Snap.Hutao）移植到鸿蒙（HarmonyOS/ArkTS）的项目。开发前请先读本文件，避免踩坑。
 
 ## 项目定位
-- 移植 Windows 版胡桃工具箱（Snap.Hutao，见 GitHub DGP-Studio/Snap.Hutao）到鸿蒙，PC/Pad 力求还原，手机优化布局。
-- **这是 API 24 起的鸿蒙 APP**（compatibleSdkVersion = 6.1.1(24)，targetSdkVersion = 26.0.0，runtimeOS = HarmonyOS）。设备类型：phone / tablet / 2in1。
-- **build-profile.json5 不入库**（含本地签名），API 版本改动只存在本地；换机后需手动把 compatibleSdkVersion 改回 6.1.1(24)。
-- API 26 能力（沉浸光感 systemMaterial/ImmersiveMaterial、deviceInfo.apiAvailable('26.0.0')）必须**运行时门控**，低版本回退（参考 Motion.detectImmersive / Index.panelMaterial）。
+- 移植 Windows 版胡桃工具箱到鸿蒙，PC/Pad 力求还原，手机优化布局。对齐上游为社区重制版 **Snap.Hutao.Remastered**（SnapHutaoRemasteringProject/Snap.Hutao.Remastered），参考源码仓在工作区 `Snap.Hutao.Remastered-latest/`（git 独立、.gitignore 忽略；基线 main `3b7475e` = 2.0.2.0，2026-10-23）。
+- **这是 API 26 起的鸿蒙 APP**（compatibleSdkVersion = targetSdkVersion = 26.0.0，runtimeOS = HarmonyOS）。设备类型：phone / tablet / 2in1。
+- **build-profile.json5 不入库**（含本地签名），API 版本改动只存在本地；换机后需手动把 compatibleSdkVersion/targetSdkVersion 设为 26.0.0（CI 侧同步 `ci/build-profile.ci.json5`）。
+- 本机 SDK 仅 API 26（26.0.0.32 Beta2）；**唯一能装包的模拟器镜像需为 API 26**（待下载；现有 MateBook Pro 24 = API 24 已装不上 compatibleSdk 26 的包）。API 26 运行时门控（`Motion.detectImmersive` / `Index.panelMaterial` / `deviceInfo.apiAvailable`）在 compatible=26 后仅作**防御性回退**，勿删。
 - **不移植**：所有胡桃云服务器功能（通行证/云备份/云统计/云攻略/云壁纸/反馈页）与注入类功能（背包内存读取/插件/游戏内悬浮/注册表切号/启动游戏进程链）。
   - 云功能**实现已删除**，只保留入口占位：导航「系统 → 胡桃通行证与云」与首页卡片指向 `pages/HutaoCloudPage.ets`（纯说明页，无网络请求、无凭据读写）；祈愿页「五星经验分布」同为占位说明（云统计已移除）。**勿在占位页里补实现**。
   - 静态资源 CDN（`StandardIconService` 图标、`HutaoDailyImageService` 每日壁纸）不属于云账号功能，保留。
 - 仅国服（米哈游 API 用国服端点）。
 
 ## 关键环境与工具（务必利用）
-- **41 个鸿蒙开发 skill** 在 `skills/` 目录：`hmos-arkui-develop-skill`、`hmos-arkts-syntax-checker`、`hmos-multidevice-*`、`hmos-arkui-mvvm-pattern`、`hmos-*crash-analysis` 等。改 UI/ArkTS/多设备适配前先查相关 skill。
-- **DevEco CLI**：`devecocli`（npm 全局，`PATH` 含 npm 全局目录）。常用：`devecocli build` / `devecocli check lint` / `devecocli emulator list|start|stop` / `devecocli skills list|add`。
-- **鸿蒙 MCP（已配置在 `.zcode/config.json`）**：`deveco-mcp`（`devecocli serve mcp`，ArkTS/C++ 静态语法检查）+ `codegenie-mcp`（构建/UI 树/hilog/鸿蒙文档检索）。
+- **鸿蒙开发 skill（46 个目录/50 个 SKILL.md）在工作区 `.agents/skills/`（真实文件副本，非软链）**：`hmos-arkui-develop-skill`、`hmos-arkts-syntax-checker`、`hmos-multidevice-*`、`hmos-arkui-mvvm-pattern`、`hmos-*crash-analysis` 等。改 UI/ArkTS/多设备适配前先查相关 skill。更新方式：`devecocli skills add --all --path "<工作区>/.agents/skills" -f`（禁止回退 junction/软链）。**工具配置一律走 `.agents/`，禁止使用/创建 `.zcode/`**。
+- **DevEco CLI**：`devecocli`（npm `@deveco/deveco-cli`，自更新 `devecocli update`；当前 1.3.9）。常用：`devecocli build` / `devecocli check lint` / `devecocli emulator list|start|stop` / `devecocli skills list|add` / `devecocli docs update`（Git Bash 下若报 `tar: Cannot connect to C:`，前置 `PATH="/c/Windows/System32:$PATH"` 再跑）。
+- **DevEco Code**：npm `@deveco/deveco-code`（bin `deveco`，当前 0.2.4），自带技能安装与 MCP 服务，更新走 `npm i -g @deveco/deveco-code@latest`。
+- **MCP（配置在 `.agents/mcp.json`，顶层 `mcpServers`）**：`deveco-mcp`（`devecocli serve mcp`，ArkTS/C++ 静态语法检查；codegenie 无独立 CLI 入口，为 DevEco Studio 内部插件，不配置）。
 - 编译：`hvigorw.bat assembleHap --mode module -p module=entry@default -p product=default --no-daemon`（DevEco Studio 自带，也可 `devecocli build`）。
-- 模拟器：`devecocli emulator start "MateBook Pro 24"`（2in1，HarmonyOS 6.1.1(24)，**唯一能装当前包的镜像**；API 23 镜像装不上 compatibleSdkVersion 24 的包）；hdc 在 SDK 的 `openharmony/toolchains/hdc.exe`。
+- 主机回归：`npm ci --prefix ci --ignore-scripts` 后 `TYPESCRIPT_PATH=<工作区>/ci/node_modules/typescript node tests/run.cjs`（当前 39/39）。
+- 模拟器：API 26 镜像待下载后 `devecocli emulator start "<镜像名>"`；hdc 在 SDK 的 `openharmony/toolchains/hdc.exe`（`E:\APP\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe`）。
 - **hdc 注意（Git Bash）**：`file send` 源路径必须是**裸文件名**（cd 到 outputs 目录后 `hdc file send entry-default-signed.hap /data/local/tmp/entry.hap`），相对子路径会被追加成目录树；`bm install -p /data/...` 要加 `MSYS_NO_PATHCONV=1` 防止路径被转换。
 
 ## 目录结构
@@ -31,9 +33,11 @@
 - `entry/src/main/ets/widgets/pages/`：ArkTS 桌面卡片（@ComponentV2，@Local 变量名与 Form 推送键一致，严禁回退 @Entry(storage) 写法）。
 - `entry/src/main/resources/rawfile/metadata/`：本地元数据（从 Snap.Metadata 提取：avatar/weapon/monster/material + 曲线表）。
 - `entry/src/main/resources/rawfile/icons/{Category}/`：打包图标（AvatarIcon/EquipIcon/MonsterIcon/Skill/Talent/ItemIcon 等，约 108MB）。
-- `skills/`：41 个鸿蒙开发 skill（来自 devecocli，只读，勿改）。
+- `.agents/`：AI 工具配置目录（`skills/` 真实副本 + `mcp.json`；`skills.bak-*` 为历史备份，勿动）。已被 .gitignore 忽略。
+- `Snap.Hutao.Remastered-latest/`：Windows 版参考源码仓（git 独立，shallow tag+main，基线 2.0.2）。差距分析见 `docs/GAP_2026-10-24.md`。
+- `snap-hutao-data/`：独立数据仓库（素材/元数据 pipeline，git 独立）。两者均被 .gitignore 忽略。
 - `example/`：Windows 版界面截图（参考 UI）。
-- `PORTING_PLAN.md`：Windows 版对齐方案（导航/主页/背景图/图标/图鉴）。
+- `PORTING_PLAN.md`：Windows 版对齐方案（导航/主页/背景图/图标/图鉴）；`docs/GAP_2026-10-24.md`：2.0.2 差距清单与实施批次。
 
 ## 架构与分层规则（重要）
 - 严格分层：`pages → viewmodel → service → data(repo/network) → model`。页面不直接发网络请求、不直接拼 SQL；Service 不写 UI。
@@ -79,14 +83,14 @@
 - **执行命令要极其谨慎**：任何可能影响系统/删除/覆盖/关机/安装的命令，先确认其影响范围与证据，再执行。宁可让某些中间文件/原始文件留着占空间，也**不要**执行可能破坏电脑、破坏仓库、误删源码、关机重启之类的危险命令。
 - 不主动 `rm -rf`、不批量删除源码或 `entry/src/main/resources` 下的资源；清理仅限明确自己创建的临时物（截图、临时脚本）。
 - 不动 `build-profile.json5` 里的签名密钥/密码，不提交 `local.properties`（含本地路径）。
-- 不修改 `skills/` 目录内容，不修改 `.zcode/` / `.agents/` 等工具配置。
+- `.agents/` 由工具链管理（skills 用 `devecocli skills add` 刷新、MCP 配置为 `.agents/mcp.json`），变更需明确说明缘由；**禁止创建/使用 `.zcode/`**。
 - 关机、卸载系统组件、修改系统级配置等一律不做；如需用户决策，停下来问，而非擅自执行。
 - 模拟器/设备命令（`devecocli emulator stop/shake`、`hdc shell bm uninstall` 等）仅在明确需要时使用，且只影响模拟器不伤宿主机。
 
 ## 素材管理（游戏版本更新时的同步流程）
 - **已内置 rawfile 的图标类目**（`entry/src/main/resources/rawfile/icons/`）：AvatarIcon / EquipIcon / MonsterIcon / Skill / Talent / ItemIcon / NameCardIcon / NameCardPic / RelicIcon —— 全部打包进安装包，**无二次下载**（ResourcePackService 已从设置页退役，仅保留代码）。
 - **角色立绘（GachaAvatarIcon）**：均幅 ~500KB/张（118 张 ≈58MB），当前**已随包内置**（`rawfile/icons/GachaAvatarIcon/`）。运行时优先走 `StandardIconService`（静态 CDN `raw/GachaAvatarIcon/UI_Gacha_AvatarIcon_{icon后缀}.png`）按需拉取 + cacheDir 沙盒缓存，rawfile 兜底；命名=角色 icon 去掉 `UI_AvatarIcon_` 前缀换 `UI_Gacha_AvatarIcon_` 前缀；旅行者无立绘（CDN 404 → 占位）。若需瘦身包体，在数据仓库跑 `python fetch-assets.py` 时**不**加 `--bundle-splash` 并移除该目录。
-- **新增/更新素材**：在**独立数据仓库**（`snap-hutao-data`，与 APP 工程同级目录）运行 `python fetch-assets.py`（源：该仓库 `.local/upstream/Snap.Metadata/Genshin/CHS`，CDN：api.snaphutaorp.org/static/raw/{Category}/{Name}.png，8 并发、增量跳过）。脚本只写数据仓库的 metadata/ 与 icons/，不再写 APP 工程；同时回填 avatar_meta.json 的 nameCardIcon/nameCardPic 字段。
+- **新增/更新素材**：在**独立数据仓库**（`snap-hutao-data/`，已迁入工作区内）运行 `python fetch-assets.py`（源：该仓库 `.local/upstream/Snap.Metadata/Genshin/CHS`，CDN：api.snaphutaorp.org/static/raw/{Category}/{Name}.png，8 并发、增量跳过）。脚本只写数据仓库的 metadata/ 与 icons/，不再写 APP 工程；同时回填 avatar_meta.json 的 nameCardIcon/nameCardPic 字段。
 - **元数据更新**：同一脚本思路；重提 monster/weapon/avatar meta 后在数据仓库跑 `powershell -File gen-manifest.ps1` 重新生成清单（记得改 channelVersion），推送 aichi-chishan/snap-hutao-data 仓库；APP 设置→游戏数据更新→立即更新即可热更（元数据远端优先、rawfile 兜底，图标 MetaIcon 自动优先远端）。
 - MetaIcon 引用约定：`category` = icons 下目录名，`name` = 文件名（去 .png）。名片大图背景直接 `Image($rawfile('icons/NameCardPic/{name}.png'))`（全幅场景不走 MetaIcon）。
 
