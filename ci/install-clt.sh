@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
-approved='https://github.com/aichi-chishan/snap-hutao-data/releases/download/clt-26.0.0.821/clt-part-00'
+approved='https://github.com/aichi-chishan/snap-hutao-data/releases/download/clt-26.0.0.851/clt-part-00'
 if [[ "${DEVECO_CLT_URL:-}" != "$approved" ]]; then
-  echo 'DEVECO_CLT_URL must match the reviewed CLT 26.0.0.821 part-00 URL exactly; other releases require reviewed pins.' >&2
+  echo 'DEVECO_CLT_URL must match the reviewed CLT 26.0.0.851 part-00 URL exactly; other releases require reviewed pins.' >&2
   exit 1
 fi
 destination="${1:?Pass a new isolated tool directory}"
 [[ ! -e "$destination" ]] || { echo 'Tool directory must not exist' >&2; exit 1; }
 mkdir -p "$destination/downloads"
 destination="$(cd "$destination" && pwd)"
-base='https://github.com/aichi-chishan/snap-hutao-data/releases/download/clt-26.0.0.821'
+base='https://github.com/aichi-chishan/snap-hutao-data/releases/download/clt-26.0.0.851'
 for part in clt-part-00 clt-part-01; do
   curl --fail --location --max-redirs 3 --connect-timeout 30 --max-time 900 --retry 0 \
     --output "$destination/downloads/$part" "$base/$part"
