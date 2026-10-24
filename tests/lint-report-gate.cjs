@@ -83,12 +83,12 @@ const fakeBin = path.join(temp, 'bin'); fs.mkdirSync(fakeBin);
 const calls = path.join(temp, 'curl-calls');
 fs.writeFileSync(path.join(fakeBin, 'curl'), `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> "$CURL_CALLS"\nwhile [[ $# -gt 0 ]]; do if [[ "$1" == --output ]]; then printf fake > "$2"; shift; fi; shift; done\n`);
 fs.chmodSync(path.join(fakeBin, 'curl'), 0o755);
-const approved = 'https://github.com/aichi-chishan/snap-hutao-data/releases/download/clt-26.0.0.821/clt-part-00';
+const approved = 'https://github.com/aichi-chishan/snap-hutao-data/releases/download/clt-26.0.0.851/clt-part-00';
 if (!hasBash || !hasPython3) {
   console.log('SKIP installer URL/size cases: no bash or no working python3 on this host (CI runs them on Linux)');
 } else {
   let index = 0;
-  for (const url of ['', 'https://example.invalid/clt-part-00', approved + '?other=1', approved.replace('821','822'), approved.replace('part-00','part-01')]) {
+  for (const url of ['', 'https://example.invalid/clt-part-00', approved + '?other=1', approved.replace('851','852'), approved.replace('part-00','part-01')]) {
     const run = spawnSync('bash', [installer, path.join(temp, `install-${index++}`)], { env: {...process.env, DEVECO_CLT_URL: url, PATH: fakeBin + path.delimiter + process.env.PATH, CURL_CALLS: calls} });
     assert.notEqual(run.status, 0); assert.equal(fs.existsSync(calls), false, 'Unknown URL must fail before any network request');
   }
@@ -100,7 +100,7 @@ if (!hasBash || !hasPython3) {
   assert.equal(fs.existsSync(path.join(destination, 'clt')), false);
 }
 const verifySource = fs.readFileSync(path.resolve(__dirname, '../ci/verify-clt.py'), 'utf8');
-for (const pin of ['2cb88715aa489620da78bd664660af97fc3b645320e998ae4fedd33e8b2c736d','5f44978744f1c3d8ef82175963fb0087a7e831ac48f5b7cbe36668b8b3e41838','58da7359019e9360a8bb82da0cd1d3b3b26fedc338379f257849f2162e3ac1fc','1992294400','355587885']) assert.ok(verifySource.includes(pin));
+for (const pin of ['c57ebdd4850bbd1eb4744da661e58c0e3fed5c492fdd2aa35c4d91edd22166d7','830ae286a66d89a43f7a88504ffab4c13317b72e29efb15bbc722b4ce16f2837','ab604bd92721d5cbcafd154e6461d46b9f1b105e7b89eab04a9d046681198082','1992294400','355768909']) assert.ok(verifySource.includes(pin));
 const workflow = fs.readFileSync(path.resolve(__dirname, '../.github/workflows/ci.yml'),'utf8');
 assert.doesNotMatch(workflow, /devecocli (check lint|build)|if-no-files-found: warn/);
 assert.match(workflow, /hvigorw clean --no-daemon/); assert.match(workflow, /ci\/check-hap.py/);

@@ -1,8 +1,8 @@
 from pathlib import Path
 import hashlib,json,os,stat,sys,zipfile,zlib
 root=Path(sys.argv[1]).resolve()
-parts={'clt-part-00':'2cb88715aa489620da78bd664660af97fc3b645320e998ae4fedd33e8b2c736d','clt-part-01':'5f44978744f1c3d8ef82175963fb0087a7e831ac48f5b7cbe36668b8b3e41838'}
-sizes={'clt-part-00':1992294400,'clt-part-01':355587885}
+parts={'clt-part-00':'c57ebdd4850bbd1eb4744da661e58c0e3fed5c492fdd2aa35c4d91edd22166d7','clt-part-01':'830ae286a66d89a43f7a88504ffab4c13317b72e29efb15bbc722b4ce16f2837'}
+sizes={'clt-part-00':1992294400,'clt-part-01':355768909}
 for name,expected in parts.items():
     if (root/'downloads'/name).stat().st_size!=sizes[name]:raise RuntimeError('Unexpected size '+name)
     with (root/'downloads'/name).open('rb') as f: actual=hashlib.file_digest(f,'sha256').hexdigest()
@@ -20,7 +20,7 @@ if stored_sha!=combined_sha:raise RuntimeError('Stored ZIP differs from verified
 receipt={'parts':parts,'combined_sha256':combined_sha,'combined_hash_source':'derived from pinned verified parts in order 00 then 01; stored ZIP independently rehashed','zip_bytes':zip_path.stat().st_size}
 (root/'evidence/archive-hashes.json').write_text(json.dumps(receipt,indent=2)+'\n')
 print('Combined derived and stored SHA-256 '+combined_sha,flush=True)
-if combined_sha != '58da7359019e9360a8bb82da0cd1d3b3b26fedc338379f257849f2162e3ac1fc':
+if combined_sha != 'ab604bd92721d5cbcafd154e6461d46b9f1b105e7b89eab04a9d046681198082':
     raise RuntimeError('Combined ZIP differs from the previously verified release')
 with zipfile.ZipFile(zip_path) as zf:
     names=set()
