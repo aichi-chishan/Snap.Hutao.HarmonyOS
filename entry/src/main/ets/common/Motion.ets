@@ -19,7 +19,7 @@ export class Motion {
     AppStorage.setOrCreate<boolean>('reduceMotion', enabled);
   }
 
-  /** API 26 沉浸光感可用性（运行时门控，失败回退） */
+  /** API 26 沉浸光感可用性（compatibleSdkVersion 已升 26，此门控仅作防御性回退） */
   static detectImmersive(): boolean {
     try {
       return deviceInfo.apiAvailable('26.0.0');
