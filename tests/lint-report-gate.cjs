@@ -15,6 +15,10 @@ const gate = path.resolve(__dirname, '../ci/check-lint-report.cjs');
 const marker = () => ({ version: 1, startedAtMs: Date.now() - 1000, minimumSourceFiles: 1, projectRoot: root });
 const message = severity => ({ line: 1, severity, message: 'Fixture diagnostic', rule: '@security/no-unsafe-hash' });
 const report = severity => [{ filePath: source, messages: [message(severity)] }];
+// The scan log embeds the project path via JSON.stringify, so on Windows the recorded form has
+// escaped separators ('\\\\'). The fixture must rewrite the escaped form too, otherwise the
+// "foreign project" case silently keeps the original root and the gate (correctly) does not throw.
+const escaped = value => JSON.stringify(String(value)).slice(1, -1);
 const scan = () => `[INFO] options ${JSON.stringify({projectPath: root})}\n[INFO] File count: 1\n[INFO] Checking completed.\n`;
 function reset() {
   fs.writeFileSync(reportPath, JSON.stringify(report('warn')));
@@ -45,35 +49,56 @@ rejects(() => fs.writeFileSync(reportPath, JSON.stringify([{filePath: '/foreign/
 rejects(() => fs.writeFileSync(scanPath, scan().replace('File count: 1', 'File count: 0')), /Incomplete/);
 rejects(() => fs.writeFileSync(scanPath, scan() + 'File count: 1\n'), /Incomplete/);
 rejects(() => fs.writeFileSync(scanPath, scan().replace('Checking completed.', 'Checking started.')), /did not complete/);
-rejects(() => fs.writeFileSync(scanPath, scan().replace(root, path.join(temp, 'other'))), /does not belong/);
+// Rewrite the JSON-escaped form actually present in the log (raw separators differ on Windows).
+const foreign = () => scan().replaceAll(escaped(root), escaped(path.join(temp, 'other')));
+rejects(() => fs.writeFileSync(scanPath, foreign()), /does not belong/);
 rejects(() => fs.writeFileSync(scanPath, scan() + '[ERROR] Error running file check: getDeclaringMethod\n'), /coverage is incomplete/);
 rejects(() => fs.writeFileSync(scanPath, scan() + '[ERROR] Invalid rule name: unavailable-rule\n'), /configuration errors/);
 rejects(() => fs.writeFileSync(scanPath, scan() + 'Error running file check for Probe.ets\n'), /coverage is incomplete/);
 for (const filename of [reportPath, scanPath]) rejects(() => fs.utimesSync(filename, new Date(0), new Date(0)), /Stale/);
 rejects(() => fs.writeFileSync(markerPath, '{}'), /Malformed/);
 rejects(() => fs.writeFileSync(markerPath, JSON.stringify({...marker(), startedAtMs:Date.now()+60000})), /Malformed/);
+// A symlink escaping the project must be refused. Creating a file symlink needs elevation on
+// Windows, so when the host forbids it we state the skip instead of silently passing the case.
 const external=path.join(temp,'external.ets');fs.writeFileSync(external,'external');
-const linked=path.join(root,'linked.ets');fs.symlinkSync(external,linked);
-rejects(() => fs.writeFileSync(reportPath,JSON.stringify([{filePath:linked,messages:[message('warn')]}])),/different project/);
+const linked=path.join(root,'linked.ets');
+let canLink=true;
+try { fs.symlinkSync(external,linked,'file'); }
+catch (error) {
+  if (error.code==='EPERM'||error.code==='EACCES') { canLink=false; console.log('SKIP external symlink case: host forbids file symlinks ('+error.code+')'); }
+  else throw error;
+}
+if (canLink) rejects(() => fs.writeFileSync(reportPath,JSON.stringify([{filePath:linked,messages:[message('warn')]}])),/different project/);
 rejects(() => fs.writeFileSync(markerPath, JSON.stringify({...marker(), minimumSourceFiles: 2})), /Incomplete/);
 
+// The installer runner and HAP checker are POSIX-only (bash / python3). On a host without
+// them the cases cannot execute; report that explicitly instead of failing or pretending.
+// The Windows Store 'python3' alias stub exits 0 while executing nothing, so probe for
+// real output instead of trusting the exit status alone.
+const hasBash = spawnSync('bash', ['-c', 'exit 0']).status === 0;
+const python3Probe = spawnSync('python3', ['-c', 'print(42)'], { encoding: 'utf8' });
+const hasPython3 = python3Probe.status === 0 && String(python3Probe.stdout).trim() === '42';
 const installer = path.resolve(__dirname, '../ci/install-clt.sh');
 const fakeBin = path.join(temp, 'bin'); fs.mkdirSync(fakeBin);
 const calls = path.join(temp, 'curl-calls');
 fs.writeFileSync(path.join(fakeBin, 'curl'), `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> "$CURL_CALLS"\nwhile [[ $# -gt 0 ]]; do if [[ "$1" == --output ]]; then printf fake > "$2"; shift; fi; shift; done\n`);
 fs.chmodSync(path.join(fakeBin, 'curl'), 0o755);
 const approved = 'https://github.com/aichi-chishan/snap-hutao-data/releases/download/clt-26.0.0.821/clt-part-00';
-let index = 0;
-for (const url of ['', 'https://example.invalid/clt-part-00', approved + '?other=1', approved.replace('821','822'), approved.replace('part-00','part-01')]) {
-  const run = spawnSync('bash', [installer, path.join(temp, `install-${index++}`)], { env: {...process.env, DEVECO_CLT_URL: url, PATH: fakeBin + path.delimiter + process.env.PATH, CURL_CALLS: calls} });
-  assert.notEqual(run.status, 0); assert.equal(fs.existsSync(calls), false, 'Unknown URL must fail before any network request');
+if (!hasBash || !hasPython3) {
+  console.log('SKIP installer URL/size cases: no bash or no working python3 on this host (CI runs them on Linux)');
+} else {
+  let index = 0;
+  for (const url of ['', 'https://example.invalid/clt-part-00', approved + '?other=1', approved.replace('821','822'), approved.replace('part-00','part-01')]) {
+    const run = spawnSync('bash', [installer, path.join(temp, `install-${index++}`)], { env: {...process.env, DEVECO_CLT_URL: url, PATH: fakeBin + path.delimiter + process.env.PATH, CURL_CALLS: calls} });
+    assert.notEqual(run.status, 0); assert.equal(fs.existsSync(calls), false, 'Unknown URL must fail before any network request');
+  }
+  const destination = path.join(temp, 'install-approved');
+  const attempted = spawnSync('bash', [installer, destination], { env: {...process.env, DEVECO_CLT_URL: approved, PATH: fakeBin + path.delimiter + process.env.PATH, CURL_CALLS: calls}, encoding:'utf8' });
+  assert.notEqual(attempted.status, 0); assert.match(attempted.stderr, /Unexpected size/, 'Fake bytes fail before extraction or execution');
+  const requests = fs.readFileSync(calls, 'utf8').trim().split('\n');
+  assert.equal(requests.length, 2); assert.ok(requests[0].endsWith(approved)); assert.ok(requests[1].endsWith(approved.replace('part-00','part-01')));
+  assert.equal(fs.existsSync(path.join(destination, 'clt')), false);
 }
-const destination = path.join(temp, 'install-approved');
-const attempted = spawnSync('bash', [installer, destination], { env: {...process.env, DEVECO_CLT_URL: approved, PATH: fakeBin + path.delimiter + process.env.PATH, CURL_CALLS: calls}, encoding:'utf8' });
-assert.notEqual(attempted.status, 0); assert.match(attempted.stderr, /Unexpected size/, 'Fake bytes fail before extraction or execution');
-const requests = fs.readFileSync(calls, 'utf8').trim().split('\n');
-assert.equal(requests.length, 2); assert.ok(requests[0].endsWith(approved)); assert.ok(requests[1].endsWith(approved.replace('part-00','part-01')));
-assert.equal(fs.existsSync(path.join(destination, 'clt')), false);
 const verifySource = fs.readFileSync(path.resolve(__dirname, '../ci/verify-clt.py'), 'utf8');
 for (const pin of ['2cb88715aa489620da78bd664660af97fc3b645320e998ae4fedd33e8b2c736d','5f44978744f1c3d8ef82175963fb0087a7e831ac48f5b7cbe36668b8b3e41838','58da7359019e9360a8bb82da0cd1d3b3b26fedc338379f257849f2162e3ac1fc','1992294400','355587885']) assert.ok(verifySource.includes(pin));
 const workflow = fs.readFileSync(path.resolve(__dirname, '../.github/workflows/ci.yml'),'utf8');
@@ -82,18 +107,22 @@ assert.match(workflow, /hvigorw clean --no-daemon/); assert.match(workflow, /ci\
 
 const hapChecker = path.resolve(__dirname, '../ci/check-hap.py');
 const hapPath = path.join(temp, 'fixture.hap');
-const manifest = {app:{minAPIVersion:60101024,targetAPIVersion:260000026,apiReleaseType:'Release'},module:{deviceTypes:['phone','tablet','2in1']}};
+const manifest = {app:{minAPIVersion:260000026,targetAPIVersion:260000026,apiReleaseType:'Release'},module:{deviceTypes:['phone','tablet','2in1']}};
 function makeHap(value) {
   const generated=spawnSync('python3',['-c',"import json,sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w'); z.writestr('module.json',sys.argv[2]); z.close()",hapPath,JSON.stringify(value)]);
   assert.equal(generated.status,0);
 }
-const checkHap=()=>spawnSync('python3',[hapChecker,hapPath]);
-assert.notEqual(checkHap().status,0,'Missing HAP fails');
-fs.writeFileSync(hapPath,'');assert.notEqual(checkHap().status,0,'Empty HAP fails');
-fs.writeFileSync(hapPath,'not a zip');assert.notEqual(checkHap().status,0,'Corrupt HAP fails');
-makeHap(manifest);assert.equal(checkHap().status,0);
-makeHap({...manifest,app:{...manifest.app,minAPIVersion:260000026}});assert.notEqual(checkHap().status,0,'Raised minimum API fails');
-makeHap({...manifest,module:{deviceTypes:['phone']}});assert.notEqual(checkHap().status,0,'Dropped devices fail');
+if (!hasPython3) {
+  console.log('SKIP HAP checker cases: no python3 on this host (CI runs them on Linux)');
+} else {
+  const checkHap=()=>spawnSync('python3',[hapChecker,hapPath]);
+  assert.notEqual(checkHap().status,0,'Missing HAP fails');
+  fs.writeFileSync(hapPath,'');assert.notEqual(checkHap().status,0,'Empty HAP fails');
+  fs.writeFileSync(hapPath,'not a zip');assert.notEqual(checkHap().status,0,'Corrupt HAP fails');
+  makeHap(manifest);assert.equal(checkHap().status,0);
+  makeHap({...manifest,app:{...manifest.app,minAPIVersion:60101024}});assert.notEqual(checkHap().status,0,'Lowered minimum API fails');
+  makeHap({...manifest,module:{deviceTypes:['phone']}});assert.notEqual(checkHap().status,0,'Dropped devices fail');
+}
 
 const fakeClt=path.join(temp,'clt');fs.mkdirSync(path.join(fakeClt,'bin'),{recursive:true});
 fs.mkdirSync(path.join(fakeClt,'codelinter/linter/result'),{recursive:true});

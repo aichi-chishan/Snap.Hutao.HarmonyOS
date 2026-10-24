@@ -37,8 +37,9 @@ Thumbs.db
 /spec/
 /skills
 
-# ===== 独立数据仓库（snap-hutao-data，另行托管）=====
-/github-data
+# ===== 独立仓库（各自保有 .git，仅作参考/数据管线，不入本库）=====
+/Snap.Hutao.Remastered-latest
+/snap-hutao-data
 
 # ===== 参考截图（Windows 版界面截图；含账号信息，不公开）=====
 /example

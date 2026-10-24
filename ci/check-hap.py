@@ -9,7 +9,7 @@ with zipfile.ZipFile(hap) as archive:
     if bad:raise SystemExit('HAP CRC failure: '+bad)
     manifest=json.loads(archive.read('module.json'))
 app=manifest['app'];module=manifest['module']
-if (app.get('minAPIVersion'),app.get('targetAPIVersion'),app.get('apiReleaseType')) != (60101024,260000026,'Release'):
+if (app.get('minAPIVersion'),app.get('targetAPIVersion'),app.get('apiReleaseType')) != (260000026,260000026,'Release'):
     raise SystemExit('Unexpected packaged API compatibility')
 if set(module.get('deviceTypes',[])) != {'phone','tablet','2in1'}:
     raise SystemExit('Unexpected packaged device types')
