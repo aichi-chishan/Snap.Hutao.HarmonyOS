@@ -203,9 +203,11 @@ export struct GachaLogPage {
     this.vm.onProgressChanged = () => {
       if (this.pageActive) { this.syncProgress(); }
     };
-    WikiMetaService.ensureIconMaps().then(() => {
-      if (this.pageActive) { this.syncAll(); }
-    });
+    WikiMetaService.ensureIconMaps()
+      .then(() => WikiMetaService.ensureBeyondItemMaps())
+      .then(() => {
+        if (this.pageActive) { this.syncAll(); }
+      });
     this.reloadData();
   }
 
@@ -347,14 +349,14 @@ export struct GachaLogPage {
     this.syncHistorySource();
   }
 
-  /** 聚合全池角色/武器按名称计数（Pivot：角色/武器页） */
+  /** 聚合全池角色/武器按名称计数（Pivot：角色/武器页；千星奇域专属物品不参与，对齐 Windows 颂愿模式仅总览） */
   syncCounts(): void {
     const charMap: Map<string, ItemCountEntry> = new Map<string, ItemCountEntry>();
     const weaponMap: Map<string, ItemCountEntry> = new Map<string, ItemCountEntry>();
     const pools: PoolStatistics[] = this.vm.stats.pools;
     for (let i = 0; i < pools.length; i++) {
       const pool: PoolStatistics = pools[i];
-      if (pool.totalCount <= 0) {
+      if (pool.totalCount <= 0 || GachaType.isBeyond(pool.gachaType)) {
         continue;
       }
       // 五星明细按服务端实际 item_type 归桶（常驻/颂愿池混有武器，按池名判断不可靠）
@@ -369,11 +371,11 @@ export struct GachaLogPage {
         }
       }
     }
-    // 加上当前池全部四星/三星（角色页补充四星角色；武器页补充四星/三星武器）
+    // 加上当前池全部四星/三星（角色页补充四星角色；武器页补充四星/三星武器；颂愿池不参与）
     const allItems: GachaItem[] = this.vm.items;
     for (let i = 0; i < allItems.length; i++) {
       const item: GachaItem = allItems[i];
-      if (item.rankType < 4) {
+      if (item.rankType < 4 || GachaType.isBeyond(item.gachaType)) {
         continue;
       }
       const isChar: boolean = item.itemType.indexOf('角色') >= 0;
@@ -795,6 +797,17 @@ export struct GachaLogPage {
     return WikiMetaService.iconOfWeaponName(GachaLogPage.cleanName(name));
   }
 
+  /** 记录 → 千星奇域专属物品图标名（itemId 优先、名称兜底；未命中返回空） */
+  beyondIconOf(item: GachaItem): string {
+    if (item.itemId > 0) {
+      const byId: string = WikiMetaService.iconOfBeyondId(item.itemId);
+      if (byId.length > 0) {
+        return byId;
+      }
+    }
+    return WikiMetaService.iconOfBeyondName(GachaLogPage.cleanName(item.name));
+  }
+
   /** 头像首字（无名字回退 ★） */
   avatarInitial(pull: FiveStarPull): string {
     if (pull.name.length === 0) {
@@ -803,20 +816,28 @@ export struct GachaLogPage {
     return pull.name.substring(0, 1);
   }
 
-  /** 出金记录 → 图标名（常驻池混有武器，池类型判定不可靠：先按 itemType，未命中双表回退） */
+  /** 出金记录 → 图标名（常驻池混有武器，池类型判定不可靠：先按 itemType，未命中双表再试千星奇域专属物品） */
   iconOfPull(pull: FiveStarPull): string {
     const clean: string = GachaLogPage.cleanName(pull.name);
     if (pull.itemType === '武器') {
-      return WikiMetaService.iconOfWeaponName(clean);
+      const w: string = WikiMetaService.iconOfWeaponName(clean);
+      if (w.length > 0) {
+        return w;
+      }
+      return WikiMetaService.iconOfBeyondName(clean);
     }
     const avatar: string = WikiMetaService.iconOfAvatarName(clean);
     if (avatar.length > 0) {
       return avatar;
     }
-    return WikiMetaService.iconOfWeaponName(clean);
+    const weapon: string = WikiMetaService.iconOfWeaponName(clean);
+    if (weapon.length > 0) {
+      return weapon;
+    }
+    return WikiMetaService.iconOfBeyondName(clean);
   }
 
-  /** 出金头像分类（按实际解析出的图标名回推；武器图未命中时保持 AvatarIcon 让回退头像兜底） */
+  /** 出金头像分类（按实际解析出的图标名回推；专属物品图未命中时保持 AvatarIcon 让占位兜底） */
   pullCategory(pull: FiveStarPull): string {
     const clean: string = GachaLogPage.cleanName(pull.name);
     if (pull.itemType === '武器') {
@@ -826,7 +847,10 @@ export struct GachaLogPage {
     if (avatar.length > 0) {
       return 'AvatarIcon';
     }
-    return WikiMetaService.iconOfWeaponName(clean).length > 0 ? 'EquipIcon' : 'AvatarIcon';
+    if (WikiMetaService.iconOfWeaponName(clean).length > 0) {
+      return 'EquipIcon';
+    }
+    return WikiMetaService.iconOfBeyondName(clean).length > 0 ? 'BeyondItemIcon' : 'AvatarIcon';
   }
 
   /** 清洗抽卡记录名：剔除星级符号/空格（★/◆/空格），对齐元数据名字做 icon 映射 */
@@ -896,6 +920,8 @@ export struct GachaLogPage {
   toggleBeyondMode(): void {
     if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
     this.beyondMode = !this.beyondMode;
+    // 颂愿模式仅保留总览页签（PivotBeyondModeBehavior 语义）：离开颂愿时也先回到总览
+    if (this.pivotIndex !== 0) { this.pivotIndex = 0; }
     const target: number = this.beyondMode ? GachaType.UGC_STANDARD : GachaType.AVATAR_EVENT;
     this.selectPool(target);
   }
@@ -1126,7 +1152,7 @@ export struct GachaLogPage {
               .backgroundColor($r('app.color.five_star'))
               .opacity(0.18)
             if (this.iconOfPull(pull).length > 0) {
-              MetaIcon({ category: this.pullCategory(pull), name: this.iconOfPull(pull), iconSize: 40 })
+              MetaIcon({ category: this.pullCategory(pull), name: this.iconOfPull(pull), iconSize: 40, remoteFallback: true })
                 .borderRadius(6)
                 .clip(true)
             } else {
@@ -1164,7 +1190,7 @@ export struct GachaLogPage {
   @Builder
   pullIcon(pull: FiveStarPull) {
     if (this.iconOfPull(pull).length > 0) {
-      MetaIcon({ category: this.pullCategory(pull), name: this.iconOfPull(pull), iconSize: 40 })
+      MetaIcon({ category: this.pullCategory(pull), name: this.iconOfPull(pull), iconSize: 40, remoteFallback: true })
         .borderRadius(8)
         .clip(true)
     } else {
@@ -1500,7 +1526,7 @@ export struct GachaLogPage {
   @Builder
   itemRow(item: GachaItem) {
     Row({ space: 10 }) {
-      // 真实素材图标：角色→AvatarIcon 武器→EquipIcon（本地元数据映射；未命中回退星级占位）
+      // 真实素材图标：角色→AvatarIcon 武器→EquipIcon 千星奇域→BeyondItemIcon（未命中回退星级占位）
       if (item.itemType === '角色') {
         if (this.iconOfName(item.name).length > 0) {
           MetaIcon({ category: 'AvatarIcon', name: this.iconOfName(item.name), iconSize: 36 })
@@ -1509,14 +1535,14 @@ export struct GachaLogPage {
         } else {
           this.starPlaceholder(item.rankType)
         }
-      } else if (item.itemType === '武器') {
-        if (this.weaponIconOfName(item.name).length > 0) {
-          MetaIcon({ category: 'EquipIcon', name: this.weaponIconOfName(item.name), iconSize: 36 })
-            .borderRadius(18)
-            .clip(true)
-        } else {
-          this.starPlaceholder(item.rankType)
-        }
+      } else if (item.itemType === '武器' && this.weaponIconOfName(item.name).length > 0) {
+        MetaIcon({ category: 'EquipIcon', name: this.weaponIconOfName(item.name), iconSize: 36 })
+          .borderRadius(18)
+          .clip(true)
+      } else if (this.beyondIconOf(item).length > 0) {
+        MetaIcon({ category: 'BeyondItemIcon', name: this.beyondIconOf(item), iconSize: 36, remoteFallback: true })
+          .borderRadius(18)
+          .clip(true)
       } else {
         this.starPlaceholder(item.rankType)
       }
@@ -1721,9 +1747,10 @@ export struct GachaLogPage {
                   Column({ space: 2 }) {
                     Stack({ alignContent: Alignment.BottomEnd }) {
                       MetaIcon({
-                        category: it.itemType === '武器' ? 'EquipIcon' : 'AvatarIcon',
+                        category: WikiMetaService.categoryOfItemName(it.name, it.itemType),
                         name: WikiMetaService.iconOfItemName(it.name, it.itemType),
                         iconSize: 40,
+                        remoteFallback: true,
                       })
                       if (it.count > 1) {
                         Text(`x${it.count}`)
@@ -2068,15 +2095,17 @@ export struct GachaLogPage {
         .padding({ left: 16, right: 16, top: 10, bottom: 8 })
         .alignItems(VerticalAlign.Center)
 
-        // Pivot 五个页签（总览/历史/角色/武器/倒计时）+ 颂愿模式切换（页签可横向滚动防窄屏溢出）
+        // Pivot 页签（总览/历史/角色/武器/倒计时）+ 颂愿模式切换；颂愿模式仅总览（对齐 Windows PivotBeyondModeBehavior）
         Row({ space: 8 }) {
           Scroll() {
             Row({ space: 6 }) {
               this.pivotTab(0, '总览')
-              this.pivotTab(1, '历史')
-              this.pivotTab(2, '角色')
-              this.pivotTab(3, '武器')
-              this.pivotTab(4, '倒计时')
+              if (!this.beyondMode) {
+                this.pivotTab(1, '历史')
+                this.pivotTab(2, '角色')
+                this.pivotTab(3, '武器')
+                this.pivotTab(4, '倒计时')
+              }
             }
           }
           .scrollable(ScrollDirection.Horizontal)
