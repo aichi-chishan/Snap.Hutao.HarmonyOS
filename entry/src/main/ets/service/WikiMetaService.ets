@@ -141,6 +141,18 @@ export class GachaEventMeta {
   upPurple: number[] = [];
 }
 
+/** 千星奇域（颂愿）专属物品（对齐 Windows BeyondItem：Id/Name/Icon/Type/RankLevel） */
+export class BeyondItemMeta {
+  id: number = 0;
+  name: string = '';
+  /** 图标名（UI_ItemIcon_{id}，走 BeyondItemIcon 静态 CDN，对齐 Windows BeyondItemNameIconConverter） */
+  icon: string = '';
+  /** 物品内部分类 */
+  type: number = 0;
+  /** 品质等级 1-5 */
+  rank: number = 0;
+}
+
 /** 幻想真境剧诗期次元数据（对齐 Snap.Metadata RoleCombatSchedule，时间已转 epoch ms） */
 export class RoleCombatScheduleMeta {
   id: number = 0;
@@ -163,6 +175,10 @@ export class WikiMetaService {
   private static nameCardByPic: Map<string, NameCardMeta> = new Map();
   private static gachaEvents: GachaEventMeta[] | undefined = undefined;
   private static roleCombatSchedules: RoleCombatScheduleMeta[] | undefined = undefined;
+  private static beyondItems: BeyondItemMeta[] | undefined = undefined;
+  private static beyondIconByName: Map<string, string> = new Map();
+  private static beyondNameById: Map<number, string> = new Map();
+  private static beyondIconById: Map<number, string> = new Map();
 
   private static async readRawJson(name: string): Promise<Record<string, Object> | Object[]> {
     return JSON.parse(await GameDataService.readMetadataFile(name)) as Record<string, Object> | Object[];
@@ -693,6 +709,62 @@ export class WikiMetaService {
     return WikiMetaService.gachaEvents;
   }
 
+  /** 千星奇域专属物品映射（懒加载 metadata/BeyondItem.json；祈愿颂愿模式渲染前调用） */
+  static async ensureBeyondItemMaps(): Promise<void> {
+    if (WikiMetaService.beyondItems !== undefined) {
+      return;
+    }
+    try {
+      const arr = await WikiMetaService.readRawJson('BeyondItem.json') as Object[];
+      const list: BeyondItemMeta[] = [];
+      for (const raw of arr) {
+        const o: Record<string, Object> = raw as Record<string, Object>;
+        const b: BeyondItemMeta = new BeyondItemMeta();
+        b.id = Number(o['Id'] ?? 0);
+        b.name = String(o['Name'] ?? '');
+        b.icon = String(o['Icon'] ?? '');
+        b.type = Number(o['Type'] ?? 0);
+        b.rank = Number(o['RankLevel'] ?? 0);
+        if (b.id <= 0 || b.name.length === 0 || b.icon.length === 0) {
+          continue;
+        }
+        list.push(b);
+        WikiMetaService.beyondIconByName.set(b.name, b.icon);
+        WikiMetaService.beyondNameById.set(b.id, b.name);
+        WikiMetaService.beyondIconById.set(b.id, b.icon);
+      }
+      WikiMetaService.beyondItems = list;
+      Logger.info(TAG, `beyond items loaded: ${list.length}`);
+    } catch (e) {
+      Logger.warn(TAG, `load beyond items fail: ${(e as Error).message}`);
+      WikiMetaService.beyondItems = [];
+    }
+  }
+
+  /** 千星奇域专属物品名 → 图标名（未命中返回空；与角色/武器名空间互斥） */
+  static iconOfBeyondName(name: string): string {
+    if (name.length === 0) {
+      return '';
+    }
+    let n: string | undefined = WikiMetaService.beyondIconByName.get(name);
+    if (n === undefined && name.trim() !== name) {
+      n = WikiMetaService.beyondIconByName.get(name.trim());
+    }
+    return n !== undefined ? n : '';
+  }
+
+  /** 千星奇域专属物品 id → 名称（未命中返回空） */
+  static nameOfBeyondId(id: number): string {
+    const n: string | undefined = WikiMetaService.beyondNameById.get(id);
+    return n !== undefined ? n : '';
+  }
+
+  /** 千星奇域专属物品 id → 图标名（未命中返回空） */
+  static iconOfBeyondId(id: number): string {
+    const n: string | undefined = WikiMetaService.beyondIconById.get(id);
+    return n !== undefined ? n : '';
+  }
+
   /** 怪物中文名 → MonsterIcon 图标名（未命中返回空；剧诗/幽境敌人头像用） */
   static iconOfMonsterName(name: string): string {
     const n: string | undefined = WikiMetaService.monsterNameMap.get(name);
@@ -724,14 +796,40 @@ export class WikiMetaService {
     return WikiMetaService.weapons ?? [];
   }
 
-  /** 抽卡记录条目 → 图标名（角色走 AvatarIcon、武器走 EquipIcon；未命中返回空） */
+  /**
+   * 抽卡记录条目 → 图标名（角色走 AvatarIcon、武器走 EquipIcon、千星奇域专属物品走 BeyondItemIcon）。
+   * 颂愿记录 item_type 服务端不固定（对齐 Windows：不按 item_type 判定专属物品），
+   * 名称未命中角色/武器映射时按专属物品映射兜底；未命中返回空。
+   */
   static iconOfItemName(name: string, itemType: string): string {
     if (itemType === '武器') {
       const w: string | undefined = WikiMetaService.weaponNameMap.get(name);
-      return w ?? '';
+      if (w !== undefined) {
+        return w;
+      }
+      return WikiMetaService.iconOfBeyondName(name);
     }
     const a: string | undefined = WikiMetaService.avatarNameMap.get(name);
-    return a ?? '';
+    if (a !== undefined) {
+      return a;
+    }
+    return WikiMetaService.iconOfBeyondName(name);
+  }
+
+  /** 抽卡记录条目 → MetaIcon 类目（与 iconOfItemName 同一判定链；未命中按常规类目兜底占位） */
+  static categoryOfItemName(name: string, itemType: string): string {
+    if (itemType === '武器') {
+      const w: string | undefined = WikiMetaService.weaponNameMap.get(name);
+      if (w !== undefined) {
+        return 'EquipIcon';
+      }
+      return WikiMetaService.iconOfBeyondName(name).length > 0 ? 'BeyondItemIcon' : 'EquipIcon';
+    }
+    const a: string | undefined = WikiMetaService.avatarNameMap.get(name);
+    if (a !== undefined) {
+      return 'AvatarIcon';
+    }
+    return WikiMetaService.iconOfBeyondName(name).length > 0 ? 'BeyondItemIcon' : 'AvatarIcon';
   }
 
   /** 元素英文 → 中文 */
