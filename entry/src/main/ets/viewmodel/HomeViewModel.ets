@@ -4,6 +4,7 @@
  * 各数据源独立加载，互不阻塞；失败只标记对应状态，不拖垮整个主页。
  */
 import { GachaRepo } from '../data/repo/GachaRepo';
+import { GachaArchive } from '../model/GachaArchive';
 import { GachaType } from '../model/GachaType';
 import { GachaItem } from '../model/GachaItem';
 import { DailyNoteRepo, DailyNoteRecord } from '../data/repo/DailyNoteRepo';
@@ -160,15 +161,26 @@ export class HomeViewModel {
 
   /** 祈愿统计：本地缓存直接算（不触发网络拉取，主页展示缓存） */
   private async loadGacha(uid: string, generation: number): Promise<void> {
+    let archiveId: number = 0;
     if (uid.length === 0) {
-      // 未登录/未绑定：不创建空归档
-      this.gachaLoaded = true;
-      return;
+      // 未登录/未绑定：不创建空归档；回退到已选/首个有效本地归档做只读统计
+      //（对齐 Windows：本地数据不因登出而不可见，B2）
+      const archives: GachaArchive[] = await GachaRepo.getAllArchives();
+      const local: GachaArchive | undefined = archives.find((a: GachaArchive): boolean =>
+        a.id > 0 && /^[1-9][0-9]{8,9}$/.test(a.uid) && a.isSelected)
+        ?? archives.find((a: GachaArchive): boolean => a.id > 0 && /^[1-9][0-9]{8,9}$/.test(a.uid));
+      if (local === undefined) {
+        this.gachaLoaded = true;
+        return;
+      }
+      archiveId = local.id;
     }
     try {
       const stats: HomePoolSummary[] = [];
       let total: number = 0;
-      const archiveId: number = await GachaRepo.getOrCreateArchive(uid).then(a => a.id);
+      if (archiveId === 0) {
+        archiveId = await GachaRepo.getOrCreateArchive(uid).then(a => a.id);
+      }
       for (let i = 0; i < GachaType.QUERY_ORDER.length; i++) {
         const type: number = GachaType.QUERY_ORDER[i];
         const pool: PoolStatInline = await HomeViewModel.computePool(archiveId, type);
