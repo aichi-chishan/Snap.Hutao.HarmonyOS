@@ -1028,7 +1028,7 @@ class DashCardSpec {
                   fillHeight: this.isWide,
                   uid: this.homeVm.currentUid,
                   note: this.homeVm.note,
-                  refreshTime: this.homeVm.noteRefreshTime,
+                  refreshTs: this.homeVm.noteRefreshTs,
                   loaded: this.homeVm.noteLoaded,
                   onTap: () => {
                     if (this.isWide) { this.switchTo(3); } else { this.switchPhoneTab(2); }

@@ -13,12 +13,14 @@ import { DailyNote, Expedition } from '../model/DailyNote';
 import { PressCard } from './PressCard';
 import { NavIcon } from './NavIcon';
 import { MetaIcon } from './MetaIcon';
+import { DateUtil } from '../common/DateUtil';
 
 @Component
 export struct HomeDailyNoteCard {
   @Prop uid: string = '';
   @Prop note: DailyNote | undefined = undefined;
-  @Prop refreshTime: string = '';
+  /** 便笺快照时间（epoch ms；渲染期算相对时间与过期标注，估算性质对齐 UX11） */
+  @Prop refreshTs: number = 0;
   @Prop loaded: boolean = false;
   /** 树脂阈值提示（默认 120） */
   @Prop resinThreshold: number = 120;
@@ -218,10 +220,12 @@ export struct HomeDailyNoteCard {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1)
-          if (this.refreshTime.length > 0) {
-            Text(`刷新 ${this.refreshTime}`)
+          if (this.refreshTs > 0) {
+            Text(DateUtil.isNoteStale(this.refreshTs)
+              ? `已过期 · ${DateUtil.timeAgo(this.refreshTs)}更新`
+              : `更新于 ${DateUtil.timeAgo(this.refreshTs)} · 估算`)
               .fontSize(12)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(DateUtil.isNoteStale(this.refreshTs) ? $r('app.color.danger') : $r('app.color.text_secondary'))
           }
         }
         .width('100%')

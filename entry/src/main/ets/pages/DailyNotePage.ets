@@ -508,7 +508,7 @@ export struct DailyNotePage {
     return `UID ${entry.uid}`;
   }
 
-  /** 卡底刷新时间（对齐 Windows RefreshTimeFormatted：'刷新于 MM.dd HH:mm:ss' / '尚未刷新'） */
+  /** 卡底刷新时间（Windows RefreshTimeFormatted 绝对时间 + UX11 估算/过期标注可区分） */
   private refreshTimeText(entry: NoteCardEntry): string {
     if (entry.note === undefined || entry.note.refreshTime <= 0) {
       return '尚未刷新';
@@ -516,7 +516,14 @@ export struct DailyNotePage {
     const d: Date = new Date(entry.note.refreshTime);
     const t: string = `${DateUtil.pad2(d.getMonth() + 1)}.${DateUtil.pad2(d.getDate())} ` +
       `${DateUtil.pad2(d.getHours())}:${DateUtil.pad2(d.getMinutes())}:${DateUtil.pad2(d.getSeconds())}`;
-    return `刷新于 ${t}`;
+    return DateUtil.isNoteStale(entry.note.refreshTime)
+      ? `已过期 · 刷新于 ${t}`
+      : `刷新于 ${t}（估算）`;
+  }
+
+  /** 卡底刷新时间颜色（过期醒目，其余次要文本） */
+  private refreshTimeStale(entry: NoteCardEntry): boolean {
+    return entry.note !== undefined && DateUtil.isNoteStale(entry.note.refreshTime);
   }
 
   private onCardRemove(entry: NoteCardEntry): void {
@@ -586,7 +593,7 @@ export struct DailyNotePage {
       Text(this.refreshTimeText(entry))
         .fontSize(12)
         .opacity(0.7)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(this.refreshTimeStale(entry) ? $r('app.color.danger') : $r('app.color.text_primary'))
     }
     .width('100%')
     .padding(8)

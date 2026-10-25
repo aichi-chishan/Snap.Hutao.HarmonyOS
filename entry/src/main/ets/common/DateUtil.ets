@@ -124,4 +124,12 @@ export class DateUtil {
     }
     return `${Math.floor(diff / 86400000)}天前`;
   }
+
+  /** 便笺快照过期阈值（2 小时；超过即标注"已过期"，对齐 UX11 状态可区分） */
+  static readonly NOTE_STALE_MS: number = 2 * 60 * 60 * 1000;
+
+  /** 便笺快照是否已过期（快照时间早于阈值；0 视为未拉取不算过期） */
+  static isNoteStale(refreshMs: number): boolean {
+    return refreshMs > 0 && Date.now() - refreshMs > DateUtil.NOTE_STALE_MS;
+  }
 }

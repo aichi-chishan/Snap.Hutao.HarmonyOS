@@ -86,7 +86,7 @@ export class HomeViewModel {
   /** 便笺（当前 UID） */
   note: DailyNote | undefined = undefined;
   noteLoaded: boolean = false;
-  noteRefreshTime: string = '';
+  noteRefreshTs: number = 0;
 
   /** 签到 */
   signInfo: SignInInfo | undefined = undefined;
@@ -120,7 +120,7 @@ export class HomeViewModel {
     this.gachaPools = [];
     this.gachaTotal = 0;
     this.note = undefined;
-    this.noteRefreshTime = '';
+    this.noteRefreshTs = 0;
     this.signInfo = undefined;
     this.acts = [];
     this.challenge = new HomeChallengeSummary();
@@ -228,7 +228,8 @@ export class HomeViewModel {
         if (generation !== this.loadGeneration) { return; }
         if (rec !== undefined) {
           this.note = rec.note;
-          this.noteRefreshTime = HomeViewModel.formatRefreshTime(rec.note.refreshTime);
+          // 存时间戳，卡面渲染期算"更新于 x 前"与过期标注（UX11：估算性质与过期可区分）
+          this.noteRefreshTs = rec.note.refreshTime;
         }
       }
       this.noteLoaded = true;
@@ -288,14 +289,6 @@ export class HomeViewModel {
       if (generation !== this.loadGeneration) { return; }
       this.announcementsLoaded = true;
     }
-  }
-
-  private static formatRefreshTime(ts: number): string {
-    if (ts <= 0) {
-      return '';
-    }
-    const d: Date = new Date(ts);
-    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   }
 
   /** 单池内联统计 */
