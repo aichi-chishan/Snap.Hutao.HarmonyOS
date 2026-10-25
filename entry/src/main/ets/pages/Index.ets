@@ -752,8 +752,9 @@ class DashCardSpec {
   sideNav() {
     Scroll() {
       Column({ space: 2 }) {
-        // 主页项独立顶置（不放在任何小标题下）
+        // 主页项独立顶置（不放在任何小标题下）；其下紧邻「胡桃通行证」（对齐 Windows 置顶组）
         this.navItemHome(0)
+        this.navItem(16, 'Passport', '胡桃通行证')
 
         this.navSectionTitle('工具')
         this.navItem(14, 'LaunchGame', '启动游戏')
@@ -761,9 +762,8 @@ class DashCardSpec {
         this.navItem(2, 'Achievement', '成就管理')
         this.navItem(3, 'DailyNote', '实时便笺')
         this.navItem(4, 'AvatarProperty', '我的角色')
+        this.navItem(17, 'Backpack', '背包物品')
         this.navItem(5, 'Cultivation', '养成计划')
-        this.navItem(17, 'Backpack', '离线背包')
-        this.navItem(18, 'GachaLog', 'UP 历史')
 
         this.navSectionTitle('周期')
         this.navItem(6, 'SpiralAbyss', '深境螺旋')
@@ -774,11 +774,8 @@ class DashCardSpec {
         this.navItem(9, 'WikiAvatar', '角色资料')
         this.navItem(10, 'WikiWeapon', '武器资料')
         this.navItem(11, 'WikiMonster', '怪物资料')
-        this.navItem(15, 'TravelersDiary', '旅行者札记')
 
         this.navSectionTitle('系统')
-        this.navItem(16, 'Passport', '胡桃通行证与云')
-        this.navItem(12, 'Passport', '账号与数据')
         this.navItem(13, 'Setting', '设置')
 
         Blank()
@@ -1681,6 +1678,11 @@ class DashCardSpec {
 
         // 分组与宽屏侧栏一致（对齐 Windows NavigationView：工具 / 周期 / 数据 / 系统），
         // 手机「我的」即全功能目录；祈愿/便笺已是底部页签，不再重复列出。
+        // 「胡桃通行证」置顶（对齐 Windows 主页下方的置顶组）
+        this.entryCard('Passport', '胡桃通行证', '通行证说明（云服务不移植）', () => {
+          router.pushUrl({ url: 'pages/HutaoCloudPage' });
+        })
+
         this.navSectionTitle('工具')
         this.entryCard('LaunchGame', '启动游戏', '配置公开启动入口', () => {
           router.pushUrl({ url: 'pages/LaunchGamePage' });
@@ -1694,7 +1696,7 @@ class DashCardSpec {
         this.entryCard('Cultivation', '养成计划', '角色养成 / 材料计算', () => {
           router.pushUrl({ url: 'pages/CultivationPage' });
         })
-        this.entryCard('Backpack', '离线背包', 'UIIF 导入导出 / 库存与装备', () => {
+        this.entryCard('Backpack', '背包物品', 'UIIF 导入导出 / 库存与装备', () => {
           router.pushUrl({ url: 'pages/BackpackPage' });
         })
         this.entryCard('GachaLog', 'UP 历史', '角色与武器历次 UP / 距上次结束时长', () => {
@@ -1738,9 +1740,6 @@ class DashCardSpec {
         })
 
         this.navSectionTitle('系统')
-        this.entryCard('Passport', '胡桃通行证与云', '通行证 / 云服务', () => {
-          router.pushUrl({ url: 'pages/HutaoCloudPage' });
-        })
         this.entryCard('Passport', '账号与数据', '多账号管理与角色绑定', () => {
           router.pushUrl({ url: 'pages/UserPage' });
         })

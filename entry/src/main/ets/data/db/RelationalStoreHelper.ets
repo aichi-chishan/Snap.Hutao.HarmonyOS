@@ -34,8 +34,11 @@ export class RelationalStoreHelper {
       name: RelationalStoreHelper.DB_NAME,
       securityLevel: relationalStore.SecurityLevel.S1,
     };
+    Logger.info(TAG, 'opening rdb store');
     const store: relationalStore.RdbStore = await relationalStore.getRdbStore(context, storeConfig);
+    Logger.info(TAG, 'rdb store opened');
     await RelationalStoreHelper.createTables(store);
+    Logger.info(TAG, 'createTables done');
     RelationalStoreHelper.rdbStore = store;
     Logger.info(TAG, 'database initialized');
   }
@@ -184,6 +187,72 @@ export class RelationalStoreHelper {
     Logger.info(TAG, 'tables ready');
   }
 
+  /** 解析 "ALTER TABLE <t> ADD COLUMN <c> ..."；非该形态返回空数组 */
+  private static parseAlterAddColumn(step: string): string[] {
+    const prefix: string = 'ALTER TABLE ';
+    const middle: string = ' ADD COLUMN ';
+    if (!step.startsWith(prefix)) {
+      return [];
+    }
+    const rest: string = step.substring(prefix.length);
+    const mid: number = rest.indexOf(middle);
+    if (mid <= 0) {
+      return [];
+    }
+    const table: string = rest.substring(0, mid).trim();
+    const column: string = rest.substring(mid + middle.length).trim().split(' ')[0];
+    if (table.length === 0 || column.length === 0) {
+      return [];
+    }
+    return [table, column];
+  }
+
+  /** 表是否已存在指定列（PRAGMA table_info；ALTER 前预检，避免依赖错误路径）。
+   *  任何查询异常都返回 false 回退为直接执行语句（与旧行为一致）。 */
+  private static async hasColumn(store: relationalStore.RdbStore, table: string, column: string): Promise<boolean> {
+    try {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(table)) {
+        return false;
+      }
+      const rs: relationalStore.ResultSet = await store.querySql(`PRAGMA table_info(${table})`);
+      try {
+        const nameIndex: number = rs.getColumnIndex('name');
+        while (rs.goToNextRow()) {
+          if (rs.getString(nameIndex) === column) {
+            return true;
+          }
+        }
+        return false;
+      } finally {
+        rs.close();
+      }
+    } catch (e) {
+      Logger.warn(TAG, `hasColumn ${table}.${column} probe fail: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
+  /** 迁移语句超时兜底：个别运行时（API26 模拟器 rdb）在事务内出错的 executeSql 永不结算，
+   *  超时显式报错回滚，保证应用能启动并暴露真实原因，而不是无限“数据库未初始化”。
+   *  环境（如宿主测试 VM）未提供 setTimeout 时不启用超时，直接透传原 Promise。 */
+  private static withTimeout<T>(task: Promise<T>, ms: number, label: string): Promise<T> {
+    if (typeof setTimeout !== 'function') {
+      return task;
+    }
+    return new Promise<T>((resolve, reject): void => {
+      const timerId: number = setTimeout((): void => {
+        reject(new Error(`数据库语句超时（${ms / 1000}s）：${label}`));
+      }, ms);
+      task.then((value: T): void => {
+        clearTimeout(timerId);
+        resolve(value);
+      }, (reason: Error): void => {
+        clearTimeout(timerId);
+        reject(reason);
+      });
+    });
+  }
+
   /** 当前数据库结构版本（每次结构变更 +1，并在 MIGRATIONS 末尾追加对应迁移） */
   private static readonly DB_VERSION: number = 8;
 
@@ -313,19 +382,34 @@ export class RelationalStoreHelper {
     if (v < 1) {
       v = 1;
     }
+    Logger.info(TAG, `migrate from v${v} to v${RelationalStoreHelper.DB_VERSION}`);
     while (v < RelationalStoreHelper.DB_VERSION) {
       const steps: string[] = RelationalStoreHelper.MIGRATIONS[v - 1] ?? [];
+      Logger.info(TAG, `migrate v${v}->v${v + 1} steps=${steps.length}`);
       store.beginTransaction();
       try {
         for (let i = 0; i < steps.length; i++) {
+          const step: string = steps[i];
+          // ALTER 前预检列存在性（新库建表已含新增列时直接跳过）：
+          // 部分 rdb 运行时在事务内出错的 executeSql 永不结算，不能依赖 duplicate column 报错路径。
+          const alter: string[] = RelationalStoreHelper.parseAlterAddColumn(step);
+          if (alter.length === 2) {
+            const already: boolean = await RelationalStoreHelper.hasColumn(store, alter[0], alter[1]);
+            if (already) {
+              Logger.info(TAG, `migrate v${v}->v${v + 1} skip: ${alter[0]}.${alter[1]} already exists`);
+              continue;
+            }
+          }
           try {
-            await store.executeSql(steps[i]);
+            await RelationalStoreHelper.withTimeout(store.executeSql(step), 8000,
+              `v${v}->v${v + 1} step ${i + 1}: ${step.substring(0, 48)}`);
           } catch (e) {
-            // 新库建表已含新增列时允许重复列；其他错误必须回滚，不能标成迁移成功。
+            // 预检不可用（如宿主测试环境）时，允许 ALTER 报 duplicate column（列已存在=目标状态）
             const message: string = (e as Error).message.toLowerCase();
-            if (!steps[i].startsWith('ALTER TABLE ') || !message.includes('duplicate column')) {
+            if (alter.length !== 2 || !message.includes('duplicate column')) {
               throw new Error((e as Error).message);
             }
+            Logger.warn(TAG, `migrate v${v}->v${v + 1} tolerate duplicate column: ${alter[0]}.${alter[1]}`);
           }
         }
         store.version = v + 1;

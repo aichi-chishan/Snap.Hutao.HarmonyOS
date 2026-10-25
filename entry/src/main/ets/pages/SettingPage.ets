@@ -108,6 +108,10 @@ export struct SettingPage {
   /** 应用版本与更新检查（GitHub Releases） */
   @State appVersion: string = '';
   @State backgroundControlsActive: boolean = false;
+  /** 顶部用户卡（对齐 Windows 用户区：头像 + 昵称；currentUserId 变化驱动刷新） */
+  @StorageLink('currentUserId') @Watch('refreshUserCard') currentUserIdNum: number = 0;
+  @State userAvatar: string = '';
+  @State userNickname: string = '';
   /** 每日一图加载状态（选中该背景时展示） */
   @State hutaoDailyStatus: string = '首次使用将自动下载今日一图';
   /** 读取主页卡片配置行（按用户顺序排序） */
@@ -165,6 +169,7 @@ export struct SettingPage {
   @State gachaRows: GachaArchiveRow[] = [];
 
   aboutToAppear(): void {
+    this.refreshUserCard();
     this.backgroundControlsActive = true;
     this.attachDataUpdates();
     this.mediaIndex = Math.max(0, this.mediaTypes.indexOf(PreferencesStore.getString(BackgroundMediaService.TYPE_KEY, 'none')));
@@ -445,6 +450,68 @@ export struct SettingPage {
     } catch (e) {
       Logger.warn(TAG, 'applyTheme fail');
     }
+  }
+
+  /** 顶部用户卡数据刷新（登录/切换/退出时由 currentUserId 变化驱动） */
+  refreshUserCard(): void {
+    const user = UserService.getInstance().getCurrentUser();
+    this.userAvatar = user !== undefined ? user.avatar : '';
+    this.userNickname = user !== undefined ? user.displayName : '';
+  }
+
+  /** 顶部用户卡（对齐 Windows 用户区：圆形头像 + 昵称；未登录显示登录入口） */
+  @Builder
+  userCard() {
+    Row({ space: 12 }) {
+      if (this.userAvatar.length > 0) {
+        Image(this.userAvatar)
+          .width(48)
+          .height(48)
+          .borderRadius(24)
+          .objectFit(ImageFit.Cover)
+          .backgroundColor($r('app.color.app_primary_bg'))
+          .draggable(false)
+      } else {
+        Column() {
+          Text(this.isLoggedIn && this.userNickname.length > 0 ? this.userNickname.substring(0, 1) : '旅')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.app_primary_text'))
+        }
+        .width(48)
+        .height(48)
+        .borderRadius(24)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor($r('app.color.app_primary_bg'))
+      }
+      Column({ space: 3 }) {
+        Text(this.isLoggedIn && this.userNickname.length > 0 ? this.userNickname : '未登录')
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(this.isLoggedIn ? '米游社账号已登录' : '登录后同步便笺、祈愿与战绩')
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+      Button(this.isLoggedIn ? '账号与数据' : '登录')
+        .fontSize(13)
+        .height(36)
+        .backgroundColor($r('app.color.app_primary'))
+        .fontColor($r('app.color.on_accent'))
+        .hoverEffect(HoverEffect.Highlight)
+        .accessibilityText(this.isLoggedIn ? '打开账号与数据' : '前往登录')
+        .onClick(() => {
+          router.pushUrl({ url: this.isLoggedIn ? 'pages/UserPage' : 'pages/LoginPage' }).catch(() => {
+          });
+        })
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 6, bottom: 6 })
+    .alignItems(VerticalAlign.Center)
   }
 
   @Builder
@@ -945,6 +1012,7 @@ export struct SettingPage {
       PageBackdrop({ embedMode: this.embedMode })
       Column() {
       this.header()
+      this.userCard()
       Scroll() {
         Column({ space: 10 }) {
           this.groupTitle('外观')
