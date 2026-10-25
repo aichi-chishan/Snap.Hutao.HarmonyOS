@@ -19,7 +19,7 @@ import {
   CategoryStats,
   UiafImportStrategy,
 } from '../model/AchievementData';
-import { AppBackButton } from '../components/AppBackButton';
+import { PageHeader } from '../components/PageHeader';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { CardSurfaceModifier } from '../common/UiSurface';
@@ -535,16 +535,7 @@ export struct AchievementPage {
   @Builder
   header() {
     Column({ space: 8 }) {
-      Row() {
-        if (!this.embedMode) {
-          AppBackButton()
-        }
-        Text('成就')
-          .fontSize($r('app.float.page_title_font_size'))
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .margin({ left: this.embedMode ? 0 : 10 })
-        Blank()
+      PageHeader({ title: '成就', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
         Button('剪贴板导入')
           .fontSize(12)
           .height(30)
@@ -572,8 +563,6 @@ export struct AchievementPage {
             this.exportUiaf();
           })
       }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
 
       Row({ space: 8 }) {
         Select([{ value: '惰性合并' }, { value: '积极合并' }, { value: '覆盖档案' }])

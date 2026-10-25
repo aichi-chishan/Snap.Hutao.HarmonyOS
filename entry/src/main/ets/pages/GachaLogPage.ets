@@ -35,6 +35,7 @@ import { Loading } from '../components/Loading';
 import { MetaIcon } from '../components/MetaIcon';
 import { NavIcon } from '../components/NavIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
+import { PageHeader } from '../components/PageHeader';
 import { Logger } from '../common/Logger';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { CardSurfaceModifier } from '../common/UiSurface';
@@ -2064,12 +2065,7 @@ export struct GachaLogPage {
       // 壁纸衬底：本页恒为 Index 壳层内嵌（壳层已铺壁纸），PageBackdrop 渲染为空仅透传
       PageBackdrop({ embedMode: true })
       Column() {
-        Row() {
-          Text('祈愿记录')
-            .fontSize($r('app.float.page_title_font_size'))
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-          Blank()
+        PageHeader({ title: '祈愿记录', embedMode: true }) {
           if (this.vm.currentUid.length > 0) {
             Text(this.vm.currentUid)
               .fontSize(12)
@@ -2091,9 +2087,6 @@ export struct GachaLogPage {
               this.refreshAccount();
             })
         }
-        .width('100%')
-        .padding({ left: 16, right: 16, top: 10, bottom: 8 })
-        .alignItems(VerticalAlign.Center)
 
         // Pivot 页签（总览/历史/角色/武器/倒计时）+ 颂愿模式切换；颂愿模式仅总览（对齐 Windows PivotBeyondModeBehavior）
         Row({ space: 8 }) {

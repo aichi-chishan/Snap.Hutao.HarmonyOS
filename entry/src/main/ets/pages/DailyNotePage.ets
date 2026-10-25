@@ -21,6 +21,7 @@ import { DateUtil } from '../common/DateUtil';
 import { NavIcon } from '../components/NavIcon';
 import { MetaIcon } from '../components/MetaIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
+import { PageHeader } from '../components/PageHeader';
 import { CardSurfaceModifier } from '../common/UiSurface';
 
 /** shimmer 行渲染数据（单实例传入 @Builder，保证动态渲染；进度条 Max/Value） */
@@ -912,15 +913,8 @@ export struct DailyNotePage {
           .height('100%')
           .justifyContent(FlexAlign.Center)
         } else {
-          // 标题行
-          Row() {
-            Text('实时便笺')
-              .fontSize($r('app.float.page_title_font_size'))
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.text_primary'))
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16, top: 10, bottom: 8 })
+          // 标题行（本页恒为壳层内嵌，无返回键；操作在下方 CommandBar 操作卡）
+          PageHeader({ title: '实时便笺', embedMode: true })
 
           // 顶部 CommandBar 操作卡（立即刷新/验证/添加实时便笺/通知设置）
           this.commandBarCard()
