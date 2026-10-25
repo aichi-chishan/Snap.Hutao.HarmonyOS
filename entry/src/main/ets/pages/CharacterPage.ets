@@ -26,6 +26,7 @@ import { PromoteState } from '../model/PromoteState';
 import { SkillLevelService, ResolvedAvatarSkill } from '../service/SkillLevelService';
 import { CultivationRepo, CultivateProject } from '../data/repo/CultivationRepo';
 import { Logger } from '../common/Logger';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 const TAG: string = 'CharacterPage';
 
@@ -354,7 +355,7 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
         }
         Row({ space: 10 }) {
@@ -433,7 +434,7 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
         }
         if (this.currentDetail.weapon.id > 0) {
@@ -455,7 +456,7 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
         }
 
@@ -482,7 +483,7 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
         }
 
@@ -582,7 +583,7 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
         }
         if (this.currentDetail.constellations.length > 0) {
@@ -641,7 +642,7 @@ export struct CharacterPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
         }
       }
@@ -685,7 +686,7 @@ export struct CharacterPage {
     .width('100%')
     .padding(14)
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 

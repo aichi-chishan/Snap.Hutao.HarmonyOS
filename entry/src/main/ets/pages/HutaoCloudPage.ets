@@ -11,6 +11,7 @@
  */
 import { PageHeader } from '../components/PageHeader';
 import { PageBackdrop } from '../components/PageBackdrop';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -31,7 +32,7 @@ export struct HutaoCloudPage {
           Text('游戏账号（米游社）登录与本地归档不受影响：见「系统 → 账号与数据」。')
             .fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
         }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
-          .borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
+          .borderRadius($r('app.float.card_radius')).attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
       }
       .width('100%').height('100%').alignItems(HorizontalAlign.Start)

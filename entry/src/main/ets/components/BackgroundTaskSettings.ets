@@ -1,6 +1,7 @@
 import { BackgroundTaskKind, BackgroundTaskState } from '../model/BackgroundTask';
 import { BackgroundTaskService } from '../service/BackgroundTaskService';
 import { BackgroundEnableReview, BackgroundTaskSettingsViewModel } from '../viewmodel/BackgroundTaskSettingsViewModel';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Component
 export struct BackgroundTaskSettings {
@@ -60,7 +61,7 @@ export struct BackgroundTaskSettings {
           .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
           .hoverEffect(HoverEffect.Highlight).onClick(() => { this.vm.retry(kind); })
         Button('关闭后台任务').width('100%').height(44).enabled(!this.vm.busy)
-          .fontColor($r('app.color.text_primary')).backgroundColor($r('app.color.card_surface'))
+          .fontColor($r('app.color.text_primary')).attributeModifier(new CardSurfaceModifier())
           .hoverEffect(HoverEffect.Highlight).onClick(() => { this.vm.disable(kind); })
       } else {
         Button('查看说明并开启').width('100%').height(44).enabled(!this.vm.busy)
@@ -68,7 +69,7 @@ export struct BackgroundTaskSettings {
           .hoverEffect(HoverEffect.Highlight).onClick(() => { this.enable(kind); })
       }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(14).borderRadius(12)
-      .backgroundColor($r('app.color.card_surface')).border({ width: 1, color: $r('app.color.card_stroke') })
+      .attributeModifier(new CardSurfaceModifier()).border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   build() {
@@ -91,7 +92,7 @@ export struct BackgroundTaskSettings {
       Text('手动重试不会弹出验证窗口。若需要验证或重新登录，请先前往签到或账号页面处理，再重试。')
         .fontSize(12).fontColor($r('app.color.text_secondary'))
       Button('刷新任务状态').width('100%').height(44).enabled(!this.vm.busy)
-        .fontColor($r('app.color.text_primary')).backgroundColor($r('app.color.card_surface'))
+        .fontColor($r('app.color.text_primary')).attributeModifier(new CardSurfaceModifier())
         .hoverEffect(HoverEffect.Highlight).onClick(() => { this.vm.refresh(); })
       if (this.vm.message.length > 0) { Text(this.vm.message).fontSize(13).fontColor($r('app.color.text_secondary')) }
     }.width('100%').alignItems(HorizontalAlign.Start)

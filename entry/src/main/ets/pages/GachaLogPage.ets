@@ -37,6 +37,7 @@ import { NavIcon } from '../components/NavIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { Logger } from '../common/Logger';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 const GACHA_TAG: string = 'GachaLogPage';
 const UIGF_MAX_BYTES: number = 32 * 1024 * 1024;
@@ -1402,7 +1403,7 @@ export struct GachaLogPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({
       width: card.isCurrent && !this.isWide ? 2 : 1,
       color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.card_stroke'),
@@ -1587,7 +1588,7 @@ export struct GachaLogPage {
           .fontSize(11)
           .constraintSize({ minHeight: 44 })
           .margin({ right: 4 })
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .fontColor($r('app.color.text_primary'))
           .accessibilityText('打开账号洞察')
           .onClick(() => {
@@ -1600,7 +1601,7 @@ export struct GachaLogPage {
           .fontSize(11)
           .constraintSize({ minHeight: 44 })
           .margin({ right: 4 })
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .fontColor($r('app.color.text_primary'))
           .onClick(() => {
             this.importFromClipboard();
@@ -1611,7 +1612,7 @@ export struct GachaLogPage {
           .fontSize(11)
           .constraintSize({ minHeight: 44 })
           .margin({ right: 4 })
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .fontColor($r('app.color.text_primary'))
           .onClick(() => {
             this.uigfImport();
@@ -1622,7 +1623,7 @@ export struct GachaLogPage {
           .fontSize(11)
           .constraintSize({ minHeight: 44 })
           .margin({ right: 4 })
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .fontColor($r('app.color.text_primary'))
           .onClick(() => {
             this.prepareUigfExport();
@@ -1670,7 +1671,7 @@ export struct GachaLogPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 
   @Builder
@@ -1760,7 +1761,7 @@ export struct GachaLogPage {
         .width('100%')
         .padding({ top: 6, left: 4, right: 4 })
         .borderRadius(8)
-        .backgroundColor($r('app.color.card_surface'))
+        .attributeModifier(new CardSurfaceModifier())
       }
     }
     .width('100%')
@@ -1921,7 +1922,7 @@ export struct GachaLogPage {
           .hoverEffect(HoverEffect.Highlight).onClick(() => this.confirmUigfImport())
       }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(12)
-      .borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
+      .borderRadius($r('app.float.card_radius')).attributeModifier(new CardSurfaceModifier())
   }
 
   @Builder
@@ -1948,7 +1949,7 @@ export struct GachaLogPage {
           .hoverEffect(HoverEffect.Highlight).onClick(() => this.uigfExport())
       }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(12)
-      .borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
+      .borderRadius($r('app.float.card_radius')).attributeModifier(new CardSurfaceModifier())
   }
 
   @Builder
@@ -1988,7 +1989,7 @@ export struct GachaLogPage {
       }.width('100%')
       Text(this.vm.gameAccountUid.length > 0 ? `自动刷新账号 UID：${this.vm.gameAccountUid}` : '离线查看、导入和导出不需要登录；手动 URL 使用链接中的鉴权')
         .fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
-    }.width('100%').padding(12).borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
+    }.width('100%').padding(12).borderRadius($r('app.float.card_radius')).attributeModifier(new CardSurfaceModifier())
   }
 
   @Builder
@@ -2008,7 +2009,7 @@ export struct GachaLogPage {
       Row({ space: 10 }) {
         Button('取消')
           .layoutWeight(1)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .fontColor($r('app.color.text_primary'))
           .fontSize(14)
           .onClick(() => {
@@ -2028,7 +2029,7 @@ export struct GachaLogPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 
   build() {
@@ -2385,7 +2386,7 @@ export struct GachaLogPage {
           .width('100%')
           .padding(12)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
           .alignItems(HorizontalAlign.Start)
         }, (view: HistoryWishView) => `hw_${view.from}_${view.type}_${view.totalCount}`)
@@ -2493,7 +2494,7 @@ export struct GachaLogPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
@@ -2551,7 +2552,7 @@ export struct GachaLogPage {
       Text('本移植版不提供胡桃云统计，经验分布数据源未接入；此处仅保留入口占位，不计算也不联网。')
         .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
     }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
-      .borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
+      .borderRadius($r('app.float.card_radius')).attributeModifier(new CardSurfaceModifier())
   }
   /** Remaining counts require the selected pool's recent reset to be verifiable from local rows. */
   @Builder
@@ -2615,7 +2616,7 @@ export struct GachaLogPage {
               .border({ width: 1, color: $r('app.color.divider') }).alignItems(HorizontalAlign.Center)
           }.width('100%')
           Text('只按本地已记录历史计算，不能确认缺失的记录。').fontSize(11).fontColor($r('app.color.text_secondary'))
-        }.width('100%').padding(14).borderRadius($r('app.float.card_radius')).backgroundColor($r('app.color.card_surface'))
+        }.width('100%').padding(14).borderRadius($r('app.float.card_radius')).attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: card.isCurrent && !this.isWide ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
       }, (card: PoolCardData) => `cd_${card.key}`)
     }.width('100%')

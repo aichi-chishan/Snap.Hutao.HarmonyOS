@@ -11,6 +11,7 @@ import { UserService } from '../service/UserService';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { NavIcon } from '../components/NavIcon';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -225,7 +226,7 @@ export struct UserPage {
       Button('删除')
         .fontSize(12)
         .height(28)
-        .backgroundColor($r('app.color.card_surface'))
+        .attributeModifier(new CardSurfaceModifier())
         .hoverEffect(HoverEffect.Highlight)
         .fontColor($r('app.color.danger'))
         .border({ width: 1, color: $r('app.color.card_stroke') })
@@ -236,7 +237,7 @@ export struct UserPage {
     .width('100%')
     .padding(12)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 
   confirmDelete(user: User): void {
@@ -349,7 +350,7 @@ export struct UserPage {
         .width('100%')
         .padding(10)
         .borderRadius(10)
-        .backgroundColor($r('app.color.card_surface'))
+        .attributeModifier(new CardSurfaceModifier())
         .hoverEffect(HoverEffect.Highlight)
         .onClick(() => {
           this.vm.setDefaultUid(role.gameUid).then(() => {
@@ -418,7 +419,7 @@ export struct UserPage {
             Button('退出登录')
               .width('100%')
               .height(44)
-              .backgroundColor($r('app.color.card_surface'))
+              .attributeModifier(new CardSurfaceModifier())
         .hoverEffect(HoverEffect.Highlight)
               .fontColor($r('app.color.danger'))
               .border({ width: 1, color: $r('app.color.card_stroke') })

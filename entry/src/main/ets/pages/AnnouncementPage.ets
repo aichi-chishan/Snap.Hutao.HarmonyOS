@@ -15,6 +15,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ErrorHint } from '../components/ErrorHint';
 import { AppBackButton } from '../components/AppBackButton';
 import { PageBackdrop } from '../components/PageBackdrop';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -114,7 +115,7 @@ export struct AnnouncementPage {
         .fontSize(13)
         .height(44)
         .width('100%')
-        .backgroundColor($r('app.color.card_surface'))
+        .attributeModifier(new CardSurfaceModifier())
         .fontColor($r('app.color.text_primary'))
         .onClick(() => {
           this.showCodeSheet = false;
@@ -123,7 +124,7 @@ export struct AnnouncementPage {
     .width(360)
     .padding(16)
     .borderRadius(16)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 
   @Builder
@@ -297,7 +298,7 @@ export struct AnnouncementPage {
     }
     .width('100%')
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
     .clip(true)
     .hoverEffect(HoverEffect.Highlight)

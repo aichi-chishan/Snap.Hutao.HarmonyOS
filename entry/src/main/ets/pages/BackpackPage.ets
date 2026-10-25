@@ -13,6 +13,7 @@ import { EmptyState } from '../components/EmptyState';
 import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 import { BackpackScoreEdit, BackpackScoreProfile, BackpackScoring, BackpackSubStat } from '../model/BackpackScore';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -340,7 +341,7 @@ export struct BackpackPage {
           .fontSize(11).fontColor($r('app.color.text_secondary'))
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Text('›').fontSize(24).fontColor($r('app.color.text_secondary')).accessibilityLevel('no')
-    }.width('100%').padding(12).borderRadius(12).backgroundColor($r('app.color.card_surface'))
+    }.width('100%').padding(12).borderRadius(12).attributeModifier(new CardSurfaceModifier())
       .border({ width: 1, color: $r('app.color.card_stroke') }).hoverEffect(HoverEffect.Highlight)
       .focusable(true).enabled(this.available()).onClick(() => { this.selected = item; this.editCount = String(item.count); if (!this.isWide) { this.openSheet('details'); } })
       .accessibilityText(`${item.name}，${BackpackCatalog.detail(item)}，查看详情`)
@@ -521,7 +522,7 @@ export struct BackpackPage {
               }.layoutWeight(1).height('100%').padding({ bottom: 24 }).cachedCount(5)
             }
             if (this.isWide) {
-              Scroll() { this.details() }.width(340).height('100%').backgroundColor($r('app.color.card_surface')).borderRadius(12)
+              Scroll() { this.details() }.width(340).height('100%').attributeModifier(new CardSurfaceModifier()).borderRadius(12)
             }
           }.layoutWeight(1).padding({ left: 16, right: 16, bottom: 12 }).alignItems(VerticalAlign.Top)
         }

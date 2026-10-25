@@ -14,6 +14,7 @@ import { MiyoliveService } from '../service/MiyoliveService';
 import { HdsTabs, HdsTabsController, hdsMaterial, SystemMaterialParams } from '@kit.UIDesignKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { Motion } from '../common/Motion';
+import { UiSurface, SurfaceClass, CardSurfaceModifier } from '../common/UiSurface';
 import { LoginStatusBar } from '../components/LoginStatusBar';
 import { WallpaperLayer } from '../components/WallpaperLayer';
 import { HomeHeroBanner } from '../components/HomeHeroBanner';
@@ -93,13 +94,11 @@ class DashCardSpec {
     @State phoneTab: number = 0;
     /** 宽屏侧边栏（>=840vp 平板/PC 显示） */
     @State isWide: boolean = false;
-    /** 沉浸光感材质等级：-1=关闭；0=自适应(ADAPTIVE)；1=精细；2=柔和；3=平滑 */
-    @State materialLevelIdx: number = 0;
-    /** API 26 沉浸光感可用性（运行时门控；低版本回退 scrim 半透明） */
-    private immersive: boolean = Motion.detectImmersive();
-    /** 宽屏侧栏/标题栏沉浸材质（仅 API 26+ 生效） */
-    private panelMaterial: uiMaterial.Material | undefined = Motion.detectImmersive()
-      ? new uiMaterial.ImmersiveMaterial({ style: uiMaterial.ImmersiveStyle.ULTRA_THIN }) : undefined;
+    /** 界面材质模式/级别（UiSurface 令牌层发布；设置页变更即时联动壳层——修复旧级别设置不生效） */
+    @StorageProp('materialMode') @Watch('refreshShellMaterial') materialModeNum: number = 0;
+    @StorageProp('materialLevel') @Watch('refreshShellMaterial') materialLevelNum: number = -1;
+    /** 宽屏侧栏/标题栏沉浸材质（随材质模式/级别重建） */
+    private panelMaterial: uiMaterial.Material | undefined = undefined;
     /** 每日背景开关 */
     /** 背景来源（none/local/bing，对齐 Windows 背景图片设置） */
     @StorageProp('bgType') bgType: string = 'local';
@@ -138,15 +137,7 @@ class DashCardSpec {
     private controller: HdsTabsController = new HdsTabsController();
 
     aboutToAppear(): void {
-      const strength: number = PreferencesStore.getAmbientStrength();
-      // 三档映射：0=关闭；0.5 档=标准(GENTLE)；1=增强(EXQUISITE)
-      if (strength <= 0) {
-        this.materialLevelIdx = -1;
-      } else if (strength >= 1) {
-        this.materialLevelIdx = 1;
-      } else {
-        this.materialLevelIdx = 2;
-      }
+      this.refreshShellMaterial();
       AppStorage.setOrCreate<string>('bgType', PreferencesStore.getBackgroundImageType());
     AppStorage.setOrCreate<boolean>('homeActCalendarShown', PreferencesStore.getHomeActCalendar());
     AppStorage.setOrCreate<boolean>('homeActPreview', PreferencesStore.getHomeActPreview());
@@ -275,7 +266,7 @@ class DashCardSpec {
           .width(360)
           .padding(16)
           .borderRadius(16)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
         }
         .width('100%')
@@ -448,15 +439,20 @@ class DashCardSpec {
     });
   }
 
-  /** 官方沉浸光感材质参数（关闭时返回 undefined） */
+  /** 材质模式/级别变化时重建壳层材质（侧栏 systemMaterial + 底部页签参数，即时生效） */
+  refreshShellMaterial(): void {
+    this.panelMaterial = UiSurface.material(SurfaceClass.SHELL_NAV);
+  }
+
+  /** 悬浮页签沉浸材质参数（UiSurface 统一令牌：普通材质或级别关闭时返回 undefined） */
   materialEffect(): SystemMaterialParams | undefined {
-    if (this.materialLevelIdx < 0) {
+    if (this.materialModeNum !== 1) {
       return undefined;
     }
     const level: hdsMaterial.MaterialLevel =
-      this.materialLevelIdx === 1 ? hdsMaterial.MaterialLevel.EXQUISITE
-        : (this.materialLevelIdx === 2 ? hdsMaterial.MaterialLevel.GENTLE
-          : (this.materialLevelIdx === 3 ? hdsMaterial.MaterialLevel.SMOOTH
+      this.materialLevelNum === 2 ? hdsMaterial.MaterialLevel.EXQUISITE
+        : (this.materialLevelNum === 1 ? hdsMaterial.MaterialLevel.GENTLE
+          : (this.materialLevelNum === 0 ? hdsMaterial.MaterialLevel.SMOOTH
             : hdsMaterial.MaterialLevel.ADAPTIVE));
     const cfg: SystemMaterialParams = {
       materialType: hdsMaterial.MaterialType.IMMERSIVE,
@@ -595,11 +591,11 @@ class DashCardSpec {
         barBottomMargin: 20,
         gradientMask: { maskColor: $r('app.color.mask_scrim'), maskHeight: 96 },
         // API<26 传 IMMERSIVE 材质参数不生效：只在 API26+ 传入，低版本回退 barBackgroundBlurStyle
-        systemMaterialEffect: this.immersive ? this.materialEffect() : undefined,
+        systemMaterialEffect: this.materialEffect(),
       })
-      // API<26 或光感关闭时悬浮页签无材质底（暗色下近似纯黑/不可辨）：用系统组件材质
-      // COMPONENT_THICK 给半透明玻璃底兜底；API26+ 材质生效路径用 NONE 不叠加
-      .barBackgroundBlurStyle(!this.immersive || this.materialEffect() === undefined
+      // 普通材质（或 API<26 材质不可用）时悬浮页签用系统组件材质 COMPONENT_THICK
+      // 给半透明玻璃底兜底；沉浸材质生效路径用 NONE 不叠加
+      .barBackgroundBlurStyle(this.materialEffect() === undefined
         ? BlurStyle.COMPONENT_THICK : BlurStyle.NONE, {
         colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
       })
@@ -1530,7 +1526,7 @@ class DashCardSpec {
     .height(height)
     .justifyContent(FlexAlign.Center)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
@@ -1595,7 +1591,7 @@ class DashCardSpec {
     .height(64)
     .padding(10)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .transition(this.reduceMotion ? TransitionEffect.IDENTITY.animation({ duration: 0 }) : Motion.riseIn())
     .hoverEffect(HoverEffect.Highlight)
     .onClick(onClick)
@@ -1639,7 +1635,7 @@ class DashCardSpec {
     .width('100%')
     .padding(12)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .onClick(onClick)
   }
 

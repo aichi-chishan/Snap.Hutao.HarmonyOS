@@ -15,6 +15,7 @@ import { PageHeader } from '../components/PageHeader';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { NavIcon } from '../components/NavIcon';
 import { Logger } from '../common/Logger';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 const TAG: string = 'LedgerPage';
 
@@ -222,7 +223,7 @@ export struct LedgerPage {
             .width('100%')
             .padding(12)
             .borderRadius(12)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .border({ width: 1, color: $r('app.color.card_stroke') })
 
             // 当月原石
@@ -258,7 +259,7 @@ export struct LedgerPage {
             .width('100%')
             .padding(14)
             .borderRadius(12)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .border({ width: 1, color: $r('app.color.card_stroke') })
 
             // 当月摩拉
@@ -287,7 +288,7 @@ export struct LedgerPage {
             .width('100%')
             .padding(14)
             .borderRadius(12)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .border({ width: 1, color: $r('app.color.card_stroke') })
 
             // 分类来源明细（group_by 条形）
@@ -324,7 +325,7 @@ export struct LedgerPage {
             .width('100%')
             .padding(14)
             .borderRadius(12)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .border({ width: 1, color: $r('app.color.card_stroke') })
           }
           .width('100%')

@@ -6,6 +6,7 @@ import { LocalePolicy } from '../model/LocalePolicy';
 import { CommonOutcome, CommonOutcomeId } from '../model/CommonOutcome';
 import { AppLocaleService } from '../service/AppLocaleService';
 import { HelpViewModel } from '../viewmodel/HelpViewModel';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -87,7 +88,7 @@ export struct HelpPage {
       Text(this.label('language')).fontSize(13).fontColor($r('app.color.text_primary'))
       Select(this.locales()).selected(this.localeIndex).value(this.locales()[this.localeIndex].value)
         .height(44).width('100%').fontColor($r('app.color.text_primary'))
-        .backgroundColor($r('app.color.card_surface')).hoverEffect(HoverEffect.Highlight)
+        .attributeModifier(new CardSurfaceModifier()).hoverEffect(HoverEffect.Highlight)
         .accessibilityText(this.label('language')).onSelect((index: number) => { this.chooseLocale(index); })
       Text(this.label('scope')).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
       if (this.fallback) {
@@ -97,7 +98,7 @@ export struct HelpPage {
         Text(this.vm.message()).fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
       }
       Search({ value: this.vm.query, placeholder: this.label('search') }).height(44)
-        .maxLength(120).fontColor($r('app.color.text_primary')).backgroundColor($r('app.color.card_surface'))
+        .maxLength(120).fontColor($r('app.color.text_primary')).attributeModifier(new CardSurfaceModifier())
         .onChange((value: string) => { this.vm.setQuery(value); this.sync(); })
     }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 16, right: 16, bottom: 12 })
   }
@@ -114,7 +115,7 @@ export struct HelpPage {
             Text(doc.title).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
             Text(doc.summary).fontSize(13).fontColor($r('app.color.text_secondary'))
           }.width('100%').alignItems(HorizontalAlign.Start).padding(14).constraintSize({ minHeight: 64 })
-            .borderRadius(12).backgroundColor($r('app.color.card_surface')).hoverEffect(HoverEffect.Highlight)
+            .borderRadius(12).attributeModifier(new CardSurfaceModifier()).hoverEffect(HoverEffect.Highlight)
             .accessibilityText(doc.title).onClick(() => { this.select(doc.id); })
         }, (doc: HelpDocument) => `${this.vm.locale}_${doc.id}`)
       }.width('100%')
@@ -130,7 +131,7 @@ export struct HelpPage {
       Select(this.issueOptions()).selected(this.issues.indexOf(this.vm.issue))
         .value(this.issueOptions()[this.issues.indexOf(this.vm.issue)].value)
         .height(44).width('100%').fontColor($r('app.color.text_primary'))
-        .backgroundColor($r('app.color.card_surface')).hoverEffect(HoverEffect.Highlight)
+        .attributeModifier(new CardSurfaceModifier()).hoverEffect(HoverEffect.Highlight)
         .accessibilityText(this.label('problem')).onSelect((index: number) => {
           if (index >= 0 && index < this.issues.length) { this.vm.setIssue(this.issues[index]); this.sync(); }
         })
@@ -150,14 +151,14 @@ export struct HelpPage {
           .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
           .hoverEffect(HoverEffect.Highlight).onClick(() => { this.copy(); })
         Button(this.label('clear')).height(44).width('100%')
-          .fontColor($r('app.color.text_secondary')).backgroundColor($r('app.color.card_surface'))
+          .fontColor($r('app.color.text_secondary')).attributeModifier(new CardSurfaceModifier())
           .hoverEffect(HoverEffect.Highlight).onClick(() => { this.vm.clearPreview(); this.sync(); })
       }
       if (this.vm.message().length > 0) {
         Text(this.vm.message()).fontSize(13).fontColor($r('app.color.text_secondary'))
       }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(14).borderRadius(12)
-      .backgroundColor($r('app.color.card_surface'))
+      .attributeModifier(new CardSurfaceModifier())
   }
 
   @Builder

@@ -13,6 +13,7 @@ import { Logger } from '../common/Logger';
 import { QTapButton } from '../components/QTapButton';
 import { NavIcon } from '../components/NavIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 const TAG: string = 'LoginPage';
 
@@ -414,7 +415,7 @@ struct LoginPage {
     .width('100%')
     .justifyContent(FlexAlign.SpaceAround)
     .padding({ top: 8, bottom: 8 })
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .borderRadius(12)
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
@@ -621,7 +622,7 @@ struct LoginPage {
             .width('100%')
             .padding({ left: 4, right: 4, top: 4, bottom: 14 })
             .borderRadius($r('app.float.card_radius'))
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .border({ width: 1, color: $r('app.color.card_stroke') })
 
             if (this.statusText.length > 0) {

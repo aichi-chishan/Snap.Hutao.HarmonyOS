@@ -17,6 +17,7 @@ import { AppBackButton } from '../components/AppBackButton';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -476,7 +477,7 @@ export struct WikiWeaponPage {
           .width('100%')
           .padding(14)
           .borderRadius($r('app.float.card_radius'))
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
 
           // 养成计划操作区（对齐 Windows WikiWeaponPage 命令区 CultivateCommand）
           this.planActionBlock()
@@ -513,7 +514,7 @@ export struct WikiWeaponPage {
             .width('100%')
             .padding(14)
             .borderRadius($r('app.float.card_radius'))
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
           }
 
           // 养成材料卡
@@ -543,7 +544,7 @@ export struct WikiWeaponPage {
             .width('100%')
             .padding(14)
             .borderRadius($r('app.float.card_radius'))
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
           }
 
           Text('数据来源：Snap.Metadata（本地打包）')
@@ -633,6 +634,6 @@ export struct WikiWeaponPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 }

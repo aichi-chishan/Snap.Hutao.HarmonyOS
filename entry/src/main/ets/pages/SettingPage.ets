@@ -23,6 +23,7 @@ import { GameDataService, GameDataUpdateStatus } from '../service/GameDataServic
 import { GameDataUpdater } from '../data/remote/GameDataUpdater';
 import { RiskVerifyService } from '../service/RiskVerifyService';
 import { AiAnalysisService, AiCustomConfig, AiProvider } from '../service/AiAnalysisService';
+import { UiSurface, MaterialMode, MaterialLevel, CardSurfaceModifier } from '../common/UiSurface';
 import { BackupService } from '../service/BackupService';
 import { SupportService } from '../service/SupportService';
 import { BackgroundMediaService } from '../service/BackgroundMediaService';
@@ -67,6 +68,9 @@ export struct SettingPage {
   @State autoRefresh: boolean = true;
   @State interval: number = 30;
   @State ambientLevel: number = 1;
+  /** 界面材质（普通/高级）与高级材质级别（跟随系统推荐/低/中/高）——UiSurface 令牌层 */
+  @StorageLink('materialMode') materialModeNum: number = 0;
+  @StorageLink('materialLevel') materialLevelNum: number = -1;
   @State dailyBgEnabled: boolean = true;
   /** 背景图片来源（none/local/bing） */
   @StorageProp('bgType') bgType: string = 'local';
@@ -185,15 +189,9 @@ export struct SettingPage {
     Motion.setReducedMotion(PreferencesStore.getReduceMotionEnabled());
     this.autoRefresh = PreferencesStore.getAutoRefreshEnabled();
     this.interval = PreferencesStore.getRefreshIntervalMinutes();
-    // 三档映射：0=关，0.5/0.25=标准，1=增强
-    const s: number = PreferencesStore.getAmbientStrength();
-    if (s <= 0) {
-      this.ambientLevel = 0;
-    } else if (s >= 1) {
-      this.ambientLevel = 2;
-    } else {
-      this.ambientLevel = 1;
-    }
+    // 界面材质（UiSurface 令牌层；StorageLink 与壳层共享同一状态，切换即时生效）
+    this.materialModeNum = PreferencesStore.getMaterialMode();
+    this.materialLevelNum = PreferencesStore.getMaterialLevel();
     this.dailyBgEnabled = PreferencesStore.getDailyBgEnabled();
     this.dataUrl = GameDataUpdater.manifestUrl();
     this.geetestInput = RiskVerifyService.getCustomCompositeUrl();
@@ -655,7 +653,7 @@ export struct SettingPage {
         .width('100%')
         .padding(12)
         .borderRadius(12)
-        .backgroundColor($r('app.color.card_surface'))
+        .attributeModifier(new CardSurfaceModifier())
         .border({ width: 1, color: $r('app.color.card_stroke') })
         .alignItems(HorizontalAlign.Start)
       }
@@ -928,7 +926,7 @@ export struct SettingPage {
       Text('进入后台自动暂停；视频不可用时继续显示背景图片。')
         .fontSize(12).fontColor($r('app.color.text_secondary'))
     }.width('100%').padding(14).alignItems(HorizontalAlign.Start)
-      .backgroundColor($r('app.color.card_surface')).borderRadius(12)
+      .attributeModifier(new CardSurfaceModifier()).borderRadius(12)
     this.sectionTitle('日历')
     Row({ space: 12 }) {
       Text('每周第一天').fontColor($r('app.color.text_primary')).layoutWeight(1)
@@ -938,7 +936,7 @@ export struct SettingPage {
           PreferencesStore.setNumber('calendar.first_day_of_week', index);
           AppStorage.setOrCreate('calendarSettingsVersion', Date.now());
         }).hoverEffect(HoverEffect.Highlight)
-    }.width('100%').padding(14).backgroundColor($r('app.color.card_surface')).borderRadius(12)
+    }.width('100%').padding(14).attributeModifier(new CardSurfaceModifier()).borderRadius(12)
   }
 
   @Builder
@@ -957,24 +955,49 @@ export struct SettingPage {
       })
   }
 
+  /** 界面材质模式滑块段（对齐 Windows「材质：默认/液态玻璃」切换；普通材质=磨砂半透明+阴影非纯色） */
   @Builder
-  ambientChip(level: number, label: string) {
+  materialModeChip(value: number, label: string, desc: string) {
+    Column({ space: 4 }) {
+      Text(label)
+        .fontSize(14)
+        .fontWeight(this.materialModeNum === value ? FontWeight.Bold : FontWeight.Normal)
+        .fontColor(this.materialModeNum === value ? $r('app.color.on_accent') : $r('app.color.text_primary'))
+      Text(desc)
+        .fontSize(10)
+        .fontColor(this.materialModeNum === value ? $r('app.color.on_accent') : $r('app.color.text_secondary'))
+    }
+    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+    .borderRadius(12)
+    .backgroundColor(this.materialModeNum === value ? $r('app.color.app_primary') : $r('app.color.card_surface'))
+    .border({ width: 1, color: $r('app.color.card_stroke') })
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Center)
+    .hoverEffect(HoverEffect.Highlight)
+    .accessibilityText(`界面材质切换为${label}`)
+    .onClick(() => {
+      if (this.materialModeNum !== value) {
+        this.materialModeNum = value;
+        UiSurface.setMode(value === 1 ? MaterialMode.IMMERSIVE : MaterialMode.NORMAL);
+        this.toast(value === 1 ? '界面材质：高级材质（沉浸光感）' : '界面材质：普通材质');
+      }
+    })
+  }
+
+  /** 高级材质级别档（跟随系统推荐 / 低 / 中 / 高；仅高级材质模式可选） */
+  @Builder
+  materialLevelChip(value: number, label: string) {
     Text(label)
-      .fontSize(14)
-      .fontColor(this.ambientLevel === level ? $r('app.color.on_accent') : $r('app.color.text_primary'))
-      .padding({ left: 18, right: 18, top: 8, bottom: 8 })
-      .borderRadius(12)
-      .backgroundColor(this.ambientLevel === level ? $r('app.color.app_primary') : $r('app.color.card_surface'))
-      .border({ width: 1, color: $r('app.color.card_stroke') })
-      .layoutWeight(1)
-      .textAlign(TextAlign.Center)
+      .fontSize(12)
+      .fontColor(this.materialLevelNum === value ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+      .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+      .borderRadius(10)
+      .backgroundColor(this.materialLevelNum === value ? $r('app.color.app_primary_bg') : Color.Transparent)
       .hoverEffect(HoverEffect.Highlight)
+      .accessibilityText(`高级材质级别：${label}`)
       .onClick(() => {
-        this.ambientLevel = level;
-        // 三档 → 存 0/0.5/1 供 Index 映射官方材质等级
-        const strength: number = level === 0 ? 0 : (level === 1 ? 0.5 : 1);
-        PreferencesStore.setAmbientStrength(strength);
-        this.toast(level === 0 ? '已关闭沉浸光感' : (level === 1 ? '沉浸光感：标准' : '沉浸光感：增强'));
+        this.materialLevelNum = value;
+        UiSurface.setLevel(value as MaterialLevel);
       })
   }
 
@@ -999,7 +1022,7 @@ export struct SettingPage {
     }
     .width('100%')
     .padding(14)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .borderRadius(12)
     .border({ width: 1, color: $r('app.color.card_stroke') })
     .hoverEffect(HoverEffect.Highlight)
@@ -1040,22 +1063,39 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
           .borderRadius(12)
 
-          this.sectionTitle('沉浸光感')
+          this.sectionTitle('界面材质')
           Row({ space: 10 }) {
-            this.ambientChip(0, '关闭')
-            this.ambientChip(1, '标准')
-            this.ambientChip(2, '增强')
+            this.materialModeChip(0, '普通材质', '磨砂半透明 · 柔和阴影')
+            this.materialModeChip(1, '高级材质', '沉浸光感 · 系统玻璃')
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
-          Text('对应 Windows「材质」选项：关闭=默认材质；标准/增强=液态玻璃（沉浸光感）两档强度')
+
+          if (this.materialModeNum === 1) {
+            Column({ space: 8 }) {
+              Text('高级材质级别（对所有界面类别统一生效，即时切换）')
+                .fontSize(11)
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%')
+              Row({ space: 6 }) {
+                this.materialLevelChip(-1, '跟随系统推荐')
+                this.materialLevelChip(0, '低')
+                this.materialLevelChip(1, '中')
+                this.materialLevelChip(2, '高')
+              }
+              .width('100%')
+            }
+            .width('100%')
+            .padding({ left: 14, right: 14 })
+          }
+          Text('同类界面（导航壳层/悬浮页签/浮层/卡片）使用同一材质，手机/平板/PC 一致；对齐 Windows「材质：默认/液态玻璃」')
             .fontSize(11)
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
@@ -1117,7 +1157,7 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
 
@@ -1137,7 +1177,7 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
           Row() {
@@ -1264,7 +1304,7 @@ export struct SettingPage {
                     .fontColor($r('app.color.danger'))
                     .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                     .borderRadius(10)
-                    .backgroundColor($r('app.color.card_surface'))
+                    .attributeModifier(new CardSurfaceModifier())
                     .border({ width: 1, color: $r('app.color.card_stroke') })
                     .onClick(() => {
                       this.confirmDeleteArchive(row);
@@ -1275,7 +1315,7 @@ export struct SettingPage {
             }
             .width('100%')
             .padding(14)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .borderRadius(12)
             .border({ width: 1, color: $r('app.color.card_stroke') })
           }
@@ -1302,7 +1342,7 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
 
@@ -1331,7 +1371,7 @@ export struct SettingPage {
           .width('100%')
           .padding(14)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
@@ -1360,7 +1400,7 @@ export struct SettingPage {
             }
             .width('100%')
             .padding(14)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .borderRadius(12)
             .border({ width: 1, color: $r('app.color.card_stroke') })
             .onClick(() => {
@@ -1394,7 +1434,7 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
 
@@ -1447,7 +1487,7 @@ export struct SettingPage {
             }
             .width('100%')
             .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .borderRadius(12)
             .border({ width: 1, color: $r('app.color.card_stroke') })
           }, (row: HomeCardRow) => `${row.key}_${row.presented}_${row.order}`)
@@ -1477,7 +1517,7 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
           Row() {
@@ -1504,7 +1544,7 @@ export struct SettingPage {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .borderRadius(12)
           .border({ width: 1, color: $r('app.color.card_stroke') })
 
@@ -1531,7 +1571,7 @@ export struct SettingPage {
           .width('100%')
           .padding(14)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
@@ -1558,7 +1598,7 @@ export struct SettingPage {
           .width('100%')
           .padding(14)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
@@ -1598,7 +1638,7 @@ export struct SettingPage {
           .width('100%')
           .padding(14)
           .borderRadius(12)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
           .border({ width: 1, color: $r('app.color.card_stroke') })
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
@@ -1637,7 +1677,7 @@ export struct SettingPage {
                 .fontSize(13)
                 .constraintSize({ minHeight: 44 })
                 .layoutWeight(1)
-                .backgroundColor($r('app.color.card_surface'))
+                .attributeModifier(new CardSurfaceModifier())
                 .fontColor($r('app.color.text_primary'))
                 .onClick(() => {
                   this.showUrlEdit = false;
@@ -1657,7 +1697,7 @@ export struct SettingPage {
           .width('100%')
           .padding(16)
           .borderRadius(16)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
         }
         .width('100%')
         .padding({ left: 20, right: 20 })
@@ -1688,7 +1728,7 @@ export struct SettingPage {
                 .fontSize(13)
                 .height(34)
                 .layoutWeight(1)
-                .backgroundColor($r('app.color.card_surface'))
+                .attributeModifier(new CardSurfaceModifier())
                 .fontColor($r('app.color.text_primary'))
                 .onClick(() => {
                   this.showGeetestEdit = false;
@@ -1708,7 +1748,7 @@ export struct SettingPage {
           .width('100%')
           .padding(16)
           .borderRadius(16)
-          .backgroundColor($r('app.color.card_surface'))
+          .attributeModifier(new CardSurfaceModifier())
         }
         .width('100%')
         .padding({ left: 20, right: 20 })

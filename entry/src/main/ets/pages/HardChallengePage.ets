@@ -18,6 +18,7 @@ import { DateUtil } from '../common/DateUtil';
 import { MetaIcon } from '../components/MetaIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { Logger } from '../common/Logger';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -363,7 +364,7 @@ export struct HardChallengePage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
@@ -396,7 +397,7 @@ export struct HardChallengePage {
     .width('100%')
     .padding(12)
     .borderRadius(10)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
@@ -503,7 +504,7 @@ export struct HardChallengePage {
                 .width('100%')
                 .padding(12)
                 .borderRadius(10)
-                .backgroundColor($r('app.color.card_surface'))
+                .attributeModifier(new CardSurfaceModifier())
                 .border({ width: 1, color: $r('app.color.card_stroke') })
                 .alignItems(HorizontalAlign.Start)
               }
