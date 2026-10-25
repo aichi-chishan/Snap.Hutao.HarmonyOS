@@ -6,7 +6,7 @@ import { router, ShowDialogSuccessResponse } from '@kit.ArkUI';
 import { SignInViewModel } from '../viewmodel/SignInViewModel';
 import { SignInInfo, SignInReward } from '../model/SignInInfo';
 import { SignInResult, ResignInfo } from '../service/SignInService';
-import { AppBackButton } from '../components/AppBackButton';
+import { PageHeader } from '../components/PageHeader';
 import { NavIcon } from '../components/NavIcon';
 
 @Entry
@@ -37,20 +37,7 @@ export struct SignInPage {
 
   @Builder
   header() {
-    Row() {
-      if (!this.embedMode) {
-        AppBackButton()
-      }
-      Text('每日签到')
-        .fontSize($r('app.float.page_title_font_size'))
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary'))
-        .margin({ left: this.embedMode ? 0 : 10 })
-      Blank()
-    }
-    .width('100%')
-    .padding({ left: 16, right: 12, top: (this.embedMode ? 0 : this.topAvoidVp) + 10, bottom: 10 })
-    .alignItems(VerticalAlign.Center)
+    PageHeader({ title: '每日签到', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp })
   }
 
   @Builder

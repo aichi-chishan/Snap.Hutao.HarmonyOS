@@ -7,7 +7,7 @@ import { BackpackCatalog } from '../model/BackpackCatalog';
 import { BackpackViewModel } from '../viewmodel/BackpackViewModel';
 import { UIIFService } from '../service/UIIFService';
 import { CultivateProject } from '../data/repo/CultivationRepo';
-import { AppBackButton } from '../components/AppBackButton';
+import { PageHeader } from '../components/PageHeader';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { EmptyState } from '../components/EmptyState';
 import { MetaIcon } from '../components/MetaIcon';
@@ -280,12 +280,9 @@ export struct BackpackPage {
   @Builder
   header() {
     Column({ space: 10 }) {
-      Row({ space: 10 }) {
-        if (!this.embedMode) { AppBackButton() }
-        Text('背包档案').fontSize(24).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
-        Blank()
+      PageHeader({ title: '背包档案', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
         Button('新建').height(44).hoverEffect(HoverEffect.Highlight).enabled(this.available()).onClick(() => this.openSheet('create'))
-      }.width('100%')
+      }
       if (this.vm.archives.length > 0) {
         Select(this.archiveOptions()).selected(this.archiveIndex()).value(this.title()).width('100%')
           .enabled(this.available()).onSelect((index: number) => { this.selectArchive(index); })
@@ -300,7 +297,7 @@ export struct BackpackPage {
       }
       Text('离线文件与手动记录 · 不读取游戏内存 · UIIF 缺失字段显示为未知')
         .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
-    }.padding({ left: 16, right: 16, top: (this.embedMode ? 0 : this.topAvoidVp) + 12, bottom: 10 })
+    }
   }
 
   @Builder

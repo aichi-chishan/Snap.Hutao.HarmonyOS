@@ -8,7 +8,7 @@ import { UserViewModel } from '../viewmodel/UserViewModel';
 import { User } from '../model/User';
 import { UserGameRole } from '../model/UserGameRole';
 import { UserService } from '../service/UserService';
-import { AppBackButton } from '../components/AppBackButton';
+import { PageHeader } from '../components/PageHeader';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { NavIcon } from '../components/NavIcon';
 import { CardSurfaceModifier } from '../common/UiSurface';
@@ -128,20 +128,7 @@ export struct UserPage {
 
   @Builder
   header() {
-    Row() {
-      if (!this.embedMode) {
-        AppBackButton()
-      }
-      Text('账号与数据')
-        .fontSize($r('app.float.page_title_font_size'))
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary'))
-        .margin({ left: this.embedMode ? 0 : 10 })
-      Blank()
-    }
-    .width('100%')
-    .padding({ left: 16, right: 12, top: (this.embedMode ? 0 : this.topAvoidVp) + 10, bottom: 10 })
-    .alignItems(VerticalAlign.Center)
+    PageHeader({ title: '账号与数据', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp })
   }
 
   @Builder

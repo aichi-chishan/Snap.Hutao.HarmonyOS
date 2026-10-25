@@ -13,7 +13,7 @@ import { MiyoliveCode } from '../model/MiyoliveCode';
 import { Loading } from '../components/Loading';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorHint } from '../components/ErrorHint';
-import { AppBackButton } from '../components/AppBackButton';
+import { PageHeader } from '../components/PageHeader';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { CardSurfaceModifier } from '../common/UiSurface';
 
@@ -129,16 +129,7 @@ export struct AnnouncementPage {
 
   @Builder
   header() {
-    Row() {
-      if (!this.embedMode) {
-        AppBackButton()
-      }
-      Text('游戏公告')
-        .fontSize($r('app.float.page_title_font_size'))
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary'))
-        .margin({ left: this.embedMode ? 0 : 10 })
-      Blank()
+    PageHeader({ title: '游戏公告', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
       if (this.vm.redeemCodes.length > 0) {
         Button('兑换码')
           .fontSize(12)
@@ -162,9 +153,6 @@ export struct AnnouncementPage {
           });
         })
     }
-    .width('100%')
-    .padding({ left: 16, right: 12, top: (this.embedMode ? 0 : this.topAvoidVp) + 10, bottom: 10 })
-    .alignItems(VerticalAlign.Center)
   }
 
   @Builder
