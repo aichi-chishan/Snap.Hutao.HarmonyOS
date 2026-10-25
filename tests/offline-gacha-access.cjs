@@ -104,8 +104,8 @@ function strictModelTypes() {
   put('service/WikiMetaService',`export class GachaEventMeta{type=0;from=0;to=0;upOrange:number[]=[];}export class WikiMetaService{static async getGachaEvents():Promise<GachaEventMeta[]>{return [];}}`);
   put('service/GachaLogService',`import {RefreshProgress} from '../model/RefreshProgress';export class RefreshResult{ok=false;uid='';message='';fetchedCount=0;}
     export class GachaLogService{static getInstance():GachaLogService{return new GachaLogService();}cancelRefresh():void{}
-      async refreshByStoken(uid:string,progress:(value:RefreshProgress)=>void,full:boolean):Promise<RefreshResult>{return new RefreshResult();}
-      async importByUrl(url:string,uid:string,progress:(value:RefreshProgress)=>void,full:boolean):Promise<RefreshResult>{return new RefreshResult();}}`);
+      async refreshByStoken(uid:string,progress:(value:RefreshProgress)=>void,full:boolean,onlyTypes?:number[]):Promise<RefreshResult>{return new RefreshResult();}
+      async importByUrl(url:string,uid:string,progress:(value:RefreshProgress)=>void,full:boolean,onlyTypes?:number[]):Promise<RefreshResult>{return new RefreshResult();}}`);
   put('data/repo/GachaRepo',`import {GachaArchive} from '../../model/GachaArchive';import {GachaItem} from '../../model/GachaItem';export class GachaRepo{
     static async getAllArchives():Promise<GachaArchive[]>{return [];}static async selectArchive(id:number):Promise<void>{}
     static async getItems(id:number,pool:number,limit:number,offset:number):Promise<GachaItem[]>{return [];}

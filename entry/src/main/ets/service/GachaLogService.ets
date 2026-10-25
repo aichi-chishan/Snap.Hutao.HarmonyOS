@@ -10,7 +10,7 @@ import { GachaRepo } from '../data/repo/GachaRepo';
 import { GachaType } from '../model/GachaType';
 import { GachaItem } from '../model/GachaItem';
 import { GachaArchive } from '../model/GachaArchive';
-import { RefreshProgress, RecentGachaItem } from '../model/RefreshProgress';
+import { RefreshProgress, PoolOutcome, RecentGachaItem } from '../model/RefreshProgress';
 import { User } from '../model/User';
 import { UserService } from './UserService';
 import { RegionUtil, AppConstants, RetCodes } from '../common/Constants';
@@ -45,7 +45,8 @@ export class GachaLogService {
    * SToken 自动鉴权刷新。
    * @param uid 拉取 UID（默认当前 UID）
    */
-  async refreshByStoken(uid: string, onProgress: (p: RefreshProgress) => void, full: boolean = false): Promise<RefreshResult> {
+  async refreshByStoken(uid: string, onProgress: (p: RefreshProgress) => void, full: boolean = false,
+    onlyTypes: number[] | undefined = undefined): Promise<RefreshResult> {
     this.cancelRequested = false;
     const user: User | undefined = UserService.getInstance().getCurrentUser();
     if (user === undefined || user.stoken.length === 0) {
@@ -62,6 +63,7 @@ export class GachaLogService {
     const region: string = RegionUtil.regionOfUid(uid);
     const progress: RefreshProgress = new RefreshProgress();
     progress.running = true;
+    progress.sourceText = 'SToken 自动鉴权';
     onProgress(progress);
     progress.reportText = '正在生成 authkey...';
     onProgress(progress);
@@ -86,13 +88,14 @@ export class GachaLogService {
       r.message = progress.error;
       return r;
     }
-    return this.fetchAll(uid, authInfo, onProgress, progress, full);
+    return this.fetchAll(uid, authInfo, onProgress, progress, full, onlyTypes);
   }
 
   /**
    * 手动 URL 兜底导入。
    */
-  async importByUrl(url: string, uid: string, onProgress: (p: RefreshProgress) => void, full: boolean = false): Promise<RefreshResult> {
+  async importByUrl(url: string, uid: string, onProgress: (p: RefreshProgress) => void, full: boolean = false,
+    onlyTypes: number[] | undefined = undefined): Promise<RefreshResult> {
     this.cancelRequested = false;
     const authInfo: GachaAuthInfo | undefined = GachaAuthApi.parseAuthFromUrl(url);
     if (authInfo === undefined) {
@@ -103,20 +106,29 @@ export class GachaLogService {
     }
     const progress: RefreshProgress = new RefreshProgress();
     progress.running = true;
+    progress.sourceText = '祈愿链接';
     onProgress(progress);
-    return this.fetchAll('', authInfo, onProgress, progress, full);
+    return this.fetchAll('', authInfo, onProgress, progress, full, onlyTypes);
   }
 
   private async fetchAll(expectedUid: string, authInfo: GachaAuthInfo,
-    onProgress: (p: RefreshProgress) => void, progress: RefreshProgress, full: boolean): Promise<RefreshResult> {
+    onProgress: (p: RefreshProgress) => void, progress: RefreshProgress, full: boolean,
+    onlyTypes: number[] | undefined = undefined): Promise<RefreshResult> {
     let archive: GachaArchive | undefined = undefined;
     let actualUid: string = '';
     let totalInserted: number = 0;
     let failure: string = '';
-    const allTypes: number[] = GachaType.QUERY_ORDER.concat(GachaType.BEYOND_ORDER);
+    const allTypes: number[] = onlyTypes !== undefined && onlyTypes.length > 0
+      ? onlyTypes
+      : GachaType.QUERY_ORDER.concat(GachaType.BEYOND_ORDER);
     for (const gachaType of allTypes) {
       const isBeyond: boolean = GachaType.isBeyond(gachaType);
       const poolName: string = GachaType.nameOf(gachaType);
+      // UX07 池级明细：新增/跳过重复/失败原因逐池可辨
+      const outcome: PoolOutcome = new PoolOutcome();
+      outcome.gachaType = gachaType;
+      outcome.name = poolName;
+      progress.pools.push(outcome);
       const existingIds: Set<string> = new Set<string>();
       if (archive !== undefined) {
         for (const id of await GachaRepo.getAllGachaIds(archive.id, gachaType)) {
@@ -154,6 +166,7 @@ export class GachaLogService {
         }
         if (archive === undefined) {
           actualUid = pageUid;
+          progress.uid = pageUid;
           archive = await GachaRepo.getOrCreateArchive(actualUid);
           for (const id of await GachaRepo.getAllGachaIds(archive.id, gachaType)) {
             existingIds.add(id);
@@ -164,6 +177,7 @@ export class GachaLogService {
           if (existingIds.has(item.gachaId)) {
             reachedExisting = true;
             if (!full) {
+              outcome.duplicates++;
               continue;
             }
           }
@@ -197,8 +211,12 @@ export class GachaLogService {
         await this.delay();
       }
       // 全量失败/取消也只覆盖已验证返回的窗口，窗口外旧历史不受影响。
-      totalInserted += full ? await GachaRepo.replaceFetchedWindow(fresh, gachaType) : await GachaRepo.insertItems(fresh);
+      const inserted: number = full ? await GachaRepo.replaceFetchedWindow(fresh, gachaType) : await GachaRepo.insertItems(fresh);
+      outcome.inserted = inserted;
+      totalInserted += inserted;
       if (failure.length > 0) {
+        outcome.failed = true;
+        outcome.errorText = failure;
         break;
       }
       await this.delay();

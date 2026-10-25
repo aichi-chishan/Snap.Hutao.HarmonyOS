@@ -24,7 +24,7 @@ import { GachaPoolRules } from '../model/GachaPoolRules';
 import { GachaItem } from '../model/GachaItem';
 import { GachaArchive } from '../model/GachaArchive';
 import { UigfArchivePreview } from '../model/UigfImportPreparation';
-import { RecentGachaItem } from '../model/RefreshProgress';
+import { PoolOutcome, RecentGachaItem, RefreshProgress } from '../model/RefreshProgress';
 import { PoolStatistics, FiveStarDetail } from '../model/GachaStatistics';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 import { UigfService } from '../service/UigfService';
@@ -197,6 +197,8 @@ export struct GachaLogPage {
   @State weaponCounts: ItemCountEntry[] = [];
   /** 长列表数据源（LazyForEach） */
   historySource: SimpleDataSource<GachaItem> = new SimpleDataSource<GachaItem>([]);
+  /** 刷新结果快照（完成后取 vm.progress 终态；UX07 结果摘要卡） */
+  @State refreshResult: RefreshProgress | undefined = undefined;
 
   aboutToAppear(): void {
     this.pageActive = true;
@@ -312,10 +314,43 @@ export struct GachaLogPage {
     const epoch: number = this.pageEpoch;
     await this.vm.refresh();
     if (!this.pageActive || epoch !== this.pageEpoch) { return; }
+    this.refreshResult = this.vm.progress;
     this.resetLocalView();
     this.syncAll();
     this.toast(this.vm.message);
     if (this.pivotIndex === 1) { this.loadHistoryWishes(); }
+  }
+
+  /** 失败池单项重试（UX07：部分成功时可只重试未完成的池） */
+  private async retryPool(gachaType: number): Promise<void> {
+    if (!this.pageActive || this.vm.isRefreshing || this.vm.isTransferring) { return; }
+    if (!this.isLoggedIn || this.vm.gameAccountUid.length === 0) {
+      this.toast('请先登录并在「账号与数据」选择默认 UID');
+      return;
+    }
+    const epoch: number = this.pageEpoch;
+    await this.vm.refresh([gachaType]);
+    if (!this.pageActive || epoch !== this.pageEpoch) { return; }
+    this.refreshResult = this.vm.progress;
+    this.resetLocalView();
+    this.syncAll();
+    this.toast(this.vm.message);
+    if (this.pivotIndex === 1) { this.loadHistoryWishes(); }
+  }
+
+  /** 刷新结果摘要卡可见性：非刷新中且已完成一次含池级明细的刷新（UX07 闭环呈现） */
+  showRefreshResult(): boolean {
+    return !this.vm.isRefreshing && !this.vm.isTransferring
+      && this.refreshResult !== undefined && this.refreshResult.hasPoolResults();
+  }
+
+  dismissRefreshResult(): void {
+    this.refreshResult = undefined;
+  }
+
+  /** 面板内取非空快照（未完成时为空对象，编译器无法跨渲染条件窄化） */
+  private resultOrEmpty(): RefreshProgress {
+    return this.refreshResult !== undefined ? this.refreshResult : new RefreshProgress();
   }
 
   private async submitUrlImport(): Promise<void> {
@@ -1798,6 +1833,74 @@ export struct GachaLogPage {
     .backgroundColor($r('app.color.app_primary_bg'))
   }
 
+  /** 刷新结果摘要卡（UX07：来源/目标/增量全量/新增/重复/失败分列 + 失败池单项重试） */
+  @Builder
+  resultPanel() {
+    Column({ space: 8 }) {
+      Row({ space: 8 }) {
+        Text('刷新结果')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
+        Text(`${this.vm.fullRefresh ? '全量' : '增量'} · ${this.resultOrEmpty().sourceText}`)
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+        Text('收起').fontSize(11).fontColor($r('app.color.app_primary_text'))
+          .onClick(() => this.dismissRefreshResult())
+      }
+      .width('100%')
+      Text(`目标 UID：${this.resultOrEmpty().uid.length > 0 ? this.resultOrEmpty().uid : '--'} · 共写入 ${this.resultOrEmpty().fetchedCount} 条`)
+        .fontSize(11)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+      // 池级明细：新增/重复分列，失败池给出原因与单项重试（部分成功可见）
+      ForEach(this.resultOrEmpty().pools, (o: PoolOutcome) => {
+        Row({ space: 8 }) {
+          Text(o.name)
+            .fontSize(12)
+            .fontColor($r('app.color.text_primary'))
+            .layoutWeight(1)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          if (o.failed) {
+            Text(o.errorText)
+              .fontSize(11)
+              .fontColor($r('app.color.danger'))
+              .layoutWeight(2)
+              .maxLines(2)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+            Button('重试此池').fontSize(11).height(28).hoverEffect(HoverEffect.Highlight)
+              .onClick(() => this.retryPool(o.gachaType))
+          } else {
+            Text(o.inserted > 0 ? `新增 ${o.inserted}` : '无新增')
+              .fontSize(11)
+              .fontColor($r('app.color.app_primary_text'))
+            Text(`重复 ${o.duplicates}`)
+              .fontSize(11)
+              .fontColor($r('app.color.text_secondary'))
+          }
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+      }, (o: PoolOutcome) => `po_${o.gachaType}_${o.inserted}_${o.duplicates}_${o.failed}`)
+      if (this.resultOrEmpty().error.length > 0) {
+        Text(this.resultOrEmpty().error)
+          .fontSize(11)
+          .fontColor($r('app.color.danger'))
+          .width('100%')
+      }
+      Button('重新刷新').fontSize(12).height(32).width('100%').hoverEffect(HoverEffect.Highlight)
+        .onClick(() => this.refreshAccount())
+    }
+    .width('100%')
+    .padding(12)
+    .borderRadius(10)
+    .attributeModifier(new CardSurfaceModifier())
+    .border({ width: 1, color: $r('app.color.card_stroke') })
+    .alignItems(HorizontalAlign.Start)
+  }
+
   /** 弹窗展示拉取进度详情（保留：供外部入口调用时显示静态摘要） */
   showProgressDetailDialog(): void {
     this.getUIContext().getPromptAction().showDialog({
@@ -2117,6 +2220,8 @@ export struct GachaLogPage {
             if (this.showExportOptions) { this.exportOptionsPanel() }
             if (this.vm.isRefreshing) {
               this.progressPanel()
+            } else if (this.showRefreshResult()) {
+              this.resultPanel()
             }
             if (this.showUrlInput) {
               this.urlInputPanel()
