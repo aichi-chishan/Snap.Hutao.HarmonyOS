@@ -403,8 +403,8 @@ export class GachaLogViewModel {
     }
   }
 
-  /** 自动鉴权仅针对登录账号 UID，绝不借用离线选档 UID。 */
-  async refresh(): Promise<boolean> {
+  /** 自动鉴权仅针对登录账号 UID，绝不借用离线选档 UID。onlyTypes 限定池（失败池单项重试）。 */
+  async refresh(onlyTypes: number[] | undefined = undefined): Promise<boolean> {
     if (this.isRefreshing || this.isTransferring) { return false; }
     if (this.gameAccountUid.length === 0) {
       this.message = '请先登录并选择默认 UID';
@@ -420,7 +420,7 @@ export class GachaLogViewModel {
           if (operation !== this.operationGeneration) { return; }
           this.progress = p;
           this.onProgressChanged();
-        }, this.fullRefresh);
+        }, this.fullRefresh, onlyTypes);
       // 已发生的持久化变更仍需通知其它页面，但不能恢复过期的页面状态。
       if (result.ok) { AppStorage.setOrCreate<number>('gachaDataVersion', Date.now()); }
       if (operation !== this.operationGeneration) { return false; }
