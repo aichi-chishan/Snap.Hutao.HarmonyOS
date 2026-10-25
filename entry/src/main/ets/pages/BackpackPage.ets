@@ -445,8 +445,10 @@ export struct BackpackPage {
         } else if (this.sheetMode === 'create') {
           Text('创建离线背包档案').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
           Text('UID 由你明确指定，不需要登录；同一 UID 可以保留不同时间的快照。').fontSize(13).fontColor($r('app.color.text_secondary'))
-          TextInput({ text: this.newName, placeholder: '档案名称，例如 主号 · 10 月背包' }).maxLength(80).onChange((value: string) => this.newName = value)
-          TextInput({ text: this.newUid, placeholder: '9 或 10 位游戏 UID' }).type(InputType.Number).maxLength(10).onChange((value: string) => this.newUid = value)
+          TextInput({ text: this.newName, placeholder: '档案名称，例如 主号 · 10 月背包' }).maxLength(80)
+            .enterKeyType(EnterKeyType.Next).onChange((value: string) => this.newName = value)
+          TextInput({ text: this.newUid, placeholder: '9 或 10 位游戏 UID' }).type(InputType.Number).maxLength(10)
+            .enterKeyType(EnterKeyType.Done).onChange((value: string) => this.newUid = value).onSubmit(() => this.createArchive())
           Button('创建档案').height(44).width('100%').enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.createArchive())
         } else if (this.sheetMode === 'manual') {
           Text('手动添加物品').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
@@ -454,7 +456,8 @@ export struct BackpackPage {
             .onSelect((index: number) => this.manualKind = index)
           TextInput({ text: this.manualId, placeholder: '物品 ID' }).type(InputType.Number).onChange((value: string) => this.manualId = value)
           if (this.manualKind === 0 || this.manualKind === 3) {
-            TextInput({ text: this.manualCount, placeholder: '数量，0 表示已确认没有' }).type(InputType.Number).onChange((value: string) => this.manualCount = value)
+            TextInput({ text: this.manualCount, placeholder: '数量，0 表示已确认没有' }).type(InputType.Number)
+              .enterKeyType(EnterKeyType.Done).onChange((value: string) => this.manualCount = value).onSubmit(() => this.saveManual())
           } else {
             Text(this.manualKind === 2 ? 'UIIF 原始等级：1 = +0，21 = +20' : '武器等级与突破等级').fontSize(12).fontColor($r('app.color.text_secondary'))
             TextInput({ text: this.manualLevel, placeholder: '等级' }).type(InputType.Number).onChange((value: string) => this.manualLevel = value)
@@ -462,10 +465,12 @@ export struct BackpackPage {
               TextInput({ text: this.manualPromote, placeholder: '突破等级' }).type(InputType.Number).onChange((value: string) => this.manualPromote = value)
               TextInput({ text: this.manualAffix, placeholder: '精炼词条 ID（可不填）' }).type(InputType.Number).onChange((value: string) => this.manualAffix = value)
               Text('精炼索引：0 = 1 阶，4 = 5 阶').fontSize(12).fontColor($r('app.color.text_secondary'))
-              TextInput({ text: this.manualRank, placeholder: '精炼索引' }).type(InputType.Number).onChange((value: string) => this.manualRank = value)
+              TextInput({ text: this.manualRank, placeholder: '精炼索引' }).type(InputType.Number)
+                .enterKeyType(EnterKeyType.Done).onChange((value: string) => this.manualRank = value).onSubmit(() => this.saveManual())
             } else {
               TextInput({ text: this.manualMain, placeholder: '主词条 ID' }).type(InputType.Number).onChange((value: string) => this.manualMain = value)
-              TextInput({ text: this.manualAppend, placeholder: '副词条 ID，以逗号或空格分隔，可留空' }).onChange((value: string) => this.manualAppend = value)
+              TextInput({ text: this.manualAppend, placeholder: '副词条 ID，以逗号或空格分隔，可留空' })
+              .enterKeyType(EnterKeyType.Done).onChange((value: string) => this.manualAppend = value).onSubmit(() => this.saveManual())
             }
           }
           Text('不会推测 GUID、锁定或词条数值。同一物品 ID 的装备会保留为不同实例。').fontSize(12).fontColor($r('app.color.text_secondary'))

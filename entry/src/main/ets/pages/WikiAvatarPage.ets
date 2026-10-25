@@ -689,6 +689,7 @@ export struct WikiAvatarPage {
       TextInput({ placeholder: '搜索角色名/称号' })
         .fontSize(13)
         .height(36)
+        .enterKeyType(EnterKeyType.Search)
         .onChange((v: string) => {
           this.keyword = v;
           this.applyFilter();

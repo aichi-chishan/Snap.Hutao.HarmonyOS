@@ -346,6 +346,7 @@ export struct WikiWeaponPage {
       TextInput({ placeholder: '搜索武器名' })
         .fontSize(13)
         .height(36)
+        .enterKeyType(EnterKeyType.Search)
         .onChange((v: string) => {
           this.keyword = v;
           this.applyFilter();
