@@ -244,6 +244,43 @@ export class PreferencesStore {
     PreferencesStore.setNumber(PreferencesStore.KEY_AMBIENT_STRENGTH, v);
   }
 
+  // ===== 界面材质（UiSurface 令牌层；键未初始化时从旧 ambient_strength 迁移） =====
+  static readonly KEY_MATERIAL_MODE: string = 'app.material.mode';
+  static readonly KEY_MATERIAL_LEVEL: string = 'app.material.level';
+
+  /** 模式：0=普通材质，1=高级材质（沉浸光感） */
+  static getMaterialMode(): number {
+    const v: number = PreferencesStore.getNumber(PreferencesStore.KEY_MATERIAL_MODE, -1);
+    if (v >= 0) {
+      return v;
+    }
+    // 迁移：旧「沉浸光感」关闭 → 普通材质；标准/增强 → 高级材质
+    const migrated: number = PreferencesStore.getAmbientStrength() <= 0 ? 0 : 1;
+    PreferencesStore.setNumber(PreferencesStore.KEY_MATERIAL_MODE, migrated);
+    return migrated;
+  }
+
+  static setMaterialMode(v: number): void {
+    PreferencesStore.setNumber(PreferencesStore.KEY_MATERIAL_MODE, v);
+  }
+
+  /** 级别：-1=跟随系统推荐，0=低，1=中，2=高 */
+  static getMaterialLevel(): number {
+    const v: number = PreferencesStore.getNumber(PreferencesStore.KEY_MATERIAL_LEVEL, -99);
+    if (v > -99) {
+      return v;
+    }
+    // 迁移：旧「增强」→ 高；旧「标准」→ 中；其余 → 跟随系统推荐
+    const strength: number = PreferencesStore.getAmbientStrength();
+    const migrated: number = strength >= 1 ? 2 : (strength > 0 ? 1 : -1);
+    PreferencesStore.setNumber(PreferencesStore.KEY_MATERIAL_LEVEL, migrated);
+    return migrated;
+  }
+
+  static setMaterialLevel(v: number): void {
+    PreferencesStore.setNumber(PreferencesStore.KEY_MATERIAL_LEVEL, v);
+  }
+
   static getDailyBgEnabled(): boolean {
     return PreferencesStore.getBool(PreferencesStore.KEY_DAILY_BG_ENABLED, PreferencesStore.DEFAULT_DAILY_BG_ENABLED);
   }

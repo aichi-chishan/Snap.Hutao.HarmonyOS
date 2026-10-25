@@ -11,6 +11,7 @@ import { ActCalendarEntry, ActCalendarType, ActRewardEntry } from '../model/ActC
 import { PressCard } from './PressCard';
 import { NavIcon } from './NavIcon';
 import { MetaIcon } from './MetaIcon';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Component
 export struct HomeActCard {
@@ -196,7 +197,7 @@ export struct HomeActCard {
       .width('100%')
       .padding(12)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_surface'))
+      .attributeModifier(new CardSurfaceModifier())
       .border({ width: 1, color: this.isCardPool() ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
       // 奖励网格半窗（$$ 双向同步下滑关闭）
       .bindSheet($$this.showRewardSheet, this.rewardSheet(), {

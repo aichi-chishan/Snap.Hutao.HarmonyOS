@@ -23,6 +23,7 @@ import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 import { BaseValueService, AvatarGrowInfo, AvatarBaseValues } from '../service/BaseValueService';
 import { Logger } from '../common/Logger';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 const AVATAR_PAGE_TAG: string = 'WikiAvatarPage';
 /** 立绘 CDN 类目（对齐 Windows GachaAvatarImgConverter：2048×1024 横版完整立绘） */
@@ -948,7 +949,7 @@ export struct WikiAvatarPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_surface'))
+      .attributeModifier(new CardSurfaceModifier())
     }
   }
 
@@ -1021,7 +1022,7 @@ export struct WikiAvatarPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 
   /**
@@ -1152,7 +1153,7 @@ export struct WikiAvatarPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 
   /** 天赋技能卡（无参：读 @State current） */
@@ -1207,7 +1208,7 @@ export struct WikiAvatarPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 
   /** 命座卡（无参：读 @State current） */
@@ -1260,7 +1261,7 @@ export struct WikiAvatarPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 
   /** 料理卡（无参：读 @State current） */
@@ -1292,7 +1293,7 @@ export struct WikiAvatarPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 
   /** 语音/故事卡（kind：'fetters'|'stories'；直接读 @State current，切换角色自动刷新） */
@@ -1327,7 +1328,7 @@ export struct WikiAvatarPage {
         .width('100%')
         .padding(14)
         .borderRadius($r('app.float.card_radius'))
-        .backgroundColor($r('app.color.card_surface'))
+        .attributeModifier(new CardSurfaceModifier())
       }
     }
   }
@@ -1396,7 +1397,7 @@ export struct WikiAvatarPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_surface'))
+      .attributeModifier(new CardSurfaceModifier())
     }
   }
 
@@ -1437,7 +1438,7 @@ export struct WikiAvatarPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_surface'))
+      .attributeModifier(new CardSurfaceModifier())
     }
   }
 

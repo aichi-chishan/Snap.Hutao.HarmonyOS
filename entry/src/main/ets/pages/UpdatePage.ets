@@ -3,6 +3,7 @@ import { PageHeader } from '../components/PageHeader';
 import { AppRelease, UpdateChannel, UpdateStatus } from '../model/AppUpdate';
 import { UpdateViewModel } from '../viewmodel/UpdateViewModel';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -94,7 +95,7 @@ export struct UpdatePage {
         .selected(this.vm.channel === UpdateChannel.Stable ? 0 : 1)
         .value(this.vm.channel === UpdateChannel.Stable ? '稳定发布' : '包含预发布（测试版本）')
         .width('100%').height(44).fontColor($r('app.color.text_primary'))
-        .backgroundColor($r('app.color.card_surface')).hoverEffect(HoverEffect.Highlight)
+        .attributeModifier(new CardSurfaceModifier()).hoverEffect(HoverEffect.Highlight)
         .accessibilityText('更新发布通道').onSelect((index: number) => {
           if (index === 0 || index === 1) { this.vm.setChannel(index === 0 ? UpdateChannel.Stable : UpdateChannel.Preview); }
         })
@@ -131,7 +132,7 @@ export struct UpdatePage {
         Text('无法打开发布页面，请稍后重试').fontSize(13).fontColor($r('app.color.text_secondary'))
       }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(16).borderRadius(14)
-      .backgroundColor($r('app.color.card_surface'))
+      .attributeModifier(new CardSurfaceModifier())
   }
   @Builder
   releasePanel() {
@@ -149,7 +150,7 @@ export struct UpdatePage {
             Text(`已跳过 ${this.skippedTag}；出现更新的发布版本时会再次提示`)
               .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
             Button('取消跳过此版本').width('100%').height(44).enabled(!this.vm.busy)
-              .fontColor($r('app.color.text_primary')).backgroundColor($r('app.color.card_surface'))
+              .fontColor($r('app.color.text_primary')).attributeModifier(new CardSurfaceModifier())
               .hoverEffect(HoverEffect.Highlight)
               .onClick(() => {
                 this.skippedTag = '';
@@ -157,7 +158,7 @@ export struct UpdatePage {
               })
           } else {
             Button('跳过此版本').width('100%').height(44).enabled(!this.vm.busy)
-              .fontColor($r('app.color.text_secondary')).backgroundColor($r('app.color.card_surface'))
+              .fontColor($r('app.color.text_secondary')).attributeModifier(new CardSurfaceModifier())
               .hoverEffect(HoverEffect.Highlight)
               .accessibilityText('跳过此版本，出现更新版本前不再提示')
               .onClick(() => {
@@ -174,7 +175,7 @@ export struct UpdatePage {
         Text('检查后可在此查看可比较版本及发布说明').fontSize(14).fontColor($r('app.color.text_secondary'))
       }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(16).borderRadius(14)
-      .backgroundColor($r('app.color.card_surface'))
+      .attributeModifier(new CardSurfaceModifier())
   }
   build() {
     Column() {

@@ -22,6 +22,7 @@ import {
 import { AppBackButton } from '../components/AppBackButton';
 import { SimpleDataSource } from '../components/SimpleDataSource';
 import { PageBackdrop } from '../components/PageBackdrop';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 /** 列表展示用分组行（多阶段成就归并） */
 class DisplayGroup {
@@ -612,7 +613,7 @@ export struct AchievementPage {
             .fontColor($r('app.color.app_primary_text'))
             .padding({ left: 12, right: 12, top: 6, bottom: 6 })
             .borderRadius(14)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .border({ width: 1, color: $r('app.color.card_stroke') })
             .onClick(() => {
               this.showCreate = !this.showCreate;
@@ -622,7 +623,7 @@ export struct AchievementPage {
             .fontColor($r('app.color.danger'))
             .padding({ left: 12, right: 12, top: 6, bottom: 6 })
             .borderRadius(14)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .border({ width: 1, color: $r('app.color.card_stroke') })
             .onClick(() => {
               this.deleteCurrentArchive();
@@ -713,7 +714,7 @@ export struct AchievementPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
   }
 
   @Builder
@@ -771,7 +772,7 @@ export struct AchievementPage {
           this.sortChip()
         }
         .borderRadius(10)
-        .backgroundColor($r('app.color.card_surface'))
+        .attributeModifier(new CardSurfaceModifier())
       }
       .width('100%')
       // 分类筛选（横向滚动 chips）
@@ -903,7 +904,7 @@ export struct AchievementPage {
           Button('复制 ID')
             .fontSize(10)
             .height(26)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .fontColor($r('app.color.app_primary_text'))
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
@@ -912,7 +913,7 @@ export struct AchievementPage {
           Button('米游社攻略')
             .fontSize(10)
             .height(26)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .fontColor($r('app.color.app_primary_text'))
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
@@ -921,7 +922,7 @@ export struct AchievementPage {
           Button('HoYoLAB')
             .fontSize(10)
             .height(26)
-            .backgroundColor($r('app.color.card_surface'))
+            .attributeModifier(new CardSurfaceModifier())
             .fontColor($r('app.color.app_primary_text'))
             .hoverEffect(HoverEffect.Highlight)
             .onClick(() => {
@@ -935,7 +936,7 @@ export struct AchievementPage {
     .width('100%')
     .padding(12)
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .opacity(g.achieved >= g.total ? 0.75 : 1)
     .hoverEffect(HoverEffect.Highlight)
     // 仅勾选圈和标题改变完成状态，攻略/复制按钮不会触发父卡片切换。

@@ -2,6 +2,7 @@ import { CultivationDraftViewModel } from '../viewmodel/CultivationDraftViewMode
 import { CultivationDraft, CultivationSkillDraft } from '../model/CultivationDraft';
 import { CultivateProject, CultivationPreparedEntry } from '../data/repo/CultivationRepo';
 import { CalItem } from '../model/Calculate';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 /** The same review surface is used before first save, on edit, and after current-progress sync. */
 @Component
@@ -66,7 +67,7 @@ export struct CultivationDraftEditor {
           }.width('100%')
         }
       }, (skill: CultivationSkillDraft) => `${skill.id}`)
-    }.width('100%').padding(14).borderRadius(12).backgroundColor($r('app.color.card_surface'))
+    }.width('100%').padding(14).borderRadius(12).attributeModifier(new CardSurfaceModifier())
   }
 
   build() {

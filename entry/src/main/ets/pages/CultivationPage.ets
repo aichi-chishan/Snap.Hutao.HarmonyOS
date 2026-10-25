@@ -23,6 +23,7 @@ import { PageBackdrop } from '../components/PageBackdrop';
 import { NavIcon } from '../components/NavIcon';
 import { MetaIcon } from '../components/MetaIcon';
 import { WikiMetaService } from '../service/WikiMetaService';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -508,7 +509,7 @@ export struct CultivationPage {
     .width('100%')
     .padding(12)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
@@ -645,7 +646,7 @@ export struct CultivationPage {
     .width('100%')
     .padding(10)
     .borderRadius(10)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
@@ -757,7 +758,7 @@ export struct CultivationPage {
     .width('100%')
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
@@ -785,7 +786,7 @@ export struct CultivationPage {
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .backgroundColor($r('app.color.card_surface'))
+      .attributeModifier(new CardSurfaceModifier())
       .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
@@ -809,7 +810,7 @@ export struct CultivationPage {
         .enabled(this.vm.selectedCount > 0 && !this.draftVm.busy).hoverEffect(HoverEffect.Highlight)
         .backgroundColor($r('app.color.app_primary')).fontColor($r('app.color.on_accent'))
         .onClick(() => this.editSelected())
-    }.width('100%').padding(14).borderRadius(12).backgroundColor($r('app.color.card_surface'))
+    }.width('100%').padding(14).borderRadius(12).attributeModifier(new CardSurfaceModifier())
 
     // 候选角色网格
     Row() {

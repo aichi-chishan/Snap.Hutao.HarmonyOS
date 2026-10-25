@@ -57,6 +57,7 @@
   - 三层阈值对象不同（窗口/内容区），720-840 之间出现"壳宽屏+内容单列"属预期（对齐 PC 窄窗口）。
   - **PC 鼠标悬停**：可点行/卡片/按钮一律加 `.hoverEffect(HoverEffect.Highlight)`（navItem/entryTile/PressCard/QTapButton/设置行已铺）。
 - **动效统一走 `common/Motion.ets`**：spring 三档 / pageSwitch 非对称转场（宽屏内容切换经 `PageContainer`）/ riseIn 进场 / staggerDelay 错峰；导航选中指示条用 geometryTransition（切换必须经 Index.switchTo 的 animateTo 驱动）。应用级沉浸光感已开（module.json5 UIMaterial.state=enable）。
+- **界面材质统一走 `common/UiSurface.ets`（勿绕过）**：模式（普通材质=磨砂半透明+发丝边+柔和阴影，非纯色 / 高级材质=沉浸光感 systemMaterial）与级别（跟随系统推荐/低/中/高）经 AppStorage（materialMode/materialLevel）全局发布，设置→外观→界面材质切换即时生效。四类槽位：导航壳层 SHELL_NAV / 悬浮页签 FLOATING_BAR（HdsTabs systemMaterialEffect）/ 全局浮层 OVERLAY_MODAL / 内容表面 CONTENT_SURFACE（卡片/中性按钮/弹窗，用 `CardSurfaceModifier`）。**禁止**手写 `systemMaterial(...)` 或新增纯色卡片背景；同类界面跨手机/平板/PC 用同一槽位。
 
 ## 已知坑（Do NOT trip）
 - **整窗发黄（真因已定位：8 位色值顺序）**：

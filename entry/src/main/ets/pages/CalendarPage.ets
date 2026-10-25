@@ -16,6 +16,7 @@ import { AppBackButton } from '../components/AppBackButton';
 import { NavIcon } from '../components/NavIcon';
 import { MetaIcon } from '../components/MetaIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -172,7 +173,7 @@ export struct CalendarPage {
     .width('100%')
     .padding(14)
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
@@ -436,7 +437,7 @@ export struct CalendarPage {
       .width('100%')
       .padding(12)
       .borderRadius(12)
-      .backgroundColor($r('app.color.card_surface'))
+      .attributeModifier(new CardSurfaceModifier())
       .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }

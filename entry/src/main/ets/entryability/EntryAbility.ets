@@ -12,6 +12,7 @@ import { DailyNoteService } from '../service/DailyNoteService';
 import { AutoSignInService } from '../service/AutoSignInService';
 import { AppContextProvider } from '../common/AppContext';
 import { Motion } from '../common/Motion';
+import { UiSurface } from '../common/UiSurface';
 import { GameDataService } from '../service/GameDataService';
 import { buildRiskVerifyOverlay } from '../components/RiskVerifyModal';
 
@@ -221,6 +222,8 @@ export default class EntryAbility extends UIAbility {
     AppContextProvider.init(context);
     await PreferencesStore.init(context);
     PreferencesStore.bumpLaunchTimes();
+    // 界面材质令牌发布（模式/级别 → AppStorage，壳层与各表面即时读取）
+    UiSurface.publish();
     await RelationalStoreHelper.init(context);
     await BackgroundTaskService.init(context);
     // Install before journal repair or any session restoration. A failed fence prevents

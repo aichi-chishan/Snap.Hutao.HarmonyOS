@@ -4,6 +4,7 @@
  * 供各页面 header 复用，风格统一。
  */
 import { router } from '@kit.ArkUI';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Component
 export struct AppBackButton {
@@ -29,7 +30,7 @@ export struct AppBackButton {
     .height(44)
     .accessibilityText(this.accessibilityLabel)
     .hoverEffect(HoverEffect.Highlight)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .shadow({
       radius: 10,
       color: $r('app.color.card_shadow'),

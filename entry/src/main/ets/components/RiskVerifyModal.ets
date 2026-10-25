@@ -17,6 +17,7 @@
  *      （HTML 里的 fit()，通过 onFrame 桥回传测量结果）。
  */
 import { GuardedMaterialModifier } from '../common/GuardedMaterialModifier';
+import { UiSurface, SurfaceClass } from '../common/UiSurface';
 import { webview } from '@kit.ArkWeb';
 import { curves, uiMaterial } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
@@ -71,7 +72,7 @@ class VerifyJsProxy {
   }
 }
 
-/** API 26 沉浸光感可用性（运行时门控） */
+/** API 26 沉浸光感可用性（运行时门控；保留给深浅色自适应分支使用） */
 function immersiveAvailable(): boolean {
   try {
     return deviceInfo.apiAvailable('26.0.0');
@@ -113,12 +114,8 @@ export struct RiskVerifyModal {
   private solved: boolean = false;
 
   aboutToAppear(): void {
-    if (immersiveAvailable()) {
-      this.material = new uiMaterial.ImmersiveMaterial({
-        style: uiMaterial.ImmersiveStyle.REGULAR,
-        applyShadow: true,
-      });
-    }
+    // 全局浮层材质走 UiSurface 统一令牌（普通材质模式返回 undefined → 纯 scrim+面板底）
+    this.material = UiSurface.material(SurfaceClass.OVERLAY_MODAL);
   }
 
   /** 面板宽度：至少容纳验证码宽度 + 内边距，且不超过可用宽度（小窗自动收窄，页面再等比缩放适配） */

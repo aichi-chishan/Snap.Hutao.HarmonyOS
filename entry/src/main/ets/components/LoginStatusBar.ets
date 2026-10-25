@@ -3,6 +3,7 @@
  * 全局登录状态展示：已登录显示昵称/头像，未登录显示「去登录」，点击跳转。
  */
 import { router } from '@kit.ArkUI';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Component
 export struct LoginStatusBar {
@@ -95,7 +96,7 @@ export struct LoginStatusBar {
     .constraintSize({ minHeight: 44 })
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .hoverEffect(HoverEffect.Highlight)
     .accessibilityGroup(true)
     .onClick(() => {

@@ -16,6 +16,7 @@ import { MetaIcon } from '../components/MetaIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { WikiMetaService } from '../service/WikiMetaService';
 import { TowerMetadataService, TowerBuff, TowerWaveView, ChamberWaves, TowerMonsterView } from '../service/TowerMetadataService';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Entry
 @Component
@@ -123,7 +124,7 @@ export struct SpiralAbyssPage {
     .width('100%')
     .padding(14)
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
@@ -260,14 +261,14 @@ export struct SpiralAbyssPage {
         .width('100%')
         .padding(10)
         .borderRadius(10)
-        .backgroundColor($r('app.color.card_surface'))
+        .attributeModifier(new CardSurfaceModifier())
         .border({ width: 1, color: $r('app.color.card_stroke') })
       }, (level: SpiralAbyssLevel, li: number) => `${li}_${level.index}`)
     }
     .width('100%')
     .padding(12)
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
@@ -379,7 +380,7 @@ export struct SpiralAbyssPage {
       .width('100%')
       .padding(14)
       .borderRadius(12)
-      .backgroundColor($r('app.color.card_surface'))
+      .attributeModifier(new CardSurfaceModifier())
       .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
@@ -555,7 +556,7 @@ export struct SpiralAbyssPage {
               .width('100%')
               .padding(14)
               .borderRadius(12)
-              .backgroundColor($r('app.color.card_surface'))
+              .attributeModifier(new CardSurfaceModifier())
               .border({ width: 1, color: $r('app.color.card_stroke') })
               ForEach(this.vm.abyss.floors, (floor: SpiralAbyssFloor, fi: number) => {
                 this.floorSection(floor)

@@ -21,6 +21,7 @@ import { DateUtil } from '../common/DateUtil';
 import { NavIcon } from '../components/NavIcon';
 import { MetaIcon } from '../components/MetaIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 /** shimmer 行渲染数据（单实例传入 @Builder，保证动态渲染；进度条 Max/Value） */
 class NoteRowData {
@@ -589,7 +590,7 @@ export struct DailyNotePage {
     .width('100%')
     .padding(8)
     .borderRadius($r('app.float.card_radius'))
-    .backgroundColor($r('app.color.card_surface'))
+    .attributeModifier(new CardSurfaceModifier())
     .border({ width: 1, color: $r('app.color.card_stroke') })
     .shadow({ radius: 8, offsetY: 4, color: $r('app.color.nav_scrim') })
     .alignItems(HorizontalAlign.Start)

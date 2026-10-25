@@ -9,6 +9,7 @@ import { PageBackdrop } from '../components/PageBackdrop';
 import { MetaIcon } from '../components/MetaIcon';
 import { EmptyState } from '../components/EmptyState';
 import { SimpleDataSource } from '../components/SimpleDataSource';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 /** 期次横幅图缓存命中（url → 沙盒本地路径） */
 class WishBannerPath {
@@ -176,7 +177,7 @@ export struct WishHistoryPage {
         .height(44)
         .width('100%')
         .fontColor($r('app.color.text_primary'))
-        .backgroundColor($r('app.color.card_surface'))
+        .attributeModifier(new CardSurfaceModifier())
         .hoverEffect(HoverEffect.Highlight)
         .accessibilityText('筛选五星角色、四星角色、五星武器或四星武器')
         .onSelect((index: number) => { this.filter(index, this.vm.keyword); })
@@ -184,7 +185,7 @@ export struct WishHistoryPage {
         .height(44)
         .maxLength(80)
         .fontColor($r('app.color.text_primary'))
-        .backgroundColor($r('app.color.card_surface'))
+        .attributeModifier(new CardSurfaceModifier())
         .onChange((value: string) => { this.filter(this.vm.category, value); })
       Text(`距上次 UP 结束最久优先 · ${this.vm.items.length} 项`)
         .fontSize(12)
@@ -273,7 +274,7 @@ export struct WishHistoryPage {
           .fontSize(12).fontColor($r('app.color.text_secondary'))
       }
     }.width('100%').padding(14).alignItems(HorizontalAlign.Start)
-      .borderRadius(12).backgroundColor($r('app.color.card_surface'))
+      .borderRadius(12).attributeModifier(new CardSurfaceModifier())
       .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
