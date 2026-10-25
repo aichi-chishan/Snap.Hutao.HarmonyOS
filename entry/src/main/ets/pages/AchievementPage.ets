@@ -630,8 +630,12 @@ export struct AchievementPage {
             .fontSize(13)
             .height(36)
             .layoutWeight(1)
+            .enterKeyType(EnterKeyType.Done)
             .onChange((v: string) => {
               this.newName = v;
+            })
+            .onSubmit(() => {
+              this.createArchive();
             })
           Button('创建')
             .fontSize(12)

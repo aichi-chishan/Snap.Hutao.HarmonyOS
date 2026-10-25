@@ -538,8 +538,12 @@ struct LoginPage {
         .width('100%')
         .fontSize(15)
         .backgroundColor($r('app.color.card_inner_tint'))
+        .enterKeyType(EnterKeyType.Done)
         .onChange((value: string) => {
           this.captchaInput = value;
+        })
+        .onSubmit(() => {
+          this.submitCaptcha();
         })
 
       QTapButton({ label: '登录', capsule: true, primary: true, disabled: this.busy, onTap: () => {
