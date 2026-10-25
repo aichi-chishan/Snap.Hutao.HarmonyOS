@@ -8,7 +8,7 @@
 
 | # | 差距 | Windows 证据 | 鸿蒙现状 | 方案 | 优先级/规模 |
 |---|---|---|---|---|---|
-| B1 | **已装备武器准确突破状态**：详情武器 PromoteLevel 未完整回流计算器；未知与未突破混淆 | `SummaryAvatarFactory.cs:136` | `CalculateService` 边界缺突破会拒绝（防护正确），但缺按 UID+角色+武器 关联详情快照补全链路 | 引入 `PromoteState`（已知/未知/手动选择）三态；`fillSyncedDetails` 补武器突破；未知时弹选择并标记手动 | **P1** / M |
+| B1 | ~~已装备武器准确突破状态~~ **已核销（2026-10-25 复核）**：鸿蒙已有完整链路——`model/PromoteState.ets` 三态解析（未知→-1，不与未突破混淆）、`CharacterService` validWeapon 校验、`CalculateService.fillSyncedDetails` 按详情快照补武器/突破并匹配已装备武器 | `SummaryAvatarFactory.cs:136` | ✅ 与 Windows 语义一致 | 无需改动 | **P1** / M |
 | B2 | **未登录访问本地祈愿档案**：退出登录后应仍能浏览已导入/已刷新的本地归档 | Windows 本地仓储与账号解耦 | 空 UID 保护已有；但未登录态无浏览入口，数据"看不见" | GachaLog/首页在未登录时提供"本地归档"只读视图（禁刷新/导入到云端语义） | **P0**（数据可达性）/ M |
 | B3 | **颂愿（千星奇域）子池与专属物品元数据**：UP 子池、专属物品展示缺失 | `BeyondItem` 元数据、颂愿子池 | 数据仓上游有 `BeyondItem.json`，rawfile/热更清单未接入 | 数据仓 pipeline 提取 → 热更 → 祈愿颂愿页子池/专属物品展示 | **P1** / M |
 | B4 | **圣遗物评分预设与排序**（SavedConfig）：自定义权重配置、按分排序 | `AvatarReliquaryScoreSetting(SavedConfig)`、`BackpackReliquaryScoreConfig` | 已做「米游社推荐/双爆」口径切换；无自定义权重与排序 | 评分配置页（权重编辑+持久化）+ 背包/角色列表按分排序 | P1 / L |
@@ -42,7 +42,7 @@
 
 每批验收：`hvigorw assembleHap` BUILD SUCCESSFUL / `devecocli check lint` Errors=0 / 主机回归 39+ 套件全绿 / API26 模拟器装机手测（模拟器可用时）。
 
-- **R1 数据正确性与可达性（P0/P1 后端）**：B2 未登录本地祈愿视图 → B1 武器突破状态链 → B3 颂愿子池元数据（数据仓热更随批）→ B5 入口语义核验补齐。
+- **R1 数据正确性与可达性（P0/P1 后端）**：B2 未登录本地祈愿视图 ✅ → B1 武器突破状态链 ✅（复核已核销，无需改动）→ B3 颂愿子池元数据（数据仓热更随批）→ B5 入口语义核验补齐。
 - **R2 交互一致性（P1 前端）**：U1 统一命令栏 → U3 状态呈现规范（含便笺标注）→ U4 祈愿闭环明细 → U2 键盘焦点收尾。
 - **R3 完善与精修（P2）**：B4 评分预设 → B6 UIGF 选择性互通 → B7 后台多 UID 与可观测 → B8 媒体管理 → B9 诊断 → B10/U10 外链类 → U5–U9 视觉精修批。
 - **R4 独立大项（按需启动，需用户逐项确认）**：B11 i18n（先英文）→ B12 折叠屏专项 → B13 AI 通用工作区 → B14 云批次（推翻口径后）。
