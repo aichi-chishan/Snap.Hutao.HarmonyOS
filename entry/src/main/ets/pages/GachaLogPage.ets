@@ -2558,6 +2558,19 @@ export struct GachaLogPage {
   countdownSection() {
     Column({ space: 10 }) {
       this.distributionPanel()
+      // UP 历史入口（对齐 Windows：倒计时/UP 复刻数据在祈愿页内呈现）
+      Button('查看 UP 历史（未复刻时长 / 期次）')
+        .width('100%')
+        .constraintSize({ minHeight: 44 })
+        .fontSize(13)
+        .backgroundColor($r('app.color.app_primary_bg'))
+        .fontColor($r('app.color.app_primary_text'))
+        .hoverEffect(HoverEffect.Highlight)
+        .accessibilityText('打开祈愿 UP 历史页')
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/WishHistoryPage' }).catch(() => {
+          });
+        })
       if (this.poolCards.length === 0) {
         Text('暂无池记录，可导入 UIGF 或刷新本地归档').fontSize(13).fontColor($r('app.color.text_secondary')).width('100%').padding(16)
       }
