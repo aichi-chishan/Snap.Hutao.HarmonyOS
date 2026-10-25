@@ -106,6 +106,47 @@ export class ReliquaryScore {
     return Math.round((crit * 2 + critHurt) * 10) / 10;
   }
 
+  /**
+   * 背包评分配置口径（Windows AvatarReliquaryScoreAlgorithm.SavedConfig）：
+   * 七项权重 0-1（暴击率/暴伤/攻击%/充能/精通/生命%/防御%），系数与背包打分同源
+   * （2/1/1.33/1.1979/0.33/1.33/1.06）；数值口径与 model/BackpackScore 一致
+   * （百分比词条按百分点数、精通按原值）。
+   */
+  static profileScore(subProps: RelicProperty[], weights: number[]): number {
+    const factors: number[] = [2, 1, 1.33, 1.1979, 0.33, 1.33, 1.06];
+    let total: number = 0;
+    for (const sp of subProps) {
+      const slot: number = ReliquaryScore.slotOfProperty(sp.propertyType);
+      if (slot < 0) {
+        continue;
+      }
+      total += ReliquaryScore.parseValue(sp.value) * factors[slot] * weights[slot];
+    }
+    return Math.round(total * 10) / 10;
+  }
+
+  /** 副词条属性串 → 七项槽位（0-6；不参与评分的词条返回 -1） */
+  static slotOfProperty(prop: string): number {
+    switch (prop) {
+      case 'FIGHT_PROP_CRITICAL':
+        return 0;
+      case 'FIGHT_PROP_CRITICAL_HURT':
+        return 1;
+      case 'FIGHT_PROP_ATTACK_PERCENT':
+        return 2;
+      case 'FIGHT_PROP_CHARGE_EFFICIENCY':
+        return 3;
+      case 'FIGHT_PROP_ELEMENT_MASTERY':
+        return 4;
+      case 'FIGHT_PROP_HP_PERCENT':
+        return 5;
+      case 'FIGHT_PROP_DEFENSE_PERCENT':
+        return 6;
+      default:
+        return -1;
+    }
+  }
+
   /** 角色双爆是否有效（Windows AvatarIds.IsCritEffective：仅心海无效） */
   static isCritEffective(avatarId: number): boolean {
     return avatarId !== KOKOMI_ID;

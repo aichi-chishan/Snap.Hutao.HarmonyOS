@@ -26,6 +26,8 @@ import { PromoteState } from '../model/PromoteState';
 import { SkillLevelService, ResolvedAvatarSkill } from '../service/SkillLevelService';
 import { CultivationRepo, CultivateProject } from '../data/repo/CultivationRepo';
 import { Logger } from '../common/Logger';
+import { BackpackScoreProfile } from '../model/BackpackScore';
+import { BackpackScoreService } from '../service/BackpackScoreService';
 import { CardSurfaceModifier } from '../common/UiSurface';
 
 const TAG: string = 'CharacterPage';
@@ -43,8 +45,10 @@ export struct CharacterPage {
   @State showVerify: boolean = false;
   /** 当前选中角色详情（页面 @State 驱动刷新；VM 内 @Observed 深属性不触发刷新） */
   @State currentDetail: CharacterDetail | undefined = undefined;
-  /** 评分口径（0=米游社推荐权重，1=双爆分；按角色记忆，对齐 Windows AvatarReliquaryScoreSetting） */
+  /** 评分口径（0=米游社推荐权重，1=双爆分，2=背包评分配置；按角色记忆，对齐 Windows AvatarReliquaryScoreSetting） */
   @State scoreAlgorithm: number = 0;
+  /** 背包评分配置缓存（口径 2 用；权重在背包页「评分设置」维护） */
+  scoreProfile: BackpackScoreProfile = new BackpackScoreProfile();
   /** 当前选中角色 id（页面态） */
   @State selectedId: number = 0;
   /** 角色列表搜索关键字（名称包含，对齐 Windows AutoSuggestTokenBox 的名称过滤） */
@@ -96,8 +100,11 @@ export struct CharacterPage {
   syncDetail(): void {
     this.selectedId = this.vm.selectedId;
     this.currentDetail = this.vm.detailOfSelected();
-    // 评分口径按角色记忆（对齐 Windows AvatarReliquaryScoreSetting；SavedConfig 属背包注入域不移植）
+    // 评分口径按角色记忆（对齐 Windows AvatarReliquaryScoreSetting 三态；背包配置口径载入活动权重）
     this.scoreAlgorithm = PreferencesStore.getNumber(`relic.score.algorithm.${this.currentDetail?.id ?? 0}`, 0);
+    if (this.scoreAlgorithm === 2) {
+      this.reloadScoreProfile();
+    }
     Logger.info(TAG, `syncDetail id=${this.selectedId} detail=${this.currentDetail?.name ?? 'undefined'}`);
   }
 
@@ -499,7 +506,7 @@ export struct CharacterPage {
               Text('评分')
                 .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))
-              Text(this.scoreAlgorithm === 0 ? '米游社推荐' : '双爆分')
+              Text(this.scoreAlgorithm === 0 ? '米游社推荐' : (this.scoreAlgorithm === 1 ? '双爆分' : '背包评分配置'))
                 .fontSize(10)
                 .fontColor($r('app.color.app_primary'))
                 .padding({ left: 8, right: 8, top: 3, bottom: 3 })
@@ -508,13 +515,14 @@ export struct CharacterPage {
                 .hoverEffect(HoverEffect.Highlight)
                 .accessibilityText('切换评分口径')
                 .onClick(() => {
-                  this.setScoreAlgorithm(this.scoreAlgorithm === 0 ? 1 : 0);
+                  this.setScoreAlgorithm((this.scoreAlgorithm + 1) % 3);
                 })
             }
             .width('100%')
             Text(this.scoreAlgorithm === 0
               ? '米游社推荐：按角色推荐副属性加权（无推荐回退双爆分）'
-              : '双爆分 = 暴击率×2 + 暴击伤害×1')
+              : (this.scoreAlgorithm === 1 ? '双爆分 = 暴击率×2 + 暴击伤害×1'
+                : `背包评分配置：${this.scoreProfile.name} · 权重在背包页「评分设置」维护`))
               .fontSize(10)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')
@@ -865,7 +873,7 @@ export struct CharacterPage {
       d.recommend.energyType, ReliquaryScore.isCritEffective(d.id)) * 10) / 10;
   }
 
-  /** 当前评分口径下的分值：0=米游社推荐权重（默认）；1=双爆分 */
+  /** 当前评分口径下的分值：0=米游社推荐权重（默认）；1=双爆分；2=背包评分配置（SavedConfig） */
   private relicScoreOf(r: Reliquary): number {
     const d: CharacterDetail | undefined = this.currentDetail;
     if (d === undefined) {
@@ -873,6 +881,9 @@ export struct CharacterPage {
     }
     if (this.scoreAlgorithm === 1) {
       return ReliquaryScore.doubleCritScore(r, ReliquaryScore.isCritEffective(d.id));
+    }
+    if (this.scoreAlgorithm === 2) {
+      return ReliquaryScore.profileScore(r.subProperties, this.scoreProfile.weights);
     }
     return CharacterPage.relicScore(r, d);
   }
@@ -897,10 +908,23 @@ export struct CharacterPage {
     return $r('app.color.text_hint');
   }
 
-  /** 切换当前角色的评分口径（0=米游社推荐权重 / 1=双爆分） */
+  /** 切换当前角色的评分口径（0=米游社推荐 / 1=双爆分 / 2=背包评分配置） */
   private setScoreAlgorithm(value: number): void {
     this.scoreAlgorithm = value;
+    if (value === 2) {
+      this.reloadScoreProfile();
+    }
     PreferencesStore.setNumber(`relic.score.algorithm.${this.currentDetail?.id ?? 0}`, value);
+  }
+
+  /** 载入背包活动评分配置（SavedConfig 指向；无配置时用默认权重） */
+  private reloadScoreProfile(): void {
+    try {
+      this.scoreProfile = BackpackScoreService.active(BackpackScoreService.load());
+    } catch (e) {
+      Logger.warn('CharacterPage', `load score profile fail: ${(e as Error).message}`);
+      this.scoreProfile = new BackpackScoreProfile();
+    }
   }
 
   /** 属性类型 → 中文标签（兼容：字符串 FIGHT_PROP_* 与数字 FightProperty 枚举） */
