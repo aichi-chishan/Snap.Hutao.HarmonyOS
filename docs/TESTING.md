@@ -21,6 +21,12 @@ Linux 和 macOS 可执行 `TYPESCRIPT_PATH="$PWD/ci/node_modules/typescript" nod
 
 [CI](../.github/workflows/ci.yml) 在推送到 main 或提交 PR 时运行主机测试和仓库检查。配置了 `DEVECO_CLT_URL` 的仓库还会运行原生 lint 和无签名 HAP 构建。工具源及摘要固定在 [install-clt.sh](../ci/install-clt.sh) 与 [verify-clt.py](../ci/verify-clt.py)，lint 验收使用 [run-native-lint.cjs](../ci/run-native-lint.cjs) 的完整扫描报告。
 
+### 2026-11-16 验证记录
+
+干净源码检出通过 76 套主机回归。本地 DevEco 完成 API 26 原生构建，未签名 HAP 通过 CRC、最低/目标 API 与设备类型校验。Windows DevEco 的 lint 汇总为 0 个错误、39 个警告、2 项建议。
+
+GitHub 上的 Linux 回归、仓库检查和无签名 HAP 构建通过。原生 lint 的 CLT 26.0.0.821 扫描日志列出 301 个文件，其中 49 个文件出现内部 `getDeclaringMethod` 异常，另有 18 条规则注册错误。CI 保留失败状态和 `lint-evidence` 附件。更新 Linux 工具链后，可比较其 `lint-scan.log`、`lint-report.json` 与本次结果。[CI 运行与附件](https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS/actions/runs/43863903424)
+
 ## 交互复测
 
 | 场景 | 观察点 |
