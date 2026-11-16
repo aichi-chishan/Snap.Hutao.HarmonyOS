@@ -1,6 +1,10 @@
 # Snap.Hutao.HarmonyOS
 
-胡桃工具箱的 HarmonyOS 移植版。项目使用 ArkTS 和 ArkUI，支持 API 26 起的手机、平板和二合一设备。平板和宽窗口采用侧栏、工具栏与列表详情分栏，手机使用底部页签。Windows 行为对照取自 [Snap.Hutao.Remastered 2.0.2.0](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/tree/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5)。
+胡桃工具箱的 HarmonyOS 移植版。当前发布版本为 **2.0.1.0**，与 [Windows 版 2.0.1 的包清单](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/7a9df50ea688ad9ae9740ff286e0457ee3cb27af/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Package.appxmanifest) 一致。项目使用 ArkTS 和 ArkUI，支持 API 26 起的手机、平板和二合一设备。平板和宽窗口采用侧栏、工具栏与列表详情分栏，手机使用底部页签。
+
+## 下载和安装
+
+从 [GitHub Releases](https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS/releases) 下载文件名以 `-unsigned.hap` 结尾的附件，核对发布说明中的 SHA-256。包名为 `com.example.snaphutaoharmonyos`。安装者使用自己的调试证书、密钥库以及与包名、证书和目标设备匹配的调试 Profile，通过 `hap-sign-tool sign-app` 签名，再用 `hdc install` 安装生成的已签名 HAP。覆盖安装时应沿用原签名。[华为命令行签名指南](https://developer.huawei.com/consumer/cn/doc/HarmonyOS-Guides/ide-hmos-command-line-building-app/)
 
 ## 功能
 

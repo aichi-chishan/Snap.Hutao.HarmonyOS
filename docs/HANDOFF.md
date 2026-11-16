@@ -1,6 +1,8 @@
 # 维护者交接
 
-工程对照 Snap.Hutao.Remastered 2.0.2.0（`3b7475e`），最低和目标系统均为 HarmonyOS API 26，设备类型为 phone、tablet、2in1。先从[工程地图](ARCHITECTURE.md)找到页面与服务；涉及导入、导出、账号或还原时查[数据与互通](DATA_AND_INTERCHANGE.md)。
+当前发布版本为 **2.0.1.0**，对应 Windows 的 `2.0.1` 标签。`AppScope/app.json5` 中的 `versionName` 决定用户看到的版本，`versionCode` 是用于系统升级的递增整数，本次从 `2000200` 增至 `2000201`。对比 Windows 功能使用的源码快照为 `3b7475e`。更新参考仓时保留已确认的发布版本，发版时同步校验 HAP 清单与 Release 标签。
+
+最低和目标系统均为 HarmonyOS API 26，设备类型为 phone、tablet、2in1。模块与持久化入口见[工程地图](ARCHITECTURE.md)和[数据与互通](DATA_AND_INTERCHANGE.md)。
 
 ## 新环境构建
 

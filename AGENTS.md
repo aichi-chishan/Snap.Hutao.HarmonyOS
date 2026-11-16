@@ -4,6 +4,7 @@
 
 ## 项目定位
 - 移植 Windows 版胡桃工具箱到鸿蒙，PC/Pad 力求还原，手机优化布局。对齐上游为社区重制版 **Snap.Hutao.Remastered**（SnapHutaoRemasteringProject/Snap.Hutao.Remastered），参考源码仓在工作区 `Snap.Hutao.Remastered-latest/`（git 独立、.gitignore 忽略；基线 main `3b7475e` = 2.0.2.0，2026-10-23）。
+- 当前对外发布版本固定为 **2.0.1.0**，与 Windows `2.0.1` 标签的包清单一致。更新上游参考源码时保持此版本，调整发布版本须由维护者指定。
 - **这是 API 26 起的鸿蒙 APP**（compatibleSdkVersion = targetSdkVersion = 26.0.0，runtimeOS = HarmonyOS）。设备类型：phone / tablet / 2in1。
 - **build-profile.json5 不入库**（含本地签名），API 版本改动只存在本地；换机后需手动把 compatibleSdkVersion/targetSdkVersion 设为 26.0.0（CI 侧同步 `ci/build-profile.ci.json5`）。
 - 本机 SDK 仅 API 26（26.0.0.32 Beta2）；**唯一能装包的模拟器镜像需为 API 26**（待下载；现有 MateBook Pro 24 = API 24 已装不上 compatibleSdk 26 的包）。API 26 运行时门控（`Motion.detectImmersive` / `Index.panelMaterial` / `deviceInfo.apiAvailable`）在 compatible=26 后仅作**防御性回退**，勿删。
