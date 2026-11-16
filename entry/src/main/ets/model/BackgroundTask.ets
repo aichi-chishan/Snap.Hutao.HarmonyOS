@@ -1,7 +1,8 @@
 import { ServerTime } from '../common/ServerTime';
 import { User } from './User';
+import { UserGameRole } from './UserGameRole';
 import { ApiResponse } from './ApiResponse';
-import { RetCodes } from '../common/Constants';
+import { RegionUtil, RetCodes } from '../common/Constants';
 
 export enum BackgroundTaskKind {
   DAILY_NOTE = 'daily_note',
@@ -34,6 +35,9 @@ export class BackgroundTaskState {
   lastSuccessAt: number = 0;
   lease: string = '';
   leaseUntil: number = 0;
+
+  /** Enabled rows without an owner cover all eligible local roles. Older rows retain their explicit owner. */
+  allAccounts(): boolean { return this.userId === 0; }
 }
 
 export class BackgroundTaskResult {
@@ -65,6 +69,7 @@ export class BackgroundOperation {
   status: string = '';
   lease: string = '';
   leaseUntil: number = 0;
+  updatedAt: number = 0;
 }
 
 export class BackgroundTaskPolicy {
@@ -86,8 +91,14 @@ export class BackgroundTaskPolicy {
   }
 
   static owns(user: User, uid: string, region: string): boolean {
-    return region.length > 0 && user.isOversea === region.startsWith('os_') &&
+    return !user.isOversea && RegionUtil.isCnUid(uid) && RegionUtil.regionOfUid(uid) === region &&
       user.roles.some(role => role.gameUid === uid && role.region === region);
+  }
+
+  static mainlandRoles(user: User): UserGameRole[] {
+    if (user.isOversea) { return []; }
+    return user.roles.filter((role: UserGameRole): boolean =>
+      RegionUtil.isCnUid(role.gameUid) && role.region === RegionUtil.regionOfUid(role.gameUid));
   }
 
   static resultForResponse(response: ApiResponse): BackgroundTaskResult | undefined {
@@ -108,7 +119,10 @@ export class BackgroundTaskPolicy {
 
   static due(operation: BackgroundOperation, day: string, now: number, signIn: boolean): boolean {
     if (operation.lease.length > 0 && operation.leaseUntil > now && operation.leaseUntil <= now + 86400000) { return false; }
-    if (signIn && operation.completedDay === day) { return false; }
+    if (signIn) {
+      if (operation.completedDay === day) { return false; }
+      if (operation.status === 'success' || operation.status === 'already_signed') { return true; }
+    }
     if (operation.day === day &&
       (operation.status === 'captcha' || operation.status === 'login_required' || operation.status === 'manual')) {
       return false;

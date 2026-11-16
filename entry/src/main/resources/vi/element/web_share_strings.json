@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "ui_web_share_title",
+      "value": "Chế độ lưu chia sẻ"
+    },
+    {
+      "name": "ui_web_share_description",
+      "value": "Chọn chế độ lưu ảnh sau khi nhấn nút chia sẻ"
+    },
+    {
+      "name": "ui_web_share_copy",
+      "value": "Sao chép vào clipboard"
+    },
+    {
+      "name": "ui_web_share_file",
+      "value": "Lưu thành tập tin"
+    }
+  ]
+}

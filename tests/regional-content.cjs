@@ -13,19 +13,23 @@ const tick=()=>new Promise(done=>setImmediate(done));
 const plain=value=>JSON.parse(JSON.stringify(value));
 function harness(){
  const state={sent:[],signatures:[],risk:[],refreshed:[],saved:[],closed:0,timestamp:100,signGate:null,tokenGate:null,
-  response:async()=>({retcode:0,data:{}}),riskResult:async()=>'',codes:async()=>[],codeCalls:0};
+  response:async()=>({retcode:0,data:{}}),riskResult:async()=>'',codes:async()=>[],codeCalls:0,deviceFp:'fixture-fp'};
  const prefs=new Map(),accountRows=new Map();
  const boundaries={
   '@kit.NetworkKit':{http:{RequestMethod:{GET:'GET',POST:'POST'},HttpDataType:{STRING:0},ResponseCode:{OK:200},createHttp:()=>({
    async request(url,options){state.sent.push({url,options:plain(options)});const result=await state.response(url,options);return{responseCode:200,result:JSON.stringify(result),header:{}};},destroy(){state.closed++;}})}},
   '@kit.BasicServicesKit':{deviceInfo:{marketName:'host fixture'}},
   Logger:{Logger:{info(){},warn(){},error(){}}},
-  PreferencesStore:{PreferencesStore:{getDeviceId:()=> 'fixture-device',getDeviceFp:()=> 'fixture-fp',getString:(key,value)=>prefs.get(key)||value,setString:(key,value)=>prefs.set(key,value)}},
+  PreferencesStore:{PreferencesStore:{getDeviceId:()=> 'fixture-device',getDeviceFp:()=> state.deviceFp,
+   getString:(key,value)=>prefs.get(key)||value,setString:(key,value)=>prefs.set(key,value),
+   getCookieExchangeTime:id=>prefs.get(`cookie-time:${id}`)??0,setCookieExchangeTime:(id,value)=>prefs.set(`cookie-time:${id}`,value)}},
   DsSigner:{DsSigner:{sortQuery:query=>Object.keys(query).sort().map(key=>`${key}=${query[key]}`).join('&'),nowTimestamp:()=>++state.timestamp,randomNumber:()=>String(state.timestamp),
+   async signGen1(salt,time,nonce){state.signatures.push({salt,time,nonce});return`${time},${nonce},fixture-signature`;},
    async signGen2(salt,time,nonce,body,query){state.signatures.push({salt,time,nonce,body,query});if(state.signGate)await state.signGate;return`${time},${nonce},fixture-signature`;}}},
   RiskVerifier:{RiskVerifier:{async tryResolveRisk(response,cookie,path){state.risk.push({response,cookie,path});return state.riskResult();}}},
   UserRepo:{UserRepo:{async getUserById(id){return accountRows.get(id)?.clone();},async loadCookieFor(id){return accountRows.get(id)?.fullCookie()||'';},async saveCookieFor(id,cookie){state.saved.push({id,cookie});const row=accountRows.get(id);if(row)row.applyCookie(cookie);}}},
   DeviceFpApi:{DeviceFpApi:{}},DailyNoteReminderService:{DailyNoteReminderService:{}},
+  PassportClient:{PassportClient:{}},
   MiyoliveService:{MiyoliveService:{getInstance:()=>({async fetchRedeemCodes(){state.codeCalls++;return state.codes();}})}},
  };
  const cache=new Map();
@@ -36,15 +40,28 @@ function harness(){
   const file=path.resolve(root,relative.endsWith('.ets')?relative:relative+'.ets');if(cache.has(file))return cache.get(file);
   let source=fs.readFileSync(file,'utf8').replace(/^@Observed\s*$/gm,'');
   if(posix(file).endsWith('/components/HomeTravelersDiaryCard.ets')){
-   // Execute real lifecycle methods; leave native build()/UI rendering to the SDK/device checks.
-   source=source.slice(0,source.indexOf('  build() {'))+'\n}';
+   // Execute real lifecycle/page methods; native builders and rendering stay in the SDK/device pass.
+   const builder=source.indexOf('  @Builder');
+   const renderStart=builder>=0?builder:source.indexOf('  build() {');
+   source=source.slice(0,renderStart)+'\n}';
    source=source.replace(/@\w+(?:\([^)]*\))?\s*/g,'').replace('export struct ','export class ')
     .replace(/^import \{ (PressCard|NavIcon) \}[^\n]*\n/gm,'');
+  }
+  if (posix(file).endsWith('/components/HomeGachaBannerCard.ets')) {
+    const build = source.indexOf('  build() {');
+    const iconMethods = source.indexOf('  /** UP 图标显示单元', build);
+    source = (source.slice(0, build) + source.slice(iconMethods))
+      .replace(/@\w+(?:\([^)]*\))?\s*/g, '').replace('export struct ', 'export class ');
+  }
+  if (posix(file).endsWith('/components/HomeActBannerCard.ets')) {
+    source = (source.slice(0, source.indexOf('  build() {')) + '\n}')
+      .replace(/@\w+(?:\([^)]*\))?\s*/g, '').replace('export struct ', 'export class ');
   }
   const compiled=ts.transpileModule(source,{fileName:file.replace('.ets','.ts'),compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});
   assert.equal(compiled.diagnostics.length,0,file);const module={exports:{}};cache.set(file,module.exports);
   const requireLocal=id=>{if(boundaries[id])return boundaries[id];const name=path.basename(id);if(boundaries[name])return boundaries[name];assert.ok(id.startsWith('.'),id);return load(path.resolve(path.dirname(file),id));};
-  vm.runInNewContext(`(function(require,module,exports){${compiled.outputText}\n})`,{AppStorage:{setOrCreate(){}}})(requireLocal,module,module.exports);return module.exports;
+  vm.runInNewContext(`(function(require,module,exports){${compiled.outputText}\n})`,{AppStorage:{setOrCreate(){}},
+    $r: name => name })(requireLocal,module,module.exports);return module.exports;
  }
  const User=load('model/User').User,Role=load('model/UserGameRole').UserGameRole;
  const Users=load('service/UserService').UserService,users=Users.getInstance(),client=load('data/network/ApiClient').ApiClient.getInstance();
@@ -57,7 +74,7 @@ function harness(){
   const region=load('common/Constants').RegionUtil.regionOfUid(uid);user.isOversea=region.startsWith('os_');
   const role=Role.of(uid,region,'fixture',55);role.userId=id;user.roles=[role];accountRows.set(id,user.clone());users.currentUser=user;users.advanceRevision();client.setCookie(user.fullCookie(),user.isOversea);return user;
  }
- users.completeTokenChainInner=async(user,force)=>{state.refreshed.push({user,force});if(state.tokenGate)await state.tokenGate;user.cookieToken='fixture-refreshed-cookie';};
+ users.completeTokenChainInner=async(user,force)=>{state.refreshed.push({user,force});if(state.tokenGate)await state.tokenGate;user.cookieToken='fixture-refreshed-cookie';return true;};
  const LedgerVM=load('viewmodel/LedgerViewModel').LedgerViewModel,AnnVM=load('viewmodel/AnnouncementViewModel').AnnouncementViewModel;
  return{state,load,users,client,ledger,announcements,Context,LedgerVM,AnnVM,select};
 }
@@ -66,40 +83,41 @@ function ledgerData(uid,region,month=10,amount=100){return{uid,region,nickname:'
  month_data:{current_primogems:amount,current_mora:20,last_primogems:90,last_mora:30,group_by:[]}};}
 const listData=(id=42,title='fixture')=>({list:[{type_id:1,list:[{ann_id:id,type:1,title,start_time:'2026-10-01 00:00:00'}]}],type_list:[{id:1,mi18n_name:'活动'}]});
 
-test('six ledger regions use exact pinned endpoints, query names, DS salt and explicit owner cookies',async()=>{
- for(const[uid,region]of Object.entries({'100000001':'cn_gf01','500000001':'cn_qd01','600000001':'os_usa','700000001':'os_euro','800000001':'os_asia','900000001':'os_cht'})){
+test('both CN ledger regions use the pinned query, DS salt and explicit owner cookie',async()=>{
+ for(const[uid,region]of Object.entries({'100000001':'cn_gf01','500000001':'cn_qd01'})){
   const h=harness(),user=h.select(uid);h.state.response=async()=>({retcode:0,data:ledgerData(uid,region)});
   const result=await h.ledger.fetchMonth(10,uid);assert.equal(result.uid,Number(uid));assert.deepEqual(plain(result.optionalMonth),[10,9]);
-  const request=h.state.sent[0],url=new URL(request.url),os=region.startsWith('os_');
-  assert.equal(url.origin,os?'https://sg-hk4e-api.hoyolab.com':'https://hk4e-api.mihoyo.com');
-  assert.equal(url.pathname,os?'/event/ysledgeros/month_info':'/event/ys_ledger/monthInfo');
-  assert.equal(url.searchParams.get(os?'uid':'bind_uid'),uid);assert.equal(url.searchParams.get(os?'region':'bind_region'),region);
-  assert.equal(url.searchParams.get('month'),'10');assert.equal(url.searchParams.get(os?'bind_uid':'uid'),null);
+  const request=h.state.sent[0],url=new URL(request.url);
+  assert.equal(url.origin,'https://hk4e-api.mihoyo.com');
+  assert.equal(url.pathname,'/event/ys_ledger/monthInfo');
+  assert.equal(url.searchParams.get('bind_uid'),uid);assert.equal(url.searchParams.get('bind_region'),region);
+  assert.equal(url.searchParams.get('month'),'10');assert.equal(url.searchParams.get('uid'),null);
   assert.equal(h.state.signatures[0].query,url.search.slice(1));assert.equal(h.state.signatures[0].body,'');
-  assert.equal(h.state.signatures[0].salt,os?'h4c1d6ywfq5bsbnbhm1bzq7bxzzv6srt':'xV8v4Qu54lUKrEYFZkJhB8cuOh9Asafs');
+  assert.equal(h.state.signatures[0].salt,'xV8v4Qu54lUKrEYFZkJhB8cuOh9Asafs');
   assert.equal(request.options.header.Cookie,user.gameRecordCookie());assert.equal(request.options.header['x-rpc-client_type'],'5');
-  assert.equal(request.options.header.Referer,os?undefined:'https://webstatic.mihoyo.com/');
-  assert.equal(request.options.header['x-rpc-device_fp'],os?undefined:'fixture-fp');
-  if(os)assert.equal(url.searchParams.get('lang'),'zh-cn');
+  assert.equal(request.options.header.Referer,'https://webstatic.mihoyo.com/');
+  assert.equal(request.options.header['x-rpc-device_fp'],'fixture-fp');
  }
 });
 
 test('ledger rejects wrong account region, unbound UID, malformed month and mismatched bound role before signing/network',async()=>{
- const h=harness(),user=h.select('800000001');
- for(const month of [-1,13,1.5,NaN])await assert.rejects(h.ledger.fetchMonth(month,'800000001'));
+ const h=harness();h.select('800000001');
  await assert.rejects(h.ledger.fetchMonth(0,'100000001'),/不匹配/);
- await assert.rejects(h.ledger.fetchMonth(0,'800000002'),/绑定/);
- user.roles[0].region='os_euro';await assert.rejects(h.ledger.fetchMonth(0,'800000001'),/绑定/);
+ const user=h.select();
+ for(const month of [-1,13,1.5,NaN])await assert.rejects(h.ledger.fetchMonth(month,'100000001'),/月份无效/);
+ await assert.rejects(h.ledger.fetchMonth(0,'100000002'),/绑定/);
+ user.roles[0].region='cn_qd01';await assert.rejects(h.ledger.fetchMonth(0,'100000001'),/绑定/);
  assert.equal(h.state.sent.length,0);assert.equal(h.state.signatures.length,0);assert.equal(h.state.refreshed.length,0);
 });
 
-test('OS authentication retry stays overseas, re-signs, refreshes explicit cookie and never falls back to CN risk flow',async()=>{
- const h=harness();h.select('800000001');let calls=0;
- h.state.response=async()=>++calls===1?{retcode:-100,message:'expired'}:{retcode:0,data:ledgerData('800000001','os_asia')};
- await h.ledger.fetchMonth(10,'800000001');assert.equal(h.state.sent.length,2);assert.equal(h.state.refreshed.length,1);
- assert.notEqual(h.state.sent[0].options.header.DS,h.state.sent[1].options.header.DS);assert.ok(h.state.sent[1].options.header.Cookie.includes('fixture-refreshed-cookie'));
- assert.ok(h.state.sent.every(request=>new URL(request.url).origin==='https://sg-hk4e-api.hoyolab.com'));
- h.state.response=async()=>({retcode:1034,message:'risk'});await assert.rejects(h.ledger.fetchMonth(10,'800000001'),/HoYoLAB/);assert.equal(h.state.risk.length,0);
+test('stored overseas ledger roles fail before signing, token refresh or network',async()=>{
+ const h=harness();
+ for(const uid of ['600000001','700000001','800000001','900000001','1800000001']){
+  const user=h.select(uid);user.cookieToken='';
+  await assert.rejects(h.ledger.fetchMonth(10,uid),/仅支持国服/);
+ }
+ assert.equal(h.state.sent.length,0);assert.equal(h.state.signatures.length,0);
+ assert.equal(h.state.refreshed.length,0);assert.equal(h.state.risk.length,0);
 });
 
 test('CN risk and auth retries are bounded and obtain new DS signatures; cancelling verification preserves ownership',async()=>{
@@ -154,9 +172,24 @@ test('ledger viewmodel keeps only latest month, clears account changes, labels s
  view.month=9;const old=view.load('100000001',1,()=>true);await tick();view.month=10;await view.load('100000001',1,()=>true);gate.resolve();await old;
  assert.equal(view.ledger.month,10);assert.equal(view.ledger.monthData.currentPrimogems,1000);
  h.state.response=async()=>({retcode:-2,message:'offline'});await view.load('100000001',1,()=>true);assert.equal(view.stale,true);assert.equal(view.ledger.month,10);
- h.select('800000001',2);view.clear();await view.load('800000001',2,()=>true);assert.equal(view.ledger,undefined);assert.equal(view.stale,false);
- const late=deferred();h.state.response=async()=>{await late.promise;return{retcode:0,data:ledgerData('800000001','os_asia')};};
- const pending=view.load('800000001',2,()=>true);await tick();view.dispose();late.resolve();await pending;assert.equal(view.ledger,undefined);assert.equal(view.loading,false);
+ view.month=9;await view.load('100000001',1,()=>true);
+ assert.equal(view.ledger,undefined);assert.equal(view.stale,false);assert.deepEqual(plain(view.availableMonths),[10,9]);
+ h.select('100000002',2);view.clear();await view.load('100000002',2,()=>true);
+ assert.equal(view.ledger,undefined);assert.deepEqual(plain(view.availableMonths),[]);
+ const late=deferred();h.state.response=async()=>{await late.promise;return{retcode:0,data:ledgerData('100000002','cn_gf01')};};
+ const pending=view.load('100000002',2,()=>true);await tick();view.dispose();late.resolve();await pending;
+ assert.equal(view.ledger,undefined);view.activate();assert.equal(view.loading,false);
+});
+
+test('latest ledger refresh keeps asking the API for the current month at rollover',async()=>{
+ const h=harness();h.select();
+ const view=new h.LedgerVM();
+ let month=12;
+ h.state.response=async()=>({retcode:0,data:ledgerData('100000001','cn_gf01',month)});
+ await view.load('100000001',1,()=>true);assert.equal(view.ledger.month,12);
+ month=1;
+ await view.load('100000001',1,()=>true);assert.equal(view.ledger.month,1);
+ assert.ok(h.state.sent.every(request=>new URL(request.url).searchParams.get('month')==='0'));
 });
 
 test('both token completion wrappers cannot republish cookies after switch, logout, or account-ID reuse',async()=>{
@@ -174,13 +207,170 @@ test('home diary lifecycle immediately clears prior account figures and ignores 
  const h=harness(),gate=deferred();h.select();
  const Card=h.load('components/HomeTravelersDiaryCard').HomeTravelersDiaryCard,card=new Card();
  card.currentUid='100000001';card.currentUserId=1;
- h.state.response=async url=>{const u=new URL(url),uid=u.searchParams.get('uid')||u.searchParams.get('bind_uid');if(uid==='100000001')await gate.promise;
-  return{retcode:0,data:ledgerData(uid,uid==='100000001'?'cn_gf01':'os_asia',10,uid==='100000001'?111:222)};};
- card.aboutToAppear();await tick();h.select('800000001',2);card.currentUid='800000001';card.currentUserId=2;card.onOwnerChanged();
+ h.state.response=async url=>{const uid=new URL(url).searchParams.get('bind_uid');if(uid==='100000001')await gate.promise;
+  return{retcode:0,data:ledgerData(uid,'cn_gf01',10,uid==='100000001'?111:222)};};
+ card.aboutToAppear();await tick();card.selectPage(1);
+ h.select('100000002',2);card.currentUid='100000002';card.currentUserId=2;card.onOwnerChanged();
+ assert.equal(card.pageIndex,0);assert.equal(card.amount(false,true),'—');
  assert.equal(card.vm.ledger,undefined);while(!card.loaded)await tick();assert.equal(card.vm.ledger.monthData.currentPrimogems,222);
- gate.resolve();await tick();await tick();assert.equal(card.vm.ledger.uid,800000001);
- const late=deferred();h.state.response=async()=>{await late.promise;return{retcode:0,data:ledgerData('800000001','os_asia',10,333)};};
- card.onOwnerChanged();await tick();card.aboutToDisappear();late.resolve();await tick();await tick();assert.equal(card.vm.ledger,undefined);assert.equal(card.loaded,false);
+ gate.resolve();await tick();await tick();assert.equal(card.vm.ledger.uid,100000002);
+ const late=deferred();h.state.response=async()=>{await late.promise;return{retcode:0,data:ledgerData('100000002','cn_gf01',10,333)};};
+ card.onOwnerChanged();await tick();card.selectPage(1);card.aboutToDisappear();late.resolve();await tick();await tick();
+ assert.equal(card.vm.ledger,undefined);assert.equal(card.loaded,false);assert.equal(card.amount(false,true),'—');
+ h.state.response=async()=>({retcode:0,data:ledgerData('100000002','cn_gf01',10,444)});
+ card.aboutToAppear();await tick();assert.equal(card.pageIndex,0);assert.equal(card.loaded,true);
+ assert.equal(card.amount(false,true),'444');
+});
+
+test('home diary changes pages without requerying and preserves independent source amounts, percentages and order',async()=>{
+ const h=harness();h.select();
+ const Card=h.load('components/HomeTravelersDiaryCard').HomeTravelersDiaryCard,card=new Card();
+ card.currentUid='100000001';card.currentUserId=1;
+ const sources=[
+  {action_id:7,action:'任务',num:25,percent:60},
+  {action_id:2,action:'活动',num:150,percent:15},
+  {action_id:9,action:'其他',num:75,percent:25},
+ ];
+ const data=ledgerData('100000001','cn_gf01',10,123456);
+ data.day_data.current_primogems=0;data.day_data.current_mora=0;
+ data.month_data.current_mora=98765;data.month_data.group_by=sources;
+ h.state.response=async()=>({retcode:0,data});
+ card.aboutToAppear();await tick();assert.equal(card.loaded,true);
+ assert.equal(card.amount(true,true),'0');assert.equal(card.amount(true,false),'0');
+ assert.equal(card.amount(false,true),'123,456');assert.equal(card.amount(false,false),'98,765');
+ const ledger=card.vm.ledger;
+ for(const page of [1,0,1,0,1,0]){card.selectPage(page);assert.equal(card.pageIndex,page);}
+ await tick();
+ assert.equal(card.vm.ledger,ledger);assert.equal(card.vm.month,0);
+ assert.equal(h.state.sent.length,1);assert.equal(new URL(h.state.sent[0].url).searchParams.get('month'),'0');
+ assert.deepEqual(plain(ledger.monthData.groupBy.map(source=>[source.actionId,source.action,source.num,source.percent])),
+  sources.map(source=>[source.action_id,source.action,source.num,source.percent]));
+});
+
+test('home diary missing daily figures use dashes while an empty source page keeps the month summary available',async()=>{
+ const h=harness();h.select();
+ const Card=h.load('components/HomeTravelersDiaryCard').HomeTravelersDiaryCard,card=new Card();
+ card.currentUid='100000001';card.currentUserId=1;
+ const data=ledgerData('100000001','cn_gf01',10,1600);delete data.day_data;
+ data.month_data.current_mora=25000;
+ h.state.response=async()=>({retcode:0,data});
+ card.aboutToAppear();await tick();assert.equal(card.loaded,true);
+ assert.equal(card.amount(true,true),'—');assert.equal(card.amount(true,false),'—');
+ assert.equal(card.amount(false,true),'1,600');assert.equal(card.amount(false,false),'25,000');
+ card.selectPage(1);assert.equal(card.pageIndex,1);assert.equal(card.vm.ledger.monthData.groupBy.length,0);
+ assert.equal(card.loaded,true);assert.equal(card.vm.message,'');
+ card.selectPage(0);assert.equal(card.pageIndex,0);assert.equal(card.amount(false,true),'1,600');
+ assert.equal(card.amount(true,true),'—');await tick();
+ assert.equal(h.state.sent.length,1);assert.equal(new URL(h.state.sent[0].url).searchParams.get('month'),'0');
+ card.aboutToDisappear();data.month_data.current_primogems=0;data.month_data.current_mora=0;
+ card.aboutToAppear();await tick();assert.equal(card.loaded,true);assert.equal(card.pageIndex,0);
+ assert.equal(card.amount(false,true),'0');assert.equal(card.amount(false,false),'0');
+ assert.equal(card.amount(true,true),'—');card.selectPage(1);
+ assert.equal(card.vm.ledger.monthData.groupBy.length,0);card.selectPage(0);
+ assert.equal(card.amount(false,true),'0');await tick();assert.equal(h.state.sent.length,2);
+});
+
+test('activity calendar signs a CN POST, replays one verified challenge and parses activities and pools',async()=>{
+ const h=harness(),user=h.select('500000001');
+ const calendar=h.load('service/CalendarService').CalendarService.getInstance();
+ const now=Date.parse('2026-11-11T00:00:00Z'),start=now/1000-1800,end=now/1000+1800;
+ h.state.riskResult=async()=> 'calendar-challenge';
+ h.state.response=async()=>h.state.sent.length===1?{retcode:1034,message:'risk'}:{retcode:0,data:{
+  act_list:[{id:1,type:'ActTypeTower',name:'挑战',start_timestamp:start,end_timestamp:end,countdown_seconds:1800,tower_detail:{is_unlock:true,max_star:36,total_star:36}}],
+  fixed_act_list:[{id:2,type:'ActTypeSignIn',name:'签到',start_timestamp:start-100,end_timestamp:end,is_finished:true}],
+  weapon_card_pool_list:[{pool_id:3,pool_name:'武器祈愿',start_timestamp:start+3600,end_timestamp:end+7200,weapon:[{icon:'https://example.test/weapon.png'}]}]
+ }};
+ const entries=await calendar.fetchCalendar('500000001');
+ assert.deepEqual(plain(entries.map(entry=>entry.name)),['签到','挑战','武器祈愿']);
+ assert.equal(entries[0].typeName,'签到');assert.equal(entries[0].statusText(now),'已完成');
+ assert.equal(entries[1].statusText(now),'进行中');assert.match(entries[1].progressLine(),/36\/36/);
+ assert.equal(entries[2].weaponIcons.length,1);assert.match(entries[2].statusText(now),/后开始/);
+ for (const request of h.state.sent) {
+  assert.equal(request.url,'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api/act_calendar');
+  assert.equal(request.options.method,'POST');assert.equal(request.options.header.Cookie,user.gameRecordCookie());
+ }
+ assert.deepEqual(JSON.parse(h.state.signatures[1].body),{role_id:'500000001',server:'cn_qd01'});
+ assert.notEqual(h.state.sent[0].options.header.DS,h.state.sent[1].options.header.DS);
+ assert.equal(h.state.risk[0].path,'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api/hard_challenge');
+ assert.equal(h.state.sent[1].options.header['x-rpc-challenge'],'calendar-challenge');
+});
+
+test('activity calendar refuses stored overseas roles and drops a request invalidated during signing',async()=>{
+ const h=harness(),calendar=h.load('service/CalendarService').CalendarService.getInstance();
+ h.select('800000001');
+ await assert.rejects(calendar.fetchCalendar('800000001'),/仅支持国服/);
+ assert.equal(h.state.sent.length,0);assert.equal(h.state.signatures.length,0);
+ const gate=deferred();h.state.signGate=gate.promise;h.select();
+ const pending=outcome(calendar.fetchCalendar('100000001'));
+ while(!h.state.signatures.length)await tick();
+ h.select('500000001',2);gate.resolve();
+ assert.match((await pending).error.message,/已改变/);
+ assert.equal(h.state.sent.length,0);assert.equal(h.state.risk.length,0);
+});
+
+test('home calendar keeps the complete Windows source order and mixed pools render both icon families', async () => {
+  const h = harness();
+  h.select();
+  const { CalendarEntryOrder, CalendarService } = h.load('service/CalendarService');
+  const calendar = CalendarService.getInstance();
+  const now = Date.parse('2026-11-12T00:00:00Z') / 1000;
+  const activity = (id, name, start, end) => ({ id, name, start_timestamp: start, end_timestamp: end });
+  const pool = (id, name, start, avatars = [], weapon = []) =>
+    ({ pool_id: id, pool_name: name, start_timestamp: start, end_timestamp: now + 10000, avatars, weapon });
+  const avatarIcon = 'https://example.test/UI_AvatarIcon_Mitya.png?v=2';
+  const weaponIcon = 'https://example.test/UI_EquipIcon_Sword_Regalis.png';
+  h.state.response = async () => ({ retcode: 0, data: {
+    fixed_act_list: [activity(1, '固定挑战', now - 500, now + 500), activity(2, '固定签到', now - 600, now + 500)],
+    act_list: [activity(3, '已排期活动', now + 100, now + 200), activity(4, '待公布活动', 0, 0)],
+    avatar_card_pool_list: [pool(31, '角色活动祈愿', now - 100), pool(32, '角色活动祈愿 - 2', now - 100)],
+    weapon_card_pool_list: [pool(33, '武器祈愿', now - 200)],
+    mixed_card_pool_list: [pool(34, '混池', now - 300, [{ icon: avatarIcon }], [{ icon: weaponIcon }])],
+    selected_act_list: [activity(9, '精选入口', 0, 0)],
+    selected_avatar_card_pool_list: [pool(39, '精选池', now)],
+  } });
+  const home = await calendar.fetchCalendar('100000001', undefined, CalendarEntryOrder.Home);
+  assert.deepEqual(plain(home.map(entry => entry.name)),
+    ['固定挑战', '固定签到', '已排期活动', '待公布活动', '角色活动祈愿', '角色活动祈愿 - 2', '武器祈愿', '混池']);
+  assert.equal(home[3].endTime, 0);
+  assert.match(home[2].statusText(now * 1000), /后开始/);
+  const timeline = await calendar.fetchCalendar('100000001');
+  assert.deepEqual(plain(timeline.map(entry => entry.name)),
+    ['待公布活动', '固定签到', '固定挑战', '混池', '武器祈愿', '角色活动祈愿', '角色活动祈愿 - 2', '已排期活动']);
+  assert.equal(h.state.sent.length, 2, 'each order uses exactly one calendar request');
+
+  const { HomeGachaBannerCard } = h.load('components/HomeGachaBannerCard');
+  const banner = new HomeGachaBannerCard();
+  banner.pool = home[7];
+  assert.deepEqual(plain(banner.upCells().map(cell => [cell.name, cell.url])),
+    [['UI_AvatarIcon_Mitya', avatarIcon], ['UI_EquipIcon_Sword_Regalis', weaponIcon]]);
+  const bannerSource = fs.readFileSync(path.join(root, 'components/HomeGachaBannerCard.ets'), 'utf8');
+  assert.match(bannerSource, /\(cell: UpIconCell, index: number\): string => `\$\{cell\.url\}_\$\{index\}`/);
+  const { HomeActBannerCard } = h.load('components/HomeActBannerCard');
+  const announcement = new HomeActBannerCard();
+  announcement.entry = home[3];
+  assert.equal(announcement.hasDates(), false);
+  assert.equal(announcement.remainText(), 'app.string.ui_calendar_time_pending');
+});
+
+test('CN action ticket keeps the default scope and includes an available fingerprint',async()=>{
+ const h=harness(),client=h.load('data/network/HoyolabClient').HoyolabClient;
+ const cookie='stuid=42; stoken=fixture',token='fixture+/?';
+ await client.getActionTicket(cookie,token,'42');
+ await client.getActionTicket(cookie,token,'42','fixture_explicit_scope');
+ h.state.deviceFp='';
+ await client.getActionTicket(cookie,token,'42','fixture_explicit_scope');
+ const requests=h.state.sent.map(request=>({url:new URL(request.url),headers:request.options.header}));
+ assert.deepEqual(requests.map(request=>request.url.searchParams.get('action_type')),
+  ['game_role','fixture_explicit_scope','fixture_explicit_scope']);
+ assert.deepEqual(requests.map(request=>request.headers['x-rpc-device_fp']),['fixture-fp','fixture-fp',undefined]);
+ for(const request of requests){
+  assert.equal(request.url.origin,'https://api-takumi.mihoyo.com');
+  assert.equal(request.url.pathname,'/auth/api/getActionTicketBySToken');
+  assert.equal(request.url.searchParams.get('stoken'),token);
+  assert.equal(request.url.searchParams.get('uid'),'42');
+  assert.equal(request.headers.Cookie,cookie);
+  assert.ok(request.headers.DS);
+ }
 });
 
 test('announcements route all six regions and 15 supported language codes without credentials or DS',async()=>{
@@ -199,6 +389,29 @@ test('announcements route all six regions and 15 supported language codes withou
  assert.equal(h.Context.forUid('1800000001').region,'os_asia');
  for(const bad of ['','os_bad','https://evil'])await assert.rejects(h.announcements.fetchGroups(bad,55,'en-us'));
  await assert.rejects(h.announcements.fetchGroups('os_asia',55,'en-us&uid=private'));
+});
+
+test('official announcement groups preserve empty wrappers and their source indices', async () => {
+  const h = harness();
+  h.state.response = async () => ({ retcode: 0, data: {
+    list: [
+      { type_id: 2, list: [] },
+      { type_id: 1, list: [{ ann_id: 40, title: '活动条目' }] },
+      { type_id: 5, list: [] },
+    ],
+    type_list: [
+      { id: 2, mi18n_name: '游戏公告' },
+      { id: 1, mi18n_name: '活动公告' },
+      { id: 5, mi18n_name: '千星奇域' },
+    ],
+  } });
+  const groups = await h.announcements.fetchGroups('cn_gf01', 55, 'zh-cn');
+  assert.deepEqual(plain(groups.map(group => [group.typeId, group.label, group.items.length])),
+    [[2, '游戏公告', 0], [1, '活动公告', 1], [5, '千星奇域', 0]]);
+  const all = await h.announcements.fetchList('cn_gf01', 55, 'zh-cn');
+  assert.deepEqual(plain(all.map(item => [item.id, item.sourceRegion, item.sourceLanguage, item.sourceLevel])),
+    [[40, 'cn_gf01', 'zh-cn', 55]]);
+  assert.equal(h.state.sent.length, 1, 'flattened consumers reuse the grouped cache');
 });
 
 test('announcement body selects exact ann_id and caches by region/language/level, never first element',async()=>{

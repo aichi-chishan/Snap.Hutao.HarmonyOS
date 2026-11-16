@@ -2,140 +2,124 @@
  * UserPage.ets（@Entry）
  * 账号与数据：账号列表/添加/删除/切换；游戏角色绑定与默认 UID 选择；退出登录。
  */
-import { router } from '@kit.ArkUI';
 import { pasteboard } from '@kit.BasicServicesKit';
-import { UserViewModel } from '../viewmodel/UserViewModel';
-import { User } from '../model/User';
-import { UserGameRole } from '../model/UserGameRole';
-import { UserService } from '../service/UserService';
+import { UserAccountItem, UserRoleItem, UserViewModel } from '../viewmodel/UserViewModel';
 import { PageHeader } from '../components/PageHeader';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { NavIcon } from '../components/NavIcon';
-import { CardSurfaceModifier } from '../common/UiSurface';
+import { MetaIcon } from '../components/MetaIcon';
+import { AppButtonModifier, CardSurfaceModifier, UiSurface } from '../common/UiSurface';
+
+interface UserTravelToolParams {
+  kind: string;
+}
 
 @Entry
 @Component
 export struct UserPage {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
-  // 全局登录态订阅：嵌入式（Index 宽屏容器内）不触发 onPageShow，靠 AppStorage 驱动刷新
-  @StorageLink('isLoggedIn') @Watch('onLoginStateChanged') isLoggedIn: boolean = false;
-  @StorageLink('currentUid') @Watch('onUidStateChanged') currentUid: string = '';
   @State vm: UserViewModel = new UserViewModel();
-  @State loaded: boolean = false;
-  // 页面级快照（避免嵌套 @Observed 不触发 UI 刷新）
-  @State snapDisplayName: string = '';
-  @State snapAvatar: string = '';
-  @State snapUid: string = '';
-  @State snapRoles: UserGameRole[] = [];
-  @State snapUsers: User[] = [];
-  /** 登录态变化刷新防抖（isLoggedIn/currentUid 成对写入，合并为一次 load） */
-  private refreshTimer: number = -1;
+  @State actionPending: boolean = false;
+  @State reordering: boolean = false;
+  private stopWatching: (() => void) | undefined = undefined;
 
   aboutToAppear(): void {
-    this.vm.load().then(() => {
-      this.loaded = true;
-      this.syncSnap();
+    this.vm.activate();
+    this.actionPending = false;
+    this.reordering = false;
+    this.stopWatching = this.vm.watchSession((): void => {
+      this.vm.load();
     });
+    this.vm.load();
   }
 
-  /** 页面显示/返回：同步登录态与角色绑定（登录/切换账号后立即刷新） */
   onPageShow(): void {
-    this.vm.load().then(() => {
-      this.loaded = true;
-      this.syncSnap();
-    });
+    if (!this.actionPending) { this.vm.load(); }
   }
 
-  /** 登录态变化（登录/退出/切号）：防抖后重载页面数据 */
-  onLoginStateChanged(): void {
-    this.scheduleRefresh();
-  }
-
-  /** 默认 UID 变化（绑定角色）：防抖后重载页面数据 */
-  onUidStateChanged(): void {
-    this.scheduleRefresh();
-  }
-
-  scheduleRefresh(): void {
-    if (this.refreshTimer >= 0) {
-      clearTimeout(this.refreshTimer);
-    }
-    this.refreshTimer = setTimeout(() => {
-      this.vm.load().then(() => {
-        this.loaded = true;
-        this.syncSnap();
-      });
-    }, 150);
-  }
-
-  /** 同步全部显示快照到页面状态（@State 直接驱动 UI） */
-  syncSnap(): void {
-    const user: User | undefined = this.vm.currentUser;
-    this.snapDisplayName = user !== undefined ? user.displayName : '';
-    this.snapAvatar = user !== undefined ? user.avatar : '';
-    this.snapUid = this.vm.currentUid;
-    this.snapRoles = user !== undefined ? user.roles.slice() : [];
-    this.snapUsers = this.vm.users.slice();
+  aboutToDisappear(): void {
+    this.stopWatching?.();
+    this.stopWatching = undefined;
+    this.vm.dispose();
   }
 
   toast(msg: string): void {
-    this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1800 });
+    if (this.stopWatching === undefined) { return; }
+    this.getUIContext().getPromptAction().showToast({ systemMaterial: UiSurface.dialogMaterial(), message: msg, duration: 1800 });
   }
 
-  /**
-   * 复制 Cookie（对齐 Windows CopyCookieCommand：SToken + LToken + CookieToken 依次拼接）。
-   * 只在剪贴板留痕，不上传；缺哪段跳过哪段。
-   */
-  copyCookie(): void {
-    const user: User | undefined = this.vm.currentUser;
-    if (user === undefined) {
-      this.toast('未登录');
-      return;
+  async runAccountAction(action: () => Promise<string>): Promise<void> {
+    const subscription: (() => void) | undefined = this.stopWatching;
+    if (this.actionPending || subscription === undefined) { return; }
+    this.actionPending = true;
+    try {
+      const message: string = await action();
+      if (this.stopWatching === subscription) { this.toast(message); }
+    } catch (e) {
+      if (this.stopWatching !== subscription) { return; }
+      await this.vm.load();
+      if (this.stopWatching === subscription) {
+        this.toast(e instanceof Error ? e.message : '账号操作失败，请稍后重试');
+      }
+    } finally {
+      if (this.stopWatching === subscription) { this.actionPending = false; }
     }
-    const parts: string[] = [];
-    if (user.stoken.length > 0) {
-      parts.push(user.stoken);
-    }
-    if (user.ltoken.length > 0) {
-      parts.push(user.ltoken);
-    }
-    if (user.cookieToken.length > 0) {
-      parts.push(user.cookieToken);
-    }
-    if (parts.length === 0) {
-      this.toast('当前账号没有可复制的凭证');
-      return;
-    }
-    const data: pasteboard.PasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, parts.join(';'));
-    pasteboard.getSystemPasteboard().setData(data).then(() => {
-      this.toast('Cookie 已复制到剪贴板');
-    }).catch(() => {
-      this.toast('复制失败');
+  }
+
+  async copyCookie(userId?: number): Promise<string> {
+    const cookie: string = userId === undefined
+      ? this.vm.cookieForClipboard() : await this.vm.savedCookieForClipboard(userId);
+    if (cookie.length === 0) { return '该账号没有可复制的凭证'; }
+    const data: pasteboard.PasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, cookie);
+    try { await pasteboard.getSystemPasteboard().setData(data); }
+    catch (e) { throw new Error('复制 Cookie 失败，请稍后重试'); }
+    return 'Cookie 已复制到剪贴板';
+  }
+
+  private accountMenu(user: UserAccountItem): MenuElement[] {
+    return [
+      { value: $r('app.string.ui_user_copy_cookie_action'), enabled: user.canSwitch, action: (): void => {
+        this.runAccountAction((): Promise<string> => this.copyCookie(user.id));
+      } },
+      { value: $r('app.string.ui_account_insights_delete'), action: (): void => { this.confirmDelete(user); } }
+    ];
+  }
+
+  private moveAccount(userId: number, direction: number): void {
+    this.runAccountAction(async (): Promise<string> => {
+      await this.vm.moveUser(userId, direction);
+      return '账号顺序已保存';
     });
   }
 
   goLogin(): void {
-    router.pushUrl({ url: 'pages/LoginPage' });
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/LoginPage' }).catch((): void => {
+      this.toast('无法打开登录页，请稍后重试');
+    });
   }
 
-  /** 账号栏显示米游社 UID（stuid/account_id）；绑定角色区显示原神 UID（role.gameUid） */
-  displayUid(user: User): string {
-    const accountId: string = user.stuid.length > 0 ? user.stuid : user.accountId;
-    return accountId.length > 0 ? `米游社UID：${accountId}` : '米游社UID：--';
+  goTravelTools(): void {
+    if (this.actionPending || !this.vm.canOpenTravelTools()) { return; }
+    const params: UserTravelToolParams = { kind: 'toolbox' };
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/OfficialWebPage', params: params }).catch((): void => {
+      this.toast('无法打开旅行工具，请稍后重试');
+    });
   }
 
   @Builder
   header() {
-    PageHeader({ title: '账号与数据', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp })
+    PageHeader({ title: $r('app.string.ui_section_account'), embedMode: this.embedMode, topAvoidVp: this.topAvoidVp })
   }
 
   @Builder
   loginGuide() {
     Column({ space: 14 }) {
       NavIcon({ name: 'Passport', iconSize: 64 })
-      Text('未登录')
+      Text($r('app.string.ui_settings_not_logged_in'))
         .fontSize($r('app.float.title_font_size'))
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary'))
@@ -143,9 +127,9 @@ export struct UserPage {
         .fontSize(13)
         .fontColor($r('app.color.text_secondary'))
         .textAlign(TextAlign.Center)
-      Button('去登录')
-        .backgroundColor($r('app.color.app_primary'))
-        .fontColor($r('app.color.on_accent'))
+      Button($r('app.string.page_title_login'), { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true)).constraintSize({ minHeight: 44 })
+        .enabled(!this.actionPending)
         .onClick(() => {
           this.goLogin();
         })
@@ -156,7 +140,7 @@ export struct UserPage {
   }
 
   @Builder
-  accountCard(user: User) {
+  accountCard(user: UserAccountItem) {
     Row({ space: 12 }) {
       // 优先加载真实头像；头像不可用则用昵称首字占位
       if (user.avatar.length > 0) {
@@ -177,73 +161,87 @@ export struct UserPage {
           .backgroundColor($r('app.color.app_primary'))
       }
       Column({ space: 3 }) {
-        Text(user.displayName.length > 0 ? user.displayName : '未命名账号')
+        Text(user.displayName)
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .maxLines(1)
-        // 账号卡片展示游戏默认角色 UID（而非米游社账号 ID），避免误导
-        Text(this.displayUid(user))
+        Text(`米游社 UID ${user.accountId}`)
           .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
 
-      if (user.isSelected) {
+      if (this.reordering) {
+        Button('上移', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+          .fontSize(12)
+          .height(44)
+          .enabled(!this.actionPending && user.canMoveUp)
+          .onClick(() => { this.moveAccount(user.id, -1); })
+        Button('下移', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+          .fontSize(12)
+          .height(44)
+          .enabled(!this.actionPending && user.canMoveDown)
+          .onClick(() => { this.moveAccount(user.id, 1); })
+      } else if (user.isSelected) {
         Text('当前')
           .fontSize(11)
           .fontColor($r('app.color.app_primary_text'))
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .borderRadius(8)
           .backgroundColor($r('app.color.app_primary_bg'))
-      } else {
-        Button('切换')
+      } else if (user.canSwitch) {
+        Button('切换', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
           .fontSize(12)
-          .height(28)
-          .backgroundColor($r('app.color.app_primary'))
-          .fontColor($r('app.color.on_accent'))
+          .height(44)
+          .enabled(!this.actionPending)
           .onClick(() => {
-            this.vm.switchUser(user.id).then(() => {
-              this.syncSnap();
-              this.toast('已切换账号');
+            this.runAccountAction(async (): Promise<string> => {
+              await this.vm.switchUser(user.id);
+              return '已切换账号';
             });
           })
+      } else {
+        Text(user.isOversea ? '仅支持国服' : '待重新登录')
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
       }
-      Button('删除')
-        .fontSize(12)
-        .height(28)
-        .attributeModifier(new CardSurfaceModifier())
-        .hoverEffect(HoverEffect.Highlight)
-        .fontColor($r('app.color.danger'))
-        .border({ width: 1, color: $r('app.color.card_stroke') })
-        .onClick(() => {
-          this.confirmDelete(user);
-        })
+      if (!this.reordering) {
+        Button('更多', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+          .fontSize(12)
+          .height(44)
+          .enabled(!this.actionPending)
+          .bindMenu(this.accountMenu(user), { systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel) })
+      }
     }
     .width('100%')
     .padding(12)
     .borderRadius($r('app.float.card_radius'))
-    .attributeModifier(new CardSurfaceModifier())
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
   }
 
-  confirmDelete(user: User): void {
-    this.getUIContext().showAlertDialog({
+  confirmDelete(user: UserAccountItem): void {
+    this.getUIContext().showAlertDialog({ systemMaterial: UiSurface.dialogMaterial(),
       title: '删除账号',
-      message: `确定删除账号「${user.displayName || '未命名'}」？其角色与本地数据将保留。`,
+      message: `确定删除「${user.displayName}」的本机登录凭证、角色绑定、便笺和签到缓存？`,
       autoCancel: true,
       primaryButton: {
-        value: '取消',
+        value: $r('app.string.common_cancel'),
         action: () => {
         },
       },
       secondaryButton: {
-        value: '删除',
+        value: $r('app.string.ui_account_insights_delete'),
         fontColor: $r('app.color.danger'),
         action: () => {
-          this.vm.deleteUser(user.id).then(() => {
-            this.syncSnap();
-            this.toast('已删除');
+          this.runAccountAction(async (): Promise<string> => {
+            await this.vm.deleteUser(user.id);
+            return '已删除账号';
           });
         },
       },
@@ -253,100 +251,121 @@ export struct UserPage {
   @Builder
   roleSection() {
     Column({ space: 10 }) {
-      Row() {
-        Text('绑定角色（默认 UID）')
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-        Blank()
-        // 对齐 Windows RefreshCookieTokenCommand：SToken 换新 cookie_token/ltoken
-        Button('刷新凭证')
+      Text('绑定角色')
+        .fontSize(15)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .width('100%')
+      Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
+        Button('刷新凭证', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
           .fontSize(12)
-          .height(26)
-          .margin({ right: 8 })
-          .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary_text'))
+          .height(44).margin({ right: 8, bottom: 6 })
+          .enabled(!this.actionPending)
           .onClick(() => {
-            const user: User | undefined = this.vm.currentUser;
-            if (user === undefined) {
-              this.toast('未登录');
-              return;
-            }
-            UserService.getInstance().refreshCookieTokenForced(user).then((ok: boolean) => {
-              this.toast(ok ? '凭证已刷新' : '刷新失败：SToken 已失效，请重新登录');
+            this.runAccountAction(async (): Promise<string> => {
+              const ok: boolean = await this.vm.refreshCredentials();
+              return ok ? '凭证已刷新' : '未能刷新登录凭证，请重试或重新登录';
             });
           })
-        // 对齐 Windows CopyCookieCommand：拼 SToken/LToken/CookieToken 入剪贴板
-        Button('复制 Cookie')
+        Button($r('app.string.ui_user_copy_cookie_action'), { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
           .fontSize(12)
-          .height(26)
-          .margin({ right: 8 })
-          .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary_text'))
+          .height(44).margin({ right: 8, bottom: 6 })
+          .enabled(!this.actionPending)
           .onClick(() => {
-            this.copyCookie();
+            this.runAccountAction((): Promise<string> => this.copyCookie());
           })
-        Button('刷新角色')
+        Button('刷新角色', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
           .fontSize(12)
-          .height(26)
-          .backgroundColor($r('app.color.app_primary_bg'))
-          .fontColor($r('app.color.app_primary_text'))
+          .height(44).margin({ right: 8, bottom: 6 })
+          .enabled(!this.actionPending)
           .onClick(() => {
-            this.vm.refreshRoles().then((count: number) => {
-              this.syncSnap();
-              if (count > 0) {
-                this.toast(`已同步 ${count} 个角色`);
-              } else {
-                this.toast('未同步到角色，请稍后重试或检查登录态');
-              }
-            }).catch((e: Error) => {
-              this.toast(`角色同步失败：${e.message}`);
+            this.runAccountAction(async (): Promise<string> => {
+              const count: number = await this.vm.refreshRoles();
+              return count > 0 ? `已同步 ${count} 个角色` : '该账号暂无绑定的国服角色';
             });
           })
+        Button('旅行工具', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+          .fontSize(12)
+          .height(44).margin({ bottom: 6 })
+          .enabled(!this.actionPending && this.vm.canOpenTravelTools())
+          .onClick(() => { this.goTravelTools(); })
       }
       .width('100%')
-      .alignItems(VerticalAlign.Center)
 
-      if (this.snapRoles.length === 0) {
+      if (this.vm.roles.length === 0) {
         Text('暂无角色数据，点击「刷新角色」从账号同步')
           .fontSize(13)
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
       }
-      ForEach(this.snapRoles, (role: UserGameRole, index: number) => {
+      ForEach(this.vm.roles, (role: UserRoleItem) => {
         Row({ space: 10 }) {
-          Text(role.isDefault ? '◉' : '○')
-            .fontSize(16)
-            .fontColor(role.isDefault ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
-          Column({ space: 2 }) {
-            Text(role.nickname.length > 0 ? role.nickname : `旅行者${role.gameUid}`)
-              .fontSize(15)
-              .fontColor($r('app.color.text_primary'))
-            Text(`UID ${role.gameUid} · ${role.region}`)
-              .fontSize(12)
-              .fontColor($r('app.color.text_secondary'))
+          Button({ type: ButtonType.Normal }) {
+            Column({ space: 2 }) {
+              if (role.avatarIcon.length > 0) {
+                MetaIcon({ category: 'AvatarIconCircle', name: role.avatarIcon, iconSize: 28, circular: true,
+                  remoteFallback: true })
+              } else {
+                NavIcon({ name: 'WikiAvatar', iconSize: 28 })
+              }
+              Text('刷新头像')
+                .fontSize(9)
+                .fontColor($r('app.color.text_secondary'))
+            }
           }
-          .alignItems(HorizontalAlign.Start)
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+          .width(50)
+          .height(48)
+          .padding(3)
+          .enabled(!this.actionPending && role.canRefreshAvatar)
+          .accessibilityText(`刷新 ${role.nickname} 的头像`)
+          .onClick(() => {
+            this.runAccountAction(async (): Promise<string> => {
+              const ok: boolean = await this.vm.refreshRoleAvatar(role.gameUid, role.userId);
+              return ok ? '角色头像已刷新' : '暂无可用角色头像，请稍后重试';
+            });
+          })
+          Row({ space: 10 }) {
+            Text(role.isDefault ? '◉' : '○')
+              .fontSize(16)
+              .fontColor(role.isDefault ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+            Column({ space: 2 }) {
+              Text(role.nickname)
+                .fontSize(15)
+                .fontColor($r('app.color.text_primary'))
+              Text(role.description)
+                .fontSize(12)
+                .fontColor($r('app.color.text_secondary'))
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            if (role.isDefault) {
+              Text($r('app.string.ui_setting_control_material_default'))
+                .fontSize(11)
+                .fontColor($r('app.color.app_primary_text'))
+            }
+          }
           .layoutWeight(1)
-          if (role.isDefault) {
-            Text('默认')
-              .fontSize(11)
-              .fontColor($r('app.color.app_primary_text'))
-          }
+          .constraintSize({ minHeight: 44 })
+          .hoverEffect(HoverEffect.Highlight)
+          .enabled(!this.actionPending)
+          .onClick(() => {
+            if (role.isDefault) { return; }
+            this.runAccountAction(async (): Promise<string> => {
+              await this.vm.setDefaultUid(role.gameUid, role.userId);
+              return `已设为默认 UID ${role.gameUid}`;
+            });
+          })
         }
         .width('100%')
         .padding(10)
         .borderRadius(10)
-        .attributeModifier(new CardSurfaceModifier())
-        .hoverEffect(HoverEffect.Highlight)
-        .onClick(() => {
-          this.vm.setDefaultUid(role.gameUid).then(() => {
-            this.syncSnap();
-            this.toast(`已设为默认 UID：${role.gameUid}`);
-          });
-        })
-      // key 含 isDefault：换默认后 ForEach 重建该行（仅 gameUid 不会触发 item 更新）
-      }, (role: UserGameRole) => `${role.gameUid}_${role.isDefault ? 1 : 0}`)
+        .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
+      }, (role: UserRoleItem): string => role.key())
     }
     .width('100%')
   }
@@ -359,22 +378,27 @@ export struct UserPage {
       this.header()
       Scroll() {
         Column({ space: 12 }) {
-          if (!this.loaded) {
+          if (this.vm.message.length > 0) {
+            Text(this.vm.message)
+              .fontSize(13)
+              .fontColor($r('app.color.text_secondary'))
+          }
+          if (!this.vm.loaded) {
             Blank().height(200)
-          } else if (this.vm.currentUser === undefined) {
+          } else if (this.vm.currentAccount === undefined) {
             this.loginGuide()
             this.accountListCard()
           } else {
             Row({ space: 10 }) {
-              if (this.snapAvatar.length > 0) {
-                Image(this.snapAvatar)
+              if ((this.vm.currentAccount?.avatar ?? '').length > 0) {
+                Image(this.vm.currentAccount?.avatar ?? '')
                   .width(52)
                   .height(52)
                   .borderRadius(26)
                   .objectFit(ImageFit.Cover)
                   .backgroundColor($r('app.color.app_primary_bg'))
               } else {
-                Text(this.snapDisplayName.length > 0 ? this.snapDisplayName.substring(0, 1) : '?')
+                Text(this.vm.currentAccount?.displayName.substring(0, 1) ?? '?')
                   .fontSize(22)
                   .fontColor($r('app.color.on_accent'))
                   .width(52)
@@ -384,11 +408,11 @@ export struct UserPage {
                   .backgroundColor($r('app.color.app_primary'))
               }
               Column({ space: 4 }) {
-                Text(this.snapDisplayName.length > 0 ? this.snapDisplayName : '未命名账号')
+                Text(this.vm.currentAccount?.displayName ?? '未命名账号')
                   .fontSize(18)
                   .fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.text_primary'))
-                Text(`当前默认 UID：${this.snapUid.length > 0 ? this.snapUid : '未选择'}`)
+                Text(`当前默认 UID ${this.vm.currentUid || '未选择'}`)
                   .fontSize(12)
                   .fontColor($r('app.color.text_secondary'))
               }
@@ -403,22 +427,15 @@ export struct UserPage {
             this.roleSection()
             this.accountListCard()
 
-            Button('退出登录')
+            Button($r('app.string.ui_setting_hutao_passport_logout_action'), { type: ButtonType.Normal })
+              .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel)).fontColor($r('app.color.danger'))
               .width('100%')
               .height(44)
-              .attributeModifier(new CardSurfaceModifier())
-        .hoverEffect(HoverEffect.Highlight)
-              .fontColor($r('app.color.danger'))
-              .border({ width: 1, color: $r('app.color.card_stroke') })
+              .enabled(!this.actionPending)
               .onClick(() => {
-                UserService.getInstance().logout().then(() => {
-                  this.toast('已退出登录');
-                  this.vm.currentUser = undefined;
-                  this.vm.currentUid = '';
-                  this.vm.load().then(() => {
-                    this.syncSnap();
-                    this.toast('已退出登录');
-                  });
+                this.runAccountAction(async (): Promise<string> => {
+                  await this.vm.logout();
+                  return '已退出登录';
                 });
               })
           }
@@ -448,11 +465,20 @@ export struct UserPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
         Blank()
-        Button('＋ 添加账号')
+        if (this.vm.users.length > 1 || this.reordering) {
+          Button(this.reordering ? $r('app.string.ui_content_dialog_complete_primary_button_text') : '调整顺序', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+            .fontSize(12)
+            .height(44)
+            .margin({ right: 8 })
+            .enabled(!this.actionPending)
+            .onClick(() => { this.reordering = !this.reordering; })
+        }
+        Button('＋ 添加账号', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
           .fontSize(12)
-          .height(28)
-          .backgroundColor($r('app.color.app_primary'))
-          .fontColor($r('app.color.on_accent'))
+          .height(44)
+          .enabled(!this.actionPending)
           .onClick(() => {
             this.goLogin();
           })
@@ -460,15 +486,15 @@ export struct UserPage {
       .width('100%')
       .alignItems(VerticalAlign.Center)
 
-      if (this.snapUsers.length === 0) {
+      if (this.vm.users.length === 0) {
         Text('暂无账号')
           .fontSize(13)
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
       }
-      ForEach(this.snapUsers, (user: User) => {
+      ForEach(this.vm.users, (user: UserAccountItem) => {
         this.accountCard(user)
-      }, (user: User) => `${user.id}`)
+      }, (user: UserAccountItem): string => user.key())
     }
     .width('100%')
   }

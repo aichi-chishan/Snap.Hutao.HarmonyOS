@@ -30,6 +30,7 @@ export class WishHistoryOccurrence {
 export class WishHistoryItem {
   id: number = 0;
   name: string = '';
+  canonicalName: string = '';
   icon: string = '';
   iconCategory: string = '';
   category: WishHistoryCategory = WishHistoryCategory.FiveStarAvatar;

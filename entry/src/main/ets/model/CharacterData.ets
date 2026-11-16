@@ -43,6 +43,7 @@ export class Reliquary {
   rarity: number = 0;
   level: number = 0;
   posName: string = '';
+  setId: number = 0;
   setName: string = '';
   mainProperty: RelicProperty = new RelicProperty();
   subProperties: RelicProperty[] = [];
@@ -67,8 +68,11 @@ export class BaseProperty {
   final: string = '';
 }
 
-/** 推荐圣遗物属性（API recommend_relic_property，用于 Windows 加权评分） */
+/** 推荐圣遗物属性（API recommend_relic_property） */
 export class RecommendRelic {
+  sandMainProperties: string[] = [];
+  gobletMainProperties: string[] = [];
+  circletMainProperties: string[] = [];
   /** 推荐词条（FightProperty 名） */
   subProperties: string[] = [];
   /** 能量类型（NONE/MAVUIKA/SKIRK，用于充能权重） */

@@ -1,9 +1,12 @@
+import { AppButtonModifier } from '../common/UiSurface';
 import { GameLauncherService, GamePackage, GameLaunchResult } from '../service/GameLauncherService';
 import { PageHeader } from '../components/PageHeader';
 
 @Entry
 @Component
 export struct LaunchGamePage {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
   @State gameName: string = '原神';
@@ -72,7 +75,7 @@ export struct LaunchGamePage {
 
   build() {
     Column() {
-      PageHeader({ title: '启动游戏', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp })
+      PageHeader({ title: $r('app.string.ui_nav_launch'), embedMode: this.embedMode, topAvoidVp: this.topAvoidVp })
       Scroll() {
         Column({ space: 16 }) {
           Text('配置游戏入口')
@@ -94,10 +97,15 @@ export struct LaunchGamePage {
             .maxLength(255).enabled(!this.launching)
             .onChange((value: string) => { this.abilityName = value; })
           Row({ space: 12 }) {
-            Button('保存').enabled(!this.launching).onClick(() => { this.save(); }).hoverEffect(HoverEffect.Highlight)
-            Button(this.launching ? '正在启动…' : '启动游戏')
-              .enabled(!this.launching).onClick(() => { this.launch(); }).hoverEffect(HoverEffect.Highlight)
-            Button('清除').enabled(!this.launching).onClick(() => { this.clear(); }).hoverEffect(HoverEffect.Highlight)
+            Button($r('app.string.ui_action_save'), { type: ButtonType.Normal })
+              .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel)).constraintSize({ minHeight: 44 })
+              .enabled(!this.launching).onClick(() => { this.save(); })
+            Button(this.launching ? $r('app.string.ui_common_loading') : $r('app.string.ui_nav_launch'), { type: ButtonType.Normal })
+              .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true)).constraintSize({ minHeight: 44 })
+              .enabled(!this.launching).onClick(() => { this.launch(); })
+            Button('清除', { type: ButtonType.Normal })
+              .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel)).constraintSize({ minHeight: 44 })
+              .enabled(!this.launching).onClick(() => { this.clear(); })
           }
           Text(this.message).fontSize(14).fontColor($r('app.color.text_secondary'))
           Text('游戏安装、更新和游戏内账号切换由游戏或应用市场管理。')

@@ -109,7 +109,7 @@ export class BackgroundTaskRepo {
   }
 
   static async finish(state: BackgroundTaskState, token: string, result: BackgroundTaskResult): Promise<void> {
-    const success: boolean = result.status === 'success' || result.status === 'already_signed';
+    const success: boolean = result.status === 'success' || result.status === 'already_signed' || result.status === 'partial';
     await BackgroundTaskRepo.db().executeSql(`UPDATE background_tasks SET lease='',lease_until=0,status=?,message=?,
       last_success_at=CASE WHEN ?=1 THEN ? ELSE last_success_at END WHERE kind=? AND epoch=? AND lease=?`,
       [result.status, result.message, success ? 1 : 0, Date.now(), state.kind, state.epoch, token]);
@@ -118,7 +118,7 @@ export class BackgroundTaskRepo {
   static async fence(kind: BackgroundTaskKind): Promise<void> {
     await BackgroundTaskRepo.db().executeSql(`UPDATE background_tasks SET epoch=epoch+1,queued=0,
       lease='',lease_until=0,status=CASE WHEN enabled=1 THEN 'paused' ELSE 'disabled' END,
-      message=CASE WHEN enabled=1 THEN '任务已暂停，等待核对原账号绑定后重新排队' ELSE '未开启后台任务' END WHERE kind=?`, [kind]);
+      message=CASE WHEN enabled=1 THEN '账号状态更新后重新排队' ELSE '未开启后台任务' END WHERE kind=?`, [kind]);
   }
 
   static async clearOperationLeases(): Promise<void> {
@@ -147,6 +147,7 @@ export class BackgroundTaskRepo {
       op.status = rs.getString(rs.getColumnIndex('status'));
       op.lease = rs.getString(rs.getColumnIndex('lease'));
       op.leaseUntil = rs.getLong(rs.getColumnIndex('lease_until'));
+      op.updatedAt = rs.getLong(rs.getColumnIndex('updated_at'));
       return op;
     } finally { rs.close(); }
   }
@@ -157,7 +158,8 @@ export class BackgroundTaskRepo {
       [op.kind, op.userId, op.uid, op.region]);
     await BackgroundTaskRepo.db().executeSql(`UPDATE background_operations SET day=?,lease=?,lease_until=?,retry_at=?,updated_at=?
       WHERE kind=? AND user_id=? AND uid=? AND region=? AND (lease='' OR lease_until<=? OR lease_until>?)
-      AND (status NOT IN ('captcha','login_required','manual') OR day<>? OR ?=1) AND (retry_at<=? OR retry_at>? OR ?=1)
+      AND (status NOT IN ('captcha','login_required','manual') OR day<>? OR ?=1)
+      AND (retry_at<=? OR retry_at>? OR ?=1 OR (kind='sign_in' AND status IN ('success','already_signed')))
       AND (?=0 OR completed_day<>?)`, [day, token, now + BackgroundTaskPolicy.BUDGET_MS,
       now + BackgroundTaskPolicy.FAILURE_COOLDOWN_MS, now, op.kind, op.userId, op.uid, op.region, now, now + 86400000,
       day, manual ? 1 : 0, now, now + 86400000, manual ? 1 : 0, op.kind === BackgroundTaskKind.SIGN_IN ? 1 : 0, day]);
@@ -167,18 +169,27 @@ export class BackgroundTaskRepo {
 
   static async finishOperation(op: BackgroundOperation, token: string, result: BackgroundTaskResult, intervalMinutes: number): Promise<void> {
     const success: boolean = result.status === 'success' || result.status === 'already_signed';
-    const retryAt: number = Date.now() + (success && op.kind === BackgroundTaskKind.DAILY_NOTE
-      ? BackgroundTaskPolicy.interval(intervalMinutes) * 60000 : BackgroundTaskPolicy.FAILURE_COOLDOWN_MS);
+    const now: number = Date.now();
+    let retryAt: number = now + BackgroundTaskPolicy.FAILURE_COOLDOWN_MS;
+    if (success) {
+      retryAt = op.kind === BackgroundTaskKind.DAILY_NOTE ? now + BackgroundTaskPolicy.interval(intervalMinutes) * 60000 : 0;
+    }
     await BackgroundTaskRepo.db().executeSql(`UPDATE background_operations SET lease='',lease_until=0,status=?,
       completed_day=CASE WHEN ?=1 THEN ? ELSE completed_day END,retry_at=?,updated_at=?
       WHERE kind=? AND user_id=? AND uid=? AND region=? AND lease=?`,
-      [result.status, success ? 1 : 0, result.day, retryAt, Date.now(), op.kind, op.userId, op.uid, op.region, token]);
+      [result.status, success ? 1 : 0, result.day, retryAt, now, op.kind, op.userId, op.uid, op.region, token]);
     // Operational records cannot grow without bound; no credentials are stored here.
     await BackgroundTaskRepo.db().executeSql(`DELETE FROM background_operations WHERE rowid IN
       (SELECT rowid FROM background_operations WHERE lease='' OR lease_until<=? ORDER BY updated_at DESC LIMIT -1 OFFSET 128)`, [Date.now()]);
   }
 
   static async clearBlocked(state: BackgroundTaskState): Promise<void> {
+    if (state.allAccounts()) {
+      await BackgroundTaskRepo.db().executeSql(`UPDATE background_operations SET status='',retry_at=0,lease='',lease_until=0
+        WHERE kind=? AND (lease='' OR lease_until<=? OR lease_until>?)`,
+        [state.kind, Date.now(), Date.now() + 86400000]);
+      return;
+    }
     await BackgroundTaskRepo.db().executeSql(`UPDATE background_operations SET status='',retry_at=0,lease='',lease_until=0 WHERE
       kind=? AND user_id=? AND uid=? AND region=? AND day=? AND (lease='' OR lease_until<=? OR lease_until>?)`,
       [state.kind, state.userId, state.uid, state.region, BackgroundTaskPolicy.day(state.region), Date.now(), Date.now() + 86400000]);

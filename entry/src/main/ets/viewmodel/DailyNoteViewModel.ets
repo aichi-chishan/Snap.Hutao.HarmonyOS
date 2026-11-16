@@ -2,31 +2,39 @@
  * DailyNoteViewModel.ets
  * 实时便笺页状态容器：数据状态、手动刷新命令、阈值设置、自动刷新开关、上次刷新时间。
  */
-import { DailyNote } from '../model/DailyNote';
-import { DailyNoteService, NotifyFlags, NeedGeetestError } from '../service/DailyNoteService';
+import { DailyNote, ArchonQuestChapter, DailyNoteChapterMetadata } from '../model/DailyNote';
+import { DailyNoteService, DailyNoteTrackedEntry, DailyNoteRefreshSummary, NotifyFlags, NeedGeetestError,
+  KEY_NOTE_VERSION } from '../service/DailyNoteService';
 import { DailyNoteRepo, DailyNoteRecord } from '../data/repo/DailyNoteRepo';
+import { UserRepo } from '../data/repo/UserRepo';
+import { User } from '../model/User';
+import { BackgroundTaskPolicy } from '../model/BackgroundTask';
+import { RegionUtil } from '../common/Constants';
 import { DailyNoteReminderService } from '../service/DailyNoteReminderService';
 import { UserService } from '../service/UserService';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { Logger } from '../common/Logger';
+import { LocalizedGameDataService } from '../service/LocalizedGameDataService';
 
 const TAG: string = 'DailyNoteViewModel';
 
-/** 追踪列表条目（uid + 本地缓存快照；未拉取过则 note 为空） */
-export class TrackedNoteEntry {
-  uid: string = '';
-  note: DailyNote | undefined = undefined;
-}
-
 /** 追踪卡条目（每 UID 一张卡：uid + 昵称 + 快照；对齐 Windows DailyNoteEntries） */
 export class NoteCardEntry {
+  userId: number = 0;
   uid: string = '';
   nickname: string = '';
+  region: string = '';
+  level: number = 0;
   isCurrent: boolean = false;
+  tracked: boolean = false;
   note: DailyNote | undefined = undefined;
+  /** -1 表示未知章节；只有元数据中的真实索引才可作为进度。 */
+  archonProgress: number = -1;
+  archonTotal: number = 0;
+  archonChapterText: string = '';
 }
 
-/** 魔神任务进度 prefs 键（DB 无 archon 列，落在偏好里随缓存补齐） */
+/** 兼容旧版本保存在 prefs 的魔神任务列表。 */
 function archonKey(userId: number, uid: string): string {
   return `dailynote.archon.${userId}.${uid}`;
 }
@@ -34,9 +42,14 @@ function archonKey(userId: number, uid: string): string {
 @Observed
 export class DailyNoteViewModel {
   currentUid: string = '';
+  private currentUserId: number = 0;
+  private loadVersion: number = 0;
+  private trackedVersion: number = 0;
+  private chapters: DailyNoteChapterMetadata[] = [];
+  private settingsVersion: number = 0;
+  private settingsUserId: number = 0;
+  private settingsSave: Promise<void> = Promise.resolve();
   note: DailyNote | undefined = undefined;
-  /** 当前用户昵称（卡头显示 昵称（UID xxx），对齐 Windows UserGameRole） */
-  nickname: string = '';
   resinThreshold: number = 120;
   homeThreshold: number = 1800;
   notifyFlags: number = NotifyFlags.ALL;
@@ -44,6 +57,8 @@ export class DailyNoteViewModel {
   settingsUid: string = '';
   settingsResinThreshold: number = 120;
   settingsHomeThreshold: number = 1800;
+  settingsResinMax: number = 0;
+  settingsHomeMax: number = 0;
   settingsNotifyFlags: number = NotifyFlags.ALL;
   isRefreshing: boolean = false;
   isAutoRunning: boolean = false;
@@ -55,20 +70,23 @@ export class DailyNoteViewModel {
   geetestGt: string = '';
   geetestChallenge: string = '';
   /** 追踪列表（对齐 Windows 多 UID 追踪：uid + 本地缓存快照） */
-  trackedEntries: TrackedNoteEntry[] = [];
+  trackedEntries: DailyNoteTrackedEntry[] = [];
   trackedBusy: boolean = false;
 
   /** 从本地缓存装载 */
   async load(uid: string): Promise<void> {
-    if (this.currentUid !== uid) {
+    const version: number = ++this.loadVersion;
+    const user: User | undefined = UserService.getInstance().getCurrentUser();
+    const userId: number = user?.id ?? 0;
+    if (this.currentUid !== uid || this.currentUserId !== userId) {
       this.note = undefined;
       this.lastRefreshAt = 0;
     }
     this.currentUid = uid;
-    const user = UserService.getInstance().getCurrentUser();
-    this.nickname = user !== undefined ? user.displayName : '';
+    this.currentUserId = userId;
     if (user !== undefined && uid.length > 0) {
       const rec: DailyNoteRecord | undefined = await DailyNoteRepo.get(user.id, uid);
+      if (version !== this.loadVersion || UserService.getInstance().getCurrentUser()?.id !== userId) { return; }
       if (rec !== undefined) {
         this.note = rec.note;
         this.resinThreshold = rec.resinNotifyThreshold;
@@ -80,83 +98,94 @@ export class DailyNoteViewModel {
     }
     this.isAutoRunning = DailyNoteService.getInstance().isTimerRunning();
     await this.loadTracked();
-    this.loaded = true;
+    if (version === this.loadVersion) { this.loaded = true; }
   }
 
-  /** DB 表未持久化魔神任务（archon_json 列恒空）：从 prefs 补齐，避免重启后该行误显示「全部完成」 */
+  /** 仅为没有原始 JSON 和章节列的旧记录补齐 prefs 中保存的任务信息。 */
   private attachArchonFromPrefs(userId: number, uid: string, note: DailyNote): void {
-    if (note.rawJson.length > 0 || note.archonQuests.length > 0) {
+    if (note.rawJson.length > 0 || note.hasArchonQuestProgress) {
       return;
     }
     const raw: string = PreferencesStore.getString(archonKey(userId, uid), '');
     if (raw.length > 0) {
       note.archonQuests = DailyNote.archonListFromJson(raw);
+      note.hasArchonQuestProgress = note.archonQuests.length > 0;
     }
   }
 
   /** 追踪列表快照（本地缓存，不联网；对齐 Windows 追踪列表展示） */
   async loadTracked(): Promise<void> {
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined) {
-      this.trackedEntries = [];
-      return;
+    const version: number = ++this.trackedVersion;
+    const locale: string = LocalizedGameDataService.current();
+    const entries: DailyNoteTrackedEntry[] = await DailyNoteService.getInstance().trackedEntries();
+    let chapters: DailyNoteChapterMetadata[] = [];
+    try {
+      chapters = DailyNoteChapterMetadata.fromJson(await LocalizedGameDataService.readJson('Chapter.json', locale));
+    } catch (e) {
+      Logger.warn(TAG, `AQ metadata unavailable: ${(e as Error).message}`);
     }
-    const uids: string[] = PreferencesStore.getTrackedUids(user.id);
-    const entries: TrackedNoteEntry[] = [];
-    for (const uid of uids) {
-      const rec: DailyNoteRecord | undefined = await DailyNoteRepo.get(user.id, uid);
-      const e: TrackedNoteEntry = new TrackedNoteEntry();
-      e.uid = uid;
-      e.note = rec !== undefined ? rec.note : undefined;
-      entries.push(e);
+    if (version !== this.trackedVersion || locale !== LocalizedGameDataService.current()) { return; }
+    for (const entry of entries) {
+      if (entry.record !== undefined) { this.attachArchonFromPrefs(entry.userId, entry.uid, entry.record.note); }
     }
+    this.chapters = chapters;
     this.trackedEntries = entries;
   }
 
   /** 追踪当前 UID（已存在则跳过） */
   async trackCurrent(): Promise<boolean> {
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined || this.currentUid.length === 0) {
+    if (this.isRefreshing) { this.message = '便笺正在刷新，请稍后添加'; return false; }
+    const user: User | undefined = UserService.getInstance().getCurrentUser();
+    const uid: string = PreferencesStore.getCurrentUid();
+    if (user === undefined || uid !== this.currentUid || !BackgroundTaskPolicy.owns(user, uid, RegionUtil.regionOfUid(uid))) {
       this.message = '请先绑定 UID';
       return false;
     }
     const uids: string[] = PreferencesStore.getTrackedUids(user.id);
-    if (uids.includes(this.currentUid)) {
+    if (uids.includes(uid)) {
+      this.message = '当前 UID 已在追踪列表';
       return false;
     }
-    uids.push(this.currentUid);
+    this.message = '';
+    // Windows 添加便笺时先请求当前数据；请求失败仍保留追踪条目供后续刷新。
+    await this.refresh(uid);
+    if (UserService.getInstance().getCurrentUser() !== user || PreferencesStore.getCurrentUid() !== uid) {
+      this.message = '当前账号或角色已切换';
+      return false;
+    }
+    uids.push(uid);
     PreferencesStore.setTrackedUids(user.id, uids);
+    DailyNoteViewModel.notifyHome();
     await this.loadTracked();
     return true;
   }
 
   /** 移除追踪 */
-  async untrack(uid: string): Promise<void> {
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined) {
-      return;
-    }
-    const uids: string[] = PreferencesStore.getTrackedUids(user.id);
+  async untrack(userId: number, uid: string): Promise<void> {
+    const uids: string[] = PreferencesStore.getTrackedUids(userId);
     const next: string[] = uids.filter((v: string): boolean => v !== uid);
-    PreferencesStore.setTrackedUids(user.id, next);
+    PreferencesStore.setTrackedUids(userId, next);
+    DailyNoteViewModel.notifyHome();
     await this.loadTracked();
     try {
-      await DailyNoteReminderService.cancelUid(user.id, uid);
+      await DailyNoteReminderService.cancelUid(userId, uid);
     } catch (e) {
       AppStorage.setOrCreate<string>(DailyNoteReminderService.ERROR_KEY, (e as Error).message);
     }
   }
 
   /** 刷新追踪列表（顺序联网拉取全部被追踪 UID） */
-  async refreshTracked(): Promise<number> {
+  async refreshTracked(): Promise<DailyNoteRefreshSummary> {
     if (this.trackedBusy) {
-      return 0;
+      const result: DailyNoteRefreshSummary = new DailyNoteRefreshSummary();
+      result.firstError = '正在刷新中，请稍候';
+      return result;
     }
     this.trackedBusy = true;
     try {
-      const n: number = await DailyNoteService.getInstance().refreshTrackedList();
-      await this.loadTracked();
-      return n;
+      const result: DailyNoteRefreshSummary = await DailyNoteService.getInstance().refreshTrackedList();
+      await this.load(PreferencesStore.getCurrentUid());
+      return result;
     } finally {
       this.trackedBusy = false;
     }
@@ -164,69 +193,107 @@ export class DailyNoteViewModel {
 
   /** 服务层刷新成功（自动刷新定时器 / 桌面卡片手动刷新）后重读本地缓存，保持界面数值同步 */
   async reloadFromCache(uid: string): Promise<void> {
-    if (uid.length > 0) {
-      this.currentUid = uid;
-    }
-    if (this.currentUid.length === 0) {
-      return;
-    }
-    await this.load(this.currentUid);
+    await this.load(uid);
   }
 
-  /** 追踪卡聚合：当前 UID（最新数据）在前，其余被追踪 UID 按本地缓存排序（每 UID 一张卡） */
+  /** 只展示追踪条目，当前角色用最新快照；移除追踪后卡片立即消失。 */
   buildCardEntries(): NoteCardEntry[] {
     const entries: NoteCardEntry[] = [];
     const currentNote: DailyNote | undefined = this.note;
-    if (this.currentUid.length > 0 && currentNote !== undefined) {
+    const currentTracked: DailyNoteTrackedEntry | undefined = this.trackedEntries.find((item: DailyNoteTrackedEntry): boolean =>
+      item.userId === this.currentUserId && item.uid === this.currentUid);
+    if (currentTracked !== undefined && this.currentUserId > 0 && this.currentUid.length > 0 && currentNote !== undefined) {
       const cur: NoteCardEntry = new NoteCardEntry();
+      cur.userId = this.currentUserId;
       cur.uid = this.currentUid;
-      cur.nickname = this.nickname;
+      cur.nickname = currentTracked.nickname;
+      cur.region = currentTracked.region;
+      cur.level = currentTracked.level;
       cur.isCurrent = true;
+      cur.tracked = true;
       cur.note = currentNote;
+      this.applyArchonProgress(cur);
       entries.push(cur);
     }
     for (const t of this.trackedEntries) {
-      if (t.uid === this.currentUid && currentNote !== undefined) {
+      if (t.userId === this.currentUserId && t.uid === this.currentUid && currentNote !== undefined) {
         continue; // 当前 UID 卡已用最新数据展示
       }
       const e: NoteCardEntry = new NoteCardEntry();
+      e.userId = t.userId;
       e.uid = t.uid;
-      e.isCurrent = t.uid === this.currentUid;
-      e.nickname = e.isCurrent ? this.nickname : '';
-      e.note = t.note;
+      e.isCurrent = t.userId === this.currentUserId && t.uid === this.currentUid;
+      e.tracked = true;
+      e.nickname = t.nickname;
+      e.region = t.region;
+      e.level = t.level;
+      e.note = t.record?.note;
+      this.applyArchonProgress(e);
       entries.push(e);
     }
     return entries;
   }
 
-  /** 打开某 UID 的通知设置（读取现有阈值/开关位；无记录用默认值） */
-  async openUidSettings(uid: string): Promise<void> {
-    this.settingsUid = uid;
-    const user = UserService.getInstance().getCurrentUser();
-    let rec: DailyNoteRecord | undefined = undefined;
-    if (user !== undefined) {
-      rec = await DailyNoteRepo.get(user.id, uid);
+  /** 对齐 Windows DailyNoteArchonQuestView：首条章节在 AQ 原序中的索引 / AQ 总数。 */
+  private applyArchonProgress(entry: NoteCardEntry): void {
+    const note: DailyNote | undefined = entry.note;
+    if (note === undefined || !note.hasArchonQuestProgress || this.chapters.length === 0) { return; }
+    entry.archonTotal = this.chapters.length;
+    const current: ArchonQuestChapter | undefined = note.archonQuests[0];
+    if (current === undefined) {
+      entry.archonProgress = this.chapters.length;
+      return;
     }
-    this.settingsResinThreshold = rec !== undefined ? rec.resinNotifyThreshold : 120;
-    this.settingsHomeThreshold = rec !== undefined ? rec.homeCoinNotifyThreshold : 1800;
-    this.settingsNotifyFlags = rec !== undefined ? rec.notifyFlags : NotifyFlags.ALL;
+    const index: number = this.chapters.findIndex((chapter: DailyNoteChapterMetadata): boolean => chapter.id === current.id);
+    entry.archonProgress = index;
+    if (index < 0) { return; }
+    const chapter: DailyNoteChapterMetadata = this.chapters[index];
+    const numberText: string = chapter.numberText || current.chapterNum;
+    const title: string = chapter.title || current.chapterTitle;
+    entry.archonChapterText = `${numberText} ${title}`.trim();
+  }
+
+  /** 打开某 UID 的通知设置（读取现有阈值/开关位；无记录用默认值） */
+  async openUidSettings(userId: number, uid: string): Promise<boolean> {
+    const version: number = ++this.settingsVersion;
+    const rec: DailyNoteRecord | undefined = await DailyNoteRepo.get(userId, uid);
+    if (version !== this.settingsVersion || rec === undefined) { return false; }
+    this.settingsUserId = userId;
+    this.settingsUid = uid;
+    this.settingsResinMax = Math.max(0, Math.floor(rec.note.maxResin));
+    this.settingsHomeMax = Math.max(0, Math.floor(rec.note.maxHomeCoin));
+    this.settingsResinThreshold = Math.min(this.settingsResinMax, Math.max(0, rec.resinNotifyThreshold));
+    this.settingsHomeThreshold = Math.min(this.settingsHomeMax, Math.max(0, rec.homeCoinNotifyThreshold));
+    this.settingsNotifyFlags = rec.notifyFlags;
+    return true;
   }
 
   /** 保存某 UID 的通知设置 */
-  private async saveUidSettings(): Promise<void> {
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined || this.settingsUid.length === 0) {
-      return;
-    }
-    await DailyNoteRepo.updateThresholds(user.id, this.settingsUid,
-      this.settingsResinThreshold, this.settingsHomeThreshold, this.settingsNotifyFlags);
-    await this.rescheduleReminders(user.id, this.settingsUid);
-    // 编辑的是当前 UID 时同步内存态，保持页面引用一致
-    if (this.settingsUid === this.currentUid) {
-      this.resinThreshold = this.settingsResinThreshold;
-      this.homeThreshold = this.settingsHomeThreshold;
-      this.notifyFlags = this.settingsNotifyFlags;
-    }
+  private saveUidSettings(): Promise<void> {
+    const userId: number = this.settingsUserId;
+    const uid: string = this.settingsUid;
+    const resin: number = this.settingsResinThreshold;
+    const home: number = this.settingsHomeThreshold;
+    const flags: number = this.settingsNotifyFlags;
+    const work: Promise<void> = this.settingsSave.then(async (): Promise<void> => {
+      const user: User | undefined = await UserRepo.getUserById(userId);
+      if (user === undefined || !BackgroundTaskPolicy.owns(user, uid, RegionUtil.regionOfUid(uid)) ||
+        PreferencesStore.getBackupJournal().length > 0) { throw new Error('该角色已不可用'); }
+      await DailyNoteRepo.updateThresholds(userId, uid, resin, home, flags);
+      DailyNoteViewModel.notifyHome();
+      await this.rescheduleReminders(userId, uid);
+      if (userId === this.currentUserId && uid === this.currentUid) {
+        this.resinThreshold = resin;
+        this.homeThreshold = home;
+        this.notifyFlags = flags;
+      }
+    });
+    this.settingsSave = work.catch(() => {});
+    return work;
+  }
+
+  private static notifyHome(): void {
+    AppStorage.setOrCreate<number>(KEY_NOTE_VERSION, (AppStorage.get<number>(KEY_NOTE_VERSION) ?? 0) + 1);
   }
 
   private async rescheduleReminders(userId: number, uid: string): Promise<void> {
@@ -241,12 +308,14 @@ export class DailyNoteViewModel {
 
   /** 每 UID 树脂阈值 */
   async setUidResinThreshold(th: number): Promise<void> {
+    if (!Number.isInteger(th) || th < 0 || th > this.settingsResinMax || th === this.settingsResinThreshold) { return; }
     this.settingsResinThreshold = th;
     await this.saveUidSettings();
   }
 
   /** 每 UID 宝钱阈值 */
   async setUidHomeThreshold(th: number): Promise<void> {
+    if (!Number.isInteger(th) || th < 0 || th > this.settingsHomeMax || th === this.settingsHomeThreshold) { return; }
     this.settingsHomeThreshold = th;
     await this.saveUidSettings();
   }
@@ -265,15 +334,14 @@ export class DailyNoteViewModel {
     this.currentUid = uid;
     this.isRefreshing = true;
     this.needGeetest = false;
+    const user: User | undefined = UserService.getInstance().getCurrentUser();
     try {
       const note: DailyNote = await DailyNoteService.getInstance().refresh(uid, challenge);
+      if (user === undefined || UserService.getInstance().getCurrentUser() !== user || PreferencesStore.getCurrentUid() !== uid) {
+        return false;
+      }
       this.note = note;
       this.lastRefreshAt = Date.now();
-      // 魔神任务进度落 prefs（DB 无 archon 列；重启后 load() 从 prefs 补齐）
-      const user = UserService.getInstance().getCurrentUser();
-      if (user !== undefined) {
-        PreferencesStore.setString(archonKey(user.id, uid), JSON.stringify(note.archonQuests));
-      }
       // 重新读阈值（可能被服务端缓存后新增行）
       await this.load(uid);
       return true;

@@ -16,6 +16,8 @@ import { CardSurfaceModifier } from '../common/UiSurface';
 @Entry
 @Component
 export struct HutaoCloudPage {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
 
@@ -32,7 +34,7 @@ export struct HutaoCloudPage {
           Text('游戏账号（米游社）登录与本地归档不受影响：见「系统 → 账号与数据」。')
             .fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
         }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
-          .borderRadius($r('app.float.card_radius')).attributeModifier(new CardSurfaceModifier())
+          .borderRadius($r('app.float.card_radius')).attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
           .border({ width: 1, color: $r('app.color.card_stroke') })
       }
       .width('100%').height('100%').alignItems(HorizontalAlign.Start)

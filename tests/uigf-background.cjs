@@ -1,7 +1,7 @@
 // Executes production worker, primitive codec, hydration, VM and SQLite transaction under SDK doubles.
 // Native API/ArkTS compilation belongs to the coordinated native build; device scheduling is not simulated.
 const assert=require('node:assert/strict'),test=require('node:test'),fs=require('node:fs'),path=require('node:path');
-const {harness,A,B,C,big,row,section,file,plain}=require('./helpers/uigf-harness.cjs');
+const {harness,A,B,C,big,row,section,file,plain,seedItems}=require('./helpers/uigf-harness.cjs');
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
 (async()=>{
@@ -78,7 +78,7 @@ const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
     const expected=plain(snapshot());for(const version of ['v2.2','v2.3','v2.4','v3.0','v4.0','v4.1','v4.2']){
       const output=await service.buildExportJson([A],version),root=JSON.parse(output),legacy=!version.startsWith('v4.');assert.equal(legacy?root.info.uigf_version:root.info.version,version);
       const records=legacy?root.list:root.hk4e[0].list;assert.equal(typeof records[0].item_id,'string');assert.equal(records[0].gacha_type,'400');assert.equal(records[0].uigf_gacha_type,'301');
-      if(legacy){assert.equal(typeof root.info.uid,'string');assert.equal('region_time_zone' in root.info,['v2.4','v3.0'].includes(version));}
+      if(legacy){assert.equal(typeof root.info.uid,'string');assert.equal(root.info.region_time_zone,8);}
       else assert.equal('hk4e_ugc' in root,version==='v4.2');
       assert.equal((await service.importFromText(output)).inserted,0);assert.deepEqual(plain(snapshot()),expected);
     }
@@ -91,14 +91,317 @@ const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
     await service.importFromText(file([],[section(C,[{id:'3',op_gacha_type:'1000',item_id:10001,item_type:'装扮',item_name:'试验',rank_type:'5',time:'2026-10-05 10:00:00',schedule_id:7}])]));
     for(const version of ['v2.2','v2.3','v2.4','v3.0','v4.0','v4.1'])await assert.rejects(service.buildExportJson([C],version),/不支持颂愿/);
   });
-  await test('export refuses unsupported optional fields, noncanonical timezone text and overlong v4 cursors',async()=>{
+  await test('export refuses out-of-range Windows IDs in legacy and modern files',async()=>{
     const {service,load}=harness();const Export=load('service/UigfExportCodec').UigfExportCodec;
     const prepared=service.prepareImport(file([section(A,[row('184467440737095516151234')])])),records=prepared.select(),item=records.get(A)[0];assert.equal(item.gachaId,'184467440737095516151234');
-    assert.throws(()=>Export.build(records,'v4.2','test'),/19 位/);assert.equal(JSON.parse(Export.build(records,'v3.0','test')).list[0].id,item.gachaId);
+    for(const version of ['v3.0','v4.2']){
+      for(const id of ['184467440737095516151234','9223372036854775808','9223372036854775807']){
+        item.gachaId=id;
+        assert.throws(()=>Export.build(records,version,'test'),/祈愿 ID 超出/);
+      }
+      item.gachaId='9223372036854775806';
+      const output=JSON.parse(Export.build(records,version,'test'));
+      assert.equal((output.list??output.hk4e[0].list)[0].id,item.gachaId);
+    }
+    assert.throws(()=>Export.build(new Map([['4294967296',[]]]),'v4.2','test'),/UID 超出/);
+    item.itemId=4294967296;assert.throws(()=>Export.build(records,'v4.2','test'),/物品 ID 超出/);
+  });
+  await test('export refuses unsupported optional fields and noncanonical timezone text',async()=>{
+    const {service,load}=harness();const Export=load('service/UigfExportCodec').UigfExportCodec;
+    const records=service.prepareImport(file()).select(),item=records.get(A)[0];
     item.gachaId='1';item.scheduleId=7;assert.throws(()=>Export.build(records,'v3.0','test'),/期次/);item.scheduleId=0;
     item.time='2026-10-05T10:00:00+08:00';assert.throws(()=>Export.build(records,'v2.4','test'),/本地时间/);item.time='2026-10-05 10:00:00';
     item.future_field=1;assert.throws(()=>Export.build(records,'v3.0','test'),/未支持字段/);delete item.future_field;
     assert.throws(()=>Export.build(records,'v8.0','test'),/不支持/);
+  });
+  await test('export reports the precise invalid stored fields and leaves the record intact',()=>{
+    const {service,load}=harness();
+    const Export=load('service/UigfExportCodec').UigfExportCodec;
+    const records=service.prepareImport(file()).select(),item=records.get(A)[0];
+    item.gachaId='1757085600000214319';item.itemId=0;item.count=0;item.rankType=2;item.scheduleId=-1;
+    assert.throws(()=>Export.build(records,'v4.2','test'),
+      /1757085600000214319.*item_id=0.*count=0.*rank_type=2.*schedule_id=-1/);
+    assert.equal(records.get(A).length,1);
+  });
+  await test('legacy API rows with blank IDs export through SQLite using exact canonical and translated identities',async()=>{
+    const {service,load,state,repo,snapshot}=harness();
+    const Item=load('model/GachaItem').GachaItem;
+    const archive=await repo.getOrCreateArchive(A);
+    const rows=[
+      Item.fromServer(row('1757085600000214319',{uid:A,item_id:'',name:'刻晴'})),
+      Item.fromServer(row('1757085600000214320',{uid:A,item_id:'',name:'Keqing',item_type:'Character'})),
+      Item.fromServer(row('1757085600000214321',{uid:A,item_id:'',name:'黎明神剑',item_type:'武器',rank_type:'3'})),
+      Item.fromServer(row('1757085600000214322',{uid:A,item_id:10000011,name:'刻晴'})),
+    ];
+    for(const item of rows)item.archiveId=archive.id;
+    await repo.insertItems(rows);
+    const before=snapshot();
+    assert.deepEqual(before.items.map(item=>item.item_id),[0,0,0,10000011]);
+    state.avatarMetadata=[{id:10000042,canonicalName:'刻晴',name:'刻晴',quality:5}];
+    state.weaponMetadata=[{id:11302,canonicalName:'黎明神剑',name:'黎明神剑',rankLevel:3}];
+    state.names.set('avatar_meta.json:en',new Map([[10000042,'Keqing']]));
+    const output=JSON.parse(await service.buildExportJson([A]));
+    assert.deepEqual(output.hk4e[0].list.map(item=>[item.id,item.item_id,item.rank_type]),[
+      ['1757085600000214319','10000042','5'],['1757085600000214320','10000042','5'],
+      ['1757085600000214321','11302','3'],['1757085600000214322','10000011','5'],
+    ]);
+    assert.equal(output.hk4e[0].list[1].name,'Keqing');
+    assert.ok(state.languageReads.includes('avatar_meta.json:en'));
+    assert.ok(!state.languageReads.some(value=>value.endsWith(':de')));
+    assert.deepEqual(snapshot(),before);
+  });
+  await test('export snapshot and preview share logical rows while original SQLite duplicates remain intact',async()=>{
+    const {load,state,service,repo,snapshot,db}=harness();
+    const Item=load('model/GachaItem').GachaItem;
+    const first=await repo.getOrCreateArchive(A),second=await repo.getOrCreateArchive(B);
+    const shared='1793884800001694719';
+    const regular=Item.fromServer(row(shared,{uid:A}));
+    const weapon=Item.fromServer(row('1793884800001694720',{uid:A,gacha_type:'302',item_id:'11501'}));
+    const beyond=Item.fromServer({id:shared,uid:A,op_gacha_type:'20011',item_id:'250013',
+      item_type:'装扮',item_name:'服饰',rank_type:'2',schedule_id:'7',time:'2026-10-05 10:00:00'},true);
+    const other=Item.fromServer(row(shared,{uid:B}));
+    for(const item of [regular,weapon,beyond])item.archiveId=first.id;
+    other.archiveId=second.id;
+    seedItems(db,[regular,regular,weapon,beyond,beyond,other]);
+    const before=snapshot();
+    const text=await service.buildExportJson([A,B]);
+    const exported=JSON.parse(text);
+    assert.deepEqual(exported.hk4e.map(entry=>entry.list.length),[2,1]);
+    assert.deepEqual(exported.hk4e_ugc.map(entry=>entry.list.length),[1]);
+    assert.equal(service.prepareImport(text).preview().totalCount,4);
+    const log=state.logs.find(([tag,message])=>tag==='UigfService'&&message.startsWith('export snapshot'))?.[1];
+    assert.equal(log,'export snapshot archives=2 rows=4 unique=4 standard=3/3 beyond=1/1 pools=100:0/0,200:0/0,301:2/2,302:1/1,500:0/0,1000:0/0,2000:1/1');
+    assert.deepEqual(snapshot(),before);
+  });
+  await test('one archive projection gives the same logical statistics and history as separate SQLite queries',async()=>{
+    const {load,state,repo,Model,snapshot,db}=harness();
+    const Item=load('model/GachaItem').GachaItem;
+    const Type=load('model/GachaType').GachaType;
+    const Identity=load('service/GachaItemIdentityService').GachaItemIdentityService;
+    const Statistics=load('service/GachaStatisticsService').GachaStatisticsService;
+    const Collection=load('service/GachaCollectionService').GachaCollectionService;
+    const archive=await repo.getOrCreateArchive(A);
+    const cursor='1793884800001694720';
+    const role=Item.fromServer(row(cursor,{uid:A,gacha_type:'301',item_id:'',name:'刻晴',
+      time:'2026-10-05 10:00:00',count:'2'}));
+    const role2=Item.fromServer(row('1793884800001694723',{uid:A,item_id:'',name:'刻晴',time:'2026-10-05 10:01:00'}));
+    const weapon=Item.fromServer(row('1793884800001694721',{uid:A,gacha_type:'302',item_type:'武器',
+      name:'风鹰剑',item_id:'11501'}));
+    const beyond=(id,type,rank)=>Item.fromServer({id,uid:A,op_gacha_type:String(type),item_id:'250013',
+      item_type:'装扮',item_name:'服饰',rank_type:String(rank),schedule_id:'7',time:'2026-10-05 10:00:00'},true);
+    const stored=[role,role2,role2,weapon,beyond(cursor,20011,5),beyond('1793884800001694722',20022,4)];
+    for(const item of stored)item.archiveId=archive.id;
+    seedItems(db,stored);
+    const before=snapshot();
+    state.avatarMetadata=[{id:10000042,canonicalName:'刻晴',name:'刻晴',quality:5,icon:'avatar'}];
+    state.weaponMetadata=[{id:11501,canonicalName:'风鹰剑',name:'风鹰剑',rankLevel:5,icon:'weapon'}];
+    state.wishEvents=[301,400].map(type=>({type,from:Date.parse('2026-10-05T00:00:00Z'),
+      to:Date.parse('2026-10-06T00:00:00Z'),upOrange:[10000042],upPurple:[]}));
+    const expectedPools=[];
+    for(const type of Type.QUERY_ORDER.concat(Type.BEYOND_ORDER)){
+      const rows=await Identity.resolveMissing(await repo.getItemsByType(archive.id,type));
+      expectedPools.push(Statistics.buildPool(rows,type,state.wishEvents,8));
+    }
+    const expectedCollection=Collection.count(await Identity.resolveMissing(await repo.getItemsByArchive(archive.id)),
+      state.avatarMetadata,state.weaponMetadata,state.wishEvents,false);
+    const expectedHistory=await Identity.resolveMissing(await repo.getItems(archive.id,301,100000,0));
+    const expectedBeyond=await Identity.resolveMissing(await repo.getItems(archive.id,2000,100000,0));
+    state.readIds=[];
+    const model=new Model();
+    await model.load('');
+    assert.deepEqual(state.readIds,[archive.id]);
+    assert.equal(state.wishEventReads,1);
+    assert.equal(model.stats.totalPulls,3);
+    assert.deepEqual(plain(model.stats.pools),plain(expectedPools));
+    assert.deepEqual(plain(model.stats.avatars),plain(expectedCollection.avatars));
+    assert.deepEqual(plain(model.stats.weapons),plain(expectedCollection.weapons));
+    assert.deepEqual(plain(model.items),plain(expectedHistory));
+    state.readIds=[];
+    const stats=model.stats;
+    await model.selectPool(2000);
+    assert.deepEqual(state.readIds,[archive.id]);
+    assert.equal(state.wishEventReads,1);
+    assert.equal(model.stats,stats);
+    assert.deepEqual(plain(model.items),plain(expectedBeyond));
+    assert.deepEqual(snapshot(),before);
+  });
+  await test('same-rarity alias collisions remain invalid and the active metadata version invalidates recovery',async()=>{
+    const {service,load,state,repo,snapshot}=harness();
+    const Item=load('model/GachaItem').GachaItem;
+    const archive=await repo.getOrCreateArchive(A);
+    const old=Item.fromServer(row('71',{uid:A,item_id:'',name:'Nome',item_type:'Arma',rank_type:'4'}));
+    old.archiveId=archive.id;
+    await repo.insertItems([old]);
+    state.weaponMetadata=[{id:11401,canonicalName:'甲',name:'甲',rankLevel:4},
+      {id:11402,canonicalName:'乙',name:'乙',rankLevel:4},{id:11301,canonicalName:'丙',name:'丙',rankLevel:3}];
+    state.names.set('weapon_meta.json:es',new Map([[11401,'Nome']]));
+    state.names.set('weapon_meta.json:pt',new Map([[11402,'Nome']]));
+    state.names.set('weapon_meta.json:it',new Map([[11301,'Nome']]));
+    await assert.rejects(service.buildExportJson([A]),/记录 71.*item_id=0/);
+    const Identity=load('service/GachaItemIdentityService').GachaItemIdentityService;
+    const stillUnknown=await Identity.resolveMissing(await repo.getItemsByArchive(archive.id));
+    assert.deepEqual(plain(stillUnknown.map(item=>[item.name,item.itemId])),[['Nome',0]]);
+    state.metadataVersion='corrected';
+    state.names.set('weapon_meta.json:pt',new Map());
+    const output=JSON.parse(await service.buildExportJson([A]));
+    assert.equal(output.hk4e[0].list[0].item_id,'11401');
+    assert.equal(snapshot().items[0].item_id,0);
+  });
+  await test('new API refresh resolves missing identities before writing and rejects an unresolved replacement page',async()=>{
+    const {load,state,snapshot}=harness();
+    const wishes=load('service/GachaLogService').GachaLogService.getInstance();
+    state.avatarMetadata=[{id:10000042,canonicalName:'刻晴',name:'刻晴',quality:5}];
+    state.wishLanguage='ja-jp';
+    state.names.set('avatar_meta.json:ja',new Map([[10000042,'刻晴（日本語）']]));
+    state.wishReplies.push({success:true,data:{list:[row('81',{uid:A,item_id:'',name:'刻晴（日本語）',item_type:'キャラクター'})]}});
+    const result=await wishes.importByUrl('fixture',A,()=>{},false,[301]);
+    assert.equal(result.ok,true);
+    assert.equal(result.fetchedCount,1);
+    assert.equal(snapshot().items[0].item_id,10000042);
+    const before=snapshot();
+    state.wishReplies.push({success:true,data:{list:[row('81',{uid:A,item_id:'',name:'未收录的新物品',item_type:'キャラクター'})]}});
+    const rejected=await wishes.importByUrl('fixture',A,()=>{},true,[301]);
+    assert.equal(rejected.ok,false);
+    assert.match(rejected.message,/记录 81.*item_id=0.*未保存本页/);
+    assert.deepEqual(snapshot(),before);
+  });
+  await test('7.2 bundled metadata resolves new avatar and weapon pages without server item IDs',async()=>{
+    const {load,state,snapshot}=harness();
+    const metadata=path.join(__dirname,'../entry/src/main/resources/rawfile/metadata');
+    const read=name=>JSON.parse(fs.readFileSync(path.join(metadata,name),'utf8'));
+    state.avatarMetadata=read('avatar_meta.json');
+    state.weaponMetadata=read('weapon_meta.json');
+    const featured=read('GachaEvent.json').filter(event=>event.Version==='7.2');
+    const newAvatars=[10000136,10000137].map(id=>state.avatarMetadata.find(item=>item.id===id));
+    const newWeapon=state.weaponMetadata.find(item=>item.id===14525);
+    assert.deepEqual(newAvatars.map(item=>item?.name),['米提亚','瓦列里']);
+    assert.equal(newWeapon?.name,'秘星典谕');
+    assert.ok(featured.some(event=>event.Type===301&&event.UpOrangeList.includes(newAvatars[0].id)));
+    assert.ok(featured.some(event=>event.Type===302&&event.UpOrangeList.includes(newWeapon.id)));
+    const time='2026-11-05 12:00:00';
+    const regularRow=(id,type,item,kind,rank)=>row(id,{uid:A,gacha_type:String(type),item_id:'',
+      item_type:kind,name:item.name,rank_type:String(rank),time});
+    state.wishUser={isOversea:false,stoken:'fixture',stokenCookie:()=> 'fixture'};
+    state.wishReplies.push(
+      {success:true,data:{list:[
+        regularRow('1793884800001600003',301,newAvatars[0],'角色',newAvatars[0].quality),
+        regularRow('1793884800001600002',400,newAvatars[1],'角色',newAvatars[1].quality),
+      ]}},
+      {success:true,data:{list:[regularRow('1793884800001600001',302,newWeapon,'武器',newWeapon.rankLevel)]}},
+    );
+    const service=load('service/GachaLogService').GachaLogService.getInstance();
+    const result=await service.refreshByStoken(A,()=>{},false,[301,302]);
+    assert.equal(result.ok,true,result.message);
+    assert.equal(result.fetchedCount,3);
+    assert.equal(state.wishReplies.length,0);
+    assert.deepEqual(snapshot().items.map(item=>[item.item_id,item.gacha_type,item.rank_type,item.name]),[
+      [10000136,301,5,'米提亚'],[10000137,400,4,'瓦列里'],[14525,302,5,'秘星典谕'],
+    ]);
+  });
+  await test('lazy refresh honors a sparse pool watermark and keeps exact long cursors across overlapping pages',async()=>{
+    const {load,state,repo,snapshot}=harness();
+    const Item=load('model/GachaItem').GachaItem;
+    const archive=await repo.getOrCreateArchive(A);
+    const newest=1793884800001694703n;
+    const make=(offset,type=400)=>row(String(newest+BigInt(offset)),{uid:A,gacha_type:String(type)});
+    const stored=[Item.fromServer(make(-30)),Item.fromServer(make(0,301)),Item.fromServer(make(900,302))];
+    for(const item of stored)item.archiveId=archive.id;
+    await repo.insertItems(stored);
+    const first=Array.from({length:20},(_,index)=>make(30-index));
+    const second=[first.at(-1),make(1),...Array.from({length:18},(_,index)=>make(-1-index))];
+    state.wishReplies.push({success:true,data:{list:first}},{success:true,data:{list:second}});
+    const service=load('service/GachaLogService').GachaLogService.getInstance();
+    const result=await service.importByUrl('fixture',A,()=>{},false,[301]);
+    assert.equal(result.ok,true,result.message);
+    assert.equal(result.fetchedCount,21);
+    assert.deepEqual(state.wishRequests.map(request=>request.slice(1)),[
+      ['/gacha_info/api/getGachaLog','301','20','0'],
+      ['/gacha_info/api/getGachaLog','301','20',first.at(-1).id],
+    ]);
+    assert.deepEqual(snapshot().items.map(item=>item.gacha_id).sort(),
+      [...stored.map(item=>item.gachaId),...first.map(item=>item.id),make(1).id].sort());
+  });
+  await test('complete refresh replaces its returned window and retains older and other-pool records',async()=>{
+    const {load,state,repo,snapshot}=harness();
+    const Item=load('model/GachaItem').GachaItem;
+    const archive=await repo.getOrCreateArchive(A);
+    const stored=[Item.fromServer(row('90',{uid:A})),Item.fromServer(row('95',{uid:A})),
+      Item.fromServer(row('99',{uid:A,gacha_type:'302'}))];
+    for(const item of stored)item.archiveId=archive.id;
+    await repo.insertItems(stored);
+    const page=[row('96',{uid:A}),row('95',{uid:A}),row('94',{uid:A})];
+    state.wishReplies.push({success:true,data:{list:page}});
+    const result=await load('service/GachaLogService').GachaLogService.getInstance().importByUrl('fixture',A,()=>{},true,[301]);
+    assert.equal(result.ok,true,result.message);
+    assert.equal(result.fetchedCount,3);
+    const rows=snapshot().items;
+    assert.deepEqual(rows.map(item=>item.gacha_id).sort(),['90','94','95','96','99']);
+    assert.equal(rows.find(item=>item.gacha_id==='95').item_id,10000001);
+  });
+  await test('Beyond refresh uses five-row CN requests and reads op_gacha_type, schedule and low ranks',async()=>{
+    const {load,state,snapshot}=harness();
+    const beyond=(id,type,rank)=>({uid:A,id,region:'cn_gf01',op_gacha_type:String(type),
+      schedule_id:'10',item_id:'250013',item_name:'服饰',item_type:'装扮',rank_type:String(rank),
+      time:'2026-11-05 12:00:00'});
+    const eventTypes=[20011,20012,20021,20022];
+    state.wishReplies.push({success:true,data:{list:[beyond('99',1000,1)]}},
+      {success:true,data:{list:eventTypes.map((type,index)=>beyond(String(98-index),type,index%2+1))}});
+    const result=await load('service/GachaLogService').GachaLogService.getInstance()
+      .importByUrl('fixture',A,()=>{},false,[1000,2000]);
+    assert.equal(result.ok,true,result.message);
+    assert.equal(result.fetchedCount,5);
+    assert.deepEqual(state.wishRequests,[
+      ['public-operation-hk4e.mihoyo.com','/gacha_info/api/getBeyondGachaLog','1000','5','0'],
+      ['public-operation-hk4e.mihoyo.com','/gacha_info/api/getBeyondGachaLog','2000','5','0'],
+    ]);
+    assert.deepEqual(snapshot().items.map(item=>[item.gacha_type,item.rank_type,item.schedule_id]),
+      [[1000,1,10],[20011,1,10],[20012,2,10],[20021,1,10],[20022,2,10]]);
+  });
+  await test('malformed successful reply and a rounded numeric cursor fail before any archive write',async()=>{
+    const {load,state,snapshot}=harness();
+    const service=load('service/GachaLogService').GachaLogService.getInstance();
+    for(const [data,message] of [[{},/缺少记录列表/],
+      [{list:[row(1793884800001694719,{uid:A})]},/祈愿记录 ID 无效/]]){
+      state.wishReplies.push({success:true,data});
+      const result=await service.importByUrl('fixture',A,()=>{},false,[301]);
+      assert.equal(result.ok,false);
+      assert.match(result.message,message);
+      assert.deepEqual(snapshot(),{archives:[],items:[]});
+    }
+  });
+  await test('Windows-style v2.0 and v2.1 files survive taskpool preview and commit',async()=>{
+    const {Model,state,service}=harness();
+    const model=new Model();
+    for(const [index,version] of ['v2.0','v2.1'].entries()){
+      const uid=index===0?A:B;
+      state.text=JSON.stringify({info:{uid,uigf_version:version,region_time_zone:8},list:[row(String(index+1))]});
+      assert.equal(await model.prepareImportFile('/picked.json'),true);
+      assert.equal(model.importPreview.version,version);
+      assert.equal((await model.confirmImport()).inserted,1);
+      await assert.rejects(service.buildExportJson([uid],version),/不支持的 UIGF 导出版本/);
+    }
+  });
+  await test('low-rank Windows Beyond subpools roundtrip and remain visible under the 2000 query pool',async()=>{
+    const {Model,state,service,snapshot,load}=harness();
+    const poolTypes=[20011,20012,20021,20022];
+    const rows=poolTypes.map((type,index)=>({id:String(index+1),op_gacha_type:String(type),
+      item_id:'250013',rank_type:String(index%2+1),schedule_id:'10',time:'2026-10-05 10:00:00'}));
+    state.text=file([section(A,[])],[section(A,rows)]);
+    const model=new Model();
+    assert.equal(await model.prepareImportFile('/picked.json'),true);
+    assert.equal(model.importPreview.archives[0].beyondCount,4);
+    assert.equal((await model.confirmImport()).inserted,4);
+    const repo=load('data/repo/GachaRepo').GachaRepo,archiveId=snapshot().archives[0].id;
+    assert.deepEqual(plain((await repo.getItemsByType(archiveId,2000)).map(item=>item.gachaType)),poolTypes);
+    assert.equal(await repo.countByType(archiveId,2000),4);
+    assert.deepEqual(plain(await repo.getAllGachaIds(archiveId,2000)),['1','2','3','4']);
+    const output=JSON.parse(await service.buildExportJson([A]));
+    assert.equal(String(output.hk4e[0].uid),A);
+    assert.deepEqual(output.hk4e[0].list,[]);
+    assert.deepEqual(output.hk4e_ugc[0].list.map(({op_gacha_type,rank_type})=>[Number(op_gacha_type),rank_type]),
+      poolTypes.map((type,index)=>[type,String(index%2+1)]));
+    assert.ok(output.hk4e_ugc[0].list.every(item=>item.count===undefined));
+    assert.throws(()=>service.prepareImport(file([section(A,[row('1',{rank_type:2})])])),/星级/);
   });
   await test('worker preparation preserves real SQLite all-selected rollback and retry uses retained records',async()=>{
     const {state,Model,snapshot}=harness(),model=new Model();await model.prepareImport(file([section(A,[row('1')]),section(B,[row('2')])]));state.failBatch=2;

@@ -20,10 +20,39 @@ class NativeTaskGuard implements BackgroundTaskGuard {
   token: string;
   constructor(state: BackgroundTaskState, token: string) { this.state = state; this.token = token; }
   async isActive(): Promise<boolean> {
-    if (this.cancelled || !await BackgroundTaskRepo.live(this.state.kind, this.state.epoch, this.token)) { return false; }
+    if (this.cancelled || BackgroundTaskService.replacementPending() ||
+      !await BackgroundTaskRepo.live(this.state.kind, this.state.epoch, this.token)) { return false; }
+    if (this.state.allAccounts()) { return !this.cancelled; }
     const user: User | undefined = await BackgroundTaskService.boundUser(this.state);
     return !this.cancelled && user !== undefined &&
       await BackgroundTaskRepo.live(this.state.kind, this.state.epoch, this.token);
+  }
+}
+
+class NativeTaskTarget {
+  user: User;
+  uid: string;
+  region: string;
+  lastAttempt: number;
+  constructor(user: User, uid: string, region: string, lastAttempt: number = 0) {
+    this.user = user; this.uid = uid; this.region = region; this.lastAttempt = lastAttempt;
+  }
+}
+
+class NativeTaskTargetGuard implements BackgroundTaskGuard {
+  private task: NativeTaskGuard;
+  private target: NativeTaskTarget;
+  constructor(task: NativeTaskGuard, target: NativeTaskTarget) { this.task = task; this.target = target; }
+
+  async isActive(): Promise<boolean> {
+    if (!await this.task.isActive()) { return false; }
+    const target: NativeTaskTarget = this.target;
+    const saved: User | undefined = await UserRepo.getUserById(target.user.id);
+    if (saved === undefined || BackgroundTaskPolicy.identity(saved) !== BackgroundTaskPolicy.identity(target.user) ||
+      !BackgroundTaskPolicy.owns(saved, target.uid, target.region)) { return false; }
+    if (this.task.state.kind === BackgroundTaskKind.DAILY_NOTE &&
+      !PreferencesStore.getTrackedUids(saved.id).includes(target.uid)) { return false; }
+    return this.task.isActive();
   }
 }
 
@@ -51,11 +80,12 @@ class WidgetTaskGuard implements BackgroundTaskGuard {
 /** Best-effort OS deferred work, never a precise alarm or foreground-service workaround. */
 export class BackgroundTaskService {
   static readonly STATUS_VERSION_KEY: string = 'backgroundTaskStatusVersion';
-  static readonly EXPLANATION: string = '后台任务只绑定开启时选择的账号和 UID。系统按电量、网络和使用情况择机执行，不能保证固定间隔或零点签到。退出登录、切换账号或恢复数据会停止旧任务；需要验证时请回到应用处理。';
+  static readonly EXPLANATION: string = '系统按电量、网络和使用情况安排执行。需要验证时请在应用内处理。退出登录或恢复数据会关闭后台任务。';
   private static readonly BUNDLE: string = 'com.example.snaphutaoharmonyos';
   private static readonly ABILITY: string = 'HutaoWorkSchedulerExtensionAbility';
   private static readonly DAILY_WORK_ID: number = 19001;
   private static readonly SIGN_WORK_ID: number = 20001;
+  private static readonly MIN_WORK_REPEAT_MS: number = 2 * 60 * 60 * 1000;
   private static guards: Map<BackgroundTaskKind, NativeTaskGuard> = new Map();
   private static changes: Promise<void> = Promise.resolve();
   private static initializing: Promise<void> | undefined = undefined;
@@ -97,24 +127,29 @@ export class BackgroundTaskService {
     return state;
   }
 
-  static captureBinding(): BackgroundTaskBinding {
+  static captureBinding(allAccounts: boolean = false): BackgroundTaskBinding {
+    const binding: BackgroundTaskBinding = new BackgroundTaskBinding();
+    binding.revision = UserService.getInstance().sessionRevision();
+    if (allAccounts) {
+      if (BackgroundTaskService.replacementPending()) { throw new Error('账号状态正在更新'); }
+      return binding;
+    }
     const user: User | undefined = UserService.getInstance().getCurrentUser();
     const uid: string = PreferencesStore.getCurrentUid();
     const region: string = RegionUtil.regionOfUid(uid);
     if (user === undefined || user.id !== PreferencesStore.getCurrentUserId() ||
       !BackgroundTaskPolicy.owns(user, uid, region)) { throw new Error('请先登录并选择属于此账号的 UID'); }
-    const binding: BackgroundTaskBinding = new BackgroundTaskBinding();
-    binding.revision = UserService.getInstance().sessionRevision();
     binding.userId = user.id; binding.uid = uid; binding.region = region;
     binding.identity = BackgroundTaskPolicy.identity(user);
     return binding;
   }
 
   private static currentBinding(binding: BackgroundTaskBinding): boolean {
+    if (BackgroundTaskService.replacementPending() ||
+      UserService.getInstance().sessionRevision() !== binding.revision) { return false; }
+    if (binding.userId === 0) { return true; }
     const user: User | undefined = UserService.getInstance().getCurrentUser();
-    return !UserService.getInstance().isSessionTransitionPending() &&
-      PreferencesStore.getBackupJournal().length === 0 && user !== undefined &&
-      UserService.getInstance().sessionRevision() === binding.revision && user.id === binding.userId &&
+    return user !== undefined && user.id === binding.userId &&
       PreferencesStore.getCurrentUserId() === binding.userId && PreferencesStore.getCurrentUid() === binding.uid &&
       BackgroundTaskPolicy.identity(user) === binding.identity && BackgroundTaskPolicy.owns(user, binding.uid, binding.region);
   }
@@ -135,9 +170,11 @@ export class BackgroundTaskService {
         }
         state.userId = binding.userId; state.uid = binding.uid; state.region = binding.region;
         state.identity = binding.identity;
-        const user: User | undefined = await BackgroundTaskService.boundUser(state);
-        if (!BackgroundTaskService.currentBinding(binding) || user === undefined || !user.hasCookie()) {
-          throw new Error('账号或 UID 已变化，请重新确认绑定');
+        if (!state.allAccounts()) {
+          const user: User | undefined = await BackgroundTaskService.boundUser(state);
+          if (!BackgroundTaskService.currentBinding(binding) || user === undefined || !user.hasCookie()) {
+            throw new Error('账号或 UID 已变化，请重新确认绑定');
+          }
         }
         state.intervalMinutes = kind === BackgroundTaskKind.DAILY_NOTE
           ? BackgroundTaskPolicy.interval(PreferencesStore.getRefreshIntervalMinutes()) : 30;
@@ -182,7 +219,8 @@ export class BackgroundTaskService {
       work.isPersisted = true;
       work.networkType = workScheduler.NetworkType.NETWORK_TYPE_ANY;
       work.isRepeat = true;
-      work.repeatCycleTime = BackgroundTaskPolicy.interval(state.intervalMinutes) * 60000;
+      const intervalMs: number = BackgroundTaskPolicy.interval(state.intervalMinutes) * 60000;
+      work.repeatCycleTime = Math.max(BackgroundTaskService.MIN_WORK_REPEAT_MS, intervalMs);
       work.earliestStartTime = work.repeatCycleTime;
       // Only a configuration generation, never a UID, account identifier or credential.
       work.parameters = { 'epoch': state.epoch };
@@ -190,7 +228,7 @@ export class BackgroundTaskService {
     return work;
   }
 
-  private static replacementPending(): boolean {
+  static replacementPending(): boolean {
     return PreferencesStore.getBackupJournal().length > 0 || UserService.getInstance().isSessionTransitionPending();
   }
 
@@ -209,7 +247,7 @@ export class BackgroundTaskService {
         if (existing !== undefined) { workScheduler.stopWork(existing, true); }
         return;
       }
-      if (state.enabled && await BackgroundTaskService.boundUser(state) === undefined) {
+      if (state.enabled && !state.allAccounts() && await BackgroundTaskService.boundUser(state) === undefined) {
         BackgroundTaskService.cancelLocal(kind);
         if (BackgroundTaskService.replacementPending()) {
           await BackgroundTaskRepo.fence(kind);
@@ -240,11 +278,12 @@ export class BackgroundTaskService {
     }
   }
 
-  /** A deliberate retry clears manual/captcha blocks only for the currently bound owner. */
+  /** A deliberate retry clears manual/captcha blocks within the authorized scope. */
   static async retryBlocked(kind: BackgroundTaskKind): Promise<void> {
     await BackgroundTaskService.serialize(async (): Promise<void> => {
       const state: BackgroundTaskState = await BackgroundTaskRepo.get(kind);
-      if (!state.enabled || await BackgroundTaskService.boundUser(state) === undefined) {
+      if (!state.enabled || BackgroundTaskService.replacementPending() ||
+        (!state.allAccounts() && await BackgroundTaskService.boundUser(state) === undefined)) {
         throw new Error('请先重新开启并确认账号与 UID 绑定');
       }
       BackgroundTaskService.cancelLocal(kind);
@@ -286,13 +325,16 @@ export class BackgroundTaskService {
       return;
     }
     if (work.parameters?.['epoch'] !== state.epoch) { return; }
-    const user: User | undefined = await BackgroundTaskService.boundUser(state);
-    if (user === undefined) {
-      if (BackgroundTaskService.replacementPending()) { await BackgroundTaskRepo.fence(kind); }
-      else { await BackgroundTaskRepo.stop(kind, '账号或 UID 已变化，请重新开启并确认绑定'); }
-      try { workScheduler.stopWork(work, true); } catch (e) {}
-      BackgroundTaskService.changed();
-      return;
+    let user: User | undefined;
+    if (!state.allAccounts()) {
+      user = await BackgroundTaskService.boundUser(state);
+      if (user === undefined) {
+        if (BackgroundTaskService.replacementPending()) { await BackgroundTaskRepo.fence(kind); }
+        else { await BackgroundTaskRepo.stop(kind, '账号或 UID 已变化，请重新开启并确认绑定'); }
+        try { workScheduler.stopWork(work, true); } catch (e) {}
+        BackgroundTaskService.changed();
+        return;
+      }
     }
     const token: string = `${Date.now()}-${Math.random()}`;
     if (!await BackgroundTaskRepo.claim(state, token, Date.now())) { return; }
@@ -307,9 +349,10 @@ export class BackgroundTaskService {
     });
     let result: BackgroundTaskResult;
     try {
-      result = await Promise.race<BackgroundTaskResult>([
-        BackgroundTaskService.execute(state, user, guard), timeout,
-      ]);
+      const execution: Promise<BackgroundTaskResult> = user === undefined
+        ? BackgroundTaskService.executeAll(state, guard)
+        : BackgroundTaskService.execute(state, new NativeTaskTarget(user, state.uid, state.region), guard, token);
+      result = await Promise.race<BackgroundTaskResult>([execution, timeout]);
     } catch (e) {
       result = BackgroundTaskResult.of('blocked', '后台处理失败，请打开应用检查状态后重新排队');
     } finally {
@@ -320,29 +363,69 @@ export class BackgroundTaskService {
     await BackgroundTaskRepo.finish(state, token, result);
     BackgroundTaskService.changed();
     // false ends this execution while retaining the persisted repeating schedule.
-    try { workScheduler.stopWork(work, false); } catch (e) {}
+    if ((await BackgroundTaskRepo.get(kind)).epoch === state.epoch) {
+      try { workScheduler.stopWork(work, false); } catch (e) {}
+    }
   }
 
-  private static async execute(state: BackgroundTaskState, user: User, guard: NativeTaskGuard): Promise<BackgroundTaskResult> {
-    if (state.kind === BackgroundTaskKind.SIGN_IN) {
-      return AutoSignInService.getInstance().runBackground(user, state.uid, state.region, guard);
+  private static async executeAll(state: BackgroundTaskState, guard: NativeTaskGuard): Promise<BackgroundTaskResult> {
+    const targets: NativeTaskTarget[] = [];
+    const users: User[] = await UserRepo.getAllUsers();
+    for (const user of users) {
+      if (!user.hasCookie()) { continue; }
+      const tracked: string[] = state.kind === BackgroundTaskKind.DAILY_NOTE ? PreferencesStore.getTrackedUids(user.id) : [];
+      for (const role of BackgroundTaskPolicy.mainlandRoles(user)) {
+        if (state.kind === BackgroundTaskKind.DAILY_NOTE && !tracked.includes(role.gameUid)) { continue; }
+        const op: BackgroundOperation = await BackgroundTaskRepo.operation(state.kind, user.id, role.gameUid, role.region);
+        targets.push(new NativeTaskTarget(user, role.gameUid, role.region, op.updatedAt));
+      }
     }
-    const day: string = BackgroundTaskPolicy.day(state.region);
-    const op: BackgroundOperation = await BackgroundTaskRepo.operation(state.kind, state.userId, state.uid, state.region);
+    if (targets.length === 0) { return BackgroundTaskResult.of('waiting', '暂无可处理的国服角色'); }
+    // Oldest first so a task reaching the OS time limit can continue with the other roles next time.
+    targets.sort((a: NativeTaskTarget, b: NativeTaskTarget): number => a.lastAttempt - b.lastAttempt);
+    let complete: number = 0;
+    let waiting: number = 0;
+    let manual: number = 0;
+    let failed: number = 0;
+    for (const target of targets) {
+      if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
+      const owned: NativeTaskTargetGuard = new NativeTaskTargetGuard(guard, target);
+      const result: BackgroundTaskResult = await BackgroundTaskService.execute(state, target, owned, guard.token);
+      if (result.status === 'success' || result.status === 'already_signed') { complete++; }
+      else if (result.status === 'cooldown' || result.status === 'cancelled') { waiting++; }
+      else if (result.status === 'login_required' || result.status === 'captcha' || result.status === 'manual') { manual++; }
+      else { failed++; }
+    }
+    const message: string = `已处理 ${complete} 个 · 等待 ${waiting} 个 · 需手动处理 ${manual} 个 · 失败 ${failed} 个`;
+    if (manual + failed > 0) {
+      return BackgroundTaskResult.of(complete > 0 ? 'partial' : manual > 0 ? 'manual' : 'retry', message);
+    }
+    return BackgroundTaskResult.of(complete > 0 ? 'success' : 'cooldown', message);
+  }
+
+  private static async execute(state: BackgroundTaskState, target: NativeTaskTarget, guard: BackgroundTaskGuard,
+    token: string): Promise<BackgroundTaskResult> {
+    if (state.kind === BackgroundTaskKind.SIGN_IN) {
+      return AutoSignInService.getInstance().runBackground(target.user, target.uid, target.region, guard);
+    }
+    const day: string = BackgroundTaskPolicy.day(target.region);
+    const op: BackgroundOperation = await BackgroundTaskRepo.operation(state.kind, target.user.id, target.uid, target.region);
     if (!BackgroundTaskPolicy.due(op, day, Date.now(), false)) {
       if (op.day === day && (op.status === 'captcha' || op.status === 'login_required' || op.status === 'manual')) {
         return BackgroundTaskResult.of(op.status, '需要手动处理，请在应用内处理后重新排队');
       }
       return BackgroundTaskResult.of('cooldown', '便笺刚刷新或仍在冷却，等待下次调度');
     }
-    if (!await guard.isActive() || !await BackgroundTaskRepo.claimOperation(op, day, guard.token, Date.now())) {
+    if (!await guard.isActive() || !await BackgroundTaskRepo.claimOperation(op, day, token, Date.now())) {
       return BackgroundTaskResult.of('cancelled', '任务已停止或已有任务在执行');
     }
     let result: BackgroundTaskResult;
-    try { result = await DailyNoteService.getInstance().refreshBackground(user, state.uid, state.region, guard); }
+    try {
+      result = await DailyNoteService.getInstance().refreshBackground(target.user, target.uid, target.region, guard, state.allAccounts());
+    }
     catch (e) { result = BackgroundTaskResult.of('retry', '便笺刷新未完成，等待系统再次调度'); }
     if (!await guard.isActive()) { result = BackgroundTaskResult.of('cancelled', '任务已停止'); }
-    await BackgroundTaskRepo.finishOperation(op, guard.token, result, state.intervalMinutes);
+    await BackgroundTaskRepo.finishOperation(op, token, result, state.intervalMinutes);
     return result;
   }
 

@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "Hủy bỏ"
+    },
+    {
+      "name": "common_confirm",
+      "value": "Xác nhận"
+    },
+    {
+      "name": "common_refresh",
+      "value": "Làm mới"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "Lịch sử cầu nguyện"
+    },
+    {
+      "name": "page_title_home",
+      "value": "Trang chủ"
+    },
+    {
+      "name": "page_title_login",
+      "value": "Đăng nhập"
+    },
+    {
+      "name": "page_title_note",
+      "value": "Ghi chú thời gian thực"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "Cài đặt"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "Lịch sử cầu nguyện"
+    },
+    {
+      "name": "tab_home",
+      "value": "Trang chủ"
+    },
+    {
+      "name": "tab_mine",
+      "value": "Hồ sơ"
+    },
+    {
+      "name": "tab_note",
+      "value": "Ghi chú thời gian thực"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "Xuất"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "Nhập"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "Lưu"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "Generate analysis"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "Account history charts and AI insights"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "Stop generation"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "Test connection"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "Kiểm tra cập nhật"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "Dữ liệu"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "Kỳ"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "Hệ thống"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "Công cụ"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "Mở lại ứng dụng để dùng ngôn ngữ hệ thống"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "Hệ thống"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "La Hoàn Thâm Cảnh"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "Quản lý thành tựu"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "Vật phẩm trong túi"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "Ảo Cảnh Hiểm Ác"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "Nhân vật của tôi"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "Kế hoạch bồi dưỡng"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "Trình khởi chạy"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "Nhật ký lữ hành"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Hutao Passport"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "Thơ Kịch Ảo Ảnh Chân Cảnh"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "Thông tin nhân vật"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "Thông tin quái vật"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "Thông tin vũ khí"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "Giới thiệu"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "Tài khoản"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "Ngoại hình"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "Ảnh nền"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "Nền video"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "Sao lưu và khôi phục"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "Lịch"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "Trang chủ"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "Cài đặt khu vực sự kiện game trên trang chủ"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "Thẻ trang chủ"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "Ngôn ngữ"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "Chất liệu nền"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "Khác"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "Đăng nhập"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "Dung lượng lưu trữ"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "Chủ đề màu"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "Xác minh không cảm nhận"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "Lịch sử cầu nguyện"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "Di chuyển dữ liệu"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "Tối"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "Sáng"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "Phiên bản Hồ Đào %s hiện có sẵn"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "Ghi chú phát hành"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "Bỏ qua phiên bản này"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "Cập nhật ứng dụng"
+    }
+  ]
+}

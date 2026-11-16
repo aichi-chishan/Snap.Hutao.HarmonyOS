@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "ui_web_share_title",
+      "value": "Modo de compartilhamento e salvamento"
+    },
+    {
+      "name": "ui_web_share_description",
+      "value": "Selecione o modo para salvar a imagem após clicar no botão de compartilhamento"
+    },
+    {
+      "name": "ui_web_share_copy",
+      "value": "Copiado para a área de transferência"
+    },
+    {
+      "name": "ui_web_share_file",
+      "value": "Salvar como arquivo"
+    }
+  ]
+}

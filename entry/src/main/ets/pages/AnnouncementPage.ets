@@ -15,11 +15,16 @@ import { EmptyState } from '../components/EmptyState';
 import { ErrorHint } from '../components/ErrorHint';
 import { PageHeader } from '../components/PageHeader';
 import { PageBackdrop } from '../components/PageBackdrop';
-import { CardSurfaceModifier } from '../common/UiSurface';
+import { AppButtonModifier, CardSurfaceModifier, SelectMaterialModifier, UiSurface } from '../common/UiSurface';
+
+const ANNOUNCEMENT_CN_REGIONS: string[] = ['cn_gf01', 'cn_qd01'];
+const ANNOUNCEMENT_CN_REGION_NAMES: string[] = ['国服 · 天空岛', '国服 · 世界树'];
 
 @Entry
 @Component
 export struct AnnouncementPage {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
@@ -37,21 +42,22 @@ export struct AnnouncementPage {
   onOwnerChanged(): void {
     if (!this.attached) { return; }
     this.showCodeSheet = false;
-    this.vm.load(AnnouncementContext.create(RegionUtil.regionOfUid(this.currentUid) || 'cn_gf01', this.vm.context.language));
+    const region: string = RegionUtil.regionOfUid(this.currentUid);
+    this.vm.load(AnnouncementContext.create(region === 'cn_qd01' ? region : 'cn_gf01', this.vm.context.language));
   }
   options(names: string[]): SelectOption[] {
     return names.map((name: string): SelectOption => { const option: SelectOption = { value: name }; return option; });
   }
   chooseRegion(index: number): void {
     this.showCodeSheet = false;
-    this.vm.load(AnnouncementContext.create(AnnouncementContext.REGIONS[index], this.vm.context.language));
+    this.vm.load(AnnouncementContext.create(ANNOUNCEMENT_CN_REGIONS[index], this.vm.context.language));
   }
   chooseLanguage(index: number): void {
     this.vm.load(AnnouncementContext.create(this.vm.context.region, AnnouncementContext.LANGUAGES[index]));
   }
 
   toast(msg: string): void {
-    this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1500 });
+    this.getUIContext().getPromptAction().showToast({ systemMaterial: UiSurface.dialogMaterial(), message: msg, duration: 1500 });
   }
 
   /** 复制兑换码到剪贴板 */
@@ -65,7 +71,7 @@ export struct AnnouncementPage {
   @Builder
   codeSheet() {
     Column({ space: 10 }) {
-      Text('前瞻直播兑换码')
+      Text($r('app.string.ui_announcement_redeem_code_label'))
         .fontSize(16)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
@@ -88,7 +94,7 @@ export struct AnnouncementPage {
               }
               .alignItems(HorizontalAlign.Start)
               .layoutWeight(1)
-              Text('复制')
+              Text($r('app.string.ui_settings_page_label_copy_profile'))
                 .fontSize(12)
                 .fontColor($r('app.color.app_primary_text'))
                 .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -111,12 +117,11 @@ export struct AnnouncementPage {
       .width('100%')
       .constraintSize({ maxHeight: 320 })
       .scrollBar(BarState.Auto)
-      Button('关闭')
+      Button($r('app.string.ui_action_close'), { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
         .fontSize(13)
         .height(44)
         .width('100%')
-        .attributeModifier(new CardSurfaceModifier())
-        .fontColor($r('app.color.text_primary'))
         .onClick(() => {
           this.showCodeSheet = false;
         })
@@ -124,30 +129,26 @@ export struct AnnouncementPage {
     .width(360)
     .padding(16)
     .borderRadius(16)
-    .attributeModifier(new CardSurfaceModifier())
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
   }
 
   @Builder
   header() {
-    PageHeader({ title: '游戏公告', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
+    PageHeader({ title: $r('app.string.ui_nav_announcements'), embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
       if (this.vm.redeemCodes.length > 0) {
-        Button('兑换码')
+        Button('兑换码', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, this.showCodeSheet))
           .fontSize(12)
           .height(44)
           .margin({ right: 8 })
-          .backgroundColor(this.showCodeSheet ? $r('app.color.app_primary') : $r('app.color.card_surface'))
-          .fontColor(this.showCodeSheet ? $r('app.color.on_accent') : $r('app.color.app_primary_text'))
-          .border({ width: 1, color: $r('app.color.app_primary') })
-          .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
             this.showCodeSheet = !this.showCodeSheet;
           })
       }
-      Button('刷新')
+      Button($r('app.string.common_refresh'), { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
         .fontSize(12)
         .height(44)
-        .backgroundColor($r('app.color.app_primary'))
-        .fontColor($r('app.color.on_accent'))
         .onClick(() => {
           this.vm.load(this.vm.context, true).then(() => {
           });
@@ -286,7 +287,7 @@ export struct AnnouncementPage {
     }
     .width('100%')
     .borderRadius(12)
-    .attributeModifier(new CardSurfaceModifier())
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
     .border({ width: 1, color: $r('app.color.card_stroke') })
     .clip(true)
     .hoverEffect(HoverEffect.Highlight)
@@ -312,11 +313,11 @@ export struct AnnouncementPage {
       Column() {
         this.header()
         Flex({ wrap: FlexWrap.Wrap }) {
-          Select(this.options(AnnouncementContext.REGION_NAMES))
-            .selected(AnnouncementContext.REGIONS.indexOf(this.vm.context.region))
-            .value(AnnouncementContext.REGION_NAMES[AnnouncementContext.REGIONS.indexOf(this.vm.context.region)])
+          Select(this.options(ANNOUNCEMENT_CN_REGION_NAMES)).attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel))
+            .selected(ANNOUNCEMENT_CN_REGIONS.indexOf(this.vm.context.region))
+            .value(ANNOUNCEMENT_CN_REGION_NAMES[ANNOUNCEMENT_CN_REGIONS.indexOf(this.vm.context.region)])
             .margin({ right: 8, bottom: 6 }).onSelect((index: number) => this.chooseRegion(index))
-          Select(this.options(AnnouncementContext.LANGUAGE_NAMES))
+          Select(this.options(AnnouncementContext.LANGUAGE_NAMES)).attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel))
             .selected(AnnouncementContext.LANGUAGES.indexOf(this.vm.context.language))
             .value(AnnouncementContext.LANGUAGE_NAMES[AnnouncementContext.LANGUAGES.indexOf(this.vm.context.language)])
             .margin({ bottom: 6 }).onSelect((index: number) => this.chooseLanguage(index))

@@ -34,7 +34,7 @@ export class BackgroundTaskSettingsViewModel {
       if (!this.current(generation)) { return; }
       this.review = undefined;
       this.busy = this.operationPending;
-      this.message = '账号状态已变化；开启后台任务前请重新确认 UID';
+      this.message = '账号状态已变化，请重新确认后台任务';
       this.refresh();
     });
     this.refresh();
@@ -66,13 +66,13 @@ export class BackgroundTaskSettingsViewModel {
     try {
       const review: BackgroundEnableReview = new BackgroundEnableReview();
       review.kind = kind;
-      review.binding = BackgroundTaskService.captureBinding();
+      review.binding = BackgroundTaskService.captureBinding(true);
       review.generation = this.generation;
       this.review = review;
       this.busy = true;
       this.message = '';
       return review;
-    } catch (e) { this.message = '请先登录并选择属于此账号的 UID'; return undefined; }
+    } catch (e) { this.message = '账号状态正在更新，请稍后重试'; return undefined; }
   }
 
   cancelEnable(review: BackgroundEnableReview): void {
@@ -85,7 +85,7 @@ export class BackgroundTaskSettingsViewModel {
     if (this.review !== review || !this.current(review.generation) || this.operationPending) { return; }
     this.review = undefined;
     if (review.binding.revision !== UserService.getInstance().sessionRevision()) {
-      this.busy = false; this.message = '账号状态已变化，请重新确认 UID'; return;
+      this.busy = false; this.message = '账号状态已变化，请重新确认后台任务'; return;
     }
     await this.run(async (): Promise<void> => {
       await BackgroundTaskService.setEnabled(review.kind, true, review.binding);
@@ -118,7 +118,7 @@ export class BackgroundTaskSettingsViewModel {
     const generation: number = this.generation;
     this.operationPending = true; this.busy = true; this.message = '';
     try { await action(); }
-    catch (e) { if (this.current(generation)) { this.message = '操作未完成；请检查账号绑定与任务状态后重试'; } }
+    catch (e) { if (this.current(generation)) { this.message = '操作未完成，请检查账号与任务状态后重试'; } }
     finally {
       this.operationPending = false;
       if (this.active) { this.busy = false; await this.refresh(); }

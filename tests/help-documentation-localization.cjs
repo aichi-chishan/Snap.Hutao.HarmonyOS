@@ -18,7 +18,7 @@ const sourceRoot = path.resolve(__dirname, '../tools/help-locales');
 const catalogNames = fs.readdirSync(path.join(root, 'data/help')).filter(n => n.endsWith('.ets')).map(n => 'data/help/' + n.slice(0,-4));
 function harness() {
   const cache = new Map();
-  const state = { preference:'system', language:'zh-CN', ready:true, appReads:0, deviceReads:0, themeReads:0,
+  const state = { preference:'system', language:'zh-CN', nativeLanguage:'default', nativeWrites:[], ready:true, appReads:0, deviceReads:0, themeReads:0,
     preferenceReads:0, preferenceWrites:0, clipboardReads:0, copies:[], routes:[], links:[],
     theme:'system', appVersion:'1.21.0', api:24, deviceType:'phone', appStorage:new Map(), copyGate:undefined };
   const prefs = { isReady:()=>state.ready, getString:()=>{state.preferenceReads++;return state.preference;},
@@ -27,7 +27,8 @@ function harness() {
   const device = { get sdkApiVersion(){state.deviceReads++;return state.api;}, get deviceType(){state.deviceReads++;return state.deviceType;},
     get osFullName(){throw Error('Forbidden full system identifier');},get serial(){throw Error('Forbidden serial');} };
   const kits={
-    '@kit.LocalizationKit':{i18n:{System:{getSystemLanguage:()=>state.language}}},
+    '@kit.LocalizationKit':{i18n:{System:{getSystemLanguage:()=>state.language,getAppPreferredLanguage:()=>state.nativeLanguage,
+      setAppPreferredLanguage:language=>{state.nativeWrites.push(language);state.nativeLanguage=language;}}}},
     '@kit.AbilityKit':{bundleManager:{BundleFlag:{GET_BUNDLE_INFO_DEFAULT:0},getBundleInfoForSelfSync:()=>{state.appReads++;return {versionName:state.appVersion};}}},
     '@kit.BasicServicesKit':{deviceInfo:device,pasteboard:{MIMETYPE_TEXT_PLAIN:'text/plain',createData:(_type,text)=>text,
       getSystemPasteboard:()=>({setData:async text=>{state.copies.push(text);if(state.copyGate)await state.copyGate.promise;},getData:()=>{state.clipboardReads++;throw Error('Forbidden clipboard read');}})}},
@@ -65,7 +66,7 @@ function strictTypes() {
  const write=(name,text)=>{const file=path.join(dir,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
  write('service/SupportService.ts',`import {CommonOutcomeId} from '../model/CommonOutcome';import {DiagnosticPreview} from '../model/DiagnosticPolicy';export class SupportService {static async previewDiagnostics(feature:string,outcome:CommonOutcomeId,include:boolean):Promise<DiagnosticPreview>{return new DiagnosticPreview();}static async copyDiagnosticPreview(preview:DiagnosticPreview):Promise<void>{}}`);
  write('data/prefs/PreferencesStore.ts',`export class PreferencesStore {static getString(key:string,value:string):string{return value;}static isReady():boolean{return true;}static setString(key:string,value:string):void{}}`);
- write('globals.d.ts',`declare function Observed<T extends new (...args:never[])=>object>(value:T):T;declare const AppStorage:{get<T>(key:string):T|undefined;setOrCreate<T>(key:string,value:T):void};declare module '@kit.LocalizationKit' {export const i18n:{System:{getSystemLanguage():string}};}`);
+ write('globals.d.ts',`declare function Observed<T extends new (...args:never[])=>object>(value:T):T;declare const AppStorage:{get<T>(key:string):T|undefined;setOrCreate<T>(key:string,value:T):void};declare module '@kit.LocalizationKit' {export const i18n:{System:{getSystemLocaleInstance():{toString():string};getSystemLanguage():string;getAppPreferredLanguage():string;setAppPreferredLanguage(language:string):void}};}`);
  const program=ts.createProgram([...names.map(n=>path.join(dir,n+'.ts')),path.join(dir,'globals.d.ts')],{strict:true,noEmit:true,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true,skipLibCheck:true});
  const errors=ts.getPreEmitDiagnostics(program).filter(d=>d.category===ts.DiagnosticCategory.Error);
  assert.equal(errors.length,0,ts.formatDiagnosticsWithColorAndContext(errors,{getCurrentDirectory:()=>dir,getCanonicalFileName:x=>x,getNewLine:()=> '\n'}));
@@ -90,10 +91,12 @@ function strictTypes() {
   for(const [input,expected] of [['zh','zh-Hans'],['zh_CN','zh-Hans'],['zh-SG','zh-Hans'],['zh-TW','zh-Hant'],['zh-HK','zh-Hant'],['zh-MO','zh-Hant'],['zh-Hans-TW','zh-Hans'],['zh-Hant-CN','zh-Hant'],['en-GB','en'],['es-MX','es'],['fr_CA','fr'],['pt-BR','pt'],['de-Latn-DE','de'],['id-ID','id'],['it-IT','it'],['ja-Jpan-JP','ja'],['ko-Kore-KR','ko'],['ru-Cyrl-RU','ru'],['th-TH','th'],['tr-TR','tr'],['vi-VN','vi'],['zh-u-rg-twzzzz','zh-Hans'],['zh-Latn-CN','en'],['ar-SA','en'],['de-','en'],['en--US','en'],['constructor','en'],['','en']])assert.equal(Policy.resourceLocale(input),expected,input);
   assert.equal(Policy.supported('fr-FR'),true);assert.equal(Policy.supported('ar-SA'),false);assert.equal(Policy.supported('zh-Latn'),false);assert.equal(Policy.supported('EN_us'),true);
   const locales=Policy.locales();locales.push('evil');assert.equal(Policy.locales().length,15);
-  assert.equal(Locale.current(),'zh-Hans');state.language='ar-SA';assert.equal(Locale.current(),'en');assert.equal(Locale.usingFallback(),true);
+  assert.equal(Locale.current(),'zh-Hans');state.language='ar-SA';Locale.onConfigurationUpdate('ar-SA');
+  assert.equal(Locale.current(),'en');assert.equal(Locale.usingFallback(),true);
   assert.equal(Locale.select('zh-Hant'),true);assert.equal(Locale.current(),'zh-Hant');assert.equal(Locale.usingFallback(),false);assert.equal(state.preferenceWrites,1);
   assert.equal(Locale.select('en-US'),false);assert.equal(Locale.select('invalid'),false);assert.equal(state.preferenceWrites,1);
-  assert.equal(Locale.select('system'),true);assert.equal(state.appStorage.get('helpLocaleVersion'),2);
+  assert.equal(Locale.select('system'),true);assert.equal(state.appStorage.get('helpLocaleVersion'),3);
+  assert.equal(Locale.current(),'zh-Hant');assert.equal(Locale.restartRequired(),true);
   state.ready=false;assert.equal(Locale.select('en'),false);assert.equal(state.preferenceWrites,2);
  });
  await test('offline search ANDs bounded terms, folds diacritics/letters and searches all canonical languages',()=>{
@@ -201,10 +204,48 @@ function strictTypes() {
   assert.equal(state.preferenceWrites,15);assert.equal(state.appStorage.get('helpLocaleVersion'),15);
   for(const bad of ['en-US','FR',' pt ','constructor','__proto__','zh-Latn','', 'de-'+ 'a'.repeat(100)]){assert.equal(Locale.select(bad),false);assert.equal(Policy.preference(bad),'system');}
   assert.equal(state.preferenceWrites,15);
-  target.chooseLocale(0);state.language='ar-SA';target.localeChanged();assert.equal(target.vm.locale,'en');assert.equal(target.fallback,true);assert.match(target.label('fallback'),/English/);
-  state.language='fr-CA';target.localeChanged();assert.equal(target.vm.locale,'fr');assert.equal(target.fallback,false);
+  target.chooseLocale(0);state.language='ar-SA';Locale.onConfigurationUpdate('ar-SA');target.localeChanged();
+  assert.equal(target.vm.locale,'vi');assert.equal(target.restartRequired,true);
+  assert.deepEqual(state.nativeWrites,[...LOCALES,'default']);
+  const cold=harness();cold.state.language='ar-SA';const coldPage=cold.page();coldPage.aboutToAppear();
+  assert.equal(coldPage.vm.locale,'en');assert.equal(coldPage.fallback,true);assert.match(coldPage.label('fallback'),/English/);
+  cold.state.language='fr-CA';cold.Locale.onConfigurationUpdate('fr-CA');coldPage.localeChanged();
+  assert.equal(coldPage.vm.locale,'fr');assert.equal(coldPage.fallback,false);coldPage.aboutToDisappear();
   assert.equal(state.deviceReads,0);assert.equal(state.appReads,0);assert.equal(state.themeReads,0);assert.equal(state.clipboardReads,0);assert.equal(state.copies.length,0);assert.equal(state.links.length,0);assert.equal(state.routes.length,0);
   target.aboutToDisappear();
+ });
+ await test('initializes an existing preference and all supported locales have the same native resource keys',()=>{
+  const {Locale,state}=harness();state.preference='ja';Locale.initialize();Locale.initialize();
+  assert.deepEqual(state.nativeWrites,['ja']);
+  const resources=path.resolve(root,'../resources');
+  const keys=folder=>['ui_strings.json','ui_labels.json'].flatMap(file=>
+    JSON.parse(fs.readFileSync(path.join(resources,folder,'element',file),'utf8')).string.map(row=>row.name)).sort();
+  const expected=keys('en');assert.ok(expected.includes('ui_section_language'));
+  assert.ok(expected.includes('ui_desc_banner_history'));assert.ok(expected.includes('ui_settings_restore_confirm'));
+  for(const locale of LOCALES)assert.deepEqual(keys(locale.replace('-','_')),expected);
+  assert.equal(new Set(expected).size,expected.length);
+ });
+ await test('miHoYo query language follows the Windows mapping and keeps its own fallback',()=>{
+  const {Locale,Policy,state}=harness();
+  const expected=['zh-cn','zh-tw','en-us','de-de','es-es','fr-fr','id-id','it-it','ja-jp','ko-kr','pt-pt','ru-ru','th-th','tr-tr','vi-vn'];
+  assert.deepEqual(LOCALES.map(locale=>Policy.apiLanguageCode(locale)),expected);
+  for(const [index,locale] of LOCALES.entries()){
+    state.preference=locale;
+    assert.equal(Locale.applyCurrentPreference(),true);
+    assert.equal(Locale.apiLanguageCode(),expected[index]);
+  }
+  const system=harness();system.state.language='zh-Hant-HK';assert.equal(system.Locale.apiLanguageCode(),'zh-tw');
+  system.state.language='pt-BR';system.Locale.onConfigurationUpdate('pt-BR');assert.equal(system.Locale.apiLanguageCode(),'pt-pt');
+  system.state.language='ar-SA';system.Locale.onConfigurationUpdate('ar-SA');
+  assert.equal(system.Locale.current(),'en');assert.equal(system.Locale.apiLanguageCode(),'zh-cn');
+ });
+ await test('applies a committed restored language without rewriting preferences',()=>{
+  const {Locale,state}=harness();
+  state.preference='ja';assert.equal(Locale.applyCurrentPreference(),true);
+  state.preference='system';assert.equal(Locale.applyCurrentPreference(),true);
+  assert.deepEqual(state.nativeWrites,['ja','default']);
+  assert.equal(state.preferenceWrites,0);assert.equal(state.appStorage.get('helpLocaleVersion'),2);
+  state.ready=false;assert.equal(Locale.applyCurrentPreference(),false);
  });
  await test('region variants cannot expand cache bounds; every locale returns detached articles and search results',()=>{
   const {Search,Policy}=harness();
@@ -237,7 +278,7 @@ function strictTypes() {
   assert.doesNotMatch(source,/PageBackdrop|WallpaperLayer|SupportService\.copyDiagnostics|openIssues|setInterval|http|#[0-9a-fA-F]{6}/);
   for(const name of ['service/DocumentationSearchService',...catalogNames,'model/DiagnosticPolicy'])assert.doesNotMatch(read(name),/from ['"].*(?:UserService|TokenVault|GachaRepo|network|pasteboard|deviceInfo)/);
   const support=read('service/SupportService');assert.doesNotMatch(support,/osFullName|versionCode|\bserial\b|TokenVault|UserService|getCurrentUid|getAllSync|getData\(/);
-  assert.doesNotMatch(read('service/AppLocaleService'),/setSystemLanguage|setAppPreferredLanguage/);
+  assert.doesNotMatch(read('service/AppLocaleService'),/setSystemLanguage/);
   const catalog=catalogNames.map(read).join('\n');assert.doesNotMatch(catalog,/Ctrl\+Alt|ArkWeb|global shortcut|C#|DLL|pipelines/);
  });
 })().catch(error=>{console.error(error);process.exitCode=1;});

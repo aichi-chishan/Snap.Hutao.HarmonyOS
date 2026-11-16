@@ -1,0 +1,20 @@
+# Windows 与鸿蒙文件交换
+
+Windows 源码基线为 Snap.Hutao.Remastered 2.0.2.0（`3b7475e`）。两端提供文件入口的交换格式为祈愿 UIGF 和成就 UIAF。
+
+## 祈愿 UIGF
+
+- 鸿蒙导入 v2.0–v2.4、v3.0 和 v4.0–v4.2。v2.0 和 v2.1 走 Windows 同款单 UID 结构，记录须有 `item_id`。鸿蒙导出 v2.2–v2.4、v3.0 和 v4.0–v4.2，旧版写入 `region_time_zone`。 [Windows 导入版本](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Service/UIGF/UIGFService.cs#L25-L35) · [旧版导出](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Service/UIGF/AbstractUIGF3ExportService.cs#L39-L48)
+- 早期鸿蒙抓取可能把接口的空 `item_id` 保存为 0。导出时按物品类型、名称和星级从本地元数据唯一恢复，原归档保持原值。若仍无法确定物品，导出会指出记录和无效字段。新抓取在写入前解析缺失 ID。 [Windows 抓取身份解析](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Service/GachaLog/GachaLogFetchContext.cs#L74) · [UIGF v4.2](https://uigf.org/en/standards/uigf.html)
+- 两端默认按 UID 和查询池追加早于本地最旧 ID 的记录。鸿蒙导入后显示新增与跳过数量，确认时也可选「补齐缺失记录」。 [Windows 常规池导入](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Service/UIGF/AbstractUIGF40ImportService.cs#L70-L84) · [颂愿池导入](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Service/UIGF/UIGF42ImportService.cs#L60-L74)
+- v4.2 保留颂愿的原始子池号、品质和期次。仅有颂愿的 UID 也会写入 `hk4e` 空列表，供 Windows 导入对话框选择。鸿蒙保留非单位 `count` 扩展，经 Windows 导入再导出时每条会按 1 计。 [Windows UID 选择](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/UI/Xaml/View/Dialog/UIGFImportDialog.xaml.cs#L19-L25) · [颂愿导出](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Service/UIGF/UIGF42ExportService.cs#L64-L80) · [常规池导出字段](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Model/InterChange/GachaLog/Hk4eItem.cs#L46-L60)
+
+## 成就 UIAF
+
+两端支持 UIAF v1.1，文件保留成就 ID、进度、状态和秒级时间。导入可保留已有记录、更新同 ID 或替换选定档案。鸿蒙接受缺省的导出元信息和 Windows 的未识别状态 `-1`。 [Windows 文件入口](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/ViewModel/Achievement/AchievementImporter.cs#L72-L114) · [导出与合并](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Service/Achievement/AchievementService.cs#L115-L161)
+
+## 背包、角色和本地备份
+
+- 鸿蒙背包可读写 UIIF v1.0 文件，保存材料、装备和摆设。Windows 背包由 Embedded Yae 刷新，UIIF 模型用于内部向养成库存供数。 [Windows 背包刷新](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Service/Backpack/BackpackService.cs#L46-L62) · [养成库存读取](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Service/Inventory/InventoryService.cs#L140-L158)
+- Windows 与鸿蒙角色面板都提供单角色和全部角色的剪贴板文本。 [Windows 角色导出](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/ViewModel/AvatarProperty/AvatarPropertyViewModel.cs#L795-L830)
+- Windows 在数据目录使用 EF Core SQLite 的 `Userdata.db`。鸿蒙本地备份使用自己的 JSON v2，兼容鸿蒙 v1。跨端迁移祈愿和成就时请分别使用 UIGF 和 UIAF。 [Windows 数据库](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/blob/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5/src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Core/DependencyInjection/ServiceCollectionExtension.cs#L27-L66) · [鸿蒙备份格式](BACKUP_FORMAT.md)

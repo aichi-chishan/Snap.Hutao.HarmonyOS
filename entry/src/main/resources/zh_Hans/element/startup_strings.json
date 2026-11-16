@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "ui_startup_failed_title", "value": "暂时无法启动" },
+    { "name": "ui_startup_failed_body", "value": "无法完成启动，请重试。重试不会清除已有数据。" }
+  ]
+}

@@ -57,6 +57,11 @@ export class CalWeaponDelta {
   weaponTargetPromoteLevel: number = -1;
 }
 
+export class CalculateInventoryCatalog {
+  avatarIds: number[] = [];
+  weaponIds: number[] = [];
+}
+
 export class CalculateService {
   private static instance: CalculateService = new CalculateService();
 
@@ -65,12 +70,13 @@ export class CalculateService {
   }
 
   /** 批量计算养成材料 */
-  async batchCompute(deltas: CalAvatarDelta[]): Promise<CalBatchResult> {
+  async batchCompute(deltas: CalAvatarDelta[], inventoryUid: string = ''): Promise<CalBatchResult> {
     const user = UserService.getInstance().getCurrentUser();
     if (user === undefined || !user.hasCookie()) {
       throw new Error('请先登录');
     }
-    const data: string = CalculateService.buildBody(deltas);
+    if (inventoryUid.length > 0 && !RegionUtil.isCnUid(inventoryUid)) { throw new Error('请选择有效的国服 UID'); }
+    const data: string = CalculateService.buildBody(deltas, inventoryUid);
     const t: number = DsSigner.nowTimestamp();
     const r: string = DsSigner.randomNumber();
     const b: string = DsSigner.sortQuery({});
@@ -98,6 +104,32 @@ export class CalculateService {
     const result: CalBatchResult = CalBatchResult.fromJson(resp.data);
     Logger.info(TAG, `batchCompute items=${result.items.length} overall=${result.overallConsume.length}`);
     return result;
+  }
+
+  /** Official calculator catalog used to request inventory across all supported materials. */
+  async fetchInventoryCatalog(): Promise<CalculateInventoryCatalog> {
+    if (UserService.getInstance().getCurrentUser()?.isOversea === true) { throw new Error('计算器库存同步仅支持国服'); }
+    const avatarFilter: Record<string, Object> = {
+      'element_attr_ids': [], 'weapon_cat_ids': [], 'page': 1, 'size': 1000, 'is_all': true,
+    };
+    const weaponFilter: Record<string, Object> = {
+      'weapon_cat_ids': [], 'weapon_levels': [4, 5], 'page': 1, 'size': 1000,
+    };
+    const catalog: CalculateInventoryCatalog = new CalculateInventoryCatalog();
+    catalog.avatarIds = CalculateService.catalogIds(await this.requestCalculator('/v1/avatar/list', JSON.stringify(avatarFilter)));
+    catalog.weaponIds = CalculateService.catalogIds(await this.requestCalculator('/v1/weapon/list', JSON.stringify(weaponFilter)));
+    return catalog;
+  }
+
+  private static catalogIds(data: Record<string, Object>): number[] {
+    if (!Array.isArray(data['list']) || (data['list'] as Object[]).length === 0) { throw new Error('计算器物品目录未返回数据'); }
+    const ids: Set<number> = new Set<number>();
+    for (const row of data['list'] as Record<string, Object>[]) {
+      const id: number = Number(row?.['id']);
+      if (!Number.isSafeInteger(id) || id <= 0) { throw new Error('计算器物品目录包含无效条目'); }
+      ids.add(id);
+    }
+    return Array.from(ids);
   }
 
   /** 计算器补充战绩接口缺失的准确突破等级，绝不把未知突破当0。 */
@@ -221,7 +253,7 @@ export class CalculateService {
   }
 
   /** 构建 batch_compute 请求体 JSON */
-  private static buildBody(deltas: CalAvatarDelta[]): string {
+  private static buildBody(deltas: CalAvatarDelta[], inventoryUid: string): string {
     const items: string[] = [];
     for (let i = 0; i < deltas.length; i++) {
       const d: CalAvatarDelta = deltas[i];
@@ -244,6 +276,8 @@ export class CalculateService {
         ',"from_user_sync":true' +
         ',"avatar_promote_level":' + d.avatarPromoteLevel + '}');
     }
-    return `{"items":[${items.join(',')}]}`;
+    const scope: string = inventoryUid.length > 0
+      ? `,"uid":${JSON.stringify(inventoryUid)},"region":${JSON.stringify(RegionUtil.regionOfUid(inventoryUid))}` : '';
+    return `{"items":[${items.join(',')}]${scope}}`;
   }
 }

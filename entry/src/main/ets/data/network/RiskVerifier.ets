@@ -69,7 +69,6 @@ export class RiskVerifier {
    * 成功返回新 challenge；用户关闭/失败返回 ''。
    */
   static async resolveGtChallenge(cookie: string, path: string): Promise<string> {
-    RiskVerifier.currentChallengePath = path;
     const gtChallenge: GtChallengeData = await RiskVerifier.createVerification(cookie, path);
     if (gtChallenge.gt.length === 0 || gtChallenge.challenge.length === 0) {
       Logger.warn(TAG, 'resolveGtChallenge: createVerification empty');
@@ -85,7 +84,7 @@ export class RiskVerifier {
     input.geetestChallenge = solved.challenge;
     input.geetestValidate = solved.validate;
     input.geetestSeccode = '';
-    return RiskVerifier.verifyXrpcChallenge(cookie, input);
+    return RiskVerifier.verifyXrpcChallenge(cookie, input, path);
   }
 
   /**
@@ -101,7 +100,6 @@ export class RiskVerifier {
 
   /** 注册极验（createVerification?is_high=true，头带 challenge_game/path） */
   static async createVerification(cookie: string, path: string): Promise<GtChallengeData> {
-    RiskVerifier.currentChallengePath = path;
     const query: Record<string, string> = { 'is_high': 'true' };
     const sorted: string = DsSigner.sortQuery(query);
     const t: number = DsSigner.nowTimestamp();
@@ -132,7 +130,7 @@ export class RiskVerifier {
   }
 
   /** 极验通过后换 x-rpc-challenge（POST verifyVerification，带 challenge_game/path 头，对齐 Windows CardClient.VerifyVerificationAsync） */
-  static async verifyXrpcChallenge(cookie: string, gv: GeetestValidateInput): Promise<string> {
+  static async verifyXrpcChallenge(cookie: string, gv: GeetestValidateInput, path: string): Promise<string> {
     const validate: string = gv.geetestValidate;
     const seccode: string = gv.geetestSeccode.length > 0 ? gv.geetestSeccode : `${validate}|jordan`;
     const body: Record<string, string> = {
@@ -150,7 +148,7 @@ export class RiskVerifier {
       'Cookie': cookie,
       'Content-Type': 'application/json',
       'x-rpc-challenge_game': '2',
-      'x-rpc-challenge_path': RiskVerifier.currentChallengePath,
+      'x-rpc-challenge_path': path,
       'x-rpc-app_version': AppConstants.APP_VERSION,
       'x-rpc-client_type': AppConstants.X_RPC_CLIENT_TYPE,
       'User-Agent': AppConstants.UA_MOBILE,
@@ -167,6 +165,4 @@ export class RiskVerifier {
     return challenge;
   }
 
-  /** createVerification/verifyVerification 需带触发风控的接口 path（checkForRisk 时记录） */
-  private static currentChallengePath: string = '';
 }

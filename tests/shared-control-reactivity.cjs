@@ -34,6 +34,13 @@ function component(name) {
 
 const TapButton = component('QTapButton');
 const button = new TapButton();
+button.icon = 'fixture-icon';
+assert.equal(button.accessibilityLabel(), 'fixture-icon', 'icon-only button keeps its accessible label');
+button.label = 'fixture-label';
+assert.equal(button.accessibilityLabel(), 'fixture-label');
+button.label = { id: 100, type: 10003, params: [] };
+assert.equal(button.accessibilityLabel(), '', 'resource text uses the native grouped child announcement');
+button.label = '';
 const animations = [];
 let taps = 0;
 button.getUIContext = () => ({ animateTo(options, update) { animations.push(options); update(); } });
@@ -149,7 +156,9 @@ assert.doesNotMatch(tapSource, /aboutToDisappear\(/, 'do not mutate decorated st
 assert.match(tapSource, /Text\(this.label\)[\s\S]*?\.flexShrink\(1\)/,
   'label shrinks and wraps without pushing the icon away from centered content');
 assert.match(tapSource, /\.onClick\(\(\) => \{\s*this.handleClick\(\)/);
-assert.match(tapSource, /\.accessibilityText\(this.label.length > 0 \? this.label : this.icon\)/);
+assert.match(tapSource, /@Prop label: ResourceStr/);
+assert.match(tapSource, /\.accessibilityGroup\(true\)/);
+assert.match(tapSource, /\.accessibilityText\(this.accessibilityLabel\(\)\)/);
 assert.doesNotMatch(tapSource, /\.animation\(/, 'no implicit animation may delay disabled/reduced-motion reset');
 
 for (const [name, key] of [['Loading', 'common_loading'], ['EmptyState', 'common_empty'], ['ErrorHint', 'common_error']]) {

@@ -21,6 +21,9 @@ const { AchievementRecord, UiafCodec, UiafImportStrategy } = await import(modelU
 
 const db = new DatabaseSync(':memory:');
 db.exec(`CREATE TABLE achievement_entries (archive_id INTEGER, ach_id INTEGER, current INTEGER, status INTEGER, timestamp INTEGER)`);
+db.exec(`CREATE TABLE achievement_archives (id INTEGER PRIMARY KEY, name TEXT, is_selected INTEGER, created_at INTEGER)`);
+const appStorage = new Map();
+globalThis.AppStorage = { get: key => appStorage.get(key), setOrCreate: (key, value) => appStorage.set(key, value) };
 let batchCalls = 0;
 let failAtBatch = 0;
 let transactionCount = 0;
@@ -28,11 +31,12 @@ class Predicates {
   constructor(table) { this.table = table; this.fields = []; this.values = []; }
   equalTo(field, value) { this.fields.push(`${field} = ?`); this.values.push(value); return this; }
   and() { return this; }
+  orderByAsc(field) { this.order = ` ORDER BY ${field}`; return this; }
   where() { return this.fields.length ? ` WHERE ${this.fields.join(' AND ')}` : ''; }
 }
-function insert(values) {
+function insert(values, table = 'achievement_entries') {
   const keys = Object.keys(values);
-  return db.prepare(`INSERT INTO achievement_entries (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`).run(...Object.values(values));
+  return db.prepare(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`).run(...Object.values(values));
 }
 const store = {
   beginTransaction() { transactionCount++; batchCalls = 0; db.exec('BEGIN'); },
@@ -42,7 +46,7 @@ const store = {
   batchInsertSync(table, values) {
     batchCalls++;
     if (batchCalls === failAtBatch) throw new Error('injected disk failure');
-    values.forEach(insert);
+    values.forEach(value => insert(value, table));
     return values.length;
   },
   insertSync(table, values) { return Number(insert(values).lastInsertRowid); },
@@ -53,11 +57,14 @@ const store = {
 };
 const helper = {
   getStore: () => store,
+  async insert(table, values) { return Number(insert(values, table).lastInsertRowid); },
+  async update(_, values, pred) { return store.updateSync(values, pred); },
+  async delete(_, pred) { return store.deleteSync(pred); },
   async query(pred) {
-    const rows = db.prepare(`SELECT * FROM ${pred.table}${pred.where()}`).all(...pred.values);
+    const rows = db.prepare(`SELECT * FROM ${pred.table}${pred.where()}${pred.order ?? ''}`).all(...pred.values);
     let index = -1;
     return { goToNextRow: () => ++index < rows.length, getColumnIndex: name => name,
-      getLong: name => rows[index][name], close() {} };
+      getLong: name => rows[index][name], getString: name => rows[index][name], close() {} };
   },
 };
 globalThis.__uiafTest = { helper, Predicates };
@@ -74,6 +81,10 @@ const serviceUrl = await etsUrl('service/AchievementService.ets', {
   '../common/AppContext': moduleUrl('export const AppContextProvider={};'),
   '../data/repo/AchievementRepo': repoUrl,
   './WikiMetaService': moduleUrl('export const WikiMetaService={cleanText:text=>text};'),
+  './LocalizedGameDataService': moduleUrl(`export const LocalizedGameDataService={
+    current:()=> 'zh-Hans',
+    readMetadataFile: async name => JSON.stringify(name==='AchievementGoal.json'?[{Id:1,Name:'test',Order:1}]:
+      [1,2,3].map(id=>({Id:id,Goal:1,Title:'test',Description:'',Order:id,Reward:5}))) };`),
   '../model/AchievementData': modelUrl,
   '../common/Logger': loggerUrl,
   './GameDataService': moduleUrl(`export const GameDataDomain={}; export const GameDataService={
@@ -95,18 +106,29 @@ await test('completion depends on status, including completed records with unkno
   assert.equal(AchievementRecord.isDone(undefined), false);
 });
 await test('UIAF exact round trip retains all statuses, unknown IDs, progress, and second timestamps', () => {
-  const values = [item(4000000000, 1, 4294967295, 253402271999), item(1, 0, 0, -62135596800),
+  const values = [item(4000000000, 1, 4294967295, 253402271999), item(1, -1, 0, -62135596800),
     item(2, 2, 30, 1700000000), item(3, 3, 0, 0)];
   const exported = JSON.parse(UiafCodec.export(parse(values), '1.2.3', 1800000000));
   assert.equal(exported.info.uiaf_version, 'v1.1');
   assert.deepEqual(exported.list, values.toSorted((a,b) => a.id-b.id));
   assert.deepEqual(UiafCodec.parse(JSON.stringify(exported), 7), parse(values).sort((a,b) => a.achId-b.achId));
 });
+await test('Windows-compatible UIAF allows absent or nullable export metadata and decimal integer strings', () => {
+  const list = [{ id: '4294967295', status: -1, current: '42', timestamp: '-62135596800' }];
+  for (const exportInfo of [{}, { export_app: null, export_app_version: null, export_timestamp: null },
+    { export_timestamp: '1800000000' }]) {
+    const text = JSON.stringify({ info: { uiaf_version: 'v1.1', ...exportInfo }, list });
+    const [record] = UiafCodec.parse(text, 7);
+    assert.deepEqual([record.achId, record.status, record.current, record.timestamp],
+      [4294967295, -1, 42, -62135596800]);
+    assert.equal(AchievementRecord.isDone(record), false);
+  }
+});
 await test('reject malformed roots, missing fields, unsupported versions, duplicate IDs and invalid numbers', () => {
   const invalid = ['{', 'null', '[]', '{}', json({}), json([null]), json([[]]),
     JSON.stringify({info:{export_app:'fixture',uiaf_version:'v1.0'},list:[]}),
-    JSON.stringify({info:{uiaf_version:'v1.1'},list:[]}), json([item(1), item(1)]),
-    ...[{id:0},{id:'1'},{current:-1},{current:0.5},{status:-1},{status:4},{timestamp:1700000000000}]
+    JSON.stringify({info:{export_app:1,uiaf_version:'v1.1'},list:[]}), json([item(1), item(1)]),
+    ...[{id:0},{id:'1e0'},{current:-1},{current:0.5},{status:-2},{status:4},{timestamp:1700000000000}]
       .map(patch => json([{...item(1),...patch}])),
     ...['id','current','status','timestamp'].map(field => {const value=item(1);delete value[field];return json([value]);})];
   invalid.forEach(text => assert.throws(() => UiafCodec.parse(text,7), undefined, text));
@@ -157,4 +179,28 @@ await test('manual checking and unchecking preserves known progress', async () =
   await AchievementRepo.setRecord(7,1,false,0);
   saved=(await AchievementRepo.getRecords(7)).get(1);
   assert.equal(saved.current,30); assert.equal(saved.status,0); assert.equal(saved.timestamp,0);
+});
+await test('archive selection and writes publish dashboard changes even when completion count stays the same', async () => {
+  clearDb();
+  const revision = () => appStorage.get('achievementDataVersion') ?? 0;
+  const initial = revision();
+  assert.deepEqual(await AchievementService.getArchives(), []);
+  await AchievementService.createArchive('first');
+  await AchievementService.createArchive('second');
+  const [first, second] = await AchievementService.getArchives();
+  assert.equal(second.isSelected, true);
+  await AchievementService.selectArchive(first.id);
+  assert.equal((await AchievementService.getArchives())[0].isSelected, true);
+  await AchievementService.importUiaf(first.id, json([item(1, 3)]), UiafImportStrategy.Overwrite);
+  await AchievementService.importUiaf(first.id, json([item(2, 3)]), UiafImportStrategy.Overwrite);
+  const records = await AchievementService.getRecords(first.id);
+  assert.equal(AchievementRecord.isDone(records.get(1)), false);
+  assert.equal(AchievementRecord.isDone(records.get(2)), true);
+  await AchievementService.setCompleted(first.id, 1, true);
+  assert.equal(revision(), initial + 6);
+  await AchievementService.deleteArchive(first.id);
+  assert.equal((await AchievementService.getArchives())[0].isSelected, true);
+  await AchievementService.deleteArchive(second.id);
+  assert.deepEqual(await AchievementService.getArchives(), []);
+  assert.equal(revision(), initial + 8);
 });

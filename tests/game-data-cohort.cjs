@@ -106,7 +106,7 @@ function environment() {
   // which its guard (correctly) rejects. Normalize into '/'-space so the adapter sees the same shape
   // as on Linux, while host fs calls below keep working.
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hutao-cohort-')).replaceAll('\\', '/'); sandboxes.push(directory);
-  const state = { directory, prefs: new Map(), revision: A, version: 'one', schema: 1, files: new Map(raw), requests: [],
+  const state = { directory, prefs: new Map(), revision: A, version: 'one', schema: 1, files: new Map(raw), requests: [], bundledMetadata: new Map(),
     free: 10 * 1024 ** 3, failUrl: '', requestGate: null, requestHook: null, workerFailure: '', workerGate: null,
     workerHook: null, workerResultHook: null, late: null, ioHook: null, uriCalls: [],
     requestBarrier: null, hashGate: null, workerBarrier: null, afterRename: null, itemLatency: 0, abortSupported: false, destroyThrows: false,
@@ -155,7 +155,8 @@ function environment() {
         const isItem = url.includes('/metadata/') || url.includes('/icons/');
         state.activeHTTP++; state.peakHTTP = Math.max(state.peakHTTP, state.activeHTTP);
         if (isItem) { state.activeItems++; state.peakItems = Math.max(state.peakItems, state.activeItems); }
-        state.requests.push(url); assert.equal(options.maxRedirects, 0); assert.equal(options.usingCache, false); assert.ok(options.maxLimit <= P.MAX_FILE_BYTES);
+        const itemPath = isItem ? url.slice(P.RAW_ROOT.length + 41) : '';
+        state.requests.push(url); assert.equal(options.maxRedirects, 0); assert.equal(options.usingCache, false); assert.ok(options.maxLimit <= P.maxFileBytes(itemPath));
         try {
           return await new Promise((resolve, reject) => {
             rejectPending = reject;
@@ -186,7 +187,7 @@ function environment() {
     '@kit.ArkTS': { taskpool, util: { TextEncoder: class { encodeInto(text) { return encode(text); } }, TextDecoder: { create: (_, options) => ({ decodeToString: bytes => new TextDecoder('utf-8', options).decode(bytes) }) } } },
     '@kit.NetworkKit': { http },
     '@kit.CryptoArchitectureKit': { cryptoFramework: { createMd() { const hash = crypto.createHash('sha256'); return { updateSync(blob) { hash.update(blob.data); }, digestSync() { return { data: hash.digest() }; }, async update(blob) { if (state.hashGate) await state.hashGate; hash.update(blob.data); }, async digest() { return { data: hash.digest() }; } }; } } },
-    AppContext: { AppContextProvider: { getFilesDir: () => directory, getResourceManager: () => ({ async getRawFileContent(name) { return Uint8Array.from(fs.readFileSync(path.join(root, 'entry/src/main/resources/rawfile', name))); } }) } },
+    AppContext: { AppContextProvider: { getFilesDir: () => directory, getResourceManager: () => ({ async getRawFileContent(name) { return Uint8Array.from(state.bundledMetadata.get(name) ?? fs.readFileSync(path.join(root, 'entry/src/main/resources/rawfile', name))); } }) } },
     PreferencesStore: { PreferencesStore: { getString: (key, fallback) => state.prefs.get(key) ?? fallback, setString: (key, value) => state.prefs.set(key, value) } },
     Logger: { Logger: { info() {}, warn() {} } },
   };
@@ -440,6 +441,167 @@ function environment() {
     assert.equal(await service.readMetadataFile('avatar_meta.json'), raw.get('metadata/avatar_meta.json').toString());
     await assert.rejects(service.readMetadataFile('../other.json'), /未知|不安全/);
     assert.equal(service.getInstance().remoteVersion(), '');
+  });
+  await test('optional metadata loads through GameDataService with the bundled or an older remote snapshot', async () => {
+    const env = environment();
+    const names = ['avatar_associations.json', 'BeyondItem.json', 'Chapter.json', 'HardChallengeSchedule.json',
+      'ProfilePicture.json', 'avatar_skill_en.json'];
+    const optional = names.map(name => fs.readFileSync(path.join(root, 'entry/src/main/resources/rawfile/metadata', name), 'utf8'));
+    const bundled = env.runtime()('../../service/GameDataService').GameDataService;
+    for (let index = 0; index < names.length; index++) {
+      assert.equal(await bundled.readMetadataFile(names[index]), optional[index]);
+    }
+    const updater = await env.updater();
+    await updater.update(); // The existing manifest contains only its required files.
+    const remote = env.runtime()('../../service/GameDataService').GameDataService;
+    await remote.initializeSnapshot();
+    assert.equal(remote.getInstance().remoteVersion(), 'one');
+    for (let index = 0; index < names.length; index++) {
+      assert.equal(await remote.readMetadataFile(names[index]), optional[index]);
+    }
+    const withOptional = new Map(raw);
+    names.forEach((name, index) => withOptional.set('metadata/' + name, Buffer.from(optional[index])));
+    assert.equal(parsed(A, 'with-optional', 2, withOptional).items.length, raw.size + names.length);
+    assert.ok(!P.METADATA.includes('Chapter.json'));
+    const metadata = new Map([...withOptional].map(([name, bytes]) => [name, bytes.toString()]));
+    P.validateModels(metadata);
+    const [chapter] = JSON.parse(metadata.get('metadata/Chapter.json'));
+    metadata.set('metadata/Chapter.json', JSON.stringify([chapter, chapter]));
+    assert.throws(() => P.validateModels(metadata), /ID 重复/);
+  });
+  await test('avatar skill catalogs are optional, verified on demand, and reject mismatched locale or level rows', async () => {
+    const env = environment(), updater = await env.updater(), name = 'avatar_skill_en.json', relative = `metadata/${name}`;
+    const bundled = fs.readFileSync(path.join(root, 'entry/src/main/resources/rawfile', relative), 'utf8');
+    const document = JSON.parse(bundled);
+    document.avatars = { 10000136: document.avatars[10000136] };
+    document.avatars[10000136][0].name = 'Verified update';
+    const published = JSON.stringify(document);
+    env.files.set(relative, encode(published));
+    for (const locale of ['zh-Hans', 'zh-Hant', 'en', 'de', 'es', 'fr', 'id', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'tr', 'vi']) {
+      const item = `metadata/avatar_skill_${locale}.json`;
+      P.validatePath(item, ItemType.Text);
+      assert.equal(P.maxFileBytes(item), P.MAX_FILE_BYTES);
+    }
+    for (const invalid of ['metadata/avatar_skill_EN.json', 'metadata/avatar_skill_xx.json', 'metadata/nested/avatar_skill_en.json']) {
+      assert.throws(() => P.validatePath(invalid, ItemType.Text));
+    }
+    env.workerResultHook = (result, task) => {
+      if (task.args[1] === 'stage' || (task.args[1] === 'selection' && result[4])) {
+        assert.equal(result.length, 6 + 2 * P.METADATA.length);
+        assert.ok(!result.slice(6).includes(relative));
+      }
+      return result;
+    };
+    await updater.update();
+    const load = env.runtime(), pinned = load('GameDataUpdater').GameDataUpdater;
+    const service = load('../../service/GameDataService').GameDataService;
+    await service.initializeSnapshot();
+    assert.equal(pinned.readMetadata(relative), '');
+    assert.equal(await service.readMetadataFile(name), published);
+    assert.throws(() => P.validateLanguageText('metadata/avatar_skill_ja.json', published), /Invalid avatar skill catalog/);
+    document.avatars[10000136][0].parameterSeries[0].values = [];
+    const before = pointerBytes(env);
+    env.revision = B;
+    env.version = 'two';
+    env.files.set(relative, encode(JSON.stringify(document)));
+    await assert.rejects(updater.update(), /avatar_skill_en.json.*校验失败/);
+    assert.deepEqual(pointerBytes(env), before);
+  });
+  await test('profile pictures join an optional cohort and preserve original circle icon identities', async () => {
+    const env = environment();
+    const names = ['avatar_associations.json', 'BeyondItem.json', 'HardChallengeSchedule.json', 'ProfilePicture.json'];
+    for (const name of names) {
+      env.files.set('metadata/' + name, fs.readFileSync(path.join(root, 'entry/src/main/resources/rawfile/metadata', name)));
+    }
+    const pictures = JSON.parse(env.files.get('metadata/ProfilePicture.json').toString());
+    assert.equal(pictures.find(row => row.Id === 1).Icon, 'UI_AvatarIcon_PlayerBoy_Circle');
+    assert.equal(pictures.find(row => row.Id === 900004).Icon, '', 'custom profile placeholder stays unmapped');
+    pictures[0].Icon = 'UI_AvatarIcon_Remote_Circle';
+    env.files.set('metadata/ProfilePicture.json', encode(JSON.stringify(pictures)));
+    const updater = await env.updater(); await updater.update();
+    const service = env.runtime()('../../service/GameDataService').GameDataService;
+    await service.initializeSnapshot();
+    assert.equal(service.getInstance().remoteVersion(), 'one');
+    assert.equal(await service.readMetadataFile('ProfilePicture.json'), JSON.stringify(pictures));
+    assert.equal(P.METADATA.length, 17);
+    assert.ok(!P.METADATA.includes('ProfilePicture.json'));
+    const metadata = new Map([...env.files].filter(([name]) => name.startsWith('metadata/')).map(([name, bytes]) => [name, bytes.toString()]));
+    metadata.set('metadata/ProfilePicture.json', JSON.stringify([pictures[0], pictures[0]]));
+    assert.throws(() => P.validateModels(metadata), /ID 重复/);
+  });
+  await test('language catalogs use a path-specific limit and stay out of the verified snapshot text cache', async () => {
+    const env = environment(), U = await env.updater(), localePath = 'metadata/locale_th.json';
+    for (const locale of ['zh-Hans', 'zh-Hant', 'en', 'de', 'es', 'fr', 'id', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'tr', 'vi']) {
+      assert.equal(P.maxFileBytes(`metadata/locale_${locale}.json`), 16 * 1024 ** 2);
+      P.validatePath(`metadata/locale_${locale}.json`, ItemType.Text);
+    }
+    for (const invalid of ['metadata/locale_TH.json', 'metadata/locale_xx.json', 'metadata/locale_en.json/', 'metadata/nested/locale_en.json']) {
+      assert.equal(P.maxFileBytes(invalid), P.MAX_FILE_BYTES);
+      assert.throws(() => P.validatePath(invalid, ItemType.Text));
+    }
+    const text = JSON.stringify({ schema: 1, locale: 'th', sourceLocale: 'TH', upstreamRevision: A,
+      files: { 'Achievement.json': [{ Id: 1, Description: 'ก'.repeat(3 * 1024 ** 2) }] } });
+    env.files.set(localePath, Buffer.from('\uFEFF' + text));
+    env.files.set('metadata/locale_en.json', encode(JSON.stringify({ schema: 1, locale: 'en', sourceLocale: 'EN', upstreamRevision: A, files: {} })));
+    env.files.set('metadata/BeyondItem.json', encode('[{"Id":123,"Name":"远端物品"}]'));
+    const value = manifest(A, 'large-language', 2, env.files);
+    assert.ok(parsed(A, 'large-language', 2, env.files).items.find(item => item.path === localePath).size > P.MAX_FILE_BYTES);
+    value.items.find(item => item.path === localePath).size = P.maxFileBytes(localePath) + 1;
+    assert.throws(() => P.parse(JSON.stringify(value), P.source(P.RAW_ROOT + 'main/manifest-hutao.json'), A), /文件大小/);
+    env.workerResultHook = (result, task) => {
+      if (task.args[1] === 'stage' || (task.args[1] === 'selection' && result[4])) {
+        assert.equal(result.length, 6 + 2 * (P.METADATA.length + 1));
+        assert.ok(result.slice(6).includes('metadata/BeyondItem.json'));
+        assert.ok(!result.slice(6).some(entry => entry.startsWith('metadata/locale_')));
+      }
+      return result;
+    };
+    await U.update(); // v1 has no per-file sizes until the updater writes its receipt.
+    const load = env.runtime(), pinned = load('GameDataUpdater').GameDataUpdater;
+    const service = load('../../service/GameDataService').GameDataService;
+    await service.initializeSnapshot();
+    assert.equal(service.getInstance().remoteVersion(), 'one');
+    assert.equal(pinned.readMetadata(localePath), '');
+    assert.equal(await service.readMetadataFile('BeyondItem.json'), '[{"Id":123,"Name":"远端物品"}]');
+    assert.equal(await service.readMetadataFile('locale_th.json'), text);
+    const current = pointerBytes(env);
+    env.revision = B;
+    env.files.set('metadata/locale_en.json', env.files.get(localePath));
+    await assert.rejects(U.update(), /locale_en.json.*校验失败/);
+    assert.deepEqual(pointerBytes(env), current);
+  });
+  await test('language reads use one pinned receipt across reset and fall back after a digest mismatch', async () => {
+    const env = environment(), U = await env.updater(), en = 'metadata/locale_en.json', ja = 'metadata/locale_ja.json';
+    const catalog = (locale, name) => JSON.stringify({ schema: 1, locale, sourceLocale: locale.toUpperCase(), upstreamRevision: A,
+      files: { 'Achievement.json': [{ Id: 1, Title: name }] } });
+    const remote = catalog('en', 'Remote'), bundled = catalog('en', 'Bundled'), fallback = catalog('ja', '日本語');
+    env.files.set(en, encode(remote)); env.bundledMetadata.set(en, encode(bundled)); env.bundledMetadata.set(ja, encode(fallback));
+    await U.update();
+    const id = JSON.parse(pointerBytes(env)).current;
+    const load = env.runtime(), pinned = load('GameDataUpdater').GameDataUpdater;
+    const service = load('../../service/GameDataService').GameDataService;
+    await service.initializeSnapshot();
+    const gate = deferred(), reads = []; let waiting = false;
+    const file = `${env.directory}/gamedata/cohort-v1/snapshots/${id}/${en}`;
+    env.workerBarrier = task => {
+      assert.equal(task.args[1], 'language');
+      assert.equal(task.args[2], id);
+      assert.equal(JSON.parse(task.args[3]).sha256, sha(encode(remote)));
+      waiting = true;
+      return gate.promise;
+    };
+    assert.equal(await service.readMetadataFile('locale_ja.json'), fallback);
+    const reading = service.readMetadataFile('locale_en.json');
+    await until(() => waiting);
+    pinned.clearAll();
+    env.ioHook = (event, name) => { if (event === 'read') reads.push(name); };
+    gate.resolve();
+    assert.equal(await reading, remote);
+    assert.deepEqual(reads, [file]);
+    fs.writeFileSync(file, encode(catalog('en', 'Alter!'))); // Same size, different digest.
+    assert.equal(await service.readMetadataFile('locale_en.json'), bundled);
+    assert.equal(pinned.localVersion(), 'one');
+    assert.equal(pinned.pendingState(), 'bundled');
   });
   await test('whole-cohort graph failure after all downloads leaves previous snapshot and version intact', async () => {
     const env = environment(), U = await env.updater(); await U.update(); env.revision = B; env.version = 'two';

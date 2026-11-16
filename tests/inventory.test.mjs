@@ -14,6 +14,7 @@ async function ets(path, imports={}) {
 }
 const db = new DatabaseSync(':memory:');
 db.exec('CREATE TABLE cultivate_inventory (project_id INTEGER, item_id INTEGER, count INTEGER, PRIMARY KEY(project_id,item_id))');
+db.exec('CREATE TABLE cultivate_projects (id INTEGER PRIMARY KEY); INSERT INTO cultivate_projects VALUES (1), (2)');
 let failInsert=false;
 let writes=0;
 class Pred {
@@ -25,9 +26,13 @@ class Pred {
 const store={
   beginTransaction(){writes++;db.exec('BEGIN');}, commit(){db.exec('COMMIT');}, rollBack(){db.exec('ROLLBACK');},
   deleteSync(pred){return db.prepare(`DELETE FROM ${pred.table}${pred.where()}`).run(...pred.values).changes;},
-  insertSync(table, values){return db.prepare(`INSERT INTO ${table} (${Object.keys(values).join(',')}) VALUES (${Object.keys(values).map(()=>'?')})`).run(...Object.values(values)).lastInsertRowid;},
+  insertSync(table, values){if(failInsert)throw new Error('simulated storage failure');return db.prepare(`INSERT INTO ${table} (${Object.keys(values).join(',')}) VALUES (${Object.keys(values).map(()=>'?')})`).run(...Object.values(values)).lastInsertRowid;},
   updateSync(values,pred){return Number(db.prepare(`UPDATE ${pred.table} SET ${Object.keys(values).map(k=>`${k}=?`).join(',')}${pred.where()}`).run(...Object.values(values),...pred.values).changes);},
   batchInsertSync(table,values){if(failInsert)throw new Error('simulated storage failure');values.forEach(value=>this.insertSync(table,value));return values.length;},
+  querySync(pred){
+    const rows=db.prepare(`SELECT * FROM ${pred.table}${pred.where()}`).all(...pred.values);
+    return {goToFirstRow:()=>rows.length>0,close(){}};
+  },
 };
 const helper={getStore:()=>store,async query(pred){
   const rows=db.prepare(`SELECT * FROM ${pred.table}${pred.where()}`).all(...pred.values);let i=-1;
@@ -89,4 +94,14 @@ await test('replacement validates before deletion and database failures roll bac
   await InventoryRepo.clear(1);
   assert.equal((await InventoryRepo.getInventory(1)).size,0);
   assert.equal((await InventoryRepo.getInventory(2)).get(10),200);
+});
+await test('a partial merge rolls back and deleted projects cannot regain inventory',async()=>{
+  const before=[...await InventoryRepo.getInventory(2)];
+  failInsert=true;
+  await assert.rejects(InventoryRepo.mergeInventory(2,new Map([[10,10],[100,10]])),/storage failure/);
+  failInsert=false;
+  assert.deepEqual([...await InventoryRepo.getInventory(2)],before);
+  await assert.rejects(InventoryRepo.setCount(999,10,1),/项目已删除/);
+  await assert.rejects(InventoryRepo.replaceInventory(999,new Map([[10,1]])),/项目已删除/);
+  assert.equal((await InventoryRepo.getInventory(999)).size,0);
 });

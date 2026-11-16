@@ -42,6 +42,7 @@ export class PoolOutcome {
 
 /** 刷新进度中的单条新记录（头像流条目） */
 export class RecentGachaItem {
+  itemId: number = 0;
   name: string = '';
   itemType: string = '';
   rank: number = 0;

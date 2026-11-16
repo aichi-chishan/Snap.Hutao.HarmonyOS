@@ -37,7 +37,13 @@ export class RelationalStoreHelper {
     Logger.info(TAG, 'opening rdb store');
     const store: relationalStore.RdbStore = await relationalStore.getRdbStore(context, storeConfig);
     Logger.info(TAG, 'rdb store opened');
-    await RelationalStoreHelper.createTables(store);
+    try {
+      await RelationalStoreHelper.createTables(store);
+    } catch (error) {
+      try { await store.close(); }
+      catch (closeError) { Logger.warn(TAG, `closing store after setup failure: ${String(closeError)}`); }
+      throw error as Error;
+    }
     Logger.info(TAG, 'createTables done');
     RelationalStoreHelper.rdbStore = store;
     Logger.info(TAG, 'database initialized');
@@ -254,7 +260,7 @@ export class RelationalStoreHelper {
   }
 
   /** 当前数据库结构版本（每次结构变更 +1，并在 MIGRATIONS 末尾追加对应迁移） */
-  private static readonly DB_VERSION: number = 8;
+  private static readonly DB_VERSION: number = 9;
 
   /**
    * 有序迁移列表：MIGRATIONS[i] 把版本 i+1 升到 i+2。
@@ -368,6 +374,10 @@ export class RelationalStoreHelper {
     [
       // v7 → v8：保留养成编辑输入；旧计划为空，编辑时显式重新确认，不推断历史进度。
       "ALTER TABLE cultivate_entries ADD COLUMN input_json TEXT NOT NULL DEFAULT ''",
+    ],
+    [
+      // v8 → v9：每个养成项目独立选择服务器时区，已有项目沿用国服 UTC+8。
+      'ALTER TABLE cultivate_projects ADD COLUMN server_timezone_offset INTEGER NOT NULL DEFAULT 8 CHECK (server_timezone_offset IN (-5, 1, 8))',
     ],
   ];
 

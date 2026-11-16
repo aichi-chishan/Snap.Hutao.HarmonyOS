@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "Abbrechen"
+    },
+    {
+      "name": "common_confirm",
+      "value": "Bestätigen"
+    },
+    {
+      "name": "common_refresh",
+      "value": "Aktualisieren"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "Wunschhistorie"
+    },
+    {
+      "name": "page_title_home",
+      "value": "Startseite"
+    },
+    {
+      "name": "page_title_login",
+      "value": "Anmelden"
+    },
+    {
+      "name": "page_title_note",
+      "value": "Echtzeit-Notiz"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "Einstellungen"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "Wunschhistorie"
+    },
+    {
+      "name": "tab_home",
+      "value": "Startseite"
+    },
+    {
+      "name": "tab_mine",
+      "value": "Ich"
+    },
+    {
+      "name": "tab_note",
+      "value": "Echtzeit-Notiz"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "Exportieren"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "Importieren"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "Speichern"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "Generate analysis"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "Account history charts and AI insights"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "Stop generation"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "Test connection"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "Auf Updates prüfen"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "Daten"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "Zeitplan"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "System"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "Werkzeuge"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "App erneut öffnen, um die Systemsprache zu übernehmen"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "Systemeinstellung"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "Spiralabgrund"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "Errungenschaften verwalten"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "Inventargegenstände"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "Düsterer Ansturm"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "Meine Charaktere"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "Entwicklungsplan"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "Spiel starten"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "Reisetagebuch"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Hutao Passport"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "Imaginarium Theater"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "Charakter-Wiki"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "Monster-Wiki"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "Waffen-Wiki"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "Über"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "Konto"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "Aussehen"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "Hintergrundbild"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "Video-Hintergrund"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "Sicherung und Wiederherstellung"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "Kalender"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "Startseite"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "Einstellungen für den Spielaktivitätenbereich der Startseite"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "Startseitenkarten"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "Sprache"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "Hintergrundmaterial"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "Sonstiges"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "Anmeldung"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "Speicherplatz"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "Farbschema"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "Unmerkliche Verifizierung"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "Wunschhistorie"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "Datenmigration"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "Dunkel"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "Hell"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "Hutao Version %s ist jetzt verfügbar"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "Versionshinweise"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "Diese Version überspringen"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "App-Update"
+    }
+  ]
+}

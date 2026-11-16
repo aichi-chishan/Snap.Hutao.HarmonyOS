@@ -20,14 +20,15 @@
  *   服务器时区-4h 取星期；周日天赋/武器本全开视为可刷），轮换表
  *   Model/Metadata/Item/MaterialIds.cs:25-73（周一四/二五/三六）。
  *
- * 鸿蒙差异：计划库无库存数量（Windows Current=游戏背包），材料勾选 finished 视为已满足
- * （折算需求量记 0）；无法表达"库存富余低阶书"的负需求，行为取保守值。
+ * 已备齐的材料不计入缺口；库存余量按同系列配方向上合成。
  * 材料 id→分类用静态 id 段判定（鸿蒙 material_meta.json 无 Windows 的 Rank 字段）：
  * 202=摩拉；104001-104003=经验书；113xxx=Boss掉落（r==5 橙→周常，否则世界）；
  * 1043xx（除 104300/104319）=天赋书；114xxx=武器突破材料。
  */
 import { WikiMetaService, MetaMaterial } from './WikiMetaService';
 import { CultivateEntry } from '../data/repo/CultivationRepo';
+import { InventoryMaterialReference } from '../model/InventoryMaterialReference';
+import { GameCalendarRules, RotationalMaterialSeries, ROTATIONAL_SERIES } from './GameCalendarRules';
 
 /** 世界等级期望掉落（对齐 Windows MaterialDropDistribution） */
 export class ResinDropDistribution {
@@ -103,6 +104,7 @@ export class ResinStatisticsResult {
   totalResin: number = 0;
   totalFragile: number = 0;
   totalDays: number = 0;
+  materialShortfalls: Map<number, number> = new Map<number, number>();
 }
 
 /** 聚合期间的材料累计 */
@@ -125,21 +127,6 @@ export class ResinStatisticsService {
   private static readonly ID_EXP_GREEN: number = 104001;
   private static readonly ID_EXP_BLUE: number = 104002;
   private static readonly ID_EXP_PURPLE: number = 104003;
-  private static readonly ID_CROWN: number = 104319; // 智识之冕（不计树脂）
-
-  /** 天赋书系列基 id → 轮换日（1=周一四 2=周二五 3=周三六 0=未知；MaterialIds.cs:25-45） */
-  private static readonly TALENT_BASES: number[] = [
-    104301, 104304, 104307, 104310, 104313, 104316, 104320, 104323, 104326,
-    104329, 104332, 104335, 104338, 104341, 104344, 104347, 104350, 104353,
-    104356, 104359, 104362,
-  ];
-  private static readonly TALENT_NEW_BASES: number[] = [104365, 104368];
-  /** 武器材料系列基 id → 轮换日（MaterialIds.cs:46-73） */
-  private static readonly WEAPON_BASES: number[] = [
-    114001, 114005, 114009, 114013, 114017, 114021, 114025, 114029, 114033,
-    114037, 114041, 114045, 114049, 114053, 114057, 114061, 114065, 114069,
-    114073, 114077, 114081,
-  ];
 
   /** 世界等级 5-9 期望掉落（数值取自 MaterialDropDistribution.cs:12-16） */
   static distributions(): ResinDropDistribution[] {
@@ -164,20 +151,7 @@ export class ResinStatisticsService {
 
   /** 材料轮换日：1=周一四 2=周二五 3=周三六 0=非轮换/未知（对齐 Windows MaterialIds 轮换表） */
   static dayPairOf(itemId: number): number {
-    for (let i = 0; i < ResinStatisticsService.TALENT_BASES.length; i++) {
-      const base: number = ResinStatisticsService.TALENT_BASES[i];
-      if (itemId >= base && itemId <= base + 2) {
-        return (i % 3) + 1;
-      }
-    }
-    for (let i = 0; i < ResinStatisticsService.WEAPON_BASES.length; i++) {
-      const base: number = ResinStatisticsService.WEAPON_BASES[i];
-      if (itemId >= base && itemId <= base + 3) {
-        return (i % 3) + 1;
-      }
-    }
-    // 新系列（104365+，Windows 轮换表未收录）日对未知
-    return 0;
+    return GameCalendarRules.materialDayPair(itemId);
   }
 
   /** 当日是否可刷（dow=Date.getDay()，0=周日；周日全开对齐 Windows treatSundayAsTrue） */
@@ -193,24 +167,17 @@ export class ResinStatisticsService {
     return todayPair === pair;
   }
 
-  /** 天赋书品质阶：0 绿 1 蓝 2 紫（未匹配按紫，避免漏算） */
-  private static talentTierOf(itemId: number): number {
-    for (const base of ResinStatisticsService.TALENT_BASES) {
-      if (itemId >= base && itemId <= base + 2) {
-        return itemId - base;
-      }
+  /** Windows AlchemyCrafting. A surplus can offset higher tiers in the same family. */
+  private static weightedDemand(series: RotationalMaterialSeries, aggs: Map<number, MaterialAgg>,
+    remaining: Map<number, number>): number {
+    const highestTier: number = series.isTalent() ? 2 : 3;
+    let demand: number = 0;
+    for (let tier: number = highestTier; tier >= 0; tier--) {
+      const id: number = series.highestId - highestTier + tier;
+      const delta: number = (aggs.get(id)?.count ?? 0) - (remaining.get(id) ?? 0);
+      demand = Math.max(0, demand + delta * Math.pow(3, tier));
     }
-    for (const base of ResinStatisticsService.TALENT_NEW_BASES) {
-      if (itemId >= base && itemId <= base + 2) {
-        return itemId - base;
-      }
-    }
-    return 2;
-  }
-
-  /** 武器材料品质阶：0 绿 1 蓝 2 紫 3 橙（114001-114084 连续，(id-1)%4 对齐系列） */
-  private static weaponTierOf(itemId: number): number {
-    return (itemId - 1) % 4;
+    return demand;
   }
 
   /**
@@ -220,7 +187,7 @@ export class ResinStatisticsService {
   static async compute(entries: CultivateEntry[], dist: ResinDropDistribution,
     inventory: Map<number, number> = new Map<number, number>()): Promise<ResinStatisticsResult> {
     // id → 未完成需求合计；Boss 材料品质取自 material_meta（r==5 橙=周常）
-    const aggs: Map<number, MaterialAgg> = new Map();
+    const aggs: Map<number, MaterialAgg> = new Map<number, MaterialAgg>();
     for (const entry of entries) {
       for (const item of entry.items) {
         if (item.finished) {
@@ -247,21 +214,17 @@ export class ResinStatisticsService {
       }
       remaining.set(id, count - used);
     });
-    const families: number[] = ResinStatisticsService.TALENT_BASES
-      .concat(ResinStatisticsService.TALENT_NEW_BASES).concat(ResinStatisticsService.WEAPON_BASES);
-    for (const base of families) {
-      const tiers: number = base >= 114000 ? 4 : 3;
-      for (let tier: number = 0; tier < tiers - 1; tier++) {
-        const lower: number = base + tier;
-        const higher: number = lower + 1;
-        const crafted: number = Math.floor((remaining.get(lower) ?? 0) / 3);
-        const need: MaterialAgg | undefined = aggs.get(higher);
-        const used: number = Math.min(crafted, need?.count ?? 0);
-        if (need !== undefined) {
-          need.count -= used;
-        }
-        remaining.set(higher, (remaining.get(higher) ?? 0) + crafted - used);
-      }
+    for (const pair of InventoryMaterialReference.CRAFTING_PAIRS) {
+      const lower: number = pair[0];
+      const higher: number = pair[1];
+      const available: number = remaining.get(lower) ?? 0;
+      const crafted: number = Math.floor(available / 3);
+      if (crafted === 0) { continue; }
+      const need: MaterialAgg | undefined = aggs.get(higher);
+      const used: number = Math.min(crafted, need?.count ?? 0);
+      if (need !== undefined) { need.count -= used; }
+      remaining.set(lower, available - crafted * 3);
+      remaining.set(higher, (remaining.get(higher) ?? 0) + crafted - used);
     }
     // Boss 品质批量补齐
     if (aggs.size > 0) {
@@ -278,54 +241,28 @@ export class ResinStatisticsService {
 
     // 分类累计（对齐 CultivationResinStatisticsService.GetResinStatisticsAsync）
     const rawWealth: number = aggs.get(ResinStatisticsService.ID_MORA)?.count ?? 0;
-    const expGreen: number = aggs.get(ResinStatisticsService.ID_EXP_GREEN)?.count ?? 0;
-    const expBlue: number = aggs.get(ResinStatisticsService.ID_EXP_BLUE)?.count ?? 0;
-    const expPurpleAgg: MaterialAgg | undefined = aggs.get(ResinStatisticsService.ID_EXP_PURPLE);
+    const expGreen: number = (aggs.get(ResinStatisticsService.ID_EXP_GREEN)?.count ?? 0)
+      - (remaining.get(ResinStatisticsService.ID_EXP_GREEN) ?? 0);
+    const expBlue: number = (aggs.get(ResinStatisticsService.ID_EXP_BLUE)?.count ?? 0)
+      - (remaining.get(ResinStatisticsService.ID_EXP_BLUE) ?? 0);
+    const expPurple: number = aggs.get(ResinStatisticsService.ID_EXP_PURPLE)?.count ?? 0;
     // Windows：仅当紫色经验书存在且未毕业才把经验折算进启示之花（:46）
-    const expRaw: number = (expPurpleAgg !== undefined && expPurpleAgg.count > 0)
-      ? expGreen * ResinStatisticsService.EXP_GREEN + expBlue * ResinStatisticsService.EXP_BLUE
-      + expPurpleAgg.count * ResinStatisticsService.EXP_PURPLE
+    const expRaw: number = expPurple > 0
+      ? Math.max(0, expGreen * ResinStatisticsService.EXP_GREEN + expBlue * ResinStatisticsService.EXP_BLUE
+        + expPurple * ResinStatisticsService.EXP_PURPLE)
       : 0;
 
-    let talentGreen: number = 0;
-    let talentBlue: number = 0;
-    let talentPurple: number = 0;
-    let weaponGreen: number = 0;
-    let weaponBlue: number = 0;
-    let weaponPurple: number = 0;
-    let weaponOrange: number = 0;
+    let talentRaw: number = 0;
+    let weaponRaw: number = 0;
+    for (const series of ROTATIONAL_SERIES) {
+      const demand: number = ResinStatisticsService.weightedDemand(series, aggs, remaining);
+      if (series.isTalent()) { talentRaw += demand; }
+      else { weaponRaw += demand; }
+    }
     let normalBossCount: number = 0;
     let weeklyBossCount: number = 0;
 
     aggs.forEach((agg: MaterialAgg, id: number) => {
-      if (id === ResinStatisticsService.ID_MORA || id === ResinStatisticsService.ID_EXP_GREEN
-        || id === ResinStatisticsService.ID_EXP_BLUE || id === ResinStatisticsService.ID_EXP_PURPLE) {
-        return;
-      }
-      if (id >= 104301 && id <= 104370 && id !== ResinStatisticsService.ID_CROWN) {
-        const tier: number = ResinStatisticsService.talentTierOf(id);
-        if (tier === 0) {
-          talentGreen += agg.count;
-        } else if (tier === 1) {
-          talentBlue += agg.count;
-        } else {
-          talentPurple += agg.count;
-        }
-        return;
-      }
-      if (id >= 114001 && id <= 114099) {
-        const tier: number = ResinStatisticsService.weaponTierOf(id);
-        if (tier === 0) {
-          weaponGreen += agg.count;
-        } else if (tier === 1) {
-          weaponBlue += agg.count;
-        } else if (tier === 2) {
-          weaponPurple += agg.count;
-        } else {
-          weaponOrange += agg.count;
-        }
-        return;
-      }
       if (id >= 113001 && id <= 113099) {
         if (agg.quality >= 5) {
           weeklyBossCount += agg.count;
@@ -333,14 +270,10 @@ export class ResinStatisticsService {
           normalBossCount += agg.count;
         }
       }
-      // 其余（突破矿石/宝石/特产/摩拉以外素材）非树脂消耗，不计入
     });
 
-    // 四阶→绿色等效（AlchemyCrafting.UnWeighted：27橙+9紫+3蓝+绿，线性）
-    const talentRaw: number = 9 * talentPurple + 3 * talentBlue + talentGreen;
-    const weaponRaw: number = 27 * weaponOrange + 9 * weaponPurple + 3 * weaponBlue + weaponGreen;
-
     const result: ResinStatisticsResult = new ResinStatisticsResult();
+    aggs.forEach((agg: MaterialAgg, id: number) => result.materialShortfalls.set(id, agg.count));
     result.worldLevel = dist.worldLevel;
 
     const revelationRow: ResinCategoryRow | null =
@@ -376,9 +309,9 @@ export class ResinStatisticsService {
       if (row !== null) {
         result.rows.push(row);
         result.totalResin += row.totalResin;
-        result.totalFragile += row.fragileResin;
       }
     }
+    result.totalFragile = Math.ceil(result.totalResin / 60);
     result.totalDays = Math.ceil(result.totalResin / ResinStatisticsService.RESIN_PER_DAY);
     return result;
   }

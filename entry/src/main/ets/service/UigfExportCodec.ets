@@ -20,7 +20,7 @@ class UigfItem {
 /** UIGF v4.2 千星奇域（hk4e_ugc）单条记录（对齐 Windows Hk4eUGCItem） */
 class UigfUgcItem {
   /** Keep non-unit quantities as an extension understood by the importer. */
-  count: string = '1';
+  count?: string;
   id: string = '';
   schedule_id: string = '';
   item_type: string = '';
@@ -76,13 +76,15 @@ export class UigfExportCodec {
     root.info.export_app_version = appVersion;
     root.info.version = version;
     for (const uid of archives.keys()) {
-      if (!/^[1-9][0-9]{8,9}$/.test(uid)) { throw new Error('无效的导出 UID'); }
-      const items: GachaItem[] = archives.get(uid) ?? [];
+      if (!/^[1-9][0-9]{8,9}$/.test(uid) || Number(uid) > 4294967295) { throw new Error('导出 UID 超出有效范围'); }
+      const raw: GachaItem[] = archives.get(uid) ?? [];
+      for (const item of raw) { UigfExportCodec.checkFields(item); }
+      const items: GachaItem[] = GachaItem.logicalRecords(raw, `UID ${uid}`);
       total += items.length;
       if (total > UigfBounds.MAX_ROWS) { throw new Error('UIGF 导出超过 262144 条记录限制'); }
       const entry: UigfEntry = new UigfEntry();
       const ugcEntry: UigfUgcEntry = new UigfUgcEntry();
-      entry.uid = Number(uid) || 0;
+      entry.uid = Number(uid);
       ugcEntry.uid = entry.uid;
       entry.timezone = UigfCodec.timezoneOfUid(uid);
       ugcEntry.timezone = entry.timezone;
@@ -92,7 +94,7 @@ export class UigfExportCodec {
         if (UigfCodec.normalizeTime(it.time, entry.timezone, entry.timezone) !== it.time) { throw new Error('导出时间不是归档服务器的标准本地时间，不能保真导出'); }
         if (GachaType.isBeyond(it.gachaType)) {
           const u: UigfUgcItem = new UigfUgcItem();
-          u.count = String(it.count);
+          if (it.count !== 1) { u.count = String(it.count); }
           u.id = it.gachaId;
           u.schedule_id = String(it.scheduleId);
           u.item_type = it.itemType;
@@ -106,7 +108,7 @@ export class UigfExportCodec {
           const u: UigfItem = new UigfItem();
           const typeStr: string = String(it.gachaType);
           u.gacha_type = typeStr;
-          u.uigf_gacha_type = it.gachaType === 400 ? '301' : typeStr;
+          u.uigf_gacha_type = String(GachaType.queryTypeOf(it.gachaType));
           u.item_id = String(it.itemId);
           u.count = String(it.count > 0 ? it.count : 1);
           u.time = it.time;
@@ -117,9 +119,8 @@ export class UigfExportCodec {
           entry.list.push(u);
         }
       }
-      if (entry.list.length > 0 || items.length === 0) {
-        root.hk4e.push(entry);
-      }
+      // Windows 从 hk4e 建立 UID 选择列表，即使该 UID 只有颂愿记录。
+      root.hk4e.push(entry);
       if (ugcEntry.list.length > 0) {
         root.hk4e_ugc.push(ugcEntry);
       }
@@ -130,10 +131,9 @@ export class UigfExportCodec {
         'uid': String(single.uid), 'uigf_version': version,
         'export_timestamp': root.info.export_timestamp,
         'export_time': UigfCodec.normalizeTime(new Date(root.info.export_timestamp * 1000).toISOString(), 0, single.timezone),
-        'export_app': root.info.export_app, 'export_app_version': root.info.export_app_version
+        'export_app': root.info.export_app, 'export_app_version': root.info.export_app_version,
+        'region_time_zone': single.timezone
       };
-      // v2.4 first introduced explicit timezone. Older formats infer it from UID.
-      if (version === 'v2.4' || version === 'v3.0') { info['region_time_zone'] = single.timezone; }
       const legacyRoot: Record<string, Object> = { 'info': info, 'list': single.list };
       return UigfExportCodec.stringify(legacyRoot);
     }
@@ -145,18 +145,24 @@ export class UigfExportCodec {
 
   private static checkRepresentable(item: GachaItem, version: string): void {
     UigfCodec.validateItem(item);
-    const allowed: string[] = ['id', 'archiveId', 'uid', 'gachaId', 'gachaType', 'itemId', 'count', 'time', 'name', 'itemType', 'rankType', 'scheduleId'];
-    for (const key of Object.keys(item)) {
-      if (allowed.indexOf(key) < 0) { throw new Error('记录包含未支持字段，无法保证无损导出'); }
-    }
     if (item.name.length > UigfBounds.MAX_FIELD_UNITS || item.itemType.length > UigfBounds.MAX_FIELD_UNITS ||
       item.gachaId.length > UigfBounds.MAX_FIELD_UNITS) { throw new Error('UIGF 导出字段超过 4096 字符限制'); }
-    if (version.startsWith('v4.') && item.gachaId.length > 19) { throw new Error(`${version} 标准记录 ID 最多 19 位，不能截断导出`); }
+    if (GachaItem.compareIds(item.gachaId, GachaItem.MAX_SIGNED_ID) >= 0) {
+      throw new Error('祈愿 ID 超出 Windows 可导入范围，已停止导出');
+    }
+    if (item.itemId > 4294967295) { throw new Error('物品 ID 超出 Windows 可导入范围，已停止导出'); }
     if (GachaType.isBeyond(item.gachaType) && version !== 'v4.2') { throw new Error(`${version} 不支持颂愿记录，请使用 v4.2`); }
     if (!GachaType.isBeyond(item.gachaType) && item.scheduleId !== 0) { throw new Error('常规祈愿包含非零期次字段，UIGF 常规分区无法保留，已停止导出'); }
     if (version.startsWith('v2.') && item.gachaType === 500) { throw new Error(`${version} 不支持集录祈愿，请使用 v3.0 或以上版本`); }
     if (version === 'v2.2' && ((item.itemType !== '角色' && item.itemType !== '武器') || /[A-Za-z]/.test(item.name))) {
       throw new Error('v2.2 仅支持已知中文物品文本，无法确认此记录语言，请使用 v2.3 或以上版本');
+    }
+  }
+
+  private static checkFields(item: GachaItem): void {
+    const allowed: string[] = ['id', 'archiveId', 'uid', 'gachaId', 'gachaType', 'itemId', 'count', 'time', 'name', 'itemType', 'rankType', 'scheduleId'];
+    for (const key of Object.keys(item)) {
+      if (allowed.indexOf(key) < 0) { throw new Error('记录包含未支持字段，无法保证无损导出'); }
     }
   }
 

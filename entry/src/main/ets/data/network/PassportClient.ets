@@ -134,6 +134,12 @@ export class PassportClient {
     const bodyJson: string = JSON.stringify({ 'ticket': ticket });
     const resp: ApiResponse = await PassportClient.postJsonRaw(
       AppConstants.URL_QUERY_QR_STATUS, bodyJson, PassportClient.hypHeaders());
+    // Windows KnownReturnCode.QRLoginExpired. Preserve the code before translating the message.
+    if (resp.retcode === -3501) {
+      const expired: QrLoginResult = new QrLoginResult();
+      expired.status = 'Expired';
+      return expired;
+    }
     if (!resp.success || resp.data === undefined) {
       throw new Error(`查询二维码状态失败：${resp.userFriendlyMessage()}`);
     }
@@ -182,7 +188,8 @@ export class PassportClient {
    * 发送手机验证码（自动处理 aigis 极验，对齐 Windows UserMobileCaptchaDialog.SendMobileCaptchaAsync）：
    * 响应带 x-rpc-aigis 头时弹统一验证窗，完成自动重放，最多 3 轮。
    */
-  static async createLoginCaptcha(mobile: string): Promise<MobileCaptcha> {
+  static async createLoginCaptcha(mobile: string, isActive?: () => boolean): Promise<MobileCaptcha> {
+    PassportClient.assertLoginActive(isActive);
     const encMobile: string = await RsaEncryptor.encrypt(mobile);
     const encArea: string = await RsaEncryptor.encrypt('+86');
     const body: Record<string, string> = { 'area_code': encArea, 'mobile': encMobile };
@@ -190,11 +197,13 @@ export class PassportClient {
     for (let attempt: number = 0; attempt < 3; attempt++) {
       const bodyJson: string = JSON.stringify(body);
       const headers: Record<string, string> = await PassportClient.dsHeader(bodyJson);
+      PassportClient.assertLoginActive(isActive);
       if (aigis.length > 0) {
         headers['x-rpc-aigis'] = aigis;
       }
       const resp: ApiResponse = await PassportClient.postJsonRaw(
         AppConstants.URL_CREATE_LOGIN_CAPTCHA, bodyJson, PassportClient.mergeBbs(headers));
+      PassportClient.assertLoginActive(isActive);
       const rawAigis: string = resp.header('x-rpc-aigis');
       if (resp.success && rawAigis.length === 0) {
         const data = resp.data as Record<string, Object>;
@@ -210,6 +219,7 @@ export class PassportClient {
       }
       Logger.info(TAG, `createLoginCaptcha hit aigis (attempt=${attempt + 1}), launching verify`);
       aigis = await RiskVerifyService.getInstance().verifyAigis(rawAigis);
+      PassportClient.assertLoginActive(isActive);
       if (aigis.length === 0) {
         throw new Error('人机验证未完成，已取消发送验证码');
       }
@@ -218,7 +228,9 @@ export class PassportClient {
   }
 
   /** 使用手机验证码登录（自动处理 aigis 极验，最多 3 轮），返回登录会话 */
-  static async loginByMobileCaptcha(mobile: string, captcha: string, actionType: string): Promise<LoginSession> {
+  static async loginByMobileCaptcha(mobile: string, captcha: string, actionType: string,
+    isActive?: () => boolean): Promise<LoginSession> {
+    PassportClient.assertLoginActive(isActive);
     const encMobile: string = await RsaEncryptor.encrypt(mobile);
     const encArea: string = await RsaEncryptor.encrypt('+86');
     const body: Record<string, string> = {
@@ -231,11 +243,13 @@ export class PassportClient {
     for (let attempt: number = 0; attempt < 3; attempt++) {
       const bodyJson: string = JSON.stringify(body);
       const headers: Record<string, string> = await PassportClient.dsHeader(bodyJson);
+      PassportClient.assertLoginActive(isActive);
       if (aigis.length > 0) {
         headers['x-rpc-aigis'] = aigis;
       }
       const resp: ApiResponse = await PassportClient.postJsonRaw(
         AppConstants.URL_LOGIN_BY_MOBILE_CAPTCHA, bodyJson, PassportClient.mergeBbs(headers));
+      PassportClient.assertLoginActive(isActive);
       const rawAigis: string = resp.header('x-rpc-aigis');
       if (resp.success && rawAigis.length === 0) {
         return PassportClient.parseLoginSession(resp);
@@ -245,6 +259,7 @@ export class PassportClient {
       }
       Logger.info(TAG, `loginByMobileCaptcha hit aigis (attempt=${attempt + 1}), launching verify`);
       aigis = await RiskVerifyService.getInstance().verifyAigis(rawAigis);
+      PassportClient.assertLoginActive(isActive);
       if (aigis.length === 0) {
         throw new Error('人机验证未完成，已取消登录');
       }
@@ -271,6 +286,10 @@ export class PassportClient {
   }
 
   // ================= 内部封装 =================
+
+  private static assertLoginActive(isActive: (() => boolean) | undefined): void {
+    if (isActive !== undefined && !isActive()) { throw new Error('登录已取消'); }
+  }
 
   /** DS Gen2/PROD 请求头（对齐 Windows LoginByMobileCaptchaAsync SignDataAsync(Gen2, PROD, true)：
    *  includeChars=true → r 为 6 位字母+数字；body 参与签名，query 为空） */

@@ -1,19 +1,15 @@
 /**
  * PressCard.ets
  * 按压反馈容器卡（QTapButton 的容器形态）：
- * 外壳承担圆角/亚克力背景/阴影/按压缩放（无点光源光效，用户要求点击不发光）。
- * 使用要点：
- *  - 卡片边框由背景色差/阴影承担，不加 border
- *  - 亚克力背景走 backgroundEffect，圆角设在壳层（radius）
- * 用法：
- *   PressCard({ onTap, cardBg: $r('app.color.card_background'), radius: 12 }) {
- *     Column() { ... }   // 内容透明，不要再画背景/边框
- *   }
+ * 外壳承担圆角、UiSurface 材质与按压缩放；内容保持透明。
  */
-import { curves } from '@kit.ArkUI';
+import { Motion } from '../common/Motion';
+import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Component
 export struct PressCard {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   /** 内容插槽 */
   @BuilderParam content: () => void;
   /** 点击回调 */
@@ -22,8 +18,6 @@ export struct PressCard {
   /** 按下缩放（默认 0.97） */
   @Prop pressScaleTo: number = 0.97;
   @StorageProp('reduceMotion') @Watch('onMotionChanged') reduceMotion: boolean = false;
-  /** 卡片壳背景（Color.Transparent = 无壳底，由调用方自绘） */
-  @Prop cardBg: ResourceColor = Color.Transparent;
   /** 卡片壳圆角（默认 12） */
   @Prop radius: number = 12;
   /** 是否启用柔和投影（对齐 Windows Acrylic 卡片层次；默认开启） */
@@ -55,7 +49,7 @@ export struct PressCard {
         this.pressScale = this.pressScaleTo;
       });
     } else if (type === TouchType.Up || type === TouchType.Cancel) {
-      this.getUIContext().animateTo({ duration: 260, curve: curves.springCurve(0.1, 1, 228, 30) }, () => {
+      this.getUIContext().animateTo({ duration: 260, curve: Motion.springFast() }, () => {
         this.pressScale = 1;
       });
     }
@@ -71,20 +65,7 @@ export struct PressCard {
     .height(this.fillHeight ? '100%' : undefined)
     .borderRadius(this.radius)
     .clip(true)
-    .backgroundColor(this.cardBg)
-    // 亚克力卡片（对齐 Windows AcrylicBorderCardStyle / SystemControlAcrylicElementBrush）：
-    // 背景模糊 + 主题染色，壁纸透过卡片呈现"一丢丢透明度"的观感
-    .backgroundEffect({
-      radius: 40,
-      color: $r('app.color.card_acrylic_tint'),
-      saturation: 1.15,
-    })
-    .shadow(this.shadowEnabled ? {
-      radius: 14,
-      color: $r('app.color.card_shadow'),
-      offsetX: 0,
-      offsetY: 5,
-    } : undefined)
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel, this.shadowEnabled))
     .scale({ x: this.reduceMotion ? 1 : this.pressScale, y: this.reduceMotion ? 1 : this.pressScale })
     .hoverEffect(HoverEffect.Highlight)
     .animation({ duration: this.reduceMotion ? 0 : 90, curve: Curve.EaseOut })

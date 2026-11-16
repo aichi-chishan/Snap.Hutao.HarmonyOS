@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "ui_web_share_title",
+      "value": "Paylaş Kaydetme Modu"
+    },
+    {
+      "name": "ui_web_share_description",
+      "value": "Paylaş düğmesine tıkladıktan sonra görüntüyü kaydetme modunu seçin"
+    },
+    {
+      "name": "ui_web_share_copy",
+      "value": "Panoya kopyala"
+    },
+    {
+      "name": "ui_web_share_file",
+      "value": "Dosya olarak kaydet"
+    }
+  ]
+}

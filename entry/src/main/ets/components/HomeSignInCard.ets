@@ -2,49 +2,40 @@
  * HomeSignInCard.ets
  * 主页签到卡（对齐 Windows HomeCardSignInCard）：
  * 头部（图标+累计天数+UID）、本月奖励网格（7 列，已签置灰打勾）、底部签到/补签按钮。
- * 整卡可点击，底部按钮独立触发签到。
+ * 标题行打开签到页，底部按钮执行对应的签到操作。
  */
 import { SignInInfo, SignInReward } from '../model/SignInInfo';
-import { PressCard } from './PressCard';
 import { NavIcon } from './NavIcon';
 import { MetaIcon } from './MetaIcon';
-import { WikiMetaService } from '../service/WikiMetaService';
+import { MetaMaterial, WikiMetaService } from '../service/WikiMetaService';
+import { AppButtonModifier, CardSurfaceModifier } from '../common/UiSurface';
+import { FrameCallback } from '@kit.ArkUI';
 
-/** 材料名→rawfile 图标名 缓存（进程内存，阻塞一次加载后常驻） */
-export class SignInCardCache {
-  private static map: Map<string, string> = new Map();
-  private static loading: boolean = false;
-
-  static materialNameToIcon(name: string): string {
-    if (name.length === 0) {
-      return '';
-    }
-    if (SignInCardCache.map.size === 0 && !SignInCardCache.loading) {
-      SignInCardCache.loading = true;
-      WikiMetaService.getMaterials().then((m) => {
-        m.forEach((v, k) => {
-          if (v.n.length > 0 && v.i.length > 0) {
-            SignInCardCache.map.set(v.n, v.i);
-          }
-        });
-        SignInCardCache.loading = false;
-      }).catch(() => {
-        SignInCardCache.loading = false;
-      });
-    }
-    return SignInCardCache.map.get(name) ?? '';
-  }
+class SignInRewardScrollFrame extends FrameCallback {
+  private readonly scroll: () => void;
+  constructor(scroll: () => void) { super(); this.scroll = scroll; }
+  onIdle(_timeLeftInNano: number): void { this.scroll(); }
 }
 
 @Component
 export struct HomeSignInCard {
-  @Prop uid: string = '';
-  @Prop info: SignInInfo | undefined = undefined;
-  @Prop loaded: boolean = false;
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
+  @StorageProp('helpLocaleVersion') @Watch('loadRewardIcons') localeVersion: number = 0;
+  @Prop @Watch('scheduleRewardScroll') uid: string = '';
+  @Prop @Watch('scheduleRewardScroll') info: SignInInfo | undefined = undefined;
+  @Prop @Watch('scheduleRewardScroll') loaded: boolean = false;
   @Prop signing: boolean = false;
   /** 今日日期（天） */
   @Prop todayDay: number = 1;
-  /** 点击整卡 */
+  @State rewardIcons: Map<string, string> = new Map();
+  private attached: boolean = false;
+  private iconRevision: number = 0;
+  private readonly rewardScroller: Scroller = new Scroller();
+  private scrollQueued: boolean = false;
+  private rewardOwner: string = '';
+  private positionedDays: number = -1;
+  /** 打开每日签到页 */
   onTap: () => void = () => {
   };
   /** 点击签到 */
@@ -53,6 +44,51 @@ export struct HomeSignInCard {
   /** 点击补签 */
   onResignIn: () => void = () => {
   };
+
+  aboutToAppear(): void {
+    this.attached = true;
+    this.loadRewardIcons();
+    this.scheduleRewardScroll();
+  }
+
+  /** 等本帧奖励网格完成布局，再定位当前领取行；图标或主题更新不打断手动滚动。 */
+  private scheduleRewardScroll(): void {
+    if (!this.attached || !this.loaded || !this.fillHeight || this.info === undefined || this.scrollQueued) { return; }
+    this.scrollQueued = true;
+    this.getUIContext().postFrameCallback(new SignInRewardScrollFrame((): void => {
+      this.scrollQueued = false;
+      const info: SignInInfo | undefined = this.info;
+      if (!this.attached || !this.loaded || !this.fillHeight || info === undefined || info.rewards.length === 0) { return; }
+      const owner: string = `${this.uid}_${info.currentMonth}`;
+      if (owner === this.rewardOwner && this.positionedDays === info.signedDays) { return; }
+      const justClaimed: boolean = owner === this.rewardOwner && this.positionedDays >= 0 && info.signedDays > this.positionedDays;
+      const index: number = Math.max(0, Math.min(info.rewards.length - 1, info.signedDays - (justClaimed ? 1 : 0)));
+      this.rewardScroller.scrollToIndex(Math.floor(index / 7) * 7, false, ScrollAlign.START);
+      this.rewardOwner = owner;
+      this.positionedDays = info.signedDays;
+    }));
+  }
+
+  aboutToDisappear(): void {
+    this.attached = false;
+    this.iconRevision++;
+  }
+
+  private loadRewardIcons(): void {
+    if (!this.attached) { return; }
+    const revision: number = ++this.iconRevision;
+    WikiMetaService.getMaterials().then((materials: Map<number, MetaMaterial>) => {
+      if (!this.attached || revision !== this.iconRevision) { return; }
+      const icons: Map<string, string> = new Map();
+      materials.forEach((material: MetaMaterial) => {
+        if (material.n.length > 0 && material.i.length > 0) { icons.set(material.n, material.i); }
+      });
+      materials.forEach((material: MetaMaterial) => {
+        if (material.canonicalName.length > 0 && material.i.length > 0) { icons.set(material.canonicalName, material.i); }
+      });
+      this.rewardIcons = icons;
+    });
+  }
 
   @Builder
   loadingView() {
@@ -104,7 +140,7 @@ export struct HomeSignInCard {
             .opacity(this.isDaySigned(reward.day) ? 0.35 : 1)
         } else {
           // 图标为物品 ID/名：尝试 rawfile ItemIcon 材料映射，未命中显示礼包图标
-          MetaIcon({ category: 'ItemIcon', name: HomeSignInCard.itemIconOf(reward.name), iconSize: 22, remoteFallback: true })
+          MetaIcon({ category: 'ItemIcon', name: this.rewardIcons.get(reward.name) ?? '', iconSize: 22, remoteFallback: true })
             .opacity(this.isDaySigned(reward.day) ? 0.35 : 1)
         }
         if (this.isDaySigned(reward.day)) {
@@ -141,111 +177,61 @@ export struct HomeSignInCard {
     return rows * 40 + Math.max(0, rows - 1) * 2;
   }
 
-  /** 奖励名（原神通用材料名）→ rawfile ItemIcon 文件名（去 UI_ 前缀映射失败则用通用）
-   *  材料元数据已含名称→图标映射（WikiMetaService.materials.n/i） */
-  static itemIconOf(name: string): string {
-    const icon: string = SignInCardCache.materialNameToIcon(name);
-    return icon;
-  }
-
-    /** 是否撑满 Grid 单元格高度（行内等高） */
-    @Prop fillHeight: boolean = false;
+  /** 是否撑满 Grid 单元格高度（行内等高） */
+  @Prop @Watch('scheduleRewardScroll') fillHeight: boolean = false;
 
   build() {
-    PressCard({
-      fillHeight: this.fillHeight,
-      onTap: () => {
-        this.onTap()
-      },
-      cardBg: $r('app.color.card_background'),
-      radius: 12,
-    }) {
-      Column({ space: 6 }) {
+    Column({ space: 6 }) {
+      Row({ space: 8 }) {
+        NavIcon({ name: 'CheckIn', iconSize: 20 })
+        Column({ space: 0 }) {
+          Text('每日签到').fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+          if (this.info !== undefined) {
+            Text(`本月已签 ${this.info.signedDays} 天`).fontSize(12).fontColor($r('app.color.text_secondary'))
+          }
+        }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+        if (this.uid.length > 0) {
+          Text(this.uid).fontSize(12).fontColor($r('app.color.app_primary_text'))
+        }
+      }.width('100%').height(44).flexShrink(0).focusable(true).hoverEffect(HoverEffect.Highlight)
+        .accessibilityDescription('打开每日签到').onClick(() => this.onTap())
+
+      if (!this.loaded) {
+        this.loadingView()
+      } else if (this.info === undefined || this.info.rewards.length === 0) {
+        this.emptyView()
+      } else {
+        Grid(this.rewardScroller) {
+          ForEach(this.info.rewards, (reward: SignInReward) => {
+            GridItem() {
+              this.awardCell(reward)
+            }.height(40)
+          }, (reward: SignInReward) => `sign_${reward.day}_${reward.name}_${reward.count}_${reward.icon}_${this.info?.signedDays}`)
+        }
+        .columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr 1fr')
+        .columnsGap(2).rowsGap(2).width('100%')
+        .height(this.fillHeight ? undefined : HomeSignInCard.gridHeight(this.info.rewards.length))
+        .layoutWeight(this.fillHeight ? 1 : 0)
+        .scrollBar(this.fillHeight ? BarState.Auto : BarState.Off)
+        .enableScrollInteraction(this.fillHeight)
+        .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+
+        Divider().width('100%').color($r('app.color.divider'))
+
         Row({ space: 8 }) {
-          NavIcon({ name: 'CheckIn', iconSize: 20 })
-          Column({ space: 0 }) {
-            Text('每日签到')
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary'))
-            if (this.info !== undefined) {
-              Text(`本月已签 ${this.info.signedDays} 天`)
-                .fontSize(12)
-                .fontColor($r('app.color.text_secondary'))
-            }
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-          if (this.uid.length > 0) {
-            Text(this.uid)
-              .fontSize(12)
-              .fontColor($r('app.color.app_primary_text'))
-          }
-        }
-        .width('100%')
-        .height(38)
-        .flexShrink(0)
-
-        if (!this.loaded) {
-          this.loadingView()
-        } else if (this.info === undefined || this.info.rewards.length === 0) {
-          this.emptyView()
-        } else {
-          // 奖励网格（7 列）
-          Grid() {
-            ForEach(this.info.rewards, (reward: SignInReward) => {
-              GridItem() {
-                this.awardCell(reward)
-              }
-              .height(40)
-            }, (reward: SignInReward) => `sign_${reward.day}_${reward.count}_${reward.icon}_${this.info?.signedDays}`)
-          }
-          .columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr 1fr')
-          .columnsGap(2)
-          .rowsGap(2)
-          .width('100%')
-          // 只设列模板，Grid 保持纵向滚动；每格独立 40vp，按钮位于视口外。
-          .height(this.fillHeight ? 92 : HomeSignInCard.gridHeight(this.info.rewards.length))
-          .scrollBar(this.fillHeight ? BarState.Auto : BarState.Off)
-          .enableScrollInteraction(this.fillHeight)
-          .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-          .flexShrink(0)
-
-          Divider()
-            .width('100%')
-            .color($r('app.color.divider'))
-
-          Row({ space: 8 }) {
-            Button(this.info.isTodaySigned(this.todayDay) ? '今日已签' : '签到')
-              .fontSize(13)
-              .height(30)
-              .hoverEffect(HoverEffect.Highlight)
-              .layoutWeight(1)
-              .backgroundColor(this.info.isTodaySigned(this.todayDay) ? $r('app.color.card_inner_tint') : $r('app.color.app_primary'))
-              .fontColor(this.info.isTodaySigned(this.todayDay) ? $r('app.color.text_secondary') : Color.White)
-              .enabled(!this.info.isTodaySigned(this.todayDay) && !this.signing)
-              .onClick(() => {
-                this.onSignIn()
-              })
-            Button('补签')
-              .fontSize(13)
-              .height(30)
-              .hoverEffect(HoverEffect.Highlight)
-              .layoutWeight(1)
-              .backgroundColor($r('app.color.app_primary_bg'))
-              .fontColor($r('app.color.app_primary_text'))
-              .onClick(() => {
-                this.onResignIn()
-              })
-          }
-          .width('100%')
-          .height(30)
-          .flexShrink(0)
-        }
+          Button(this.info.isTodaySigned(this.todayDay) ? '今日已签' : '签到', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+            .fontSize(13).height(44).layoutWeight(1)
+            .enabled(!this.info.isTodaySigned(this.todayDay) && !this.signing)
+            .onClick(() => this.onSignIn())
+          Button('补签', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+            .fontSize(13).height(44).layoutWeight(1)
+            .onClick(() => this.onResignIn())
+        }.width('100%').height(44).flexShrink(0)
       }
-      .width('100%')
-      .height(this.fillHeight ? '100%' : undefined)
-      .padding(12)
     }
+    .width('100%').height(this.fillHeight ? '100%' : undefined).padding(12).borderRadius(12)
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
   }
 }

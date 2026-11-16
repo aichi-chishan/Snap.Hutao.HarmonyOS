@@ -1,0 +1,1244 @@
+{
+  "string": [
+    {
+      "name": "ui_about_restart",
+      "value": "Đặt ngôn ngữ hiển thị"
+    },
+    {
+      "name": "ui_account_insights_copied_json",
+      "value": "De-identified statistics copied to clipboard."
+    },
+    {
+      "name": "ui_account_insights_copy_json",
+      "value": "Copy de-identified statistics (JSON)"
+    },
+    {
+      "name": "ui_account_insights_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_account_insights_loading",
+      "value": "Loading saved records…"
+    },
+    {
+      "name": "ui_account_insights_missing_model",
+      "value": "Enter a model identifier."
+    },
+    {
+      "name": "ui_account_insights_no_account",
+      "value": "Select a game account and UID first."
+    },
+    {
+      "name": "ui_account_insights_no_records",
+      "value": "No saved records available for charting."
+    },
+    {
+      "name": "ui_account_insights_open",
+      "value": "History charts and AI insights"
+    },
+    {
+      "name": "ui_account_insights_unit_wish",
+      "value": "wishes"
+    },
+    {
+      "name": "ui_action_choose",
+      "value": "Chọn"
+    },
+    {
+      "name": "ui_action_clear",
+      "value": "Xóa hết"
+    },
+    {
+      "name": "ui_action_clear_cache",
+      "value": "Xóa bộ nhớ đệm"
+    },
+    {
+      "name": "ui_action_close",
+      "value": "Đóng"
+    },
+    {
+      "name": "ui_action_continue",
+      "value": "Tiếp tục"
+    },
+    {
+      "name": "ui_action_disable",
+      "value": "Tắt"
+    },
+    {
+      "name": "ui_action_edit",
+      "value": "Sửa"
+    },
+    {
+      "name": "ui_action_enable",
+      "value": "Bật"
+    },
+    {
+      "name": "ui_action_restore",
+      "value": "Khôi phục"
+    },
+    {
+      "name": "ui_agent_page_label_delete_conversation",
+      "value": "Delete conversation"
+    },
+    {
+      "name": "ui_agent_page_label_model_profile",
+      "value": "Model"
+    },
+    {
+      "name": "ui_agent_page_label_model_provider_profile",
+      "value": "Model Provider Profile"
+    },
+    {
+      "name": "ui_agent_page_label_placeholder",
+      "value": "Type a message..."
+    },
+    {
+      "name": "ui_ai_approval",
+      "value": "Tool approval required"
+    },
+    {
+      "name": "ui_ai_continue",
+      "value": "Tiếp tục tạo"
+    },
+    {
+      "name": "ui_ai_conversation_actions",
+      "value": "Thao tác cuộc trò chuyện"
+    },
+    {
+      "name": "ui_ai_copied_text",
+      "value": "Đã sao chép vào clipboard"
+    },
+    {
+      "name": "ui_ai_copy_error",
+      "value": "Mở khay nhớ tạm thất bại"
+    },
+    {
+      "name": "ui_ai_copy_text",
+      "value": "Copy Text"
+    },
+    {
+      "name": "ui_ai_custom_api",
+      "value": "API tùy chỉnh"
+    },
+    {
+      "name": "ui_ai_device_generate",
+      "value": "Phân tích trên thiết bị"
+    },
+    {
+      "name": "ui_ai_endpoint_placeholder",
+      "value": "URL gốc (để trống để dùng mặc định)"
+    },
+    {
+      "name": "ui_ai_initial_request",
+      "value": "Analyze my account performance, wish results and future priorities using the historical statistics in this chat."
+    },
+    {
+      "name": "ui_ai_key_placeholder",
+      "value": "Khóa API (để trống để giữ khóa hiện tại)"
+    },
+    {
+      "name": "ui_ai_mode",
+      "value": "Chế độ phân tích AI"
+    },
+    {
+      "name": "ui_ai_on_device",
+      "value": "AI trên thiết bị"
+    },
+    {
+      "name": "ui_ai_privacy_body",
+      "value": "Khi bạn gửi tin nhắn, dịch vụ AI đã chọn sẽ nhận cuộc trò chuyện và số liệu lịch sử đã loại bỏ thông tin định danh. Ứng dụng không đính kèm UID, cookie, ID vật phẩm gốc hay tệp cơ sở dữ liệu. Cuộc trò chuyện lưu trên thiết bị và khóa API được hệ thống bảo vệ. Công cụ cần bạn phê duyệt."
+    },
+    {
+      "name": "ui_ai_privacy_title",
+      "value": "Before using third-party AI"
+    },
+    {
+      "name": "ui_ai_reasoning_completed",
+      "value": "Thought"
+    },
+    {
+      "name": "ui_ai_reasoning_in_progress",
+      "value": "Thinking"
+    },
+    {
+      "name": "ui_ai_return",
+      "value": "Quay lại cuộc trò chuyện"
+    },
+    {
+      "name": "ui_ai_select_conversation",
+      "value": "Chọn cuộc trò chuyện"
+    },
+    {
+      "name": "ui_ai_workspace",
+      "value": "Không gian AI"
+    },
+    {
+      "name": "ui_announcement_redeem_code_label",
+      "value": "Mã đổi chương trình phát sóng trực tiếp"
+    },
+    {
+      "name": "ui_avatar_property_score_algorithm",
+      "value": "Thuật toán đánh giá Thánh Di Vật"
+    },
+    {
+      "name": "ui_backpack_category_reliquary",
+      "value": "Thánh Di Vật"
+    },
+    {
+      "name": "ui_backpack_category_weapon",
+      "value": "Vũ khí"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_name_header",
+      "value": "Tên cấu hình"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_new_config",
+      "value": "Tạo cấu hình mới"
+    },
+    {
+      "name": "ui_backpack_sort_count",
+      "value": "Số lượng"
+    },
+    {
+      "name": "ui_backpack_sort_quality",
+      "value": "Chất lượng"
+    },
+    {
+      "name": "ui_base_value_slider_level",
+      "value": "Cấp độ"
+    },
+    {
+      "name": "ui_bg_choose_folder",
+      "value": "Chọn thư mục"
+    },
+    {
+      "name": "ui_bg_folder_picker_failed",
+      "value": "Không thể chọn thư mục hình nền"
+    },
+    {
+      "name": "ui_bg_folder_saved",
+      "value": "Đã cập nhật thư mục hình nền"
+    },
+    {
+      "name": "ui_bg_folder_temporary",
+      "value": "Chỉ có thể truy cập thư mục trong phiên này"
+    },
+    {
+      "name": "ui_bg_none",
+      "value": "Không"
+    },
+    {
+      "name": "ui_card_calendar_all_materials_hint",
+      "value": "Có thể khiêu chiến tất cả các bản sao nguyên liệu"
+    },
+    {
+      "name": "ui_card_sign_in_auto_sign_in",
+      "value": "Tự động điểm danh"
+    },
+    {
+      "name": "ui_card_sign_in_claim_re_sign_in_action",
+      "value": "Bù đăng nhập"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_allow",
+      "value": "Allow"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_deny",
+      "value": "Deny"
+    },
+    {
+      "name": "ui_clear_filters",
+      "value": "Xóa bộ lọc"
+    },
+    {
+      "name": "ui_code_copied",
+      "value": "Sao chép mã đổi thành công"
+    },
+    {
+      "name": "ui_common_loading",
+      "value": "Đang tải…"
+    },
+    {
+      "name": "ui_content_dialog_complete_primary_button_text",
+      "value": "Hoàn thành"
+    },
+    {
+      "name": "ui_cultivation_add_project_action",
+      "value": "Tạo mới"
+    },
+    {
+      "name": "ui_cultivation_material_list_world_level_title",
+      "value": "Cấp Thế Giới"
+    },
+    {
+      "name": "ui_cultivation_navigate_action",
+      "value": "Đi đến"
+    },
+    {
+      "name": "ui_daily_note_notification_setting",
+      "value": "Cài đặt thông báo"
+    },
+    {
+      "name": "ui_calendar_time_pending",
+      "value": "Thời gian sẽ được công bố"
+    },
+    {
+      "name": "ui_daily_note_refresh",
+      "value": "Làm mới ngay"
+    },
+    {
+      "name": "ui_daily_note_setting_auto_refresh",
+      "value": "Tự động làm mới"
+    },
+    {
+      "name": "ui_desc_abyss",
+      "value": "Kỳ hiện tại và kỳ trước"
+    },
+    {
+      "name": "ui_desc_account",
+      "value": "Quản lý tài khoản và nhân vật liên kết"
+    },
+    {
+      "name": "ui_desc_achievement",
+      "value": "Xuất / Nhập / UIAF"
+    },
+    {
+      "name": "ui_desc_announcements",
+      "value": "Cập nhật và tin tức"
+    },
+    {
+      "name": "ui_desc_backpack",
+      "value": "Vũ khí / Thánh Di Vật / UIIF"
+    },
+    {
+      "name": "ui_desc_banner_history",
+      "value": "Nhân vật và vũ khí nổi bật"
+    },
+    {
+      "name": "ui_desc_calendar",
+      "value": "Sự kiện / Cầu nguyện / Điểm danh"
+    },
+    {
+      "name": "ui_desc_challenge",
+      "value": "Đơn / Phối hợp / Thành tích tốt nhất"
+    },
+    {
+      "name": "ui_desc_character",
+      "value": "Thuộc tính nhân vật / Thánh Di Vật"
+    },
+    {
+      "name": "ui_desc_cultivation",
+      "value": "Danh sách nguyên liệu / Thống kê nguyên liệu"
+    },
+    {
+      "name": "ui_desc_daily_note",
+      "value": "Nhựa nguyên chất / Phái đi thám hiểm / Thông báo"
+    },
+    {
+      "name": "ui_desc_launch",
+      "value": "Lối tắt khởi chạy"
+    },
+    {
+      "name": "ui_desc_ledger",
+      "value": "Nhật ký Nguyên Thạch và Mora theo tháng"
+    },
+    {
+      "name": "ui_desc_passport",
+      "value": "Thông tin hộ chiếu"
+    },
+    {
+      "name": "ui_desc_settings",
+      "value": "Chủ đề màu / Làm mới / Ngôn ngữ"
+    },
+    {
+      "name": "ui_desc_sign_in",
+      "value": "Thưởng điểm danh hằng ngày"
+    },
+    {
+      "name": "ui_desc_theater",
+      "value": "Huy chương thử thách / Nhân vật dự bị"
+    },
+    {
+      "name": "ui_desc_wiki_avatar",
+      "value": "Nguyên tố và kỹ năng nhân vật"
+    },
+    {
+      "name": "ui_desc_wiki_monster",
+      "value": "Nguyên tố và phe của quái vật"
+    },
+    {
+      "name": "ui_desc_wiki_weapon",
+      "value": "Chỉ số và tấn công vũ khí"
+    },
+    {
+      "name": "ui_desc_wish",
+      "value": "Tổng quan / Lịch sử"
+    },
+    {
+      "name": "ui_exception_close",
+      "value": "Đóng"
+    },
+    {
+      "name": "ui_filter",
+      "value": "Lọc"
+    },
+    {
+      "name": "ui_filter_count",
+      "value": "Lọc (%d)"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_down",
+      "value": "Nửa sau"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_up",
+      "value": "Nửa đầu"
+    },
+    {
+      "name": "ui_gacha_log_orange_avatar_countdown",
+      "value": "Nhân vật 5 sao"
+    },
+    {
+      "name": "ui_gacha_log_orange_weapon_countdown",
+      "value": "Vũ khí 5 sao"
+    },
+    {
+      "name": "ui_gacha_log_purple_avatar_countdown",
+      "value": "Nhân vật 4 sao"
+    },
+    {
+      "name": "ui_gacha_log_purple_weapon_countdown",
+      "value": "Vũ khí 4 sao"
+    },
+    {
+      "name": "ui_gacha_log_switch_to_beyond_gacha_mode_header",
+      "value": "Nguyện Ca"
+    },
+    {
+      "name": "ui_gacha_pool_avatar_event",
+      "value": "Cầu nguyện nhân vật"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_event",
+      "value": "Nguyện Ca Sự Kiện"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_permanent",
+      "value": "Tiếng Vọng Kỳ Ngộ"
+    },
+    {
+      "name": "ui_gacha_pool_chronicled",
+      "value": "Ước Nguyện Tuyển Chọn"
+    },
+    {
+      "name": "ui_gacha_pool_novice",
+      "value": "Ước Nguyện Tân Thủ"
+    },
+    {
+      "name": "ui_gacha_pool_permanent",
+      "value": "Lang thang thế gian"
+    },
+    {
+      "name": "ui_gacha_pool_weapon_event",
+      "value": "Thân hình thần đúc"
+    },
+    {
+      "name": "ui_grid_view",
+      "value": "Dạng lưới"
+    },
+    {
+      "name": "ui_history_charts",
+      "value": "Biểu đồ lịch sử"
+    },
+    {
+      "name": "ui_home_greeting",
+      "value": "Nhà lữ hành, chào mừng đến với lục địa Teyvat!"
+    },
+    {
+      "name": "ui_home_greeting_count",
+      "value": "Bạn đã khởi chạy Snap Hutao %s lần"
+    },
+    {
+      "name": "ui_home_greeting_rare",
+      "value": "Bạn nói đúng, nhưng Snap Hutao là một sản phẩm do DGP Studio tự phát triển..."
+    },
+    {
+      "name": "ui_home_greeting_text_default",
+      "value": "Nhà lữ hành, chào mừng đến với lục địa Teyvat!"
+    },
+    {
+      "name": "ui_home_no_codes",
+      "value": "Chưa có mã đổi quà"
+    },
+    {
+      "name": "ui_home_no_events",
+      "value": "Chưa có sự kiện theo lịch"
+    },
+    {
+      "name": "ui_home_recent",
+      "value": "Sự kiện và cầu nguyện sắp tới"
+    },
+    {
+      "name": "ui_hutao_passport_verify_code_action",
+      "value": "Lấy mã xác minh"
+    },
+    {
+      "name": "ui_info_bar_panel_contract_content",
+      "value": "Thu gọn"
+    },
+    {
+      "name": "ui_list_view",
+      "value": "Dạng danh sách"
+    },
+    {
+      "name": "ui_material_frosted",
+      "value": "Trong mờ phủ sương và bóng dịu"
+    },
+    {
+      "name": "ui_material_system_glass",
+      "value": "Kính hệ thống và ánh sáng đắm chìm"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_elec",
+      "value": "Lôi"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_fire",
+      "value": "Hỏa"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_grass",
+      "value": "Thảo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_ice",
+      "value": "Băng"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_rock",
+      "value": "Nham"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_water",
+      "value": "Thủy"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_wind",
+      "value": "Phong"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_blue",
+      "value": "Ba sao"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_green",
+      "value": "Hai sao"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_orange",
+      "value": "Năm sao"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_purple",
+      "value": "Bốn sao"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_red",
+      "value": "Năm sao giới hạn"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_white",
+      "value": "Một sao"
+    },
+    {
+      "name": "ui_model_intrinsic_role_combat_difficulty_level_lunar",
+      "value": "Chế độ Nguyệt Dụ"
+    },
+    {
+      "name": "ui_model_metadata_material_weapon_ascension_material",
+      "value": "Nguyên liệu đột phá vũ khí"
+    },
+    {
+      "name": "ui_nav_announcements",
+      "value": "Thông báo trò chơi"
+    },
+    {
+      "name": "ui_nav_banner_history",
+      "value": "Lịch sử banner"
+    },
+    {
+      "name": "ui_navigation_collapse",
+      "value": "Thu gọn điều hướng"
+    },
+    {
+      "name": "ui_navigation_expand",
+      "value": "Mở rộng điều hướng"
+    },
+    {
+      "name": "ui_option_selected",
+      "value": "Đã chọn"
+    },
+    {
+      "name": "ui_option_unselected",
+      "value": "Chưa chọn"
+    },
+    {
+      "name": "ui_plugin_setting_back_button",
+      "value": "Quay lại"
+    },
+    {
+      "name": "ui_role_combat_avatar_trial_hint",
+      "value": "Dùng thử"
+    },
+    {
+      "name": "ui_role_combat_shortest",
+      "value": "Màn trình diễn nhanh nhất"
+    },
+    {
+      "name": "ui_role_combat_splendour_buffs_header",
+      "value": "Chúc phúc rực rỡ"
+    },
+    {
+      "name": "ui_role_combat_support",
+      "value": "Hỗ trợ"
+    },
+    {
+      "name": "ui_setting_apperance_first_day_of_week_header",
+      "value": "Ngày đầu tuần"
+    },
+    {
+      "name": "ui_setting_background_image_custom_folder_header",
+      "value": "Thư mục ảnh nền tùy chỉnh"
+    },
+    {
+      "name": "ui_setting_background_media_local_folder",
+      "value": "Video ngẫu nhiên từ máy"
+    },
+    {
+      "name": "ui_setting_background_media_official_launcher_video",
+      "value": "Video nền từ launcher chính thức"
+    },
+    {
+      "name": "ui_setting_background_video_is_looping_header",
+      "value": "Phát lặp lại"
+    },
+    {
+      "name": "ui_setting_background_video_is_muted_header",
+      "value": "Phát ở chế độ im lặng"
+    },
+    {
+      "name": "ui_setting_control_material_default",
+      "value": "Mặc định"
+    },
+    {
+      "name": "ui_setting_create_desktop_shortcut_action",
+      "value": "Tạo"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_off",
+      "value": "Ẩn"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_on",
+      "value": "Hiển thị"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_action",
+      "value": "Cấu hình"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_header",
+      "value": "Cấu hình điểm cuối xác minh Geetest"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_description",
+      "value": "Có hiệu lực ngay lập tức, sau khi tắt sẽ không hiển thị nữa"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_header",
+      "value": "Bật hiển thị lịch sự kiện game"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_description",
+      "value": "Mặc định tắt, một số nội dung như ngày sự kiện không đang diễn ra sẽ không được hiển thị chính xác"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_header",
+      "value": "Hiển thị các sự kiện phiên bản trong game không đang diễn ra"
+    },
+    {
+      "name": "ui_setting_home_card_description",
+      "value": "Quản lý thẻ trong bảng điều khiển trang chủ, kéo để sắp xếp"
+    },
+    {
+      "name": "ui_setting_hutao_passport_logout_action",
+      "value": "Đăng xuất"
+    },
+    {
+      "name": "ui_setting_key_shortcut_virtual_key_code_action",
+      "value": "Xem"
+    },
+    {
+      "name": "ui_settings_auto_sign_info",
+      "value": "Điểm danh UID hiện tại khi mở và các nhân vật CN cục bộ khi sang ngày mới trong lúc ứng dụng chạy."
+    },
+    {
+      "name": "ui_settings_backup_credentials",
+      "value": "Bản sao lưu chứa thông tin đăng nhập. Hãy giữ tệp ở nơi an toàn."
+    },
+    {
+      "name": "ui_settings_cache",
+      "value": "Bộ nhớ đệm ảnh và biểu tượng"
+    },
+    {
+      "name": "ui_settings_cache_size",
+      "value": "Kích thước bộ nhớ đệm %s"
+    },
+    {
+      "name": "ui_settings_cancel_update",
+      "value": "Hủy cập nhật"
+    },
+    {
+      "name": "ui_settings_cancelling",
+      "value": "Đang hủy…"
+    },
+    {
+      "name": "ui_settings_choose_video",
+      "value": "Chọn video"
+    },
+    {
+      "name": "ui_settings_configure",
+      "value": "Cấu hình"
+    },
+    {
+      "name": "ui_settings_data_next_launch",
+      "value": "Dữ liệu đã chọn có hiệu lực khi mở ứng dụng lần sau."
+    },
+    {
+      "name": "ui_settings_data_source",
+      "value": "URL nguồn dữ liệu"
+    },
+    {
+      "name": "ui_settings_delete_wish",
+      "value": "Xóa toàn bộ dữ liệu cầu nguyện"
+    },
+    {
+      "name": "ui_settings_delete_wish_archive",
+      "value": "Xóa kho cầu nguyện"
+    },
+    {
+      "name": "ui_settings_delete_wish_confirm",
+      "value": "Xóa lịch sử cầu nguyện của mọi UID? Không thể hoàn tác."
+    },
+    {
+      "name": "ui_settings_download_verify",
+      "value": "Tải xuống và xác minh"
+    },
+    {
+      "name": "ui_settings_export_backup",
+      "value": "Xuất bản sao lưu đầy đủ"
+    },
+    {
+      "name": "ui_settings_feedback",
+      "value": "Phản hồi và chẩn đoán"
+    },
+    {
+      "name": "ui_settings_game_data",
+      "value": "Cập nhật dữ liệu trò chơi"
+    },
+    {
+      "name": "ui_settings_geetest_help",
+      "value": "Dùng {0} cho gt và {1} cho challenge. Phản hồi GET cần có code: 0, challenge và validate. Để trống để xác minh tương tác."
+    },
+    {
+      "name": "ui_settings_help",
+      "value": "Trợ giúp ngoại tuyến"
+    },
+    {
+      "name": "ui_settings_immersive_material",
+      "value": "Chất liệu đắm chìm"
+    },
+    {
+      "name": "ui_settings_local_backup_success",
+      "value": "Hoàn thành"
+    },
+    {
+      "name": "ui_settings_manifest_help",
+      "value": "Lưu URL bản kê rồi kiểm tra bản cập nhật."
+    },
+    {
+      "name": "ui_settings_material_level",
+      "value": "Mức chất liệu đắm chìm"
+    },
+    {
+      "name": "ui_settings_material_scope",
+      "value": "Mức chất liệu được cập nhật ngay. Bề mặt nội dung dùng hiệu ứng phủ sương. Các điều khiển tương thích dùng hiệu ứng đắm chìm của hệ thống."
+    },
+    {
+      "name": "ui_settings_no_wallpaper",
+      "value": "Chưa chọn hình nền"
+    },
+    {
+      "name": "ui_settings_no_wish_archives",
+      "value": "Chưa có kho cầu nguyện. Làm mới hoặc nhập để thêm."
+    },
+    {
+      "name": "ui_settings_normal_material",
+      "value": "Chất liệu tiêu chuẩn"
+    },
+    {
+      "name": "ui_settings_not_logged_in",
+      "value": "Chưa đăng nhập"
+    },
+    {
+      "name": "ui_settings_page_description_add_model_provider_profile_to_edit",
+      "value": "Add a model provider profile first"
+    },
+    {
+      "name": "ui_settings_page_label_add_profile",
+      "value": "Add"
+    },
+    {
+      "name": "ui_settings_page_label_agent_maximum_iterations_per_request",
+      "value": "Maximum Tool Iterations Per Request"
+    },
+    {
+      "name": "ui_settings_page_label_agent_system_prompt",
+      "value": "System Prompt"
+    },
+    {
+      "name": "ui_settings_page_label_agent_user_name",
+      "value": "User Name"
+    },
+    {
+      "name": "ui_settings_page_label_clear_models",
+      "value": "Clear Models"
+    },
+    {
+      "name": "ui_settings_page_label_copy_profile",
+      "value": "Copy"
+    },
+    {
+      "name": "ui_settings_page_label_delete_model",
+      "value": "Delete Model"
+    },
+    {
+      "name": "ui_settings_page_label_delete_profile",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_settings_page_label_fetch_models",
+      "value": "Fetch"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_context_window_tokens",
+      "value": "Context Window Length"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_input_tokens",
+      "value": "Input Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_output_tokens",
+      "value": "Output Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_name",
+      "value": "Model Name"
+    },
+    {
+      "name": "ui_settings_page_label_model_omit_reasoning_effort_when_thinking_disabled",
+      "value": "Omit reasoning effort when Thinking is off"
+    },
+    {
+      "name": "ui_settings_page_label_model_provider_profiles",
+      "value": "Model Provider Profiles"
+    },
+    {
+      "name": "ui_settings_page_label_model_reasoning_effort",
+      "value": "Reasoning Effort"
+    },
+    {
+      "name": "ui_settings_page_label_model_temperature",
+      "value": "Temperature"
+    },
+    {
+      "name": "ui_settings_page_label_model_thinking_enabled",
+      "value": "Enable Thinking"
+    },
+    {
+      "name": "ui_settings_page_label_model_top_p",
+      "value": "Top P"
+    },
+    {
+      "name": "ui_settings_page_label_profile_model_id",
+      "value": "Model ID"
+    },
+    {
+      "name": "ui_settings_page_label_profile_name",
+      "value": "Profile Name"
+    },
+    {
+      "name": "ui_settings_page_label_profile_provider_type",
+      "value": "Provider Type"
+    },
+    {
+      "name": "ui_settings_page_label_selected_model",
+      "value": "Selected Model"
+    },
+    {
+      "name": "ui_settings_page_option_provider_default",
+      "value": "Provider default"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_extra_high",
+      "value": "Extra high"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_high",
+      "value": "High"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_low",
+      "value": "Low"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_medium",
+      "value": "Medium"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_none",
+      "value": "None"
+    },
+    {
+      "name": "ui_settings_previous_data",
+      "value": "Khôi phục dữ liệu trò chơi trước đó"
+    },
+    {
+      "name": "ui_settings_processing",
+      "value": "Đang xử lý…"
+    },
+    {
+      "name": "ui_settings_random_video",
+      "value": "Phát ngẫu nhiên một video đã nhập khi tải."
+    },
+    {
+      "name": "ui_settings_reduce_motion",
+      "value": "Giảm chuyển động"
+    },
+    {
+      "name": "ui_settings_reduced_motion_info",
+      "value": "Giảm hiệu ứng chuyển trang và nhấn nút."
+    },
+    {
+      "name": "ui_settings_reset_builtin",
+      "value": "Khôi phục dữ liệu trò chơi tích hợp"
+    },
+    {
+      "name": "ui_settings_restore_backup",
+      "value": "Khôi phục từ bản sao lưu"
+    },
+    {
+      "name": "ui_settings_restore_confirm",
+      "value": "Thay dữ liệu hiện tại bằng bản sao lưu này?"
+    },
+    {
+      "name": "ui_settings_restore_scope",
+      "value": "Khôi phục tài khoản, lịch sử trò chơi và tùy chọn"
+    },
+    {
+      "name": "ui_settings_signed_in",
+      "value": "Đã đăng nhập tài khoản trò chơi"
+    },
+    {
+      "name": "ui_settings_stop_download",
+      "value": "Dừng tải xuống và chờ xác minh hoàn tất?"
+    },
+    {
+      "name": "ui_settings_verified_data",
+      "value": "Tải và xác minh bộ dữ liệu đầy đủ từ commit GitHub đáng tin cậy."
+    },
+    {
+      "name": "ui_settings_video_fallback",
+      "value": "Tạm dừng khi chạy nền. Hiện hình nền nếu video không khả dụng."
+    },
+    {
+      "name": "ui_settings_wallpaper_sources",
+      "value": "Ảnh cục bộ đổi sau mỗi năm phút. Hình nền hằng ngày từ Snap Hutao. Bản quyền thuộc về tác giả."
+    },
+    {
+      "name": "ui_spiral_abyss_hutao_statistics",
+      "value": "Thống kê kỳ này"
+    },
+    {
+      "name": "ui_spiral_abyss_upload_record_homa_not_login_primary_button_text",
+      "value": "Đến trang đăng nhập"
+    },
+    {
+      "name": "ui_travelers_diary_no_income_source_hint",
+      "value": "Tháng này chưa có ghi nhận thu nhập Nguyên Thạch"
+    },
+    {
+      "name": "ui_travelers_diary_today",
+      "value": "Hôm nay"
+    },
+    {
+      "name": "ui_update_cancel",
+      "value": "Hủy kiểm tra"
+    },
+    {
+      "name": "ui_update_cancelled",
+      "value": "Đã hủy"
+    },
+    {
+      "name": "ui_update_channel",
+      "value": "Kênh phát hành"
+    },
+    {
+      "name": "ui_update_check_failed",
+      "value": "Lỗi khi kiểm tra cập nhật"
+    },
+    {
+      "name": "ui_update_checking",
+      "value": "Đang kiểm tra bản cập nhật…"
+    },
+    {
+      "name": "ui_update_compare_unknown",
+      "value": "Không đủ thông tin phiên bản"
+    },
+    {
+      "name": "ui_update_compatibility_unknown",
+      "value": "Chưa rõ khả năng tương thích cài đặt"
+    },
+    {
+      "name": "ui_update_conflict",
+      "value": "Tên và mã phiên bản không khớp"
+    },
+    {
+      "name": "ui_update_current",
+      "value": "Hiện đã là phiên bản mới nhất"
+    },
+    {
+      "name": "ui_update_hap_listed",
+      "value": "Có gói HarmonyOS"
+    },
+    {
+      "name": "ui_update_installed",
+      "value": "Phiên bản đã cài %s"
+    },
+    {
+      "name": "ui_update_invalid",
+      "value": "Thông tin bản phát hành không hợp lệ"
+    },
+    {
+      "name": "ui_update_local_newer",
+      "value": "Phiên bản đã cài mới hơn"
+    },
+    {
+      "name": "ui_update_no_hap",
+      "value": "Không có gói HarmonyOS trong danh sách"
+    },
+    {
+      "name": "ui_update_no_notes",
+      "value": "Phiên bản này không có ghi chú phát hành"
+    },
+    {
+      "name": "ui_update_no_release",
+      "value": "Kênh này chưa có bản phát hành công khai"
+    },
+    {
+      "name": "ui_update_notes_error",
+      "value": "Không mở được ghi chú phát hành"
+    },
+    {
+      "name": "ui_update_preview",
+      "value": "Bao gồm bản phát hành trước"
+    },
+    {
+      "name": "ui_update_project_releases",
+      "value": "Bản phát hành dự án"
+    },
+    {
+      "name": "ui_update_rate_limit",
+      "value": "GitHub đã giới hạn yêu cầu. Hãy thử lại sau."
+    },
+    {
+      "name": "ui_update_recent_only",
+      "value": "Đã kiểm tra 300 bản phát hành gần nhất"
+    },
+    {
+      "name": "ui_update_required_api",
+      "value": "API tối thiểu %d"
+    },
+    {
+      "name": "ui_update_skipped",
+      "value": "Đã bỏ qua phiên bản %s, sẽ không tự động nhắc về phiên bản này khi khởi động nữa, bạn vẫn có thể kiểm tra cập nhật thủ công trong phần cài đặt"
+    },
+    {
+      "name": "ui_update_stable",
+      "value": "Bản ổn định"
+    },
+    {
+      "name": "ui_update_unavailable",
+      "value": "Không thể truy cập kho bản phát hành"
+    },
+    {
+      "name": "ui_update_unknown",
+      "value": "Không rõ"
+    },
+    {
+      "name": "ui_update_unskip",
+      "value": "Bỏ qua trạng thái bỏ qua phiên bản này"
+    },
+    {
+      "name": "ui_user_copy_cookie_action",
+      "value": "Sao chép Cookie"
+    },
+    {
+      "name": "ui_web_daily_note_attendance_reward_status_finished_non_reward",
+      "value": "Đã hoàn thành"
+    },
+    {
+      "name": "ui_web_hoyolab_game_record_act_calendar_hard_challenge_locked",
+      "value": "Chưa mở khóa"
+    },
+    {
+      "name": "ui_weekday_friday",
+      "value": "Thứ 6"
+    },
+    {
+      "name": "ui_weekday_monday",
+      "value": "Thứ 2"
+    },
+    {
+      "name": "ui_weekday_saturday",
+      "value": "Thứ 7"
+    },
+    {
+      "name": "ui_weekday_sunday",
+      "value": "CN"
+    },
+    {
+      "name": "ui_weekday_thursday",
+      "value": "Thứ 5"
+    },
+    {
+      "name": "ui_weekday_tuesday",
+      "value": "Thứ 3"
+    },
+    {
+      "name": "ui_weekday_wednesday",
+      "value": "Thứ 4"
+    },
+    {
+      "name": "ui_wi_ki_avatar_ascension_materials_header",
+      "value": "Nguyên liệu bồi dưỡng"
+    },
+    {
+      "name": "ui_wi_ki_avatar_auto_suggest_box_place_holder",
+      "value": "Lọc nhân vật"
+    },
+    {
+      "name": "ui_wi_ki_avatar_name_card_header",
+      "value": "Danh thiếp"
+    },
+    {
+      "name": "ui_wi_ki_avatar_special_food_title",
+      "value": "Món ăn đặc biệt"
+    },
+    {
+      "name": "ui_wi_ki_weapon_auto_suggest_box_place_holder",
+      "value": "Lọc vũ khí"
+    },
+    {
+      "name": "ui_wish_show_empty_history",
+      "value": "Sự kiện cầu nguyện lịch sử không có lịch sử"
+    },
+    {
+      "name": "ui_wish_show_empty_overview",
+      "value": "Tổng quan cầu nguyện không có bản ghi"
+    },
+    {
+      "name": "ui_wish_show_unobtained",
+      "value": "Vật phẩm Cầu Nguyện chưa nhận được"
+    },
+    {
+      "name": "ui_gacha_pivot_overview",
+      "value": "Tổng quan"
+    },
+    {
+      "name": "ui_gacha_pivot_history",
+      "value": "Lịch sử"
+    },
+    {
+      "name": "ui_gacha_pivot_avatar",
+      "value": "Nhân Vật"
+    },
+    {
+      "name": "ui_gacha_pivot_weapon",
+      "value": "Vũ Khí"
+    },
+    {
+      "name": "ui_gacha_pivot_countdown",
+      "value": "Đếm ngược"
+    },
+    {
+      "name": "ui_gacha_pivot_statistics",
+      "value": "Thống kê cầu nguyện toàn cầu"
+    },
+    {
+      "name": "ui_gacha_full_refresh",
+      "value": "Làm mới toàn bộ"
+    },
+    {
+      "name": "ui_gacha_full_refresh_selected",
+      "value": "✓ Làm mới toàn bộ"
+    },
+    {
+      "name": "ui_gacha_card_statistics",
+      "value": "Thống kê"
+    },
+    {
+      "name": "ui_gacha_card_ratio",
+      "value": "Tỷ lệ"
+    },
+    {
+      "name": "ui_gacha_card_five_average",
+      "value": "Số lần quay trung bình 5 Sao"
+    },
+    {
+      "name": "ui_gacha_card_four_average",
+      "value": "Số lần quay trung bình 4 Sao"
+    },
+    {
+      "name": "ui_gacha_card_up_average",
+      "value": "Số lượt trung bình UP"
+    },
+    {
+      "name": "ui_gacha_card_to_five",
+      "value": "Lần 5 Sao trước"
+    },
+    {
+      "name": "ui_gacha_card_to_four",
+      "value": "Lần 4 Sao trước"
+    },
+    {
+      "name": "ui_gacha_card_to_three",
+      "value": "Lần ba sao trước"
+    },
+    {
+      "name": "ui_travelers_diary_month",
+      "value": "Tháng này"
+    },
+    {
+      "name": "ui_travelers_diary_primogems",
+      "value": "Nguyên Thạch"
+    },
+    {
+      "name": "ui_travelers_diary_mora",
+      "value": "Mora"
+    }
+  ]
+}

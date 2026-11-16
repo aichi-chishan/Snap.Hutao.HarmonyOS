@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "ui_startup_failed_title", "value": "Không thể khởi động" },
+    { "name": "ui_startup_failed_body", "value": "Không thể hoàn tất quá trình khởi động. Vui lòng thử lại. Việc thử lại sẽ không xóa dữ liệu hiện có của bạn." }
+  ]
+}

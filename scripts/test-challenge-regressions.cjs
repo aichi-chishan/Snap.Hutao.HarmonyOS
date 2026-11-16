@@ -32,12 +32,14 @@ function load(relative) {
   return module.exports;
 }
 mock('common/Logger', { Logger: noLog });
-mock('common/Constants', { RegionUtil: { regionOfUid: () => 'cn_gf01' }, RetCodes: { ALREADY_SIGNED: -5003, RISK_CONTROL: 1034 } });
+mock('common/Constants', { RegionUtil: { regionOfUid: () => 'cn_gf01', isCnUid: uid => /^1\d{8}$/.test(uid) },
+  RetCodes: { ALREADY_SIGNED: -5003, RISK_CONTROL: 1034 } });
 
 async function main() {
   const { SpiralAbyssData } = load('model/SpiralAbyss');
-  const payload = { schedule_id: 42, total_star: 36, start_time: '100', floors: [{ index: 12, star: 9,
-    levels: [{ index: 1, star: 3, battles: [{ index: 1, timestamp: '101', avatars: [{ id: 10000046, level: 90 }] }] }] }] };
+  const payload = { schedule_id: 42, total_star: 36, max_floor: '12-3', start_time: '100', floors: [{ index: 12, star: 9,
+    levels: [{ index: 1, star: 3, battles: [{ index: 1, timestamp: '101', avatars: [{ id: 10000046, level: 90 }] }] }] },
+    { index: 9, star: 9 }] };
   for (const raw of [payload, { retcode: 0, data: payload }]) {
     const abyss = SpiralAbyssData.fromJson(raw);
     assert.equal(abyss.scheduleId, 42);
@@ -57,7 +59,9 @@ async function main() {
   assert.equal(HardChallengeRoot.fromJson({ is_unlock: true, data: [] }).periods.length, 0);
   const legacy = period(8);
   legacy.single.challenge[0].teams = [{ avatars: [avatar] }];
+  legacy.single.challenge[0].monster = { desc: ['第一条描述', '第二条描述'] };
   assert.equal(HardChallengeRoot.fromJson({ is_unlock: true, data: legacy }).data.single.challenges[0].teams[0].avatars[0].avatarId, avatar.avatar_id);
+  assert.equal(HardChallengeRoot.fromJson({ is_unlock: true, data: legacy }).data.single.challenges[0].monster.desc, '第一条描述\n第二条描述');
 
   // Run production migration statements against real SQLite for both fresh and v5 databases.
   const { DatabaseSync } = require('node:sqlite');
@@ -81,7 +85,7 @@ async function main() {
     }
     RelationalStoreHelper.rdbStore = undefined;
     await RelationalStoreHelper.init({});
-    assert.equal(sqlStore.version, 8);
+    assert.equal(sqlStore.version, RelationalStoreHelper.DB_VERSION);
     for (const table of ['challenge_records', 'cultivate_inventory', 'backup_recovery']) {
       assert.equal(sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name=?").get(table).n, 1);
     }
@@ -133,6 +137,123 @@ async function main() {
     assert.equal((await repo.listHistory('', 'cn_gf01')).length, 0);
   }
   assert.equal(rows.length, 9);
+
+  // Challenge pages restore the latest saved record and refresh only when requested.
+  const uid = '100000001';
+  let selectedUid = uid;
+  let revision = 1;
+  const owner = { id: 1, isOversea: false, roles: [{ gameUid: uid, region: 'cn_gf01' }], hasCookie: () => true };
+  mock('service/UserService', { UserService: { getInstance: () => ({ getCurrentUser: () => owner, sessionRevision: () => revision }) } });
+  mock('data/prefs/PreferencesStore', { PreferencesStore: { getCurrentUid: () => selectedUid } });
+  mock('common/RiskUiHelper', { RiskUiHelper: { consumePendingChallenge: () => '' } });
+  mock('data/network/RiskVerifier', { RiskControlError: class extends Error {} });
+  const { ChallengePeriod } = load('model/ChallengePeriod');
+  mock('service/TowerMetadataService', { TowerMetadataService: {
+    preload: async () => {}, publishedPeriods: () => [new ChallengePeriod(43, 100000, 200000, '渊月祝福')],
+    preview: period => SpiralAbyssData.fromJson({ schedule_id: period.scheduleId }),
+    periodFloors: (_scheduleId, floors) => floors.slice().sort((a,b) => b.index - a.index),
+  } });
+  mock('service/WikiMetaService', { WikiMetaService: {
+    getRoleCombatSchedules: async () => [{ id: 8, begin: 100000, end: 200000 }],
+  } });
+  const requests = [];
+  let completeAbyss;
+  mock('service/SpiralAbyssService', { SpiralAbyssService: { getInstance: () => ({ fetch: (id, type) => {
+    requests.push(['abyss', id, type]);
+    return new Promise(resolve => { completeAbyss = resolve; });
+  } }) } });
+  mock('service/RoleCombatService', { RoleCombatService: { getInstance: () => ({ fetch: async () => {
+    requests.push(['role-combat']);
+    throw new Error('offline');
+  } }) } });
+  const multiplayer = period(10);
+  multiplayer.mp = multiplayer.single;
+  multiplayer.single = { has_data: false };
+  const unplayed = { schedule: { schedule_id: 11 }, single: { has_data: false }, mp: { has_data: false } };
+  mock('service/HardChallengeService', { HardChallengeService: {
+    publishedPeriods: async () => [new ChallengePeriod(5269008, 100000, 200000, '本期名称')],
+    getInstance: () => ({
+      fetch: async () => { requests.push(['hard']); return HardChallengeRoot.fromJson({ is_unlock: true, data: [unplayed, period(9), multiplayer] }); },
+      fetchPopularity: async () => { requests.push(['popularity']); return []; },
+    }),
+  } });
+  await load('data/repo/SpiralAbyssRepo').SpiralAbyssRepo.saveHistory(uid, 'cn_gf01', 42, 100000, 200000, 36, JSON.stringify(payload));
+  const theater = {
+    has_data: true, schedule: { schedule_id: 7 }, stat: { difficulty_id: 5, max_round_id: 10, tarot_finished_cnt: 3 },
+    detail: { rounds_data: [{ round_id: 10, is_tarot: true, tarot_serial_no: 2,
+      choice_cards: [{ name: '卡牌甲' }, { name: '卡牌乙' }],
+      splendour_buff: { summary: { desc: '总效果\\n第二行' },
+        buffs: [{ name: '祝福', level: 3, level_effect: [{ desc: '一级效果' }, { desc: '二级效果' }] }] } }] },
+  };
+  await load('data/repo/RoleCombatRepo').RoleCombatRepo.saveHistory(uid, 'cn_gf01', 7, 100000, 200000, JSON.stringify(theater));
+  const completed = period(7);
+  completed.single.best = { difficulty: 3 };
+  completed.mp = { has_data: true, best: { difficulty: 5 } };
+  await load('data/repo/HardChallengeRepo').HardChallengeRepo.saveHistory(uid, 'cn_gf01', 7, 100000, 200000,
+    HardChallengeRoot.fromJson({ is_unlock: true, data: completed }).itemRawJson[0]);
+  const abyssView = new (load('viewmodel/SpiralAbyssViewModel').SpiralAbyssViewModel)();
+  const theaterView = new (load('viewmodel/RoleCombatViewModel').RoleCombatViewModel)();
+  const hardView = new (load('viewmodel/HardChallengeViewModel').HardChallengeViewModel)();
+  await Promise.all([abyssView.initialize(uid), theaterView.initialize(uid), hardView.initialize(uid)]);
+  assert.equal(abyssView.abyss.scheduleId, 42);
+  assert.equal(abyssView.history.find(item => item.scheduleId === 42).summary, '12-3');
+  assert.equal(theaterView.history.find(item => item.scheduleId === 7).summary, '第 10 幕 圣牌 3');
+  assert.equal(hardView.history.find(item => item.scheduleId === 7).summary, '无畏');
+  assert.equal(abyssView.history[0].summary, '', 'published-only entries never synthesize a result');
+  assert.equal(ChallengePeriod.detailedRange(Date.UTC(2026, 9, 15, 20), Date.UTC(2026, 10, 15, 19, 59)),
+    '2026.10.16 04:00 – 2026.11.16 03:59');
+  assert.equal(abyssView.selectedFloors().length, 1);
+  assert.equal(abyssView.selectedFloors()[0].index, 12);
+  abyssView.selectFloor(9);
+  assert.equal(abyssView.selectedFloors()[0].index, 9);
+  abyssView.selectFloor(99);
+  assert.equal(abyssView.selectedFloors()[0].index, 9);
+  assert.equal(abyssView.abyss.scheduleId, 42, 'selecting a floor keeps the current period');
+  assert.equal(theaterView.current().stat.tarotFinishedCount, 3);
+  assert.equal(theaterView.current().stat.difficultyLabel(), '月谕模式');
+  const tarotRound = theaterView.current().detail.roundsData[0];
+  assert.equal(tarotRound.label(), '圣牌挑战 II');
+  assert.deepEqual(tarotRound.choiceCards.map(card => card.name), ['卡牌甲', '卡牌乙']);
+  assert.equal(tarotRound.splendourSummary, '总效果\n第二行');
+  assert.equal(tarotRound.splendourBuffs[0].desc, '一级效果\n二级效果');
+  assert.equal(tarotRound.splendourBuffs[0].level, 3);
+  assert.equal(hardView.scheduleId, 7);
+  assert.deepEqual(requests, [['popularity']], 'official popularity loads independently of personal records');
+  assert.equal(abyssView.history[0].hasRecord, false);
+  await abyssView.loadFromHistory(uid, 43);
+  assert.equal(abyssView.publishedOnly, true);
+  assert.equal(abyssView.abyss.scheduleId, 43);
+  await abyssView.loadFromHistory(uid, 42);
+  assert.equal(abyssView.publishedOnly, false);
+  assert.equal(abyssView.selectedFloors()[0].index, 12, 'reopening a period selects its highest floor');
+  await theaterView.loadFromHistory(uid, 8);
+  assert.equal(theaterView.current().hasData, false);
+  assert.equal(theaterView.current().schedule.scheduleId, 8);
+  await theaterView.loadFromHistory(uid, 7);
+  await hardView.loadFromHistory(uid, 5269008);
+  assert.equal(hardView.scheduleName, '本期名称');
+  assert.equal(hardView.single.hasData, false);
+  assert.equal(ChallengePeriod.hardChallengeNumber(hardView.scheduleId), 8);
+  assert.deepEqual(requests, [['popularity']], 'published periods are browsable without a personal record request');
+
+  const pendingAbyss = abyssView.load(uid);
+  while (!completeAbyss) await new Promise(resolve => setImmediate(resolve));
+  selectedUid = '100000002'; revision++;
+  completeAbyss(SpiralAbyssData.fromJson({ ...payload, schedule_id: 43 }));
+  await pendingAbyss;
+  assert.deepEqual(requests.filter(request => request[0] === 'abyss'), [['abyss', uid, 1]]);
+  assert.equal(abyssView.abyss.scheduleId, 42, 'a stale first response cannot be shown or start the other period');
+  assert.equal(abyssView.loading, false, 'the stale request clears its own loading state');
+
+  selectedUid = uid; revision++;
+  await theaterView.backToLive(uid);
+  assert.equal(theaterView.fromHistory, true);
+  assert.equal(theaterView.current().schedule.scheduleId, 7, 'failed refresh leaves the cached record readable');
+  await hardView.load(uid);
+  assert.equal(hardView.scheduleId, 10, 'the latest played period wins over an unplayed period');
+  assert.equal(hardView.modeIndex, 1, 'a multiplayer-only period opens the available record');
+  hardView.mp.best.difficulty = 6;
+  assert.equal(hardView.mp.best.difficultyLabel(), '绝境');
 
   const { SignInInfo } = load('model/SignInInfo');
   const signed = SignInInfo.fromInfo({ total_sign_day: 1, is_sign: true, today: '2026-10-29' });

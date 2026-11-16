@@ -5,9 +5,15 @@ const root=path.resolve(__dirname,'../entry/src/main/ets');
 const {harness,A,B,C,big,row,section,file,plain}=require('./helpers/uigf-harness.cjs');
 function strictGraphTypes(){
   const virtualRoot='/uigf-selection-types',files=new Map(),put=(name,text)=>files.set(virtualRoot+'/'+name+'.ts',text);
-  for(const name of ['service/UigfService','service/UigfCodec','service/UigfExportCodec','model/UigfBounds','model/UigfError','data/repo/GachaRepo','model/GachaItem','model/GachaType','model/GachaArchive','model/UigfImportPreparation'])put(name,fs.readFileSync(path.join(root,name+'.ets'),'utf8'));
+  for(const name of ['service/UigfService','service/UigfCodec','service/UigfExportCodec','service/GachaItemIdentityService','model/LocalePolicy','model/UigfBounds','model/UigfError','data/repo/GachaRepo','model/GachaItem','model/GachaType','model/GachaArchive','model/UigfImportPreparation'])put(name,fs.readFileSync(path.join(root,name+'.ets'),'utf8'));
   put('common/Logger',`export class Logger{static info(tag:string,message:string):void{} static warn(tag:string,message:string):void{}}`);
   put('common/Constants',`export class AppConstants{static APP_VERSION:string='host';}`);
+  put('service/GameDataService',`export class GameDataService{static getInstance():GameDataService{return new GameDataService();}remoteVersion():string{return '';}}`);
+  put('service/LocalizedGameDataService',`export class LocalizedGameDataService{static async names(table:string,locale:string):Promise<Map<number,string>>{return new Map();}}`);
+  put('service/WikiMetaService',`export class WikiAvatarMeta{id=0;name='';canonicalName='';quality=0;}
+    export class WikiWeaponMeta{id=0;name='';canonicalName='';rankLevel=0;}
+    export class WikiMetaService{static async getAvatars():Promise<WikiAvatarMeta[]>{return [];}
+      static async getWeapons():Promise<WikiWeaponMeta[]>{return [];}}`);
   put('data/db/RelationalStoreHelper',`import {relationalStore as r} from '@kit.ArkData';export class RelationalStoreHelper{
     static getStore():r.RdbStore{throw Error();}static async query(pred:r.RdbPredicates):Promise<r.ResultSet>{throw Error();}
     static async insert(table:string,value:r.ValuesBucket):Promise<number>{return 0;}static async batchInsert(table:string,rows:r.ValuesBucket[]):Promise<number>{return 0;}
@@ -27,9 +33,9 @@ function strictGraphTypes(){
   assert.equal(diagnostics.length,0,diagnostics.map(value=>ts.flattenDiagnosticMessageText(value.messageText,'\n')).join('\n'));
 }
 (async()=>{
-  await test('all seven input versions retain preview, exact string cursor and normalized data with one parse',async()=>{
+  await test('input versions retain preview, exact string cursor and normalized data with one parse',async()=>{
     const {state,service}=harness();
-    for(const version of ['v2.2','v2.3','v2.4','v3.0','v4.0','v4.1','v4.2']){
+    for(const version of ['v2.0','v2.1','v2.2','v2.3','v2.4','v3.0','v4.0','v4.1','v4.2']){
       const text=version.startsWith('v4.')?JSON.stringify({info:{version},hk4e:[section(A,[row(version.slice(1).replace('.',''))])]}):JSON.stringify({info:{uid:A,uigf_version:version,region_time_zone:8},list:[row(version.slice(1).replace('.',''))]});
       const before=state.parseCalls,prepared=service.prepareImport(text);assert.equal(prepared.preview().version,version);assert.equal(prepared.preview().totalCount,1);assert.equal(state.parseCalls,before+1);
       assert.equal((await service.importPrepared(prepared,[A])).ok,true);assert.equal(state.parseCalls,before+1,'confirmation does not parse');prepared.dispose();
@@ -47,6 +53,27 @@ function strictGraphTypes(){
     assert.deepEqual(snapshot().archives.map(row=>row.uid),[B]);assert.equal(state.begins,1);assert.equal(state.commits,1);assert.equal(state.rollbacks,0);assert.equal(JSON.stringify([...prepared.select()]),original,'repository never assigns archiveId into preparation');
     assert.equal((await service.importPrepared(prepared,[B])).inserted,0);assert.equal(state.resultSets,state.closedSets);
   });
+  await test('default import uses the Windows oldest ID per query pool and explicit gap filling keeps existing rows',async()=>{
+    const {Model,service,snapshot}=harness();
+    const standard=(id,extra={})=>row(id,{gacha_type:'400',...extra});
+    const beyond=(id,type)=>({id,op_gacha_type:String(type),item_id:'250013',rank_type:'2',time:'2026-10-05 10:00:00'});
+    await service.importFromText(file([section(A,[row('9007199254740993')])],
+      [section(A,[beyond('9007199254741003',20011)])]));
+    const incoming=file([section(A,[standard('9007199254740992'),standard('9007199254740994'),
+      standard('9007199254740993')])],
+      [section(A,[beyond('9007199254741002',20022),beyond('9007199254741004',20021),beyond('9007199254741005',1000)])]);
+    const model=new Model();
+    assert.equal(await model.prepareImport(incoming),true);
+    let result=await model.confirmImport();
+    assert.equal(result.inserted,3);assert.equal(result.skipped,3);
+    assert.deepEqual(snapshot().items.map(item=>item.gacha_id).sort(),
+      ['9007199254740992','9007199254740993','9007199254741002','9007199254741003','9007199254741005']);
+    assert.equal(await model.prepareImport(incoming),true);
+    result=await model.confirmImport(true);
+    assert.equal(result.inserted,2);assert.equal(result.skipped,4);
+    assert.equal(snapshot().items.length,7);
+    assert.equal(snapshot().items.find(item=>item.gacha_id==='9007199254740993').item_id,10000001);
+  });
   await test('empty/unknown selections and invalidated preparation fail without database writes',async()=>{
     const {state,service}=harness();const prepared=service.prepareImport(file());
     for(const selection of [[],[B]]){const result=await service.importPrepared(prepared,selection);assert.equal(result.ok,false);assert.equal(result.inserted,0);assert.equal(result.archiveCount,0);}
@@ -55,7 +82,7 @@ function strictGraphTypes(){
   await test('malformed and conflicting unselected UID records fail full-file validation before any write',async()=>{
     const {state,service}=harness();const bad=[
       file([section(A,[row()]),section(B,[row('2',{time:'2026-02-30 00:00:00'})])]),
-      file([section(A,[row()]),section(B,[row('2'),row('2',{name:'conflict'})])]),
+      file([section(A,[row()]),section(B,[row('2'),row('2',{item_id:'10000002'})])]),
       file([section(A,[row()]),section(B,[row('2',{uid:C})])]),
       file([section(A,[row()]),section(B,[row('2',{uigf_gacha_type:302})])])
     ];
@@ -116,7 +143,7 @@ function strictGraphTypes(){
   });
   await test('service/model/repository graph passes strict host types with explicit RDB declarations',strictGraphTypes);
   await test('new UID controls expose readable names, visible counts and minimum44vp target constraints',()=>{
-    const page=fs.readFileSync(path.join(root,'pages/GachaLogPage.ets'),'utf8');const panels=page.slice(page.indexOf('  importPreviewPanel()'),page.indexOf('  urlInputPanel()'));
+    const page=fs.readFileSync(path.join(root,'pages/GachaLogPage.ets'),'utf8');const panels=page.slice(page.indexOf('  importPreviewPanel()'),page.indexOf('  archivePicker()'));
     assert.match(panels,/accessibilityText\(`导入 UID \$\{archive\.uid\}，\$\{archive\.totalCount\} 条记录`\)/);
     assert.match(panels,/accessibilityText\(`导出 UID \$\{archive\.uid\}`\)/);
     assert.equal((panels.match(/\.width\(44\)\.height\(44\)/g)||[]).length,2);
@@ -126,7 +153,7 @@ function strictGraphTypes(){
   await test('confirmation source has no reparse and repository transaction contains no await',()=>{
     const service=fs.readFileSync(path.join(root,'service/UigfService.ets'),'utf8');const method=service.slice(service.indexOf('  async importPrepared('),service.indexOf('  /** Backwards-compatible'));
     assert.doesNotMatch(method,/JSON\.parse|prepareImport\(/);
-    const repo=fs.readFileSync(path.join(root,'data/repo/GachaRepo.ets'),'utf8');const transaction=repo.slice(repo.indexOf('  static async importArchives('),repo.indexOf('  private static importKey('));assert.doesNotMatch(transaction,/\bawait\b/);
+    const repo=fs.readFileSync(path.join(root,'data/repo/GachaRepo.ets'),'utf8');const transaction=repo.slice(repo.indexOf('  static async importArchives('),repo.indexOf('  private static archiveUidSync('));assert.doesNotMatch(transaction,/\bawait\b/);
     const page=fs.readFileSync(path.join(root,'pages/GachaLogPage.ets'),'utf8');assert.match(page,/this\.importPreviewPanel\(\)/);assert.match(page,/this\.exportOptionsPanel\(\)/);assert.match(page,/buildExportJson\(this\.vm\.exportUids\.slice\(\), this\.vm\.exportVersion\)/);
   });
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -5,44 +5,22 @@
  */
 import { GachaRepo } from '../data/repo/GachaRepo';
 import { GachaArchive } from '../model/GachaArchive';
-import { GachaType } from '../model/GachaType';
+import { GachaHomeStatService, HomePoolSummary } from '../service/GachaHomeStatService';
 import { GachaItem } from '../model/GachaItem';
-import { DailyNoteRepo, DailyNoteRecord } from '../data/repo/DailyNoteRepo';
 import { DailyNote } from '../model/DailyNote';
+import { DailyNoteService, DailyNoteTrackedEntry, DailyNoteRefreshSummary } from '../service/DailyNoteService';
 import { SignInInfo } from '../model/SignInInfo';
 import { SignInService } from '../service/SignInService';
-import { CalendarService } from '../service/CalendarService';
+import { CalendarEntryOrder, CalendarService } from '../service/CalendarService';
 import { ActCalendarEntry } from '../model/ActCalendarEntry';
-import { Announcement } from '../model/Announcement';
+import { AnnouncementGroup } from '../model/Announcement';
 import { AnnouncementContext } from '../model/RegionalContent';
+import { User } from '../model/User';
 import { AnnouncementService } from '../service/AnnouncementService';
 import { UserService } from '../service/UserService';
-import { SpiralAbyssData } from '../model/SpiralAbyss';
-import { SpiralAbyssService } from '../service/SpiralAbyssService';
-import { RoleCombatRoot } from '../model/RoleCombat';
-import { RoleCombatService } from '../service/RoleCombatService';
-import { HardChallengeRoot, HardChallengeDataEntry } from '../model/HardChallenge';
-import { HardChallengeService } from '../service/HardChallengeService';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'HomeViewModel';
-
-/** 池摘要卡：祈愿统计主页迷你版（每池：名称/总抽/距保底橙紫） */
-export class HomePoolSummary {
-  gachaType: number = 0;
-  typeName: string = '';
-  totalCount: number = 0;
-  sinceLastFive: number = 0;
-  sinceLastFour: number = 0;
-  /** 距上次五星（用于进度条/大数字） */
-  fiveStarCount: number = 0;
-  fourStarCount: number = 0;
-  avgOrangePull: number = 0;
-  maxOrangePull: number = 0;
-  minOrangePull: number = 0;
-  startDate: string = '';
-  endDate: string = '';
-}
 
 /** 周期挑战进度摘要（深境螺旋/幻想真境剧诗/幽境危战） */
 export class HomeChallengeSummary {
@@ -76,32 +54,39 @@ export class HomeChallengeSummary {
   }
 }
 
+export class HomeNoteEntry {
+  userId: number = 0;
+  uid: string = '';
+  note: DailyNote | undefined = undefined;
+  resinThreshold: number = 120;
+  homeCoinThreshold: number = 1800;
+}
+
 @Observed
 export class HomeViewModel {
   /** 祈愿池摘要（有数据的池） */
   gachaPools: HomePoolSummary[] = [];
   gachaTotal: number = 0;
+  gachaUid: string = '';
   gachaLoaded: boolean = false;
 
-  /** 便笺（当前 UID） */
-  note: DailyNote | undefined = undefined;
+  /** 所有已存账号的追踪便笺，与完整便笺页使用同一份本地追踪列表。 */
+  noteEntries: HomeNoteEntry[] = [];
   noteLoaded: boolean = false;
-  noteRefreshTs: number = 0;
+  noteRefreshing: boolean = false;
+  private noteLoadRevision: number = 0;
 
   /** 签到 */
   signInfo: SignInInfo | undefined = undefined;
   signLoaded: boolean = false;
 
-  /** 活动（取前 N 条进行中/即将开始） */
+  /** 首页活动与卡池使用完整响应，预告筛选由首页展示层处理。 */
   acts: ActCalendarEntry[] = [];
   actsLoaded: boolean = false;
 
-  /** 公告预览（前 N 条） */
-  announcements: Announcement[] = [];
+  /** 首页按官方分类展示各组的完整列表。 */
+  announcementGroups: AnnouncementGroup[] = [];
   announcementsLoaded: boolean = false;
-
-  /** 周期挑战进度（深境螺旋/剧诗/幽境） */
-  challenge: HomeChallengeSummary = new HomeChallengeSummary();
 
   /** 当前 UID（登录态的） */
   currentUid: string = '';
@@ -109,44 +94,66 @@ export class HomeViewModel {
   /** 是否加载中（任一数据源） */
   loading: boolean = false;
   private loadGeneration: number = 0;
+  private ownerUser: User | undefined = undefined;
+
+  /** Session changes invalidate old reads. Reload only after the account transition settles. */
+  watchSession(onCommitted: () => void): () => void {
+    const users: UserService = UserService.getInstance();
+    let watching: boolean = true;
+    const unsubscribe: () => void = users.addSessionRevisionListener((): void => {
+      if (!watching) { return; }
+      this.invalidate();
+      if (!users.isSessionTransitionPending()) { onCommitted(); }
+    });
+    return (): void => {
+      watching = false;
+      unsubscribe();
+    };
+  }
+
+  invalidate(): void { this.loadGeneration++; }
 
   /**
    * 页面可见/登录态变化时调用：聚合加载全部数据源。
    */
-  async load(uid: string): Promise<void> {
+  async load(uid: string): Promise<boolean> {
+    const users: UserService = UserService.getInstance();
+    if (users.isSessionTransitionPending()) { return false; }
     const generation: number = ++this.loadGeneration;
-    // Remove account-owned state immediately, including on logout or an unbound account.
-    this.currentUid = uid;
-    this.gachaPools = [];
-    this.gachaTotal = 0;
-    this.note = undefined;
-    this.noteRefreshTs = 0;
-    this.signInfo = undefined;
-    this.acts = [];
-    this.challenge = new HomeChallengeSummary();
-    this.gachaLoaded = false;
-    this.noteLoaded = false;
-    this.signLoaded = false;
-    this.actsLoaded = false;
-    this.announcements = [];
-    this.announcementsLoaded = false;
+    const owner: User | undefined = users.getCurrentUser();
+    // 同一账号返回首页时保留已展示的数据；换账号或角色则立即清空。
+    if (this.ownerUser !== owner || this.currentUid !== uid) {
+      this.ownerUser = owner;
+      this.currentUid = uid;
+      this.gachaPools = [];
+      this.gachaUid = '';
+      this.gachaTotal = 0;
+      this.noteEntries = [];
+      this.signInfo = undefined;
+      this.acts = [];
+      this.gachaLoaded = false;
+      this.noteLoaded = false;
+      this.signLoaded = false;
+      this.actsLoaded = false;
+      this.announcementGroups = [];
+      this.announcementsLoaded = false;
+    }
     this.loading = true;
     const tasks: Promise<void>[] = [
       this.loadGacha(uid, generation),
-      this.loadNote(uid, generation),
+      this.loadNote(generation),
       this.loadSignIn(uid, generation),
       this.loadActs(uid, generation),
       this.loadAnnouncements(uid, generation),
-      this.loadChallenges(uid),
     ];
     try {
       await Promise.all(tasks);
     } catch (e) {
       Logger.warn(TAG, `aggregate load fail: ${(e as Error).message}`);
     }
-    if (generation === this.loadGeneration) {
-      this.loading = false;
-    }
+    if (generation !== this.loadGeneration) { return false; }
+    this.loading = false;
+    return true;
   }
 
   /** 刷新全部（下拉/手动） */
@@ -161,51 +168,18 @@ export class HomeViewModel {
 
   /** 祈愿统计：本地缓存直接算（不触发网络拉取，主页展示缓存） */
   private async loadGacha(uid: string, generation: number): Promise<void> {
-    let archiveId: number = 0;
-    if (uid.length === 0) {
-      // 未登录/未绑定：不创建空归档；回退到已选/首个有效本地归档做只读统计
-      //（对齐 Windows：本地数据不因登出而不可见，B2）
-      const archives: GachaArchive[] = await GachaRepo.getAllArchives();
-      const local: GachaArchive | undefined = archives.find((a: GachaArchive): boolean =>
-        a.id > 0 && /^[1-9][0-9]{8,9}$/.test(a.uid) && a.isSelected)
-        ?? archives.find((a: GachaArchive): boolean => a.id > 0 && /^[1-9][0-9]{8,9}$/.test(a.uid));
-      if (local === undefined) {
-        this.gachaLoaded = true;
-        return;
-      }
-      archiveId = local.id;
-    }
     try {
-      const stats: HomePoolSummary[] = [];
-      let total: number = 0;
-      if (archiveId === 0) {
-        archiveId = await GachaRepo.getOrCreateArchive(uid).then(a => a.id);
-      }
-      for (let i = 0; i < GachaType.QUERY_ORDER.length; i++) {
-        const type: number = GachaType.QUERY_ORDER[i];
-        const pool: PoolStatInline = await HomeViewModel.computePool(archiveId, type);
-        if (pool.totalCount <= 0) {
-          continue;
-        }
-        const summary: HomePoolSummary = new HomePoolSummary();
-        summary.gachaType = type;
-        summary.typeName = GachaType.nameOf(type);
-        summary.totalCount = pool.totalCount;
-        summary.sinceLastFive = pool.sinceLastFive;
-        summary.sinceLastFour = pool.sinceLastFour;
-        summary.fiveStarCount = pool.fiveStarCount;
-        summary.fourStarCount = pool.fourStarCount;
-        summary.avgOrangePull = pool.avgOrangePull;
-        summary.maxOrangePull = pool.maxOrangePull;
-        summary.minOrangePull = pool.minOrangePull;
-        summary.startDate = pool.startDate;
-        summary.endDate = pool.endDate;
-        total += pool.totalCount;
-        stats.push(summary);
-      }
+      const archives: GachaArchive[] = (await GachaRepo.getAllArchives()).filter((archive: GachaArchive): boolean =>
+        archive.id > 0 && /^[1-9][0-9]{8,9}$/.test(archive.uid));
       if (generation !== this.loadGeneration) { return; }
-      this.gachaPools = stats;
-      this.gachaTotal = total;
+      const archive: GachaArchive | undefined = archives.find((item: GachaArchive): boolean => item.uid === uid)
+        ?? archives.find((item: GachaArchive): boolean => item.isSelected) ?? archives[0];
+      const records: GachaItem[] = archive === undefined ? [] : await GachaRepo.getItemsByArchive(archive.id);
+      if (generation !== this.loadGeneration) { return; }
+      const pools: HomePoolSummary[] = GachaHomeStatService.summarize(records);
+      this.gachaPools = pools;
+      this.gachaTotal = pools.reduce((total: number, pool: HomePoolSummary): number => total + pool.totalCount, 0);
+      this.gachaUid = archive?.uid ?? '';
       this.gachaLoaded = true;
     } catch (e) {
       if (generation !== this.loadGeneration) { return; }
@@ -216,25 +190,53 @@ export class HomeViewModel {
 
   /** 便笺刷新后重读本地缓存（服务层自动刷新/桌面卡片刷新触发，不重复拉网络） */
   async reloadNote(uid: string): Promise<void> {
-    await this.loadNote(uid, this.loadGeneration);
+    if (uid !== this.currentUid) { return; }
+    await this.loadNote(this.loadGeneration);
   }
 
-  /** 便笺：本地缓存 */
-  private async loadNote(uid: string, generation: number): Promise<void> {
+  /** 对齐 Windows：首页刷新全部追踪角色，账号归属和交互验证由服务统一控制。 */
+  async refreshNotes(): Promise<string> {
+    if (this.noteRefreshing || this.noteEntries.length === 0) { return ''; }
+    const generation: number = this.loadGeneration;
+    const users: UserService = UserService.getInstance();
+    const revision: number = users.sessionRevision();
+    this.noteRefreshing = true;
     try {
-      const user = UserService.getInstance().getCurrentUser();
-      if (user !== undefined && uid.length > 0) {
-        const rec: DailyNoteRecord | undefined = await DailyNoteRepo.get(user.id, uid);
-        if (generation !== this.loadGeneration) { return; }
-        if (rec !== undefined) {
-          this.note = rec.note;
-          // 存时间戳，卡面渲染期算"更新于 x 前"与过期标注（UX11：估算性质与过期可区分）
-          this.noteRefreshTs = rec.note.refreshTime;
-        }
+      const summary: DailyNoteRefreshSummary = await DailyNoteService.getInstance().refreshTrackedList();
+      if (generation !== this.loadGeneration || users.sessionRevision() !== revision) { return ''; }
+      await this.reloadNote(this.currentUid);
+      if (generation !== this.loadGeneration || users.sessionRevision() !== revision) { return ''; }
+      if (summary.total === 0) { return summary.firstError; }
+      const message: string = `已刷新 ${summary.succeeded}/${summary.total} 个 UID 的便笺`;
+      return summary.firstError.length > 0 ? `${message}：${summary.firstError}` : message;
+    } catch (e) {
+      if (generation !== this.loadGeneration || users.sessionRevision() !== revision) { return ''; }
+      if (e instanceof Error) { throw e; }
+      throw new Error('便笺刷新失败，请稍后重试');
+    } finally {
+      this.noteRefreshing = false;
+    }
+  }
+
+  private async loadNote(generation: number): Promise<void> {
+    const revision: number = ++this.noteLoadRevision;
+    try {
+      const tracked: DailyNoteTrackedEntry[] = await DailyNoteService.getInstance().trackedEntries();
+      if (generation !== this.loadGeneration || revision !== this.noteLoadRevision) { return; }
+      const entries: HomeNoteEntry[] = [];
+      for (const item of tracked) {
+        const entry: HomeNoteEntry = new HomeNoteEntry();
+        entry.userId = item.userId;
+        entry.uid = item.uid;
+        entry.note = item.record?.note;
+        entry.resinThreshold = item.record?.resinNotifyThreshold ?? entry.resinThreshold;
+        entry.homeCoinThreshold = item.record?.homeCoinNotifyThreshold ?? entry.homeCoinThreshold;
+        entries.push(entry);
       }
+      this.noteEntries = entries;
       this.noteLoaded = true;
     } catch (e) {
-      if (generation !== this.loadGeneration) { return; }
+      if (generation !== this.loadGeneration || revision !== this.noteLoadRevision) { return; }
       Logger.warn(TAG, `loadNote fail: ${(e as Error).message}`);
       this.noteLoaded = true;
     }
@@ -247,6 +249,8 @@ export class HomeViewModel {
         const info: SignInInfo = await SignInService.getInstance().fetchInfo(uid);
         if (generation !== this.loadGeneration) { return; }
         this.signInfo = info;
+      } else {
+        this.signInfo = undefined;
       }
       this.signLoaded = true;
     } catch (e) {
@@ -256,17 +260,14 @@ export class HomeViewModel {
     }
   }
 
-  /** 活动日历：网络（act_calendar），取进行中/开始中前 6 条 */
+  /** 首页活动日历沿用原响应顺序，保留未公布时间的预告。 */
   private async loadActs(uid: string, generation: number): Promise<void> {
     try {
       if (uid.length > 0) {
-        const all: ActCalendarEntry[] = await CalendarService.getInstance().fetchCalendar(uid);
-        if (generation !== this.loadGeneration) { return; }
-        const now: number = Date.now();
-        const sorted: ActCalendarEntry[] = all
-          .filter((a: ActCalendarEntry) => a.endTime > now)
-          .sort((a: ActCalendarEntry, b: ActCalendarEntry) => a.startTime - b.startTime);
-        this.acts = sorted.length > 6 ? sorted.slice(0, 6) : sorted;
+        const current: () => boolean = (): boolean => generation === this.loadGeneration;
+        const all: ActCalendarEntry[] = await CalendarService.getInstance().fetchCalendar(uid, current, CalendarEntryOrder.Home);
+        if (!current()) { return; }
+        this.acts = all;
       }
       this.actsLoaded = true;
     } catch (e) {
@@ -276,13 +277,14 @@ export class HomeViewModel {
     }
   }
 
-  /** 公告预览：网络（getAnnList）前 3 条 */
+  /** Windows 首页公告页签按响应第 2、第 1、第 3 组排列。 */
   private async loadAnnouncements(uid: string, generation: number): Promise<void> {
     try {
       const context: AnnouncementContext = AnnouncementContext.forUid(uid);
-      const list: Announcement[] = await AnnouncementService.getInstance().fetchList(context.region, context.level, context.language);
+      const groups: AnnouncementGroup[] = await AnnouncementService.getInstance()
+        .fetchGroups(context.region, context.level, context.language);
       if (generation !== this.loadGeneration) { return; }
-      this.announcements = list.length > 3 ? list.slice(0, 3) : list;
+      this.announcementGroups = groups.length > 1 ? [groups[1], groups[0]].concat(groups.slice(2)) : groups;
       this.announcementsLoaded = true;
     } catch (e) {
       Logger.warn(TAG, `loadAnnouncements fail: ${(e as Error).message}`);
@@ -290,138 +292,4 @@ export class HomeViewModel {
       this.announcementsLoaded = true;
     }
   }
-
-  /** 单池内联统计 */
-  private static async computePool(archiveId: number, gachaType: number): Promise<PoolStatInline> {
-    const pool: PoolStatInline = new PoolStatInline();
-    const items: GachaItem[] = await GachaRepo.getItemsByType(archiveId, gachaType);
-    pool.totalCount = items.length;
-    // 与 GachaLogViewModel.buildPoolStats 同构：五星/四星计数、垫数、均/最非/最欧
-    let fiveStar: number = 0;
-    let fourStar: number = 0;
-    const fiveSpans: number[] = [];
-    let span: number = 0;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].rankType === 5) {
-        fiveStar++;
-        fiveSpans.push(span + 1);
-        span = 0;
-      } else {
-        span++;
-        if (items[i].rankType === 4) {
-          fourStar++;
-        }
-      }
-    }
-    let sinceLastFive: number = 0;
-    for (let i = items.length - 1; i >= 0; i--) {
-      if (items[i].rankType === 5) {
-        break;
-      }
-      sinceLastFive++;
-    }
-    let sinceLastFour: number = 0;
-    for (let i = items.length - 1; i >= 0; i--) {
-      if (items[i].rankType === 4) {
-        break;
-      }
-      sinceLastFour++;
-    }
-    pool.fiveStarCount = fiveStar;
-    pool.fourStarCount = fourStar;
-    pool.sinceLastFive = sinceLastFive;
-    pool.sinceLastFour = sinceLastFour;
-    if (fiveStar > 0) {
-      pool.avgOrangePull = Math.round(items.length / fiveStar);
-      for (let i = 0; i < fiveSpans.length; i++) {
-        if (pool.maxOrangePull === 0 || fiveSpans[i] > pool.maxOrangePull) {
-          pool.maxOrangePull = fiveSpans[i];
-        }
-        if (pool.minOrangePull === 0 || fiveSpans[i] < pool.minOrangePull) {
-          pool.minOrangePull = fiveSpans[i];
-        }
-      }
-    }
-    pool.startDate = HomeViewModel.formatDate(items.length > 0 ? items[0].time : '');
-    pool.endDate = HomeViewModel.formatDate(items.length > 0 ? items[items.length - 1].time : '');
-    return pool;
-  }
-
-  /** 周期挑战进度：并行拉螺旋/剧诗/幽境（各源独立失败，不阻塞主页） */
-  private async loadChallenges(uid: string): Promise<void> {
-    if (uid.length === 0) {
-      this.challenge.loaded = true;
-      return;
-    }
-    const c: HomeChallengeSummary = this.challenge;
-    await Promise.all([
-      this.loadAbyss(uid, c),
-      this.loadRoleCombat(uid, c),
-      this.loadHardChallenge(uid, c),
-    ]);
-    c.loaded = true;
-  }
-
-  private async loadAbyss(uid: string, c: HomeChallengeSummary): Promise<void> {
-    try {
-      const data: SpiralAbyssData = await SpiralAbyssService.getInstance().fetch(uid, 1);
-      if (data !== undefined) {
-        c.abyssFloor = data.maxFloor;
-        c.abyssStar = data.totalStar;
-        c.abyssMaxStar = 36;
-      }
-    } catch (e) {
-      Logger.warn(TAG, `challenge abyss fail: ${(e as Error).message}`);
-    }
-  }
-
-  private async loadRoleCombat(uid: string, c: HomeChallengeSummary): Promise<void> {
-    try {
-      const root: RoleCombatRoot = await RoleCombatService.getInstance().fetch(uid);
-      if (root !== undefined && root.data.length > 0) {
-        c.roleCombatMedals = root.data[0].stat.medalNumber;
-        c.roleCombatMaxRound = root.data[0].stat.maxRoundId;
-      }
-    } catch (e) {
-      Logger.warn(TAG, `challenge roleCombat fail: ${(e as Error).message}`);
-    }
-  }
-
-  private async loadHardChallenge(uid: string, c: HomeChallengeSummary): Promise<void> {
-    try {
-      const root: HardChallengeRoot = await HardChallengeService.getInstance().fetch(uid);
-      if (root !== undefined) {
-        const best: HardChallengeDataEntry = root.data.single.hasData ? root.data.single : root.data.mp;
-        if (best.hasData) {
-          // 最佳难度文案：best.name（本地化难度名）优先；空则用 difficulty/秒数兜底
-          c.hardChallengeBest = best.best.name.length > 0 ? best.best.name
-            : (best.best.difficulty > 0 ? `难度 ${best.best.difficulty}` : '挑战');
-          c.hardChallengeSecond = best.best.second;
-        }
-      }
-    } catch (e) {
-      Logger.warn(TAG, `challenge hard fail: ${(e as Error).message}`);
-    }
-  }
-
-  private static formatDate(time: string): string {
-    if (time.length < 10) {
-      return time;
-    }
-    return `${time.substring(0, 4)}.${time.substring(5, 7)}.${time.substring(8, 10)}`;
-  }
-}
-
-/** 内联单池统计（HomeViewModel 专用） */
-class PoolStatInline {
-  totalCount: number = 0;
-  fiveStarCount: number = 0;
-  fourStarCount: number = 0;
-  sinceLastFive: number = 0;
-  sinceLastFour: number = 0;
-  avgOrangePull: number = 0;
-  maxOrangePull: number = 0;
-  minOrangePull: number = 0;
-  startDate: string = '';
-  endDate: string = '';
 }

@@ -1,0 +1,1244 @@
+{
+  "string": [
+    {
+      "name": "ui_about_restart",
+      "value": "Выбрать язык"
+    },
+    {
+      "name": "ui_account_insights_copied_json",
+      "value": "De-identified statistics copied to clipboard."
+    },
+    {
+      "name": "ui_account_insights_copy_json",
+      "value": "Copy de-identified statistics (JSON)"
+    },
+    {
+      "name": "ui_account_insights_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_account_insights_loading",
+      "value": "Loading saved records…"
+    },
+    {
+      "name": "ui_account_insights_missing_model",
+      "value": "Enter a model identifier."
+    },
+    {
+      "name": "ui_account_insights_no_account",
+      "value": "Select a game account and UID first."
+    },
+    {
+      "name": "ui_account_insights_no_records",
+      "value": "No saved records available for charting."
+    },
+    {
+      "name": "ui_account_insights_open",
+      "value": "History charts and AI insights"
+    },
+    {
+      "name": "ui_account_insights_unit_wish",
+      "value": "wishes"
+    },
+    {
+      "name": "ui_action_choose",
+      "value": "Выбрать"
+    },
+    {
+      "name": "ui_action_clear",
+      "value": "Очистить"
+    },
+    {
+      "name": "ui_action_clear_cache",
+      "value": "Очистить кэш"
+    },
+    {
+      "name": "ui_action_close",
+      "value": "Закрыть"
+    },
+    {
+      "name": "ui_action_continue",
+      "value": "Продолжить"
+    },
+    {
+      "name": "ui_action_disable",
+      "value": "Отключить"
+    },
+    {
+      "name": "ui_action_edit",
+      "value": "Изменить"
+    },
+    {
+      "name": "ui_action_enable",
+      "value": "Включить"
+    },
+    {
+      "name": "ui_action_restore",
+      "value": "Восстановить"
+    },
+    {
+      "name": "ui_agent_page_label_delete_conversation",
+      "value": "Delete conversation"
+    },
+    {
+      "name": "ui_agent_page_label_model_profile",
+      "value": "Model"
+    },
+    {
+      "name": "ui_agent_page_label_model_provider_profile",
+      "value": "Model Provider Profile"
+    },
+    {
+      "name": "ui_agent_page_label_placeholder",
+      "value": "Type a message..."
+    },
+    {
+      "name": "ui_ai_approval",
+      "value": "Tool approval required"
+    },
+    {
+      "name": "ui_ai_continue",
+      "value": "Продолжить генерацию"
+    },
+    {
+      "name": "ui_ai_conversation_actions",
+      "value": "Действия с беседой"
+    },
+    {
+      "name": "ui_ai_copied_text",
+      "value": "Скопировано в буфер обмена"
+    },
+    {
+      "name": "ui_ai_copy_error",
+      "value": "Не удалось открыть буфер обмена"
+    },
+    {
+      "name": "ui_ai_copy_text",
+      "value": "Copy Text"
+    },
+    {
+      "name": "ui_ai_custom_api",
+      "value": "Собственный API"
+    },
+    {
+      "name": "ui_ai_device_generate",
+      "value": "Анализировать на устройстве"
+    },
+    {
+      "name": "ui_ai_endpoint_placeholder",
+      "value": "Базовый URL (пусто для значения по умолчанию)"
+    },
+    {
+      "name": "ui_ai_initial_request",
+      "value": "Analyze my account performance, wish results and future priorities using the historical statistics in this chat."
+    },
+    {
+      "name": "ui_ai_key_placeholder",
+      "value": "Ключ API (пусто, чтобы сохранить текущий)"
+    },
+    {
+      "name": "ui_ai_mode",
+      "value": "Режим анализа ИИ"
+    },
+    {
+      "name": "ui_ai_on_device",
+      "value": "Локальный ИИ"
+    },
+    {
+      "name": "ui_ai_privacy_body",
+      "value": "При отправке сообщения выбранный сервис ИИ получает беседу и обезличенную статистику истории. Приложение не прикрепляет UID, файлы cookie, исходные ID предметов и файлы базы данных. Беседы хранятся на устройстве, а ключи API защищены системой. Для запуска инструментов требуется ваше разрешение."
+    },
+    {
+      "name": "ui_ai_privacy_title",
+      "value": "Before using third-party AI"
+    },
+    {
+      "name": "ui_ai_reasoning_completed",
+      "value": "Thought"
+    },
+    {
+      "name": "ui_ai_reasoning_in_progress",
+      "value": "Thinking"
+    },
+    {
+      "name": "ui_ai_return",
+      "value": "Вернуться к беседе"
+    },
+    {
+      "name": "ui_ai_select_conversation",
+      "value": "Выбрать беседу"
+    },
+    {
+      "name": "ui_ai_workspace",
+      "value": "Рабочая область ИИ"
+    },
+    {
+      "name": "ui_announcement_redeem_code_label",
+      "value": "Код для трансляции"
+    },
+    {
+      "name": "ui_avatar_property_score_algorithm",
+      "value": "Алгоритм оценки артефактов"
+    },
+    {
+      "name": "ui_backpack_category_reliquary",
+      "value": "Артефакты"
+    },
+    {
+      "name": "ui_backpack_category_weapon",
+      "value": "Оружие"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_name_header",
+      "value": "Название конфигурации"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_new_config",
+      "value": "Создать конфигурацию"
+    },
+    {
+      "name": "ui_backpack_sort_count",
+      "value": "Количество"
+    },
+    {
+      "name": "ui_backpack_sort_quality",
+      "value": "Качество"
+    },
+    {
+      "name": "ui_base_value_slider_level",
+      "value": "Уровень"
+    },
+    {
+      "name": "ui_bg_choose_folder",
+      "value": "Выбрать папку"
+    },
+    {
+      "name": "ui_bg_folder_picker_failed",
+      "value": "Не удалось выбрать папку фонов"
+    },
+    {
+      "name": "ui_bg_folder_saved",
+      "value": "Папка фонов обновлена"
+    },
+    {
+      "name": "ui_bg_folder_temporary",
+      "value": "Папка доступна только в текущем сеансе"
+    },
+    {
+      "name": "ui_bg_none",
+      "value": "Нет"
+    },
+    {
+      "name": "ui_card_calendar_all_materials_hint",
+      "value": "Все подземелья материалов доступны"
+    },
+    {
+      "name": "ui_card_sign_in_auto_sign_in",
+      "value": "Автоматическая подпись."
+    },
+    {
+      "name": "ui_card_sign_in_claim_re_sign_in_action",
+      "value": "Дополнительная отметка"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_allow",
+      "value": "Allow"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_deny",
+      "value": "Deny"
+    },
+    {
+      "name": "ui_clear_filters",
+      "value": "Сбросить фильтры"
+    },
+    {
+      "name": "ui_code_copied",
+      "value": "Код успешно скопирован"
+    },
+    {
+      "name": "ui_common_loading",
+      "value": "Загрузка…"
+    },
+    {
+      "name": "ui_content_dialog_complete_primary_button_text",
+      "value": "Завершено"
+    },
+    {
+      "name": "ui_cultivation_add_project_action",
+      "value": "Создать"
+    },
+    {
+      "name": "ui_cultivation_material_list_world_level_title",
+      "value": "Уровень мира"
+    },
+    {
+      "name": "ui_cultivation_navigate_action",
+      "value": "Перейти"
+    },
+    {
+      "name": "ui_daily_note_notification_setting",
+      "value": "Настройки уведомлений"
+    },
+    {
+      "name": "ui_calendar_time_pending",
+      "value": "Время пока не объявлено"
+    },
+    {
+      "name": "ui_daily_note_refresh",
+      "value": "Обновить"
+    },
+    {
+      "name": "ui_daily_note_setting_auto_refresh",
+      "value": "Автообновление"
+    },
+    {
+      "name": "ui_desc_abyss",
+      "value": "Текущий и предыдущий периоды"
+    },
+    {
+      "name": "ui_desc_account",
+      "value": "Управление аккаунтами и привязанными персонажами"
+    },
+    {
+      "name": "ui_desc_achievement",
+      "value": "Экспортировать / Импорт / UIAF"
+    },
+    {
+      "name": "ui_desc_announcements",
+      "value": "Обновления и новости"
+    },
+    {
+      "name": "ui_desc_backpack",
+      "value": "Оружие / Артефакты / UIIF"
+    },
+    {
+      "name": "ui_desc_banner_history",
+      "value": "Особые персонажи и оружие"
+    },
+    {
+      "name": "ui_desc_calendar",
+      "value": "События / Молитвы / Отметки"
+    },
+    {
+      "name": "ui_desc_challenge",
+      "value": "Соло / Кооператив / Лучшее время"
+    },
+    {
+      "name": "ui_desc_character",
+      "value": "Характеристики персонажа / Артефакты"
+    },
+    {
+      "name": "ui_desc_cultivation",
+      "value": "Список материалов / Статистика материалов"
+    },
+    {
+      "name": "ui_desc_daily_note",
+      "value": "Первородная смола / Экспедиции / Уведомления"
+    },
+    {
+      "name": "ui_desc_launch",
+      "value": "Ярлыки запуска"
+    },
+    {
+      "name": "ui_desc_ledger",
+      "value": "Месячный учёт Камней Истока и моры"
+    },
+    {
+      "name": "ui_desc_passport",
+      "value": "Сведения о паспорте"
+    },
+    {
+      "name": "ui_desc_settings",
+      "value": "Цветовая тема / Обновить / Язык"
+    },
+    {
+      "name": "ui_desc_sign_in",
+      "value": "Награды за ежедневную отметку"
+    },
+    {
+      "name": "ui_desc_theater",
+      "value": "Звёзды испытания / Запасные персонажи"
+    },
+    {
+      "name": "ui_desc_wiki_avatar",
+      "value": "Стихии и навыки"
+    },
+    {
+      "name": "ui_desc_wiki_monster",
+      "value": "Стихии и фракции монстров"
+    },
+    {
+      "name": "ui_desc_wiki_weapon",
+      "value": "Характеристики и атака оружия"
+    },
+    {
+      "name": "ui_desc_wish",
+      "value": "Обзор / История"
+    },
+    {
+      "name": "ui_exception_close",
+      "value": "Закрыть"
+    },
+    {
+      "name": "ui_filter",
+      "value": "Фильтр"
+    },
+    {
+      "name": "ui_filter_count",
+      "value": "Фильтр (%d)"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_down",
+      "value": "Нижняя половина"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_up",
+      "value": "Верхняя половина"
+    },
+    {
+      "name": "ui_gacha_log_orange_avatar_countdown",
+      "value": "Пятизвездочные персонажи"
+    },
+    {
+      "name": "ui_gacha_log_orange_weapon_countdown",
+      "value": "Пятизвездочное оружие"
+    },
+    {
+      "name": "ui_gacha_log_purple_avatar_countdown",
+      "value": "Четырехзвездочные персонажи"
+    },
+    {
+      "name": "ui_gacha_log_purple_weapon_countdown",
+      "value": "Четырёхзвёздочное оружие"
+    },
+    {
+      "name": "ui_gacha_log_switch_to_beyond_gacha_mode_header",
+      "value": "Молитва"
+    },
+    {
+      "name": "ui_gacha_pool_avatar_event",
+      "value": "Молитва события персонажа"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_event",
+      "value": "Молитва события"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_permanent",
+      "value": "Эхо встречи"
+    },
+    {
+      "name": "ui_gacha_pool_chronicled",
+      "value": "Хроники желаний"
+    },
+    {
+      "name": "ui_gacha_pool_novice",
+      "value": "Молитва новичка"
+    },
+    {
+      "name": "ui_gacha_pool_permanent",
+      "value": "Жажда странствий"
+    },
+    {
+      "name": "ui_gacha_pool_weapon_event",
+      "value": "Воплощение божества"
+    },
+    {
+      "name": "ui_grid_view",
+      "value": "Вид сетки"
+    },
+    {
+      "name": "ui_history_charts",
+      "value": "Графики истории"
+    },
+    {
+      "name": "ui_home_greeting",
+      "value": "Добро пожаловать в Тейват, Путешественник!"
+    },
+    {
+      "name": "ui_home_greeting_count",
+      "value": "Вы запустили Snap Hutao %s раз"
+    },
+    {
+      "name": "ui_home_greeting_rare",
+      "value": "Ты прав, но Snap Hutao — это самостоятельно разработанное DGP Studio приложение..."
+    },
+    {
+      "name": "ui_home_greeting_text_default",
+      "value": "Добро пожаловать в Тейват, Путешественник!"
+    },
+    {
+      "name": "ui_home_no_codes",
+      "value": "Нет доступных кодов"
+    },
+    {
+      "name": "ui_home_no_events",
+      "value": "Нет запланированных событий"
+    },
+    {
+      "name": "ui_home_recent",
+      "value": "Предстоящие события и молитвы"
+    },
+    {
+      "name": "ui_hutao_passport_verify_code_action",
+      "value": "Получить код подтверждения"
+    },
+    {
+      "name": "ui_info_bar_panel_contract_content",
+      "value": "Свернуть"
+    },
+    {
+      "name": "ui_list_view",
+      "value": "Вид списка"
+    },
+    {
+      "name": "ui_material_frosted",
+      "value": "Матовое стекло и мягкие тени"
+    },
+    {
+      "name": "ui_material_system_glass",
+      "value": "Системное стекло и иммерсивное освещение"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_elec",
+      "value": "Электро"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_fire",
+      "value": "Пиро"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_grass",
+      "value": "Дендро"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_ice",
+      "value": "Крио"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_rock",
+      "value": "Гео"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_water",
+      "value": "Гидро"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_wind",
+      "value": "Анемо"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_blue",
+      "value": "3★"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_green",
+      "value": "2★"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_orange",
+      "value": "5★"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_purple",
+      "value": "4★"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_red",
+      "value": "Эксклюзивная 5★"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_white",
+      "value": "1★"
+    },
+    {
+      "name": "ui_model_intrinsic_role_combat_difficulty_level_lunar",
+      "value": "Лунный режим"
+    },
+    {
+      "name": "ui_model_metadata_material_weapon_ascension_material",
+      "value": "Материалы возвышения оружия"
+    },
+    {
+      "name": "ui_nav_announcements",
+      "value": "Новости игры"
+    },
+    {
+      "name": "ui_nav_banner_history",
+      "value": "История баннеров"
+    },
+    {
+      "name": "ui_navigation_collapse",
+      "value": "Свернуть навигацию"
+    },
+    {
+      "name": "ui_navigation_expand",
+      "value": "Развернуть навигацию"
+    },
+    {
+      "name": "ui_option_selected",
+      "value": "Выбрано"
+    },
+    {
+      "name": "ui_option_unselected",
+      "value": "Не выбрано"
+    },
+    {
+      "name": "ui_plugin_setting_back_button",
+      "value": "Назад"
+    },
+    {
+      "name": "ui_role_combat_avatar_trial_hint",
+      "value": "Пробная версия"
+    },
+    {
+      "name": "ui_role_combat_shortest",
+      "value": "Самое быстрое выступление"
+    },
+    {
+      "name": "ui_role_combat_splendour_buffs_header",
+      "value": "Великолепные благословения"
+    },
+    {
+      "name": "ui_role_combat_support",
+      "value": "Поддержка"
+    },
+    {
+      "name": "ui_setting_apperance_first_day_of_week_header",
+      "value": "Первый день недели"
+    },
+    {
+      "name": "ui_setting_background_image_custom_folder_header",
+      "value": "Пользовательская папка с фоновыми изображениями"
+    },
+    {
+      "name": "ui_setting_background_media_local_folder",
+      "value": "Случайное локальное видео"
+    },
+    {
+      "name": "ui_setting_background_media_official_launcher_video",
+      "value": "Официальное видео лаунчера"
+    },
+    {
+      "name": "ui_setting_background_video_is_looping_header",
+      "value": "Зацикливание"
+    },
+    {
+      "name": "ui_setting_background_video_is_muted_header",
+      "value": "Без звука"
+    },
+    {
+      "name": "ui_setting_control_material_default",
+      "value": "По умолчанию"
+    },
+    {
+      "name": "ui_setting_create_desktop_shortcut_action",
+      "value": "Создать"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_off",
+      "value": "Скрыть"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_on",
+      "value": "Показать"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_action",
+      "value": "Конфигурация"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_header",
+      "value": "Настроить интерфейс запроса проверки"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_description",
+      "value": "Вступает в силу немедленно. После отключения календарь не будет отображаться"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_header",
+      "value": "Включить календарь игровых событий"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_description",
+      "value": "По умолчанию выключено. Некоторые данные, такие как даты событий не в процессе, могут отображаться некорректно"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_header",
+      "value": "Показывать игровые события версии, которые ещё не активны"
+    },
+    {
+      "name": "ui_setting_home_card_description",
+      "value": "Управление карточками на главной панели, перетаскивайте для сортировки"
+    },
+    {
+      "name": "ui_setting_hutao_passport_logout_action",
+      "value": "Выйти из аккаунта"
+    },
+    {
+      "name": "ui_setting_key_shortcut_virtual_key_code_action",
+      "value": "Просмотр"
+    },
+    {
+      "name": "ui_settings_auto_sign_info",
+      "value": "При запуске отмечает текущий UID, а при смене дня во время работы — локальных персонажей CN."
+    },
+    {
+      "name": "ui_settings_backup_credentials",
+      "value": "Копия содержит данные входа. Храните её в безопасном месте."
+    },
+    {
+      "name": "ui_settings_cache",
+      "value": "Кэш медиа и значков"
+    },
+    {
+      "name": "ui_settings_cache_size",
+      "value": "Размер кэша %s"
+    },
+    {
+      "name": "ui_settings_cancel_update",
+      "value": "Отменить обновление"
+    },
+    {
+      "name": "ui_settings_cancelling",
+      "value": "Отмена…"
+    },
+    {
+      "name": "ui_settings_choose_video",
+      "value": "Выбрать видео"
+    },
+    {
+      "name": "ui_settings_configure",
+      "value": "Конфигурация"
+    },
+    {
+      "name": "ui_settings_data_next_launch",
+      "value": "Выбранные данные вступят в силу при следующем запуске."
+    },
+    {
+      "name": "ui_settings_data_source",
+      "value": "URL источника данных"
+    },
+    {
+      "name": "ui_settings_delete_wish",
+      "value": "Удалить все данные молитв"
+    },
+    {
+      "name": "ui_settings_delete_wish_archive",
+      "value": "Удалить архив молитв"
+    },
+    {
+      "name": "ui_settings_delete_wish_confirm",
+      "value": "Удалить записи молитв для всех UID? Отменить это действие нельзя."
+    },
+    {
+      "name": "ui_settings_download_verify",
+      "value": "Скачать и проверить"
+    },
+    {
+      "name": "ui_settings_export_backup",
+      "value": "Экспорт полной копии"
+    },
+    {
+      "name": "ui_settings_feedback",
+      "value": "Отзывы и диагностика"
+    },
+    {
+      "name": "ui_settings_game_data",
+      "value": "Обновления данных игры"
+    },
+    {
+      "name": "ui_settings_geetest_help",
+      "value": "{0} означает gt, {1} — challenge. Ответ GET должен содержать code: 0, challenge и validate. Оставьте пустым для интерактивной проверки."
+    },
+    {
+      "name": "ui_settings_help",
+      "value": "Автономная справка"
+    },
+    {
+      "name": "ui_settings_immersive_material",
+      "value": "Иммерсивный материал"
+    },
+    {
+      "name": "ui_settings_local_backup_success",
+      "value": "Завершено"
+    },
+    {
+      "name": "ui_settings_manifest_help",
+      "value": "Сохраните URL манифеста, затем проверьте обновления."
+    },
+    {
+      "name": "ui_settings_material_level",
+      "value": "Уровень иммерсивного материала"
+    },
+    {
+      "name": "ui_settings_material_scope",
+      "value": "Уровни применяются сразу. Поверхности содержимого матовые. Поддерживаемые элементы используют иммерсивный эффект системы."
+    },
+    {
+      "name": "ui_settings_no_wallpaper",
+      "value": "Обои не выбраны"
+    },
+    {
+      "name": "ui_settings_no_wish_archives",
+      "value": "Архивов молитв нет. Обновите данные или импортируйте архив."
+    },
+    {
+      "name": "ui_settings_normal_material",
+      "value": "Обычный материал"
+    },
+    {
+      "name": "ui_settings_not_logged_in",
+      "value": "Вход не выполнен"
+    },
+    {
+      "name": "ui_settings_page_description_add_model_provider_profile_to_edit",
+      "value": "Add a model provider profile first"
+    },
+    {
+      "name": "ui_settings_page_label_add_profile",
+      "value": "Add"
+    },
+    {
+      "name": "ui_settings_page_label_agent_maximum_iterations_per_request",
+      "value": "Maximum Tool Iterations Per Request"
+    },
+    {
+      "name": "ui_settings_page_label_agent_system_prompt",
+      "value": "System Prompt"
+    },
+    {
+      "name": "ui_settings_page_label_agent_user_name",
+      "value": "User Name"
+    },
+    {
+      "name": "ui_settings_page_label_clear_models",
+      "value": "Clear Models"
+    },
+    {
+      "name": "ui_settings_page_label_copy_profile",
+      "value": "Copy"
+    },
+    {
+      "name": "ui_settings_page_label_delete_model",
+      "value": "Delete Model"
+    },
+    {
+      "name": "ui_settings_page_label_delete_profile",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_settings_page_label_fetch_models",
+      "value": "Fetch"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_context_window_tokens",
+      "value": "Context Window Length"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_input_tokens",
+      "value": "Input Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_output_tokens",
+      "value": "Output Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_name",
+      "value": "Model Name"
+    },
+    {
+      "name": "ui_settings_page_label_model_omit_reasoning_effort_when_thinking_disabled",
+      "value": "Omit reasoning effort when Thinking is off"
+    },
+    {
+      "name": "ui_settings_page_label_model_provider_profiles",
+      "value": "Model Provider Profiles"
+    },
+    {
+      "name": "ui_settings_page_label_model_reasoning_effort",
+      "value": "Reasoning Effort"
+    },
+    {
+      "name": "ui_settings_page_label_model_temperature",
+      "value": "Temperature"
+    },
+    {
+      "name": "ui_settings_page_label_model_thinking_enabled",
+      "value": "Enable Thinking"
+    },
+    {
+      "name": "ui_settings_page_label_model_top_p",
+      "value": "Top P"
+    },
+    {
+      "name": "ui_settings_page_label_profile_model_id",
+      "value": "Model ID"
+    },
+    {
+      "name": "ui_settings_page_label_profile_name",
+      "value": "Profile Name"
+    },
+    {
+      "name": "ui_settings_page_label_profile_provider_type",
+      "value": "Provider Type"
+    },
+    {
+      "name": "ui_settings_page_label_selected_model",
+      "value": "Selected Model"
+    },
+    {
+      "name": "ui_settings_page_option_provider_default",
+      "value": "Provider default"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_extra_high",
+      "value": "Extra high"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_high",
+      "value": "High"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_low",
+      "value": "Low"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_medium",
+      "value": "Medium"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_none",
+      "value": "None"
+    },
+    {
+      "name": "ui_settings_previous_data",
+      "value": "Восстановить предыдущие данные игры"
+    },
+    {
+      "name": "ui_settings_processing",
+      "value": "Обработка…"
+    },
+    {
+      "name": "ui_settings_random_video",
+      "value": "При загрузке воспроизводится случайное импортированное видео."
+    },
+    {
+      "name": "ui_settings_reduce_motion",
+      "value": "Уменьшить анимацию"
+    },
+    {
+      "name": "ui_settings_reduced_motion_info",
+      "value": "Уменьшает анимацию переходов и нажатий."
+    },
+    {
+      "name": "ui_settings_reset_builtin",
+      "value": "Восстановить встроенные данные игры"
+    },
+    {
+      "name": "ui_settings_restore_backup",
+      "value": "Восстановить из копии"
+    },
+    {
+      "name": "ui_settings_restore_confirm",
+      "value": "Заменить текущие данные этой копией?"
+    },
+    {
+      "name": "ui_settings_restore_scope",
+      "value": "Восстановить аккаунты, историю игры и настройки"
+    },
+    {
+      "name": "ui_settings_signed_in",
+      "value": "Вход в игровой аккаунт выполнен"
+    },
+    {
+      "name": "ui_settings_stop_download",
+      "value": "Остановить загрузку и дождаться проверки?"
+    },
+    {
+      "name": "ui_settings_verified_data",
+      "value": "Полный набор данных загружается и проверяется по доверенному коммиту GitHub."
+    },
+    {
+      "name": "ui_settings_video_fallback",
+      "value": "В фоне видео приостанавливается. Если видео недоступно, показываются обои."
+    },
+    {
+      "name": "ui_settings_wallpaper_sources",
+      "value": "Локальные изображения меняются каждые пять минут. Обои дня предоставляет Snap Hutao. Права принадлежат авторам."
+    },
+    {
+      "name": "ui_spiral_abyss_hutao_statistics",
+      "value": "Статистика"
+    },
+    {
+      "name": "ui_spiral_abyss_upload_record_homa_not_login_primary_button_text",
+      "value": "Перейти ко входу"
+    },
+    {
+      "name": "ui_travelers_diary_no_income_source_hint",
+      "value": "В этом месяце нет записей о получении камней Истока"
+    },
+    {
+      "name": "ui_travelers_diary_today",
+      "value": "Сегодня"
+    },
+    {
+      "name": "ui_update_cancel",
+      "value": "Отменить проверку"
+    },
+    {
+      "name": "ui_update_cancelled",
+      "value": "Отменено"
+    },
+    {
+      "name": "ui_update_channel",
+      "value": "Канал выпуска"
+    },
+    {
+      "name": "ui_update_check_failed",
+      "value": "Произошла ошибка при проверке обновлений"
+    },
+    {
+      "name": "ui_update_checking",
+      "value": "Проверка обновлений…"
+    },
+    {
+      "name": "ui_update_compare_unknown",
+      "value": "Недостаточно сведений о версии"
+    },
+    {
+      "name": "ui_update_compatibility_unknown",
+      "value": "Совместимость установки неизвестна"
+    },
+    {
+      "name": "ui_update_conflict",
+      "value": "Имя и код версии не совпадают"
+    },
+    {
+      "name": "ui_update_current",
+      "value": "Уже установлена последняя версия"
+    },
+    {
+      "name": "ui_update_hap_listed",
+      "value": "Указан пакет HarmonyOS"
+    },
+    {
+      "name": "ui_update_installed",
+      "value": "Установленная версия %s"
+    },
+    {
+      "name": "ui_update_invalid",
+      "value": "Некорректные сведения о выпуске"
+    },
+    {
+      "name": "ui_update_local_newer",
+      "value": "Установленная версия новее"
+    },
+    {
+      "name": "ui_update_no_hap",
+      "value": "Пакет HarmonyOS не указан"
+    },
+    {
+      "name": "ui_update_no_notes",
+      "value": "Нет примечаний к этой версии"
+    },
+    {
+      "name": "ui_update_no_release",
+      "value": "В этом канале нет публичных версий"
+    },
+    {
+      "name": "ui_update_notes_error",
+      "value": "Не удалось открыть примечания к выпуску"
+    },
+    {
+      "name": "ui_update_preview",
+      "value": "Включить предварительные версии"
+    },
+    {
+      "name": "ui_update_project_releases",
+      "value": "Выпуски проекта"
+    },
+    {
+      "name": "ui_update_rate_limit",
+      "value": "GitHub ограничил запрос. Повторите позже."
+    },
+    {
+      "name": "ui_update_recent_only",
+      "value": "Проверены 300 последних выпусков"
+    },
+    {
+      "name": "ui_update_required_api",
+      "value": "Минимальный API %d"
+    },
+    {
+      "name": "ui_update_skipped",
+      "value": "Версия %s пропущена. При запуске напоминание о ней больше не будет появляться, но вы по-прежнему можете проверить обновления вручную в настройках"
+    },
+    {
+      "name": "ui_update_stable",
+      "value": "Стабильные версии"
+    },
+    {
+      "name": "ui_update_unavailable",
+      "value": "Репозиторий выпусков недоступен"
+    },
+    {
+      "name": "ui_update_unknown",
+      "value": "Неизвестно"
+    },
+    {
+      "name": "ui_update_unskip",
+      "value": "Не пропускать эту версию"
+    },
+    {
+      "name": "ui_user_copy_cookie_action",
+      "value": "Скопировать Cookie"
+    },
+    {
+      "name": "ui_web_daily_note_attendance_reward_status_finished_non_reward",
+      "value": "Выполнено"
+    },
+    {
+      "name": "ui_web_hoyolab_game_record_act_calendar_hard_challenge_locked",
+      "value": "Ещё не разблокировано"
+    },
+    {
+      "name": "ui_weekday_friday",
+      "value": "пт"
+    },
+    {
+      "name": "ui_weekday_monday",
+      "value": "пн"
+    },
+    {
+      "name": "ui_weekday_saturday",
+      "value": "сб"
+    },
+    {
+      "name": "ui_weekday_sunday",
+      "value": "вс"
+    },
+    {
+      "name": "ui_weekday_thursday",
+      "value": "чт"
+    },
+    {
+      "name": "ui_weekday_tuesday",
+      "value": "вт"
+    },
+    {
+      "name": "ui_weekday_wednesday",
+      "value": "ср"
+    },
+    {
+      "name": "ui_wi_ki_avatar_ascension_materials_header",
+      "value": "Материалы для возвышения"
+    },
+    {
+      "name": "ui_wi_ki_avatar_auto_suggest_box_place_holder",
+      "value": "Фильтр персонажей"
+    },
+    {
+      "name": "ui_wi_ki_avatar_name_card_header",
+      "value": "Визитка"
+    },
+    {
+      "name": "ui_wi_ki_avatar_special_food_title",
+      "value": "Особое блюдо"
+    },
+    {
+      "name": "ui_wi_ki_weapon_auto_suggest_box_place_holder",
+      "value": "Фильтр оружия"
+    },
+    {
+      "name": "ui_wish_show_empty_history",
+      "value": "Скрыть события Молитвы без истории"
+    },
+    {
+      "name": "ui_wish_show_empty_overview",
+      "value": "Обзор молитв без записей"
+    },
+    {
+      "name": "ui_wish_show_unobtained",
+      "value": "Неполученные предметы желаний"
+    },
+    {
+      "name": "ui_gacha_pivot_overview",
+      "value": "Обзор"
+    },
+    {
+      "name": "ui_gacha_pivot_history",
+      "value": "История"
+    },
+    {
+      "name": "ui_gacha_pivot_avatar",
+      "value": "Персонажи"
+    },
+    {
+      "name": "ui_gacha_pivot_weapon",
+      "value": "Оружие"
+    },
+    {
+      "name": "ui_gacha_pivot_countdown",
+      "value": "Таймер"
+    },
+    {
+      "name": "ui_gacha_pivot_statistics",
+      "value": "统计"
+    },
+    {
+      "name": "ui_gacha_full_refresh",
+      "value": "Полное обновление"
+    },
+    {
+      "name": "ui_gacha_full_refresh_selected",
+      "value": "✓ Полное обновление"
+    },
+    {
+      "name": "ui_gacha_card_statistics",
+      "value": "Статистика"
+    },
+    {
+      "name": "ui_gacha_card_ratio",
+      "value": "Пропорция"
+    },
+    {
+      "name": "ui_gacha_card_five_average",
+      "value": "Среднее число молитв на 5★"
+    },
+    {
+      "name": "ui_gacha_card_four_average",
+      "value": "Среднее количество круток для 4★"
+    },
+    {
+      "name": "ui_gacha_card_up_average",
+      "value": "Среднее число молитв на ивентовый предмет"
+    },
+    {
+      "name": "ui_gacha_card_to_five",
+      "value": "С последнего 5★"
+    },
+    {
+      "name": "ui_gacha_card_to_four",
+      "value": "С последнего 4★"
+    },
+    {
+      "name": "ui_gacha_card_to_three",
+      "value": "С прошлой 3★"
+    },
+    {
+      "name": "ui_travelers_diary_month",
+      "value": "Этот месяц"
+    },
+    {
+      "name": "ui_travelers_diary_primogems",
+      "value": "Камень Истока"
+    },
+    {
+      "name": "ui_travelers_diary_mora",
+      "value": "Мора"
+    }
+  ]
+}

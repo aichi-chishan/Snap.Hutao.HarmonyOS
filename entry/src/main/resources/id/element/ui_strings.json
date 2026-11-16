@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "Batal"
+    },
+    {
+      "name": "common_confirm",
+      "value": "Konfirmasi"
+    },
+    {
+      "name": "common_refresh",
+      "value": "Muat ulang"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "Riwayat Wish"
+    },
+    {
+      "name": "page_title_home",
+      "value": "Beranda"
+    },
+    {
+      "name": "page_title_login",
+      "value": "Masuk"
+    },
+    {
+      "name": "page_title_note",
+      "value": "Catatan Waktu"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "Pengaturan"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "Riwayat Wish"
+    },
+    {
+      "name": "tab_home",
+      "value": "Beranda"
+    },
+    {
+      "name": "tab_mine",
+      "value": "Profil"
+    },
+    {
+      "name": "tab_note",
+      "value": "Catatan Waktu"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "Ekspor"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "Impor"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "Simpan"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "Generate analysis"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "Account history charts and AI insights"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "Stop generation"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "Test connection"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "Periksa pembaruan"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "Data"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "Jadwal"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "Sistem"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "Alat"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "Buka ulang aplikasi untuk mengikuti bahasa sistem"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "Ikuti sistem"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "Spiral Abyss"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "Achievements"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "Item Inventori"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "Stygian Onslaught"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "Karakter Saya"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "Rencana pengembang"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "Game Launcher"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "Catatan Pengembara"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Hutao Passport"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "Puisi Teater Imaginarium"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "Karakter WIKI"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "Monster WIKI"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "Senjata WIKI"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "Tentang"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "Akun"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "Penampilan"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "Gambar Latar"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "Latar belakang video"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "Cadangkan dan pulihkan"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "Kalender"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "Beranda"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "Pengaturan area kegiatan game di beranda"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "Card Dashbaord"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "Bahasa"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "Backdrop Material"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "Lainnya"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "Check-in"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "Penyimpanan"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "Tema Warna"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "CAPTCHA"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "Riwayat Wish"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "Migrasi Data"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "Gelap"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "Terang"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "Snap Hutao versi %s sudah tersedia"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "Catatan rilis"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "Lewati Pembaharuan Versi"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "Pembaruan aplikasi"
+    }
+  ]
+}

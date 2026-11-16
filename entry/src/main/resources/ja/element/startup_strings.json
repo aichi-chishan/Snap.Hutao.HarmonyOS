@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "ui_startup_failed_title", "value": "起動できません" },
+    { "name": "ui_startup_failed_body", "value": "起動を完了できませんでした。もう一度お試しください。再試行しても既存のデータは削除されません。" }
+  ]
+}

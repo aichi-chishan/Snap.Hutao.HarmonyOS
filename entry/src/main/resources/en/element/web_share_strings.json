@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "ui_web_share_title",
+      "value": "Share Save Mode"
+    },
+    {
+      "name": "ui_web_share_description",
+      "value": "Select the mode in which to save the image after clicking the share button"
+    },
+    {
+      "name": "ui_web_share_copy",
+      "value": "Copy to clipboard"
+    },
+    {
+      "name": "ui_web_share_file",
+      "value": "Save as file"
+    }
+  ]
+}

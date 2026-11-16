@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "İptal"
+    },
+    {
+      "name": "common_confirm",
+      "value": "Onayla"
+    },
+    {
+      "name": "common_refresh",
+      "value": "Yenile"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "Dilek Kayıtları"
+    },
+    {
+      "name": "page_title_home",
+      "value": "Ana Sayfa"
+    },
+    {
+      "name": "page_title_login",
+      "value": "Giriş Yap"
+    },
+    {
+      "name": "page_title_note",
+      "value": "Gerçek Zamanlı Not"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "Ayarlar"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "Dilek Kayıtları"
+    },
+    {
+      "name": "tab_home",
+      "value": "Ana Sayfa"
+    },
+    {
+      "name": "tab_mine",
+      "value": "Profil"
+    },
+    {
+      "name": "tab_note",
+      "value": "Gerçek Zamanlı Not"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "Dışa Aktar"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "İçe Aktar"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "Kaydet"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "Generate analysis"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "Account history charts and AI insights"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "Stop generation"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "Test connection"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "Güncellemeleri kontrol et"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "Veri"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "Dönem"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "Sistem"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "Araçlar"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "Sistem dilini kullanmak için uygulamayı yeniden açın"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "Sistemi Takip Et"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "Sarmal Abyss"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "Başarı Yönetimi"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "Envanter Öğeleri"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "Kasvetli Taarruz"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "Karakterlerim"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "Geliştirme Planı"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "Oyunu Başlat"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "Gezgin Günlüğü"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Snap Hutao Pasaportu"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "Hayali Tiyatro"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "Karakter WIKI"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "Canavar WIKI"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "Silah WIKI"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "Hakkında"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "Hesap"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "Görünüm"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "Arka Plan Resmi"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "Video Arka Planı"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "Yedekleme ve geri yükleme"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "Takvim"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "Ana Sayfa"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "Ana Sayfa Oyun Etkinlik Alanı Ayarları"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "Ana Sayfa Kartları"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "Dil"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "Arka Plan Materyali"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "Diğer"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "Giriş"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "Depolama"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "Tema"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "Gizli Doğrulama"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "Dilek Kayıtları"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "Veri Geçişi"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "Koyu"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "Açık"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "Hu Tao %s sürümü şu anda mevcut"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "Sürüm notları"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "Bu sürümü atla"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "Uygulama güncellemesi"
+    }
+  ]
+}

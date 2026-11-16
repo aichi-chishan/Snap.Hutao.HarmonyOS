@@ -49,6 +49,50 @@ export class InsightSeries {
 export class InsightBundle {
   series: InsightSeries[] = [];
   failedSources: string[] = [];
+  wishStatistics?: InsightWishStatistics;
+  featuredChart?: InsightSeries;
+}
+
+export class InsightWishObtain {
+  name: string = '';
+  date: string = '';
+  pulls_for_this_five_star: number = 0;
+  is_featured: boolean | null = null;
+  is_guaranteed: boolean | null = null;
+  pulls_since_previous_featured: number | null = null;
+}
+
+export class InsightWishPool {
+  pool: string = '';
+  total_wishes: number = 0;
+  five_star_count: number = 0;
+  four_star_count: number = 0;
+  five_star_rate_in_observed_wishes: number | null = null;
+  average_wishes_per_five_star: number | null = null;
+  average_wishes_per_featured_five_star: number | null = null;
+  minimum_wishes_per_five_star: number = 0;
+  maximum_wishes_per_five_star: number = 0;
+  current_wishes_since_last_five_star: number = 0;
+  game_guarantee_threshold: number = 0;
+  recorded_five_star_obtains: InsightWishObtain[] = [];
+}
+
+export class InsightBannerObtain {
+  name: string = '';
+  recorded_obtain_count: number = 0;
+}
+
+export class InsightBanner {
+  from: string = '';
+  to: string = '';
+  featured_five_stars: InsightBannerObtain[] = [];
+}
+
+export class InsightWishStatistics {
+  origin: string = 'Snap Hutao local wish statistics';
+  scope_note: string = 'Use observed rarity and pity only. Partial imports and absent banner metadata limit conclusions.';
+  pools: InsightWishPool[] = [];
+  recent_banner_featured_characters_and_weapons: InsightBanner[] = [];
 }
 
 /** 序列摘要（对齐 Windows CreateAnonymousJson 的 summary 块） */

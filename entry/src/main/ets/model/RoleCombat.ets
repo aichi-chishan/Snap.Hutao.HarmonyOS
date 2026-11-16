@@ -36,13 +36,24 @@ export class RoleCombatBuff {
 
 /** 单回合数据 */
 export class RoleCombatRoundData {
+  private static readonly TAROT_NUMBERS: string[] = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
   roundId: number = 0;
   avatars: RoleCombatAvatar[] = [];
   choiceCards: RoleCombatBuff[] = [];
   buffs: RoleCombatBuff[] = [];
   enemies: RoleCombatEnemy[] = [];
   isGetMedal: boolean = false;
+  isTarot: boolean = false;
+  tarotSerialNo: number = 0;
+  splendourSummary: string = '';
+  splendourBuffs: RoleCombatBuff[] = [];
   finishTime: number = 0;
+
+  label(): string {
+    if (!this.isTarot) { return `第 ${this.roundId} 幕`; }
+    const number: string = RoleCombatRoundData.TAROT_NUMBERS[this.tarotSerialNo] ?? String(this.tarotSerialNo);
+    return number.length > 0 ? `圣牌挑战 ${number}` : '圣牌挑战';
+  }
 }
 
 /** 战斗统计（最大伤害/最快通关等，对齐 Windows RoleCombatFightStatistics） */
@@ -95,6 +106,11 @@ export class RoleCombatStat {
   /** 塔罗完成数（tarot_finished_cnt） */
   tarotFinishedCount: number = 0;
   getMedalRoundList: number[] = [];
+
+  difficultyLabel(): string {
+    const labels: string[] = ['', '轻简模式', '普通模式', '困难模式', '卓越模式', '月谕模式'];
+    return labels[this.difficultyId] ?? '';
+  }
 }
 
 /** 周期 */
@@ -201,6 +217,8 @@ export class RoleCombatRoot {
     const round: RoleCombatRoundData = new RoleCombatRoundData();
     round.roundId = RoleCombatRoot.number(o['round_id'], 0);
     round.isGetMedal = RoleCombatRoot.bool(o['is_get_medal']);
+    round.isTarot = RoleCombatRoot.bool(o['is_tarot']);
+    round.tarotSerialNo = RoleCombatRoot.number(o['tarot_serial_no'], 0);
     round.finishTime = RoleCombatRoot.number(o['finish_time'], 0);
     const avatars = o['avatars'] as Array<Object>;
     if (avatars !== undefined && avatars !== null) {
@@ -210,15 +228,28 @@ export class RoleCombatRoot {
     }
     const choices = o['choice_cards'] as Array<Object>;
     if (choices !== undefined && choices !== null) {
-      const cards = choices[0] as Record<string, Object>;
-      if (cards !== undefined && cards !== null) {
-        round.choiceCards.push(RoleCombatRoot.parseBuff(cards));
+      for (const card of choices) {
+        if (card !== undefined && card !== null) { round.choiceCards.push(RoleCombatRoot.parseBuff(card)); }
       }
     }
     const buffs = o['buffs'] as Array<Object>;
     if (buffs !== undefined && buffs !== null) {
       for (let i = 0; i < buffs.length; i++) {
         round.buffs.push(RoleCombatRoot.parseBuff(buffs[i]));
+      }
+    }
+    const splendour: Record<string, Object> | undefined = o['splendour_buff'] as Record<string, Object> | undefined;
+    if (splendour !== undefined && splendour !== null) {
+      const summary: Record<string, Object> | undefined = splendour['summary'] as Record<string, Object> | undefined;
+      round.splendourSummary = RoleCombatRoot.str(summary?.['desc']).replace(/\\n/g, '\n');
+      const blessings: Object[] = (splendour['buffs'] as Object[]) ?? [];
+      for (const raw of blessings) {
+        const blessing: RoleCombatBuff = RoleCombatRoot.parseBuff(raw);
+        const effects: Object[] = ((raw as Record<string, Object>)['level_effect'] as Object[]) ?? [];
+        const descriptions: string[] = effects.map((effect: Object): string =>
+          RoleCombatRoot.str((effect as Record<string, Object>)['desc']).replace(/\\n/g, '\n'));
+        blessing.desc = descriptions.filter((desc: string): boolean => desc.length > 0).join('\n');
+        round.splendourBuffs.push(blessing);
       }
     }
     const enemies = o['enemies'] as Array<Object>;
@@ -302,7 +333,7 @@ export class RoleCombatRoot {
     return Number.isNaN(n) ? def : n;
   }
 
-  private static str(v: Object): string {
+  private static str(v: Object | undefined): string {
     if (v === undefined || v === null) {
       return '';
     }

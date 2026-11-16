@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Build offline character guide IDs from the publishers' public content directories."""
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+from urllib.request import Request, urlopen
+
+
+ROOT = Path(__file__).resolve().parents[1]
+METADATA = ROOT / "entry/src/main/resources/rawfile/metadata"
+REVISION = "fb3e2692579495c6b181403da01fde1e5b8f9193"
+SNAPSHOT = ROOT / "scripts/data/wiki-avatar-guides.json"
+OUTPUT = ROOT / "entry/src/main/ets/model/AvatarGuideReference.ets"
+MYS_URL = (
+    "https://act-api-takumi-static.mihoyo.com/common/blackboard/"
+    "ys_strategy/v1/getChannelTree?app_sn=ys_strategy"
+)
+HOYOLAB_URL = "https://bbs-api-os-static.hoyolab.com/community/post/wapi/guide/list/all?gids=2"
+MAX_SOURCE_BYTES = 2 * 1024 * 1024
+LABELS = ROOT / "scripts/data/wiki-avatar-labels.json"
+LOCALES = ("zh-Hans", "zh-Hant", "de", "en", "es", "fr", "id", "it", "ja", "ko", "pt", "ru", "th", "tr", "vi")
+LABEL_KEYS = (
+    "ViewPageWiKiAvatarStrategyChineseButtonLabel",
+    "ViewPageWiKiAvatarStrategyBilibiliButtonLabel",
+    "ViewPageWiKiAvatarStrategyOverseaButtonLabel",
+    "ViewModelWikiAvatarStrategyNotFound",
+)
+
+
+def read_json(path):
+    return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def fetch(url):
+    request = Request(url, headers={"Accept": "application/json", "User-Agent": "SnapHutaoHarmonyOS"})
+    with urlopen(request, timeout=15) as response:
+        raw = response.read(MAX_SOURCE_BYTES + 1)
+    if len(raw) > MAX_SOURCE_BYTES:
+        raise ValueError(f"public guide directory exceeds size limit: {url}")
+    document = json.loads(raw)
+    if document.get("retcode") != 0 or not isinstance(document.get("data"), dict):
+        raise ValueError(f"invalid public guide directory: {url}")
+    return document["data"], hashlib.sha256(raw).hexdigest()
+
+
+def channel_by_id(node, channel_id):
+    if node["channel_id"] == channel_id:
+        return node
+    for child in node.get("children") or []:
+        found = channel_by_id(child, channel_id)
+        if found is not None:
+            return found
+    return None
+
+
+def refresh_snapshot():
+    chinese, chinese_hash = fetch(MYS_URL)
+    overseas, overseas_hash = fetch(HOYOLAB_URL)
+    role_channel = channel_by_id(chinese, 39)
+    if role_channel is None or role_channel["name"] != "角色攻略":
+        raise ValueError("official Chinese character guide channel is missing")
+    channels = role_channel["children"]
+    if any(row["parent_id"] != 39 for row in channels):
+        raise ValueError("unexpected Chinese character guide relationship")
+    # Retain guide metadata only. Article text, authors and profile data are discarded.
+    return {
+        "schema": 1,
+        "metadataRevision": REVISION,
+        "mys": {
+            "url": MYS_URL, "sha256": chinese_hash,
+            "rows": [{"id": row["channel_id"], "title": row["name"]} for row in channels],
+        },
+        "hoyolab": {
+            "url": HOYOLAB_URL, "sha256": overseas_hash,
+            "rows": [{"id": row["id"], "title": row["title"]} for row in overseas["guides"]],
+        },
+    }
+
+
+def guides_by_title(source):
+    result = {}
+    identities = set()
+    for row in source["rows"]:
+        identity, title = row["id"], row["title"]
+        if type(identity) is not int or identity <= 0 or identity in identities:
+            raise ValueError(f"invalid or repeated guide ID: {identity}")
+        if not isinstance(title, str) or not title or title in result:
+            raise ValueError(f"invalid or repeated guide title: {title}")
+        result[title] = identity
+        identities.add(identity)
+    return result
+
+
+def match_avatars(avatars, guides):
+    result = {}
+    for avatar in avatars:
+        if avatar["name"] in guides:
+            result[avatar["id"]] = guides[avatar["name"]]
+    return result
+
+
+def generate(snapshot, metadata):
+    if snapshot["schema"] != 1 or snapshot["metadataRevision"] != REVISION:
+        raise ValueError("unsupported guide source snapshot")
+    if snapshot["mys"]["url"] != MYS_URL or snapshot["hoyolab"]["url"] != HOYOLAB_URL:
+        raise ValueError("unexpected guide source")
+    avatars = read_json(metadata / "avatar_meta.json")
+    english = read_json(metadata / "locale_en.json")
+    if english["upstreamRevision"] != REVISION or english["locale"] != "en":
+        raise ValueError("English avatar names do not match the pinned metadata revision")
+    english_avatars = english["files"]["avatar_meta.json"]
+    if {row["id"] for row in avatars} != {row["id"] for row in english_avatars}:
+        raise ValueError("bundled Chinese and English avatar identities differ")
+    chinese = guides_by_title(snapshot["mys"])
+    overseas = guides_by_title(snapshot["hoyolab"])
+    mys_ids = match_avatars(avatars, chinese)
+    hoyolab_ids = match_avatars(english_avatars, overseas)
+    lines = [
+        "/** Generated by scripts/generate-avatar-guide-reference.py; publisher content IDs only.",
+        f" * Snap.Metadata identity snapshot {REVISION}.",
+        " * Rebuild/check offline using scripts/data/wiki-avatar-guides.json.",
+        " * Windows MIT caption provenance is recorded in scripts/data/wiki-avatar-labels.json.",
+        " * HoYoLAB rows cover the groups returned by its public index at collection time.",
+        " */",
+        "export class AvatarGuideReference {",
+    ]
+    for name, rows in (("chinese", mys_ids), ("hoyolab", hoyolab_ids)):
+        lines.append(f"  static readonly {name}: Map<number, number> = new Map<number, number>([")
+        lines.extend(f"    [{identity}, {guide}]," for identity, guide in sorted(rows.items()))
+        lines.append("  ]);")
+    lines.append("  static readonly labels: Map<string, string[]> = new Map<string, string[]>([")
+    labels = read_json(LABELS)
+    positions = [labels["keys"].index(key) for key in LABEL_KEYS]
+    for locale in LOCALES:
+        captions = labels["locales"][locale]
+        if len(captions) != len(labels["keys"]):
+            raise ValueError(f"upstream caption keys and values differ: {locale}")
+        texts = [captions[index] for index in positions]
+        if any(not isinstance(text, str) or not text for text in texts):
+            raise ValueError(f"incomplete upstream guide captions: {locale}")
+        lines.append(f"    [{json.dumps(locale)}, {json.dumps(texts, ensure_ascii=False)}],")
+    lines.append("  ]);")
+    lines.extend(["}", ""])
+    return "\n".join(lines), len(mys_ids), len(hoyolab_ids)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--metadata", type=Path, default=METADATA, help="bundled compact metadata directory")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--refresh", action="store_true", help="refresh from the two public content directories")
+    mode.add_argument("--check", action="store_true", help="compare generated output offline")
+    args = parser.parse_args()
+    snapshot = refresh_snapshot() if args.refresh else read_json(SNAPSHOT)
+    output, chinese_count, overseas_count = generate(snapshot, args.metadata)
+    if args.check:
+        if OUTPUT.read_text(encoding="utf-8") != output:
+            parser.error("generated character guide reference differs")
+    else:
+        if args.refresh:
+            SNAPSHOT.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        OUTPUT.write_text(output, encoding="utf-8", newline="\n")
+    print(f"Character guide IDs: {chinese_count} Chinese, {overseas_count} HoYoLAB")
+
+
+if __name__ == "__main__":
+    main()

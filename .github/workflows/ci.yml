@@ -2,8 +2,8 @@ name: CI
 
 # HarmonyOS lint/build 依赖华为 Command Line Tools（华为开发者站需登录下载，无公开直链）。
 # 在仓库 Settings → Secrets and variables → Actions → Variables 配置
-#   DEVECO_CLT_URL = https://github.com/aichi-chishan/snap-hutao-data/releases/download/clt-26.0.0.821/clt-part-00
-# 仅接受此已审核版本；更换来源/版本必须先审核并更新固定大小与 SHA-256。
+#   DEVECO_CLT_URL = ci/install-clt.sh 中的 approved URL。
+# 安装脚本按固定大小与 SHA-256 校验已审核的工具包。
 # 后本工作流自动启用；未配置时两个 job 跳过（不阻塞 PR）。
 on:
   push:
@@ -39,11 +39,18 @@ jobs:
           test -f entry/src/test/LogicUnitTest.test.ets
           grep -q "logicUnitTest()" entry/src/test/List.test.ets
           grep -q "logicUnitTest" entry/src/test/List.test.ets
+          # 本地签名、用户导出、设备调试现场与安装包留在工作区。
+          local_files=$(git ls-files -- build-profile.json5 local.properties '.local/**' '.debug/**' 'example/**' 'signing/**' '*.p12' '*.pfx' '*.p7b' '*.key' '*.jks' '*.keystore' '*.hap' '*.htrace' '*.ftrace')
+          if [ -n "$local_files" ]; then
+            printf '%s\n' "$local_files"
+            echo "::error::Local-only files are tracked"
+            exit 1
+          fi
           # 隐私回归门禁：仓库不得含个人隐私（本机用户名 / 私人邮箱 / 本机绝对路径）
           # 注意：此处只写通用模式，禁止把真实隐私值写进本文件（那本身就是泄露）
           # 用 git grep 只扫已跟踪文件（免疫未跟踪的本地目录）
-          if git grep -InE "[A-Za-z0-9._%+-]+@(qq|163|126|gmail|outlook|foxmail)\.com|[A-Za-z]:[\\\\/]Users[\\\\/]|/home/[a-z0-9_-]+/|/Users/[a-z0-9_-]+/" \
-               -- '*.md' '*.ets' '*.json5' '*.yml' '*.ts'; then
+          if git grep -IlE "[A-Za-z0-9._%+-]+@(qq|163|126|gmail|outlook|foxmail)\.com|[A-Za-z]:[\\\\/]Users[\\\\/]|/home/[a-z0-9_-]+/|/Users/[a-z0-9_-]+/" \
+               -- '*.md' '*.ets' '*.json5' '*.yml' '*.ts' '*.py' '*.ps1'; then
             echo "::error::Privacy regression: personal info detected in tracked files"
             exit 1
           fi

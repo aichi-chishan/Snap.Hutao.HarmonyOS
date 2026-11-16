@@ -3,7 +3,7 @@
  * 人机验证页（通用化）：内嵌极验（gt.0.5.2.js + api.geetest.com），完成验证后
  * 调用 verifyVerification 换取 challenge，写入 AppStorage(replayKey) 供来源页重放。
  * 参数：{ gt, challenge, path?, replayKey? }
- *   path — 触发风控的接口路径（createVerification 阶段已带，这里仅作回显）
+ *   path — 触发风控的接口路径，注册和提交验证保持一致。
  *   replayKey — 完成时写入的 AppStorage 键（默认 pendingRiskChallenge）
  */
 import { router } from '@kit.ArkUI';
@@ -51,6 +51,7 @@ export struct GeetestVerifyPage {
   @State verifying: boolean = false;
   private gt: string = '';
   private challenge: string = '';
+  private challengePath: string = '';
   private replayKey: string = 'pendingRiskChallenge';
   private proxy: GeetestJsProxy = new GeetestJsProxy((json: string) => {
     this.handleValidate(json);
@@ -60,6 +61,7 @@ export struct GeetestVerifyPage {
     const params = router.getParams() as GeetestVerifyParams;
     this.gt = params?.gt ?? '';
     this.challenge = params?.challenge ?? '';
+    this.challengePath = params?.path ?? '';
     this.replayKey = params?.replayKey !== undefined && params.replayKey.length > 0
       ? params.replayKey : 'pendingRiskChallenge';
     Logger.info(TAG, `gt=${this.gt.length > 0 ? 'ok' : 'empty'} challenge=${this.challenge.length} key=${this.replayKey}`);
@@ -162,7 +164,7 @@ initGeetest({
       validate.geetestSeccode = geetestSeccode;
       const user = UserService.getInstance().getCurrentUser();
       const cookie: string = user !== undefined ? user.gameRecordCookie() : '';
-      const challenge: string = await RiskVerifier.verifyXrpcChallenge(cookie, validate);
+      const challenge: string = await RiskVerifier.verifyXrpcChallenge(cookie, validate, this.challengePath);
       if (challenge.length === 0) {
         this.statusText = '验证提交失败，请重试';
         this.verifying = false;

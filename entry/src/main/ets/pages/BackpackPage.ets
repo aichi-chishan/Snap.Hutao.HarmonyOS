@@ -2,7 +2,8 @@ import { common } from '@kit.AbilityKit';
 import { ShowDialogSuccessResponse } from '@kit.ArkUI';
 import { fileIo, picker } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
-import { BackpackArchive, BackpackImport, BackpackItem, BackpackManualInput } from '../model/BackpackData';
+import { BackpackArchive, BackpackCategory, BackpackFilterChoice, BackpackFilterKind, BackpackImport, BackpackItem,
+  BackpackManualInput, BackpackSortRule } from '../model/BackpackData';
 import { BackpackCatalog } from '../model/BackpackCatalog';
 import { BackpackViewModel } from '../viewmodel/BackpackViewModel';
 import { UIIFService } from '../service/UIIFService';
@@ -12,21 +13,41 @@ import { PageBackdrop } from '../components/PageBackdrop';
 import { EmptyState } from '../components/EmptyState';
 import { MetaIcon } from '../components/MetaIcon';
 import { SimpleDataSource } from '../components/SimpleDataSource';
+import { ReliquaryScoreEditor } from '../components/ReliquaryScoreEditor';
 import { BackpackScoreEdit, BackpackScoreProfile, BackpackScoring, BackpackSubStat } from '../model/BackpackScore';
-import { CardSurfaceModifier } from '../common/UiSurface';
+import { AppButtonModifier, CardSurfaceModifier, ControlMaterialModifier, SelectMaterialModifier, UiSurface } from '../common/UiSurface';
+import { WikiMetaService } from '../service/WikiMetaService';
+
+@Component
+struct BackpackFilterSelect {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
+  @Prop labels: ResourceStr[] = [];
+  onChoose: (index: number) => void = () => {};
+
+  build() {
+    Select(this.labels.map((label: ResourceStr): SelectOption => ({ value: label })))
+      .attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel))
+      .selected(0).value(this.labels[0]).width('100%')
+      .onSelect((index: number) => this.onChoose(index))
+  }
+}
 
 @Entry
 @Component
 export struct BackpackPage {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
+  @StorageProp('helpLocaleVersion') @Watch('localeChanged') localeVersion: number = 0;
   @State vm: BackpackViewModel = new BackpackViewModel();
   @State busy: boolean = false;
   @State isWide: boolean = false;
   @State keyword: string = '';
   @State categoryIndex: number = 0;
-  @State sortIndex: number = 0;
-  @State lockedOnly: boolean = false;
+  @State filterChoices: BackpackFilterChoice[] = [];
+  @State sortRules: BackpackSortRule[] = [];
   @State selected: BackpackItem | undefined = undefined;
   @State showSheet: boolean = false;
   @State sheetMode: string = '';
@@ -44,8 +65,7 @@ export struct BackpackPage {
   @State projectIndex: number = 0;
   @State replaceMaterials: boolean = false;
   @State editCount: string = '';
-  @State scoreDraft: BackpackScoreProfile = new BackpackScoreProfile();
-  private scoreEdit: BackpackScoreEdit | undefined = undefined;
+  @State scoreEdit: BackpackScoreEdit = new BackpackScoreEdit();
   private source: SimpleDataSource<BackpackItem> = new SimpleDataSource<BackpackItem>([]);
   private searchTimer: number = -1;
   private attached: boolean = false;
@@ -57,13 +77,31 @@ export struct BackpackPage {
     if (this.searchTimer >= 0) { clearTimeout(this.searchTimer); this.searchTimer = -1; }
   }
 
-  private toast(message: string): void { this.getUIContext().getPromptAction().showToast({ message: message, duration: 2400 }); }
+  private toast(message: string): void { this.getUIContext().getPromptAction().showToast({ systemMaterial: UiSurface.dialogMaterial(), message: message, duration: 2400 }); }
   private available(): boolean { return !this.busy && !this.vm.loading; }
   private refreshList(): void {
     this.source.notifyDataReload(this.vm.items);
     this.selected = undefined;
   }
   private async reload(): Promise<void> { await this.vm.load(); if (this.attached) { this.refreshList(); } }
+  private async refreshLocalizedItems(): Promise<void> {
+    if (!this.attached) { return; }
+    const refreshed: boolean = await this.vm.refreshDisplay();
+    if (!refreshed || !this.attached) { return; }
+    const selected: BackpackItem | undefined = this.selected;
+    if (selected !== undefined) {
+      this.selected = this.vm.allItems.find((item: BackpackItem): boolean =>
+        item.archiveId === selected.archiveId && item.instanceId === selected.instanceId && item.rawJson === selected.rawJson);
+      if (this.selected === undefined && this.sheetMode === 'details') { this.showSheet = false; }
+    }
+    const sets: Map<number, string> = new Map<number, string>();
+    for (const item of this.vm.allItems) { if (item.setId > 0) { sets.set(item.setId, item.setName); } }
+    this.filterChoices = this.filterChoices.map((choice: BackpackFilterChoice): BackpackFilterChoice =>
+      choice.kind === BackpackFilterKind.Set ? new BackpackFilterChoice(choice.kind, choice.code, sets.get(choice.code) ?? choice.label) : choice);
+    this.vm.filter.choices = this.filterChoices;
+    this.source.notifyDataReload(this.vm.items);
+  }
+  private localeChanged(): void { this.refreshLocalizedItems(); }
   private async selectArchive(index: number): Promise<void> {
     if (!this.available() || this.vm.archives[index] === undefined) { return; }
     this.busy = true;
@@ -71,8 +109,23 @@ export struct BackpackPage {
     catch (e) { this.toast((e as Error).message); }
     finally { this.busy = false; }
   }
-  private options(names: string[]): SelectOption[] {
-    return names.map((name: string): SelectOption => { const option: SelectOption = { value: name }; return option; });
+  private options(names: ResourceStr[]): SelectOption[] {
+    return names.map((name: ResourceStr): SelectOption => { const option: SelectOption = { value: name }; return option; });
+  }
+  private categoryLabel(category: number): ResourceStr {
+    if (category === BackpackCategory.Weapon) { return $r('app.string.ui_backpack_category_weapon'); }
+    if (category === BackpackCategory.Reliquary) { return $r('app.string.ui_backpack_category_reliquary'); }
+    return category < 0 ? '全部分类' : BackpackCatalog.CATEGORY_NAMES[category];
+  }
+  private categoryLabels(): ResourceStr[] {
+    const labels: ResourceStr[] = [];
+    for (let category: number = -1; category < BackpackCatalog.CATEGORY_NAMES.length; category++) {
+      labels.push(this.categoryLabel(category));
+    }
+    return labels;
+  }
+  private manualKindLabels(): ResourceStr[] {
+    return ['材料', this.categoryLabel(BackpackCategory.Weapon), this.categoryLabel(BackpackCategory.Reliquary), '摆设'];
   }
   private archiveOptions(): SelectOption[] {
     return this.options(this.vm.archives.map((archive: BackpackArchive): string => `${archive.name} · ${archive.uid}`));
@@ -87,48 +140,135 @@ export struct BackpackPage {
     if (!this.available()) { return; }
     try {
       this.scoreEdit = this.vm.beginScoreEdit();
-      this.scoreDraft = BackpackScoreProfile.clone(this.scoreEdit.profile);
       this.openSheet('score');
     } catch (e) { this.toast((e as Error).message); }
   }
-  private choosePreset(preset: number): void {
-    const next: BackpackScoreProfile = BackpackScoreProfile.create(preset);
-    next.id = this.scoreDraft.id;
-    this.scoreDraft = next;
-  }
-  private changeWeight(index: number, value: number): void {
-    const next: BackpackScoreProfile = BackpackScoreProfile.clone(this.scoreDraft);
-    next.weights[index] = Math.round(value * 10) / 10;
-    next.preset = 5;
-    this.scoreDraft = next;
-  }
-  private saveScore(): void {
-    if (!this.available() || this.scoreEdit === undefined) { return; }
+  private saveScore(profile: BackpackScoreProfile, deletedIds: string[]): void {
+    if (!this.available()) { return; }
     try {
-      this.vm.saveScore(this.scoreEdit, this.scoreDraft);
-      this.showSheet = false; this.scoreEdit = undefined; this.refreshList();
+      this.vm.saveScore(this.scoreEdit, profile, deletedIds);
+      this.showSheet = false;
+      this.refreshList();
       this.toast('评分配置已应用');
     } catch (e) { this.toast((e as Error).message); }
   }
-  private async deleteScore(): Promise<void> {
-    const edit: BackpackScoreEdit | undefined = this.scoreEdit;
-    const id: string = this.scoreDraft.id;
-    if (!this.available() || edit === undefined || id.length === 0) { return; }
-    this.busy = true;
-    try {
-      if (!await this.confirm('删除评分配置', `删除「${this.scoreDraft.name}」？删除活动配置后恢复默认评分，物品原始数据不变。`, '删除配置')) { return; }
-      this.vm.deleteScore(edit, id);
-      this.showSheet = false; this.scoreEdit = undefined; this.refreshList();
-    } catch (e) { this.toast((e as Error).message); }
-    finally { this.busy = false; }
+
+  private availableSortKeys(): string[] {
+    return BackpackCatalog.sortKeys(this.categoryIndex - 1)
+      .filter((key: string): boolean => !this.sortRules.some((rule: BackpackSortRule): boolean => rule.key === key));
+  }
+
+  private sortLabel(key: string): ResourceStr {
+    switch (key) {
+      case 'rarity': return $r('app.string.ui_backpack_sort_quality');
+      case 'level': return $r('app.string.ui_base_value_slider_level');
+      case 'count': return $r('app.string.ui_backpack_sort_count');
+      default: return BackpackCatalog.SORT_LABELS[key];
+    }
+  }
+
+  private sortLabels(): ResourceStr[] {
+    const labels: ResourceStr[] = ['添加排序条件'];
+    for (const key of this.availableSortKeys()) { labels.push(this.sortLabel(key)); }
+    return labels;
+  }
+
+  private setOptions(): BackpackItem[] {
+    const sets: Map<number, BackpackItem> = new Map<number, BackpackItem>();
+    for (const item of this.vm.allItems) {
+      if (item.setId > 0 && item.setName.length > 0) { sets.set(item.setId, item); }
+    }
+    return Array.from(sets.values()).sort((left: BackpackItem, right: BackpackItem): number => left.setId - right.setId);
+  }
+
+  private numberedFilterChoices(kind: BackpackFilterKind, labels: string[], firstCode: number = 0): BackpackFilterChoice[] {
+    return labels.map((label: string, index: number): BackpackFilterChoice => new BackpackFilterChoice(kind, firstCode + index, label));
+  }
+
+  private allFilterChoices(kind: BackpackFilterKind): BackpackFilterChoice[] {
+    switch (kind) {
+      case BackpackFilterKind.Rarity: return this.numberedFilterChoices(kind, ['一星', '二星', '三星', '四星', '五星'], 1);
+      case BackpackFilterKind.WeaponType:
+        return BackpackCatalog.WEAPON_TYPES.slice(1).map((type: number): BackpackFilterChoice =>
+          new BackpackFilterChoice(kind, type, WikiMetaService.weaponTypeName(type)));
+      case BackpackFilterKind.EquipType: return this.numberedFilterChoices(kind, BackpackCatalog.RELIC_SLOTS.slice(1), 1);
+      case BackpackFilterKind.Set:
+        return this.setOptions().map((item: BackpackItem): BackpackFilterChoice => new BackpackFilterChoice(kind, item.setId, item.setName));
+      case BackpackFilterKind.FoodType: return this.numberedFilterChoices(kind, ['恢复类', '攻击类', '冒险类', '防御类'], 1);
+      case BackpackFilterKind.FoodQuality: return this.numberedFilterChoices(kind, ['奇怪的', '普通', '美味的']);
+      case BackpackFilterKind.Lock: return this.numberedFilterChoices(kind, ['未锁定', '已锁定', '锁定未知']);
+      case BackpackFilterKind.Mark: return this.numberedFilterChoices(kind, ['未标记', '已标记', '标记未知']);
+      case BackpackFilterKind.Equipped: return this.numberedFilterChoices(kind, ['未装备', '已装备', '装备状态未知']);
+      case BackpackFilterKind.Purchased: return this.numberedFilterChoices(kind, ['未购定向词条', '已购定向词条', '定向词条未知']);
+      default: return [];
+    }
+  }
+
+  private availableFilterChoices(kind: BackpackFilterKind): BackpackFilterChoice[] {
+    return this.allFilterChoices(kind).filter((choice: BackpackFilterChoice): boolean =>
+      !this.filterChoices.some((selected: BackpackFilterChoice): boolean => selected.kind === choice.kind && selected.code === choice.code));
+  }
+
+  private filterLabel(choice: BackpackFilterChoice): ResourceStr {
+    if (choice.kind === BackpackFilterKind.Rarity) {
+      const stars: ResourceStr[] = [$r('app.string.ui_model_intrinsic_item_quality_white'),
+        $r('app.string.ui_model_intrinsic_item_quality_green'), $r('app.string.ui_model_intrinsic_item_quality_blue'),
+        $r('app.string.ui_model_intrinsic_item_quality_purple'), $r('app.string.ui_model_intrinsic_item_quality_orange')];
+      return stars[choice.code - 1] ?? choice.label;
+    }
+    return choice.label;
+  }
+
+  private filterLabels(kind: BackpackFilterKind, title: ResourceStr): ResourceStr[] {
+    const labels: ResourceStr[] = [title];
+    for (const choice of this.availableFilterChoices(kind)) { labels.push(this.filterLabel(choice)); }
+    return labels;
+  }
+
+  private chooseFilter(kind: BackpackFilterKind, index: number): void {
+    const choice: BackpackFilterChoice | undefined = this.availableFilterChoices(kind)[index - 1];
+    if (choice === undefined) { return; }
+    this.filterChoices = this.filterChoices.concat([choice]);
+    this.applyFilters();
+  }
+
+  private removeFilter(choice: BackpackFilterChoice): void {
+    this.filterChoices = this.filterChoices.filter((selected: BackpackFilterChoice): boolean =>
+      selected.kind !== choice.kind || selected.code !== choice.code);
+    this.applyFilters();
+  }
+
+  private addSortRule(index: number): void {
+    const key: string | undefined = this.availableSortKeys()[index - 1];
+    if (key === undefined) { return; }
+    this.sortRules = this.sortRules.concat([new BackpackSortRule(key, key !== 'id' && key !== 'name' && key !== 'set')]);
+    this.applyFilters();
+  }
+
+  private changeSortRule(key: string, remove: boolean): void {
+    this.sortRules = remove ? this.sortRules.filter((rule: BackpackSortRule): boolean => rule.key !== key)
+      : this.sortRules.map((rule: BackpackSortRule): BackpackSortRule =>
+        rule.key === key ? new BackpackSortRule(key, !rule.descending) : rule);
+    this.applyFilters();
+  }
+
+  private selectCategory(index: number): void {
+    this.categoryIndex = index;
+    this.filterChoices = [];
+    this.sortRules = [];
+    this.applyFilters();
   }
 
   private applyFilters(): void {
     this.vm.filter.keyword = this.keyword;
     this.vm.filter.category = this.categoryIndex - 1;
-    this.vm.filter.lockedOnly = this.lockedOnly;
-    this.vm.filter.sort = ['id', 'name', 'rarity', 'level', 'count', 'score'][this.sortIndex];
+    this.vm.filter.choices = this.filterChoices;
+    this.vm.filter.sortRules = this.sortRules;
     this.vm.applyFilter();
+    const selected: BackpackItem | undefined = this.selected;
+    if (selected !== undefined && !this.vm.items.some((item: BackpackItem): boolean => item.instanceId === selected.instanceId)) {
+      this.selected = undefined;
+    }
     this.source.notifyDataReload(this.vm.items);
   }
   private search(value: string): void {
@@ -138,9 +278,9 @@ export struct BackpackPage {
   }
   private async confirm(title: string, message: string, action: string): Promise<boolean> {
     if (!this.attached) { return false; }
-    const result: ShowDialogSuccessResponse = await this.getUIContext().getPromptAction().showDialog({
+    const result: ShowDialogSuccessResponse = await this.getUIContext().getPromptAction().showDialog({ systemMaterial: UiSurface.dialogMaterial(),
       title: title, message: message,
-      buttons: [{ text: '取消', color: $r('app.color.text_secondary') }, { text: action, color: $r('app.color.app_primary') }],
+      buttons: [{ text: $r('app.string.common_cancel'), color: $r('app.color.text_secondary') }, { text: action, color: $r('app.color.app_primary') }],
     });
     return result.index === 1 && this.attached;
   }
@@ -248,7 +388,7 @@ export struct BackpackPage {
     if (!this.available() || item === undefined) { return; }
     this.busy = true;
     try {
-      await this.vm.updateCount(item.instanceId, this.editCount);
+      await this.vm.updateCount(item, this.editCount);
       this.refreshList(); this.selected = this.vm.items.find((entry: BackpackItem): boolean => entry.instanceId === item.instanceId);
       this.toast('数量已保存');
     } catch (e) { this.toast((e as Error).message); }
@@ -261,7 +401,7 @@ export struct BackpackPage {
     this.busy = true;
     try {
       if (!await this.confirm('移除物品记录', `仅从「${this.title()}」移除 ${item.name}（${item.instanceId}）？此操作无法撤销。`, '移除此项')) { return; }
-      await this.vm.removeItem(item.instanceId); this.refreshList(); this.showSheet = false;
+      await this.vm.removeItem(item); this.refreshList(); this.showSheet = false;
     } catch (e) { this.toast((e as Error).message); }
     finally { this.busy = false; }
   }
@@ -271,7 +411,7 @@ export struct BackpackPage {
     if (!this.available() || item === undefined) { return; }
     this.busy = true;
     try {
-      await this.vm.categorize(item.instanceId, [2, 3, 4, 5, 6, 7, 9][index]);
+      await this.vm.categorize(item, [2, 3, 4, 5, 6, 7, 9][index]);
       this.refreshList(); this.selected = this.vm.allItems.find((entry: BackpackItem): boolean => entry.instanceId === item.instanceId);
     } catch (e) { this.toast((e as Error).message); }
     finally { this.busy = false; }
@@ -280,19 +420,34 @@ export struct BackpackPage {
   @Builder
   header() {
     Column({ space: 10 }) {
-      PageHeader({ title: '背包档案', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
-        Button('新建').height(44).hoverEffect(HoverEffect.Highlight).enabled(this.available()).onClick(() => this.openSheet('create'))
+      PageHeader({ title: $r('app.string.ui_nav_backpack'), embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
+        Button($r('app.string.ui_cultivation_add_project_action'), { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+          .height(44)
+          .enabled(this.available()).onClick(() => this.openSheet('create'))
       }
       if (this.vm.archives.length > 0) {
-        Select(this.archiveOptions()).selected(this.archiveIndex()).value(this.title()).width('100%')
+        Select(this.archiveOptions()).attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel)).selected(this.archiveIndex()).value(this.title()).width('100%')
           .enabled(this.available()).onSelect((index: number) => { this.selectArchive(index); })
         Flex({ wrap: FlexWrap.Wrap }) {
-          Button('导入 UIIF').height(44).margin({ right: 8, bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.importFile())
-          Button('导出').height(44).margin({ right: 8, bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.exportFile())
-          Button('手动添加').height(44).margin({ right: 8, bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.openSheet('manual'))
-          Button('同步养成库存').height(44).margin({ right: 8, bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.openSheet('sync'))
-          Button('评分设置').height(44).margin({ right: 8, bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.openScore())
-          Button('删除档案').height(44).margin({ bottom: 6 }).hoverEffect(HoverEffect.Highlight).onClick(() => this.deleteArchive())
+          Button($r('app.string.ui_action_import'), { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+            .height(44).margin({ right: 8, bottom: 6 }).onClick(() => this.importFile())
+          Button($r('app.string.ui_action_export'), { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+            .height(44).margin({ right: 8, bottom: 6 }).onClick(() => this.exportFile())
+          Button('手动添加', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+            .height(44).margin({ right: 8, bottom: 6 }).onClick(() => this.openSheet('manual'))
+          Button('同步养成库存', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+            .height(44).margin({ right: 8, bottom: 6 }).onClick(() => this.openSheet('sync'))
+          Button('评分设置', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+            .height(44).margin({ right: 8, bottom: 6 }).onClick(() => this.openScore())
+          Button('删除档案', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel)).fontColor($r('app.color.danger'))
+            .height(44).margin({ bottom: 6 }).onClick(() => this.deleteArchive())
         }.enabled(this.available())
       }
       Text('离线文件与手动记录 · 不读取游戏内存 · UIIF 缺失字段显示为未知')
@@ -303,18 +458,17 @@ export struct BackpackPage {
   @Builder
   filters() {
     Column({ space: 8 }) {
-      Search({ value: this.keyword, placeholder: '搜索名称、物品 ID 或实例 ID' }).onChange((value: string) => this.search(value))
+      Search({ value: this.keyword, placeholder: '搜索名称、物品 ID 或实例 ID' })
+        .attributeModifier(new ControlMaterialModifier(this.surfaceMode, this.surfaceLevel))
+        .onChange((value: string) => this.search(value))
       Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
-        Select(this.options(['全部分类'].concat(BackpackCatalog.CATEGORY_NAMES))).selected(this.categoryIndex)
-          .value(this.categoryIndex === 0 ? '全部分类' : BackpackCatalog.CATEGORY_NAMES[this.categoryIndex - 1])
-          .margin({ right: 8, bottom: 6 }).onSelect((index: number) => { this.categoryIndex = index; this.applyFilters(); })
-        Select(this.options(['物品 ID', '名称', '品质', '等级', '数量', '圣遗物评分'])).selected(this.sortIndex)
-          .value(['物品 ID', '名称', '品质', '等级', '数量', '圣遗物评分'][this.sortIndex])
-          .margin({ right: 8, bottom: 6 }).onSelect((index: number) => { this.sortIndex = index; this.applyFilters(); })
-        Row({ space: 4 }) {
-          Checkbox({ name: 'locked' }).select(this.lockedOnly).onChange((value: boolean) => { this.lockedOnly = value; this.applyFilters(); })
-          Text('仅已知锁定').fontSize(12).fontColor($r('app.color.text_secondary'))
-        }
+        Select(this.options(this.categoryLabels())).attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel)).selected(this.categoryIndex)
+          .value(this.categoryLabel(this.categoryIndex - 1))
+          .margin({ right: 8, bottom: 6 }).onSelect((index: number) => this.selectCategory(index))
+        Button('筛选与排序', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+          .height(44).margin({ bottom: 6 })
+          .enabled(this.available()).onClick(() => this.openSheet('filters'))
       }
       if (this.vm.scoreSettings.warning.length > 0) {
         Text(this.vm.scoreSettings.warning).fontSize(12).fontColor($r('app.color.danger')).width('100%')
@@ -322,6 +476,80 @@ export struct BackpackPage {
       Text(`${this.vm.items.length} / ${this.vm.allItems.length} 项 · 未识别物品保留原始 ID 与数据`)
         .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
     }.padding({ left: 16, right: 16, bottom: 10 })
+  }
+
+  @Builder
+  filterControl(kind: BackpackFilterKind, title: ResourceStr) {
+    if (this.availableFilterChoices(kind).length > 0) {
+      BackpackFilterSelect({ labels: this.filterLabels(kind, title),
+        onChoose: (index: number) => this.chooseFilter(kind, index) })
+    }
+  }
+
+  @Builder
+  filterSheet() {
+    Column({ space: 10 }) {
+      Text($r('app.string.ui_filter')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
+      if (this.filterChoices.length > 0) {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.filterChoices, (choice: BackpackFilterChoice) => {
+            Button({ type: ButtonType.Normal }) {
+              Row({ space: 4 }) {
+                Text(this.filterLabel(choice)).fontSize(12).fontColor($r('app.color.text_primary'))
+                Text('×').fontSize(12).fontColor($r('app.color.text_primary'))
+              }
+            }
+              .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+              .height(44).margin({ right: 6, bottom: 6 })
+              .accessibilityText(`移除${choice.label}筛选`)
+              .onClick(() => this.removeFilter(choice))
+          }, (choice: BackpackFilterChoice): string => `${choice.kind}:${choice.code}:${choice.label}`)
+        }.width('100%')
+      }
+      this.filterControl(BackpackFilterKind.Rarity, $r('app.string.ui_backpack_sort_quality'))
+      if (this.categoryIndex === BackpackCategory.Weapon + 1) {
+        this.filterControl(BackpackFilterKind.WeaponType, '按武器类型筛选')
+      }
+      if (this.categoryIndex === BackpackCategory.Reliquary + 1) {
+        this.filterControl(BackpackFilterKind.EquipType, '按圣遗物部位筛选')
+        this.filterControl(BackpackFilterKind.Set, '按套装筛选')
+        this.filterControl(BackpackFilterKind.Mark, '按标记状态筛选')
+        this.filterControl(BackpackFilterKind.Purchased, '按定向词条筛选')
+      }
+      if (this.categoryIndex === BackpackCategory.Weapon + 1 || this.categoryIndex === BackpackCategory.Reliquary + 1) {
+        this.filterControl(BackpackFilterKind.Equipped, '按装备状态筛选')
+      }
+      if (this.categoryIndex === 0 || this.categoryIndex === BackpackCategory.Weapon + 1 || this.categoryIndex === BackpackCategory.Reliquary + 1) {
+        this.filterControl(BackpackFilterKind.Lock, '按锁定状态筛选')
+      }
+      if (this.categoryIndex === BackpackCategory.Food + 1) {
+        this.filterControl(BackpackFilterKind.FoodType, '按料理类型筛选')
+        this.filterControl(BackpackFilterKind.FoodQuality, '按料理品质筛选')
+      }
+      Text('排序').fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
+      ForEach(this.sortRules, (rule: BackpackSortRule) => {
+        Row({ space: 8 }) {
+          Text(this.sortLabel(rule.key)).fontSize(14).fontColor($r('app.color.text_primary')).layoutWeight(1)
+          Button(rule.descending ? '降序' : '升序', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+            .height(44).fontSize(12)
+            .onClick(() => this.changeSortRule(rule.key, false))
+          Button('移除', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+            .height(44).fontSize(12)
+            .onClick(() => this.changeSortRule(rule.key, true))
+        }.width('100%')
+      }, (rule: BackpackSortRule): string => `${rule.key}:${rule.descending}`)
+      if (this.availableSortKeys().length > 0) {
+        BackpackFilterSelect({ labels: this.sortLabels(),
+          onChoose: (index: number) => this.addSortRule(index) })
+      }
+      Button('重置筛选与排序', { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+        .height(44).onClick(() => {
+        this.filterChoices = []; this.sortRules = []; this.applyFilters();
+      })
+    }.width('100%').alignItems(HorizontalAlign.Start)
   }
 
   @Builder
@@ -334,11 +562,13 @@ export struct BackpackPage {
           Text(BackpackScoring.label(item.score)).fontSize(12).fontColor($r('app.color.app_primary_text')).maxLines(2)
         }
         Text(BackpackCatalog.detail(item)).fontSize(12).fontColor($r('app.color.text_secondary')).maxLines(2)
-        Text(`${BackpackCatalog.CATEGORY_NAMES[item.category]} · #${item.itemId}${item.isLocked === true ? ' · 已锁定' : ''}`)
-          .fontSize(11).fontColor($r('app.color.text_secondary'))
+        Row({ space: 4 }) {
+          Text(this.categoryLabel(item.category)).fontSize(11).fontColor($r('app.color.text_secondary'))
+          Text(`· #${item.itemId}${item.isLocked === true ? ' · 已锁定' : ''}`).fontSize(11).fontColor($r('app.color.text_secondary'))
+        }
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Text('›').fontSize(24).fontColor($r('app.color.text_secondary')).accessibilityLevel('no')
-    }.width('100%').padding(12).borderRadius(12).attributeModifier(new CardSurfaceModifier())
+    }.width('100%').padding(12).borderRadius(12).attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
       .border({ width: 1, color: $r('app.color.card_stroke') }).hoverEffect(HoverEffect.Highlight)
       .focusable(true).enabled(this.available()).onClick(() => { this.selected = item; this.editCount = String(item.count); if (!this.isWide) { this.openSheet('details'); } })
       .accessibilityText(`${item.name}，${BackpackCatalog.detail(item)}，查看详情`)
@@ -350,9 +580,31 @@ export struct BackpackPage {
       Column({ space: 12 }) {
         Text(this.selected.name).fontSize(21).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
         Text(BackpackCatalog.detail(this.selected)).fontSize(14).fontColor($r('app.color.text_primary'))
+        if (this.selected.setName.length > 0) {
+          Text(`${this.selected.setName} · ${BackpackCatalog.RELIC_SLOTS[this.selected.equipType]}`)
+            .fontSize(13).fontColor($r('app.color.text_secondary'))
+        }
+        if (this.selected.kind === 'weapon' || this.selected.kind === 'reliquary') {
+          Row({ space: 8 }) {
+            if (this.vm.equippedAvatarIcon(this.selected.equippedAvatarId).length > 0) {
+              MetaIcon({ category: 'AvatarIcon', name: this.vm.equippedAvatarIcon(this.selected.equippedAvatarId),
+                iconSize: 32, remoteFallback: false })
+            }
+            Text(this.vm.equippedAvatarLabel(this.selected.equippedAvatarId))
+              .fontSize(13).fontColor($r('app.color.text_secondary'))
+          }
+        }
         Text(`物品 ID：${this.selected.itemId}\n本地实例：${this.selected.instanceId}\n游戏 GUID：${this.selected.guid || '文件未提供'}\n锁定：${this.selected.isLocked === undefined ? '未知' : this.selected.isLocked ? '是' : '否'}\n标记：${this.selected.isMarked === undefined ? '未知' : this.selected.isMarked ? '是' : '否'}`)
           .fontSize(13).fontColor($r('app.color.text_secondary')).copyOption(CopyOptions.InApp)
         if (this.selected.kind === 'reliquary') {
+          if (this.selected.purchasedAppendPropIds === undefined || this.selected.purchasedAppendPropIds.length === 0) {
+            Text(this.selected.purchasedAppendPropIds === undefined ? '定向词条未知' : '未购定向词条')
+              .fontSize(13).fontColor($r('app.color.text_secondary'))
+          } else {
+            Text('定向词条').fontSize(13).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+            Text(this.vm.purchasedStatNames(this.selected.purchasedAppendPropIds).join('、'))
+              .fontSize(13).fontColor($r('app.color.text_secondary'))
+          }
           Text(`副词条原始 ID（含重复强化记录）：\n${this.selected.appendPropIds.length > 0 ? this.selected.appendPropIds.join('、') : '无记录'}`)
             .fontSize(13).fontColor($r('app.color.text_secondary'))
           Text(BackpackScoring.label(this.selected.score)).fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.app_primary_text'))
@@ -364,17 +616,22 @@ export struct BackpackPage {
         }
         if (this.selected.kind === 'material' || this.selected.kind === 'furniture') {
           Row({ space: 8 }) {
-            TextInput({ text: this.editCount, placeholder: '数量' }).type(InputType.Number).layoutWeight(1).onChange((value: string) => this.editCount = value)
-            Button('保存数量').height(44).enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.saveCount())
+            TextInput({ text: this.editCount, placeholder: $r('app.string.ui_backpack_sort_count') }).type(InputType.Number)
+              .layoutWeight(1).onChange((value: string) => this.editCount = value)
+            Button($r('app.string.ui_action_save'), { type: ButtonType.Normal })
+              .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
+              .height(44).enabled(this.available()).onClick(() => this.saveCount())
           }
         }
         if (this.selected.kind === 'material') {
           Text('本地分类（随应用备份保留）').fontSize(12).fontColor($r('app.color.text_secondary'))
-          Select(this.options(['养成道具', '食物', '材料', '小道具', '任务', '贵重道具', '恢复自动分类']))
+          Select(this.options(['养成道具', '食物', '材料', '小道具', '任务', '贵重道具', '恢复自动分类'])).attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel))
             .value(BackpackCatalog.CATEGORY_NAMES[this.selected.category]).enabled(this.available())
             .onSelect((index: number) => this.categorize(index))
         }
-        Button('移除此项记录').height(44).enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.removeItem())
+        Button('移除此项记录', { type: ButtonType.Normal })
+          .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel)).fontColor($r('app.color.danger'))
+          .height(44).enabled(this.available()).onClick(() => this.removeItem())
         Text('原始 UIIF 条目').fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
         Text(this.selected.rawJson.substring(0, 4000)).fontSize(12).fontFamily('monospace').fontColor($r('app.color.text_secondary')).copyOption(CopyOptions.InApp)
         if (this.selected.rawJson.length > 4000) {
@@ -385,63 +642,19 @@ export struct BackpackPage {
   }
 
   @Builder
-  scoreWeight(index: number) {
-    Row({ space: 10 }) {
-      Text(BackpackScoreProfile.LABELS[index]).fontSize(13).fontColor($r('app.color.text_primary')).width(100)
-      Slider({ value: this.scoreDraft.weights[index], min: 0, max: 1, step: 0.1 }).layoutWeight(1)
-        .enabled(this.available()).onChange((value: number) => this.changeWeight(index, value))
-      Text(this.scoreDraft.weights[index].toFixed(1)).fontSize(13).fontColor($r('app.color.text_secondary')).width(30)
-    }.width('100%')
-  }
-
-  @Builder
-  scoreEditor() {
-    Column({ space: 12 }) {
-      Text('圣遗物评分配置').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
-      Text('所有背包共用活动配置，与角色推荐评分分开。取消不会保存改动。').fontSize(12).fontColor($r('app.color.text_secondary'))
-      Flex({ wrap: FlexWrap.Wrap }) {
-        ForEach([0, 1, 2, 3, 4], (preset: number) => {
-          Button(BackpackScoreProfile.PRESETS[preset]).height(44).margin({ right: 8, bottom: 6 })
-            .enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.choosePreset(preset))
-        }, (preset: number) => `${preset}`)
-      }
-      if (this.vm.scoreSettings.profiles.length > 0) {
-        Select(this.options(this.vm.scoreSettings.profiles.map((profile: BackpackScoreProfile): string => profile.name)))
-          .value(this.scoreDraft.name).enabled(this.available()).onSelect((index: number) => {
-            this.scoreDraft = BackpackScoreProfile.clone(this.vm.scoreSettings.profiles[index]);
-          })
-      }
-      TextInput({ text: this.scoreDraft.name, placeholder: '配置名称' }).maxLength(80).enabled(this.available())
-        .onChange((value: string) => {
-          const next: BackpackScoreProfile = BackpackScoreProfile.clone(this.scoreDraft);
-          next.name = value; this.scoreDraft = next;
-        })
-      this.scoreWeight(0)
-      this.scoreWeight(1)
-      this.scoreWeight(2)
-      this.scoreWeight(3)
-      this.scoreWeight(4)
-      this.scoreWeight(5)
-      this.scoreWeight(6)
-      Text('固定生命、攻击、防御不计分。权重 0 表示不计入该项；合法零分仍会显示。').fontSize(12).fontColor($r('app.color.text_secondary'))
-      Flex({ wrap: FlexWrap.Wrap }) {
-        Button('另存为新配置').height(44).margin({ right: 8, bottom: 6 }).enabled(this.available()).hoverEffect(HoverEffect.Highlight)
-          .onClick(() => { const next: BackpackScoreProfile = BackpackScoreProfile.clone(this.scoreDraft); next.id = ''; this.scoreDraft = next; })
-        if (this.scoreDraft.id.length > 0) {
-          Button('删除当前配置').height(44).margin({ right: 8, bottom: 6 }).enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.deleteScore())
-        }
-        Button('应用并保存').height(44).enabled(this.available() && this.vm.scoreSettings.warning.length === 0)
-          .hoverEffect(HoverEffect.Highlight).onClick(() => this.saveScore())
-      }
-    }.width('100%').alignItems(HorizontalAlign.Start)
-  }
-
-  @Builder
   sheetContent() {
     Scroll() {
       Column({ space: 14 }) {
         if (this.sheetMode === 'score') {
-          this.scoreEditor()
+          ReliquaryScoreEditor({
+            initialProfile: this.scoreEdit.profile,
+            savedProfiles: this.vm.scoreSettings.profiles,
+            warning: this.vm.scoreSettings.warning,
+            onConfirm: (profile: BackpackScoreProfile, deletedIds: string[]) => this.saveScore(profile, deletedIds),
+            onCancel: () => { this.showSheet = false; }
+          })
+        } else if (this.sheetMode === 'filters') {
+          this.filterSheet()
         } else if (this.sheetMode === 'create') {
           Text('创建离线背包档案').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
           Text('UID 由你明确指定，不需要登录；同一 UID 可以保留不同时间的快照。').fontSize(13).fontColor($r('app.color.text_secondary'))
@@ -449,10 +662,13 @@ export struct BackpackPage {
             .enterKeyType(EnterKeyType.Next).onChange((value: string) => this.newName = value)
           TextInput({ text: this.newUid, placeholder: '9 或 10 位游戏 UID' }).type(InputType.Number).maxLength(10)
             .enterKeyType(EnterKeyType.Done).onChange((value: string) => this.newUid = value).onSubmit(() => this.createArchive())
-          Button('创建档案').height(44).width('100%').enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.createArchive())
+          Button('创建档案', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
+            .height(44).width('100%').enabled(this.available()).onClick(() => this.createArchive())
         } else if (this.sheetMode === 'manual') {
           Text('手动添加物品').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
-          Select(this.options(['材料', '武器', '圣遗物', '摆设'])).selected(this.manualKind).value(['材料', '武器', '圣遗物', '摆设'][this.manualKind])
+          Select(this.options(this.manualKindLabels())).attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel))
+            .selected(this.manualKind).value(this.manualKindLabels()[this.manualKind])
             .onSelect((index: number) => this.manualKind = index)
           TextInput({ text: this.manualId, placeholder: '物品 ID' }).type(InputType.Number).onChange((value: string) => this.manualId = value)
           if (this.manualKind === 0 || this.manualKind === 3) {
@@ -460,7 +676,8 @@ export struct BackpackPage {
               .enterKeyType(EnterKeyType.Done).onChange((value: string) => this.manualCount = value).onSubmit(() => this.saveManual())
           } else {
             Text(this.manualKind === 2 ? 'UIIF 原始等级：1 = +0，21 = +20' : '武器等级与突破等级').fontSize(12).fontColor($r('app.color.text_secondary'))
-            TextInput({ text: this.manualLevel, placeholder: '等级' }).type(InputType.Number).onChange((value: string) => this.manualLevel = value)
+            TextInput({ text: this.manualLevel, placeholder: $r('app.string.ui_base_value_slider_level') })
+              .type(InputType.Number).onChange((value: string) => this.manualLevel = value)
             if (this.manualKind === 1) {
               TextInput({ text: this.manualPromote, placeholder: '突破等级' }).type(InputType.Number).onChange((value: string) => this.manualPromote = value)
               TextInput({ text: this.manualAffix, placeholder: '精炼词条 ID（可不填）' }).type(InputType.Number).onChange((value: string) => this.manualAffix = value)
@@ -474,21 +691,25 @@ export struct BackpackPage {
             }
           }
           Text('不会推测 GUID、锁定或词条数值。同一物品 ID 的装备会保留为不同实例。').fontSize(12).fontColor($r('app.color.text_secondary'))
-          Button('添加物品').height(44).width('100%').enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.saveManual())
+          Button('添加物品', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
+            .height(44).width('100%').enabled(this.available()).onClick(() => this.saveManual())
         } else if (this.sheetMode === 'sync') {
           Text('同步材料到养成项目').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
           Text(this.title()).fontSize(13).fontColor($r('app.color.text_secondary'))
           if (this.vm.projects.length === 0) {
             EmptyState({ text: '暂无养成项目，请先在养成计算中创建项目' })
           } else {
-            Select(this.options(this.vm.projects.map((project: CultivateProject): string => project.name))).selected(this.projectIndex)
+            Select(this.options(this.vm.projects.map((project: CultivateProject): string => project.name))).attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel)).selected(this.projectIndex)
               .value(this.vm.projects[this.projectIndex]?.name ?? '选择项目').onSelect((index: number) => this.projectIndex = index)
             Row({ space: 8 }) {
               Checkbox({ name: 'replace' }).select(this.replaceMaterials).onChange((value: boolean) => this.replaceMaterials = value)
               Text('替换项目库存（默认合并）').fontSize(14).fontColor($r('app.color.text_primary'))
             }
             Text('合并只更新此背包中明确给出的材料数量。替换会移除目标项目里未出现的库存记录。').fontSize(13).fontColor($r('app.color.text_secondary'))
-            Button('预览并同步').height(44).width('100%').enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.syncMaterials())
+            Button('预览并同步', { type: ButtonType.Normal })
+              .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
+              .height(44).width('100%').enabled(this.available()).onClick(() => this.syncMaterials())
           }
         } else { this.details() }
       }.width('100%').padding(20).alignItems(HorizontalAlign.Start)
@@ -502,7 +723,9 @@ export struct BackpackPage {
         this.header()
         if (this.vm.message.length > 0) {
           Text(this.vm.message).fontColor($r('app.color.danger')).padding(12)
-          Button('重试').height(44).enabled(this.available()).hoverEffect(HoverEffect.Highlight).onClick(() => this.reload())
+          Button('重试', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
+            .height(44).enabled(this.available()).onClick(() => this.reload())
         }
         if (this.vm.loading || this.busy) {
           Row({ space: 8 }) {
@@ -520,11 +743,11 @@ export struct BackpackPage {
             } else {
               List({ space: 8 }) {
                 LazyForEach(this.source, (item: BackpackItem) => { ListItem() { this.itemRow(item) } },
-                  (item: BackpackItem): string => `${this.vm.currentId}:${item.instanceId}:${item.count}:${item.level}:${item.category}:${item.score.available}:${item.score.value}:${this.vm.scoreSettings.revision}`)
+                  (item: BackpackItem): string => `${this.vm.currentId}:${item.instanceId}:${item.count}:${item.level}:${item.category}:${item.score.available}:${item.score.value}:${this.vm.scoreSettings.revision}:${item.name}`)
               }.layoutWeight(1).height('100%').padding({ bottom: 24 }).cachedCount(5)
             }
             if (this.isWide) {
-              Scroll() { this.details() }.width(340).height('100%').attributeModifier(new CardSurfaceModifier()).borderRadius(12)
+              Scroll() { this.details() }.width(340).height('100%').attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel)).borderRadius(12)
             }
           }.layoutWeight(1).padding({ left: 16, right: 16, bottom: 12 }).alignItems(VerticalAlign.Top)
         }
@@ -535,6 +758,7 @@ export struct BackpackPage {
         if (wide && !this.isWide && this.sheetMode === 'details') { this.showSheet = false; }
         this.isWide = wide;
       })
-      .bindSheet($$this.showSheet, this.sheetContent(), { height: '80%', showClose: true })
+      .bindSheet($$this.showSheet, this.sheetContent(), { height: '80%', showClose: true,
+        systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel) })
   }
 }

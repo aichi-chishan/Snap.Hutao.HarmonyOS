@@ -3,11 +3,11 @@
  * 活动日历：周视图（生日角色 + 当日可刷天赋/武器材料，对齐 Windows CalendarCard）
  * + 按时间排序列表（活动/卡池/签到条目）；周视图与材料不依赖登录。
  */
-import { router, LengthMetrics } from '@kit.ArkUI';
+import { LengthMetrics } from '@kit.ArkUI';
 import { CalendarViewModel } from '../viewmodel/CalendarViewModel';
-import { ActCalendarEntry, ActCalendarType } from '../model/ActCalendarEntry';
-import { DateUtil } from '../common/DateUtil';
-import { CalendarWeekData, CalendarWeekDay, CalendarWeekService, CalendarBirthday,
+import { ActCalendarEntry, ActCalendarType, ActRewardEntry } from '../model/ActCalendarEntry';
+import { GameCalendarRules } from '../service/GameCalendarRules';
+import { CalendarWeekDay, CalendarWeekService, CalendarBirthday,
   CalendarWeekMaterial, CalendarMaterialConsumer } from '../service/CalendarWeekService';
 import { Loading } from '../components/Loading';
 import { EmptyState } from '../components/EmptyState';
@@ -16,65 +16,102 @@ import { PageHeader } from '../components/PageHeader';
 import { NavIcon } from '../components/NavIcon';
 import { MetaIcon } from '../components/MetaIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
-import { CardSurfaceModifier } from '../common/UiSurface';
+import { calendarDateLabel, calendarWeekdayLabel } from '../components/CalendarWeekdayLabel';
+import { AppButtonModifier, CardSurfaceModifier, SelectMaterialModifier, UiSurface } from '../common/UiSurface';
+
+const OFFSET_OPTIONS: SelectOption[] = GameCalendarRules.OFFSET_HOURS.map((hours: number): SelectOption =>
+  ({ value: GameCalendarRules.offsetLabel(hours) }));
 
 @Entry
 @Component
 export struct CalendarPage {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
-  @StorageLink('currentUid') currentUid: string = '';
-  @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
+  @StorageProp('currentUid') @Watch('onOwnerChanged') currentUid: string = '';
+  @StorageProp('currentUserId') @Watch('onOwnerChanged') currentUserId: number = 0;
+  @StorageProp('isLoggedIn') @Watch('onOwnerChanged') isLoggedIn: boolean = false;
+  @StorageProp('calendarSettingsVersion') @Watch('onCalendarSettingsChanged') calendarVersion: number = 0;
+  @StorageProp('helpLocaleVersion') @Watch('onCalendarSettingsChanged') localeVersion: number = 0;
   @State vm: CalendarViewModel = new CalendarViewModel();
   @State now: number = Date.now();
-  /** 周视图数据（生日 + 材料轮换；不依赖登录） */
-  @State week: CalendarWeekData | undefined = undefined;
-  /** 选中的周历日下标 */
-  @State weekSelIdx: number = 0;
+  @State isWide: boolean = false;
   /** 材料详情弹层（点击材料图标打开，展示消费者角色/武器） */
   @State selectedMat: CalendarWeekMaterial | undefined = undefined;
   @State showMatSheet: boolean = false;
+  private attached: boolean = false;
+  private clockTimer: number = -1;
 
   aboutToAppear(): void {
+    this.attached = true;
+    this.vm.clearActivities();
+    this.refresh();
+    this.clockTimer = setInterval(() => {
+      this.now = Date.now();
+      const today: CalendarWeekDay | undefined = this.vm.week?.days.find((day: CalendarWeekDay): boolean => day.isToday);
+      if (today !== undefined && GameCalendarRules.serverDay(this.now, this.displayOffset()) !==
+        GameCalendarRules.serverDay(today.dateMs, this.displayOffset())) {
+        this.loadWeek();
+      }
+    }, 60000);
+  }
+
+  aboutToDisappear(): void {
+    this.attached = false;
+    clearInterval(this.clockTimer);
+    this.vm.dispose();
+  }
+
+  onOwnerChanged(): void {
+    this.vm.clearActivities();
+    this.loadData();
+  }
+
+  onCalendarSettingsChanged(): void {
+    if (this.attached) { this.loadWeek(); }
+  }
+
+  private refresh(): void {
     this.loadWeek();
     this.loadData();
   }
 
   loadWeek(): void {
-    CalendarWeekService.loadWeek().then((w: CalendarWeekData) => {
-      this.week = w;
-      // 默认选中今日
-      for (let i = 0; i < w.days.length; i++) {
-        if (w.days[i].isToday) {
-          this.weekSelIdx = i;
-          break;
-        }
-      }
-    });
+    this.now = Date.now();
+    this.vm.loadWeek(this.now);
   }
 
   loadData(): void {
-    if (this.isLoggedIn && this.currentUid.length > 0) {
-      this.vm.load(this.currentUid).then(() => {
-      });
-    }
+    if (!this.attached || !this.isLoggedIn || this.currentUid.length === 0) { return; }
+    const uid: string = this.currentUid;
+    const userId: number = this.currentUserId;
+    this.vm.load(uid, (): boolean => this.attached && this.isLoggedIn &&
+      this.currentUid === uid && this.currentUserId === userId);
   }
 
-  toast(msg: string): void {
-    this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1800 });
+  private displayOffset(): number {
+    return this.vm.week?.offsetHours ?? GameCalendarRules.DEFAULT_OFFSET_HOURS;
+  }
+
+  private changeGlobalOffset(index: number): void {
+    const hours: number | undefined = GameCalendarRules.OFFSET_HOURS[index];
+    if (hours === undefined || hours === this.vm.week?.globalOffsetHours) { return; }
+    CalendarWeekService.setGlobalOffset(hours);
+    const version: number = AppStorage.get<number>('calendarSettingsVersion') ?? 0;
+    AppStorage.setOrCreate<number>('calendarSettingsVersion', version + 1);
   }
 
   @Builder
   header() {
-    PageHeader({ title: '活动日历', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
-      Button('刷新')
+    PageHeader({ title: $r('app.string.ui_section_calendar'), embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
+      Button($r('app.string.ui_daily_note_refresh'), { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
         .fontSize(12)
-        .height(28)
-        .backgroundColor($r('app.color.app_primary'))
-        .fontColor($r('app.color.on_accent'))
+        .height(44)
         .onClick(() => {
-          this.loadData();
+          this.refresh();
         })
     }
   }
@@ -83,26 +120,25 @@ export struct CalendarPage {
   loginGuide() {
     Column({ space: 14 }) {
       NavIcon({ name: 'Database', iconSize: 60 })
-      Text('需登录后查看活动日历')
+      Text($r('app.string.ui_settings_not_logged_in'))
         .fontSize(17)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary'))
-      Button('去登录')
-        .backgroundColor($r('app.color.app_primary'))
-        .fontColor($r('app.color.on_accent'))
+      Button($r('app.string.ui_spiral_abyss_upload_record_homa_not_login_primary_button_text'), { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true)).constraintSize({ minHeight: 44 })
         .onClick(() => {
-          router.pushUrl({ url: 'pages/LoginPage' });
+          this.getUIContext().getRouter().pushUrl({ url: 'pages/LoginPage' });
         })
     }
     .width('100%')
-    .padding({ top: 80, bottom: 80 })
+    .padding({ top: 40, bottom: 40 })
   }
 
   @Builder
   calendarRow(entry: ActCalendarEntry) {
     Row({ space: 10 }) {
       Column() {
-        Text(entry.typeName)
+        Text(entry.type === ActCalendarType.SIGN_IN ? $r('app.string.ui_section_sign_in') : entry.typeName)
           .fontSize(11)
           .fontColor($r('app.color.on_accent'))
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
@@ -128,9 +164,15 @@ export struct CalendarPage {
             .fontSize(11)
             .fontColor($r('app.color.app_primary_text'))
         }
-        Text(`${DateUtil.formatMonthDay(entry.startTime)} ~ ${DateUtil.formatMonthDay(entry.endTime)}`)
+        Text(`${GameCalendarRules.formatMonthDay(entry.startTime, this.displayOffset())} ~ ` +
+          GameCalendarRules.formatMonthDay(entry.endTime, this.displayOffset()))
           .fontSize(12)
           .fontColor($r('app.color.text_secondary'))
+        if (entry.isOngoing(this.now)) {
+          Text(`剩余 ${ActCalendarEntry.timeSpan(entry.endTime - this.now)}`)
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+        }
         if (entry.desc.length > 0 && entry.type !== ActCalendarType.CARD_POOL) {
           Text(entry.desc)
             .fontSize(11)
@@ -138,19 +180,31 @@ export struct CalendarPage {
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
-        // 卡池角色头像
-        if (entry.avatarIcons.length > 0) {
-          Row({ space: 4 }) {
-            ForEach(entry.avatarIcons, (icon: string, idx: number) => {
-              if (idx < 5) {
-                Image(icon)
-                  .width(32)
-                  .height(32)
-                  .borderRadius(16)
-                  .objectFit(ImageFit.Cover)
-                  .backgroundColor($r('app.color.app_primary_bg'))
-              }
+        if (entry.progressLine().length > 0) {
+          Text(entry.progressLine()).fontSize(12).fontColor($r('app.color.app_primary_text'))
+        }
+        if (entry.avatarIcons.length > 0 || entry.weaponIcons.length > 0) {
+          Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(4), cross: LengthMetrics.vp(4) } }) {
+            ForEach(entry.avatarIcons.concat(entry.weaponIcons), (icon: string) => {
+              Image(icon)
+                .width(32)
+                .height(32)
+                .borderRadius(8)
+                .objectFit(ImageFit.Contain)
+                .backgroundColor($r('app.color.app_primary_bg'))
             }, (icon: string, idx: number) => `${idx}_${icon}`)
+          }
+          .margin({ top: 4 })
+        }
+        if (entry.rewards.length > 0) {
+          Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(4) } }) {
+            ForEach(entry.rewards, (reward: ActRewardEntry) => {
+              Row({ space: 2 }) {
+                MetaIcon({ category: 'ItemIcon', name: reward.iconName(), iconSize: 22, remoteFallback: true })
+                Text(`×${reward.num}`).fontSize(10).fontColor($r('app.color.text_secondary'))
+              }
+              .accessibilityText(`${reward.name} ${reward.num}`)
+            }, (reward: ActRewardEntry, idx: number) => `${reward.itemId}_${idx}`)
           }
           .margin({ top: 4 })
         }
@@ -161,42 +215,46 @@ export struct CalendarPage {
     .width('100%')
     .padding(14)
     .borderRadius(12)
-    .attributeModifier(new CardSurfaceModifier())
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
     .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
   /** 周条（7 天切换；生日角色有角标，对齐 Windows CalendarCard 周历） */
   @Builder
   weekStrip() {
-    if (this.week !== undefined) {
+    if (this.vm.week !== undefined) {
       Row({ space: 6 }) {
-        ForEach(this.week.days, (day: CalendarWeekDay, idx: number) => {
+        ForEach(this.vm.week.days, (day: CalendarWeekDay) => {
           Column({ space: 2 }) {
-            Text(day.dayName)
+            Text(calendarWeekdayLabel(day.weekday))
               .fontSize(10)
-              .fontColor(this.weekSelIdx === idx ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .fontColor(this.vm.selectedDateMs === day.dateMs ? $r('app.color.app_primary_text') : $r('app.color.text_secondary'))
             Text(day.monthDay)
               .fontSize(13)
               .fontWeight(day.isToday ? FontWeight.Bold : FontWeight.Normal)
-              .fontColor(this.weekSelIdx === idx ? $r('app.color.app_primary') : $r('app.color.text_primary'))
-            // 生日角标（🎂）与今日圆点
-            Text(this.week !== undefined && this.week.birthdayFlags[idx] ? '🎂' : (day.isToday ? '·' : ''))
+              .fontColor(this.vm.selectedDateMs === day.dateMs ? $r('app.color.app_primary_text') : $r('app.color.text_primary'))
+            Text(day.birthdays.length > 0 ? '🎂' : (day.isToday ? '·' : ''))
               .fontSize(10)
               .height(14)
           }
           .layoutWeight(1)
           .padding({ top: 8, bottom: 6 })
           .borderRadius(10)
-          .backgroundColor(this.weekSelIdx === idx ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
+          .backgroundColor(this.vm.selectedDateMs === day.dateMs ? $r('app.color.app_primary_bg') : $r('app.color.card_inner_tint'))
           .border({
             width: 1,
-            color: this.weekSelIdx === idx ? $r('app.color.app_primary') : $r('app.color.card_stroke')
+            color: this.vm.selectedDateMs === day.dateMs ? $r('app.color.app_primary') : $r('app.color.card_stroke')
           })
+          .focusable(true)
+          .accessibilitySelected(this.vm.selectedDateMs === day.dateMs)
+          .accessibilityText(`${calendarDateLabel(this.getUIContext(), day)}${day.birthdays.length > 0 ? ' 有角色生日' : ''}`)
           .hoverEffect(HoverEffect.Highlight)
           .onClick(() => {
-            this.weekSelIdx = idx;
+            this.vm.selectedDateMs = day.dateMs;
           })
-        }, (day: CalendarWeekDay, idx: number) => `wd_${day.dateMs}_${this.weekSelIdx === idx}`)
+        }, (day: CalendarWeekDay) => `wd_${day.dateMs}_${day.isToday}_${day.birthdays.length}_${this.localeVersion}`)
       }
       .width('100%')
     }
@@ -207,7 +265,7 @@ export struct CalendarPage {
   birthdayCell(b: CalendarBirthday) {
     Column({ space: 2 }) {
       if (b.icon.length > 0) {
-        MetaIcon({ category: 'AvatarIcon', name: b.icon, iconSize: 36 })
+        MetaIcon({ category: 'AvatarIcon', name: b.icon, iconSize: 36, remoteFallback: true })
           .borderRadius(18)
           .clip(true)
       } else {
@@ -232,14 +290,6 @@ export struct CalendarPage {
     .backgroundColor($r('app.color.cultivate_highlight'))
   }
 
-  /** 当前选中的周历日（未就绪返回 undefined） */
-  private curWeekDay(): CalendarWeekDay | undefined {
-    if (this.week === undefined || this.weekSelIdx < 0 || this.weekSelIdx >= this.week.days.length) {
-      return undefined;
-    }
-    return this.week.days[this.weekSelIdx];
-  }
-
   /** 品质描边色（对齐 Windows ItemIcon Quality：金/紫/灰） */
   private static matColor(rank: number): Resource {
     if (rank >= 5) {
@@ -251,11 +301,20 @@ export struct CalendarPage {
     return $r('app.color.text_secondary');
   }
 
+  private openMaterial(id: number): void {
+    const day: CalendarWeekDay | undefined = this.vm.selectedDay();
+    const material: CalendarWeekMaterial | undefined = day?.talentMats.find((item: CalendarWeekMaterial): boolean => item.id === id)
+      ?? day?.weaponMats.find((item: CalendarWeekMaterial): boolean => item.id === id);
+    if (material === undefined) { return; }
+    this.selectedMat = material;
+    this.showMatSheet = true;
+  }
+
   /** 材料图标格（品质描边 + 名称；养成计划命中加高亮底色，对齐 Windows CalendarMaterial.Highlight） */
   @Builder
   matCell(mat: CalendarWeekMaterial) {
     Column({ space: 3 }) {
-      MetaIcon({ category: 'ItemIcon', name: mat.icon, iconSize: 34 })
+      MetaIcon({ category: 'ItemIcon', name: mat.icon, iconSize: 34, remoteFallback: true })
         .padding(3)
         .border({ width: 1.5, color: CalendarPage.matColor(mat.rank) })
         .borderRadius(8)
@@ -272,10 +331,11 @@ export struct CalendarPage {
     .padding(4)
     .borderRadius(8)
     .backgroundColor(mat.highlighted ? $r('app.color.cultivate_highlight') : $r('app.color.card_inner_tint'))
+    .focusable(true)
+    .accessibilityText(mat.name)
     .hoverEffect(HoverEffect.Highlight)
     .onClick(() => {
-      this.selectedMat = mat;
-      this.showMatSheet = true;
+      this.openMaterial(mat.id);
     })
   }
 
@@ -289,7 +349,7 @@ export struct CalendarPage {
     }) {
       ForEach(mats, (mat: CalendarWeekMaterial) => {
         this.matCell(mat)
-      }, (mat: CalendarWeekMaterial) => `m_${mat.id}_${mat.highlighted}`)
+      }, (mat: CalendarWeekMaterial) => `m_${mat.id}_${mat.name}_${mat.icon}_${mat.highlighted}_${mat.rank}`)
     }
     .width('100%')
   }
@@ -302,7 +362,8 @@ export struct CalendarPage {
         MetaIcon({
           category: 'ItemIcon',
           name: this.selectedMat !== undefined ? this.selectedMat.icon : '',
-          iconSize: 48
+          iconSize: 48,
+          remoteFallback: true
         })
           .padding(3)
           .border({ width: 1.5, color: this.selectedMat !== undefined ? CalendarPage.matColor(this.selectedMat.rank) : $r('app.color.divider') })
@@ -312,7 +373,9 @@ export struct CalendarPage {
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
-          Text(this.selectedMat !== undefined ? (this.selectedMat.isTalent ? '角色天赋培养素材' : '武器突破素材') : '')
+          Text(this.selectedMat !== undefined
+            ? (this.selectedMat.isTalent ? '角色天赋培养素材' : $r('app.string.ui_model_metadata_material_weapon_ascension_material'))
+            : '')
             .fontSize(12)
             .fontColor($r('app.color.text_secondary'))
           if (this.selectedMat !== undefined && this.selectedMat.highlighted) {
@@ -347,7 +410,7 @@ export struct CalendarPage {
           ForEach(this.selectedMat !== undefined ? this.selectedMat.consumers : [],
             (c: CalendarMaterialConsumer) => {
               Column({ space: 3 }) {
-                MetaIcon({ category: c.category, name: c.icon, iconSize: 42 })
+                MetaIcon({ category: c.category, name: c.icon, iconSize: 42, remoteFallback: true })
                   .padding(3)
                   .border({ width: 1.5, color: CalendarPage.matColor(c.quality) })
                   .borderRadius(9)
@@ -378,138 +441,183 @@ export struct CalendarPage {
   /** 选中日详情：生日角色 + 当日可刷材料（天赋/武器两段，对齐 Windows CalendarCard 内容） */
   @Builder
   weekDetail() {
-    if (this.curWeekDay() !== undefined) {
+    if (this.vm.selectedDay() !== undefined) {
       Column({ space: 8 }) {
         Row({ space: 6 }) {
-          Text(`${this.curWeekDay()?.dayName ?? ''} ${this.curWeekDay()?.monthDay ?? ''}${this.curWeekDay()?.isToday === true ? '（今日）' : ''}`)
+          Text(calendarDateLabel(this.getUIContext(), this.vm.selectedDay()))
             .fontSize(13)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1)
-          if ((this.curWeekDay()?.birthdays.length ?? 0) > 0) {
-            Text(`${this.curWeekDay()?.birthdays.length ?? 0} 位角色生日`)
+          if ((this.vm.selectedDay()?.birthdays.length ?? 0) > 0) {
+            Text(`${this.vm.selectedDay()?.birthdays.length ?? 0} 位角色生日`)
               .fontSize(11)
               .fontColor($r('app.color.notice_on'))
           }
         }
         .width('100%')
 
-        if ((this.curWeekDay()?.birthdays.length ?? 0) > 0) {
-          Row({ space: 6 }) {
-            ForEach(this.curWeekDay()?.birthdays ?? [], (b: CalendarBirthday) => {
+        if ((this.vm.selectedDay()?.birthdays.length ?? 0) > 0) {
+          Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(6), cross: LengthMetrics.vp(6) } }) {
+            ForEach(this.vm.selectedDay()?.birthdays ?? [], (b: CalendarBirthday) => {
               this.birthdayCell(b)
-            }, (b: CalendarBirthday) => `bd_${b.name}`)
+            }, (b: CalendarBirthday) => `bd_${b.name}_${b.icon}`)
           }
           .width('100%')
         }
 
-        if ((this.curWeekDay()?.talentMats.length ?? 0) === 0
-          && (this.curWeekDay()?.weaponMats.length ?? 0) === 0) {
-          Text('全部材料副本均可挑战')
+        if (this.vm.selectedDay()?.allMaterialsOpen === true) {
+          Text($r('app.string.ui_card_calendar_all_materials_hint'))
+            .fontSize(11)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+        } else if ((this.vm.selectedDay()?.talentMats.length ?? 0) === 0 &&
+          (this.vm.selectedDay()?.weaponMats.length ?? 0) === 0) {
+          Text('暂无轮换材料数据')
             .fontSize(11)
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
         } else {
-          Text('天赋书')
-            .fontSize(11)
-            .fontColor($r('app.color.text_secondary'))
-            .width('100%')
-          this.matGrid(this.curWeekDay()?.talentMats ?? [])
-          Text('武器突破材料')
-            .fontSize(11)
-            .fontColor($r('app.color.text_secondary'))
-            .width('100%')
-          this.matGrid(this.curWeekDay()?.weaponMats ?? [])
+          if ((this.vm.selectedDay()?.talentMats.length ?? 0) > 0) {
+            Text('天赋书').fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
+            this.matGrid(this.vm.selectedDay()?.talentMats ?? [])
+          }
+          if ((this.vm.selectedDay()?.weaponMats.length ?? 0) > 0) {
+            Text($r('app.string.ui_model_metadata_material_weapon_ascension_material'))
+              .fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
+            this.matGrid(this.vm.selectedDay()?.weaponMats ?? [])
+          }
         }
       }
       .width('100%')
       .padding(12)
       .borderRadius(12)
-      .attributeModifier(new CardSurfaceModifier())
+      .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
       .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
 
-  build() {
-    Stack() {
-      PageBackdrop({ embedMode: this.embedMode })
-      Column() {
-      this.header()
-      // 周视图（生日 + 材料轮换）不依赖登录，未登录也可见
-      Column({ space: 8 }) {
+  @Builder
+  weekPanel() {
+    Column({ space: 8 }) {
+      Row({ space: 8 }) {
+        Text('默认日历时区')
+          .fontSize(13)
+          .fontColor($r('app.color.text_secondary'))
+          .layoutWeight(1)
+        Select(OFFSET_OPTIONS)
+          .selected(GameCalendarRules.OFFSET_HOURS.indexOf(this.vm.week?.globalOffsetHours ?? this.displayOffset()))
+          .value(GameCalendarRules.offsetLabel(this.vm.week?.globalOffsetHours ?? this.displayOffset()))
+          .attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel))
+          .hoverEffect(HoverEffect.Highlight)
+          .onSelect((index: number) => this.changeGlobalOffset(index))
+      }
+      .width('100%')
+      if ((this.vm.week?.projectId ?? 0) > 0) {
+        Text(`当前养成项目「${this.vm.week?.projectName ?? ''}」 · ${GameCalendarRules.offsetLabel(this.displayOffset())}`)
+          .fontSize(12)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+      }
+      if (this.vm.weekMessage.length > 0) {
+        ErrorHint({ text: this.vm.weekMessage, onRetry: () => this.loadWeek() })
+      }
+      if (this.vm.week !== undefined) {
         this.weekStrip()
         this.weekDetail()
+      } else if (this.vm.weekMessage.length === 0) {
+        Loading()
+      }
+    }
+    .width('100%')
+  }
+
+  @Builder
+  activityPanel() {
+    Column({ space: 10 }) {
+      Row({ space: 8 }) {
+        Text($r('app.string.ui_home_recent'))
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
+        if (this.isLoggedIn && this.currentUid.length > 0) {
+          Text(GameCalendarRules.offsetLabel(this.displayOffset()))
+            .fontSize(12)
+            .fontColor($r('app.color.text_secondary'))
+        }
       }
       .width('100%')
       if (!this.isLoggedIn) {
         this.loginGuide()
       } else if (this.currentUid.length === 0) {
         Column({ space: 14 }) {
-          Text('请先在「账号与数据」选择默认 UID')
+          Text($r('app.string.ui_account_insights_no_account'))
             .fontSize(15)
             .fontColor($r('app.color.text_secondary'))
-          Button('前往')
-            .backgroundColor($r('app.color.app_primary'))
-            .fontColor($r('app.color.on_accent'))
+          Button($r('app.string.ui_cultivation_navigate_action'), { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true)).constraintSize({ minHeight: 44 })
             .onClick(() => {
-              router.pushUrl({ url: 'pages/UserPage' });
+              this.getUIContext().getRouter().pushUrl({ url: 'pages/UserPage' });
             })
         }
         .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
+        .padding({ top: 40, bottom: 40 })
+      } else if (this.vm.loading) {
+        Loading()
       } else {
-        Column() {
-          Row() {
-            Text('近期活动 / 卡池')
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary'))
-          }
-          .width('100%')
-          .padding({ left: 16, top: 6 })
-          Scroll() {
-            Column({ space: 10 }) {
-              if (this.vm.loading) {
-                Loading()
-              } else if (this.vm.entries.length === 0) {
-                if (this.vm.message.length > 0) {
-                  ErrorHint({ text: this.vm.message, onRetry: () => {
-                    this.loadData();
-                  } })
-                } else {
-                  EmptyState({ icon: '🗓️', text: '暂无活动数据' })
-                }
-              } else {
-                ForEach(this.vm.entries, (entry: ActCalendarEntry) => {
-                  this.calendarRow(entry)
-                }, (entry: ActCalendarEntry) => `${entry.name}_${entry.startTime}`)
-              }
-            }
-            .width('100%')
-            .padding(16)
-            .alignItems(HorizontalAlign.Center)
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .align(Alignment.Top)
+        if (this.vm.message.length > 0) {
+          ErrorHint({ text: this.vm.message, onRetry: () => this.loadData() })
+        } else if (this.vm.entries.length === 0) {
+          EmptyState({
+            icon: '🗓️',
+            text: this.getUIContext().getHostContext()?.resourceManager.getStringSync($r('app.string.ui_home_no_events').id) ?? ''
+          })
         }
-        .width('100%')
-        .layoutWeight(1)
+        ForEach(this.vm.entries, (entry: ActCalendarEntry) => {
+          this.calendarRow(entry)
+        }, (entry: ActCalendarEntry) => `${entry.type}_${entry.id}_${entry.name}_${entry.startTime}`)
       }
     }
     .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
-    // 材料详情半窗（点击材料图标打开）
-    .bindSheet($$this.showMatSheet, this.matSheet(), {
-      title: { title: '材料详情' },
-      showClose: true,
-      dragBar: true,
-      height: 420,
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: $r('app.color.sheet_material_tint'),
-    })
+  }
+
+  build() {
+    Stack() {
+      PageBackdrop({ embedMode: this.embedMode })
+      Column() {
+        this.header()
+        Scroll() {
+          GridRow({ columns: 2, gutter: 16 }) {
+            GridCol({ span: this.isWide ? 1 : 2 }) {
+              this.weekPanel()
+            }
+            GridCol({ span: this.isWide ? 1 : 2 }) {
+              this.activityPanel()
+            }
+          }
+          .width('100%')
+          .padding({ left: 16, right: 16, bottom: 16 })
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .align(Alignment.Top)
+        .scrollBar(BarState.Auto)
+      }
+      .width('100%')
+      .height('100%')
+      .onAreaChange((_oldValue: Area, area: Area) => {
+        this.isWide = (area.width as number) >= 840;
+      })
+      .bindSheet($$this.showMatSheet, this.matSheet(), {
+        title: { title: '材料详情' },
+        showClose: true,
+        dragBar: true,
+        height: '70%',
+        blurStyle: BlurStyle.Regular,
+        systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel),
+        backgroundColor: UiSurface.immersiveActive() ? Color.Transparent : $r('app.color.sheet_material_tint'),
+      })
     }
     .width('100%')
     .height('100%')

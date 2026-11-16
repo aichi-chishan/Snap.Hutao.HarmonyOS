@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "ui_web_share_title",
+      "value": "Mode Simpan Bagikan"
+    },
+    {
+      "name": "ui_web_share_description",
+      "value": "Pilih mode untuk menyimpan gambar setelah mengeklik tombol bagikan"
+    },
+    {
+      "name": "ui_web_share_copy",
+      "value": "Disalin ke clipboard"
+    },
+    {
+      "name": "ui_web_share_file",
+      "value": "Simpan sebagai berkas"
+    }
+  ]
+}

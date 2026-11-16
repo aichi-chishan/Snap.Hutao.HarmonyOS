@@ -8,6 +8,8 @@
  * 数据：rawfile/metadata/{TowerSchedule,TowerFloor,TowerLevel,monster_meta}.json（本地打包）
  */
 import { GameDataService } from './GameDataService';
+import { ChallengePeriod } from '../model/ChallengePeriod';
+import { SpiralAbyssData, SpiralAbyssFloor, SpiralAbyssLevel, SpiralAbyssBattle } from '../model/SpiralAbyss';
 import { WikiMetaService } from './WikiMetaService';
 import { Logger } from '../common/Logger';
 
@@ -47,6 +49,8 @@ export class TowerBuff {
 
 interface TowerScheduleRow {
   Id: number;
+  Open: string;
+  Close: string;
   FloorIds: number[];
   BuffName: string;
   Descriptions: string[];
@@ -58,6 +62,8 @@ interface TowerFloorRow {
   LevelGroupId: number;
   /** 地脉紊乱（每层增益，对齐 Windows FloorView.Disorders） */
   Descriptions?: string[];
+  FirstDescriptions?: string[];
+  SecondDescriptions?: string[];
 }
 
 interface TowerLevelRow {
@@ -88,8 +94,8 @@ interface MonsterMetaRow {
 const NORMALIZE: Map<number, number> = new Map([
   [5020, 502], [5021, 502], [5040, 504], [5041, 504], [5070, 507], [5071, 507],
   [5102, 510], [5112, 511], [30121, 30111], [30123, 30113], [30126, 30116],
-  [30127, 30115], [30129, 30117], [30591, 30581], [30605, 30603], [30606, 30603],
-  [31301, 31301], [31302, 31302], [31311, 31311], [31312, 31312],
+  [30605, 30603], [30606, 30604], [40632, 40613],
+  [60402, 60401], [60403, 60401], [60404, 60401], [28021302, 80213],
 ]);
 
 /** WaveType → 中文描述（对齐 Windows SH.ModelMetadataTowerWaveType*） */
@@ -178,6 +184,60 @@ export class TowerMetadataService {
     Logger.info(TAG, `tower meta loaded: schedules=${schedules.length} floors=${floors.length} levels=${levels.length}`);
   }
 
+  static publishedPeriods(): ChallengePeriod[] {
+    const schedules: Map<number, TowerScheduleRow> | undefined = TowerMetadataService.schedules;
+    if (schedules === undefined) { return []; }
+    return Array.from(schedules.values()).map((row: TowerScheduleRow): ChallengePeriod =>
+      new ChallengePeriod(row.Id, Date.parse(row.Open), Date.parse(row.Close), row.BuffName));
+  }
+
+  static preview(period: ChallengePeriod): SpiralAbyssData {
+    const data: SpiralAbyssData = new SpiralAbyssData();
+    data.scheduleId = period.scheduleId;
+    data.startTime = period.startTime;
+    data.endTime = period.endTime;
+    data.floors = TowerMetadataService.periodFloors(period.scheduleId, []);
+    return data;
+  }
+
+  /** Windows 先按公告期次建楼层和房间，再把玩家战绩挂到对应编号上。 */
+  static periodFloors(scheduleId: number, records: SpiralAbyssFloor[]): SpiralAbyssFloor[] {
+    const published: TowerFloorRow[] = TowerMetadataService.floorsBySchedule?.get(scheduleId) ?? [];
+    if (published.length === 0) {
+      return records.slice().sort((a: SpiralAbyssFloor, b: SpiralAbyssFloor): number => b.index - a.index);
+    }
+    const floors: SpiralAbyssFloor[] = [];
+    for (const row of published) {
+      const played: SpiralAbyssFloor | undefined = records.find((item: SpiralAbyssFloor): boolean => item.index === row.Index);
+      const floor: SpiralAbyssFloor = new SpiralAbyssFloor();
+      floor.index = row.Index;
+      floor.hasRecord = played !== undefined;
+      floor.star = played?.star ?? 0;
+      floor.maxStar = played?.maxStar ?? 0;
+      floor.icon = played?.icon ?? '';
+      floor.isUnlock = played?.isUnlock ?? false;
+      for (const chamber of TowerMetadataService.levelsByGroup?.get(row.LevelGroupId) ?? []) {
+        const record: SpiralAbyssLevel | undefined = played?.levels.find((item: SpiralAbyssLevel): boolean => item.index === chamber.Index);
+        if (record !== undefined) {
+          floor.levels.push(record);
+          continue;
+        }
+        const level: SpiralAbyssLevel = new SpiralAbyssLevel();
+        level.index = chamber.Index;
+        for (let half: number = 1; half <= 2; half++) {
+          const battle: SpiralAbyssBattle = new SpiralAbyssBattle();
+          battle.index = half;
+          level.battles.push(battle);
+        }
+        floor.levels.push(level);
+      }
+      if (floor.levels.length === 0 && played !== undefined) { floor.levels = played.levels.slice(); }
+      floor.levels.sort((a: SpiralAbyssLevel, b: SpiralAbyssLevel): number => a.index - b.index);
+      floors.push(floor);
+    }
+    return floors.sort((a: SpiralAbyssFloor, b: SpiralAbyssFloor): number => b.index - a.index);
+  }
+
   /** 渊月祝福（scheduleId → BuffName + 全部 Descriptions，展示前逐条清洗） */
   static buffOf(scheduleId: number): TowerBuff {
     const out: TowerBuff = new TowerBuff();
@@ -193,14 +253,16 @@ export class TowerMetadataService {
   }
 
   /** 某期某层的地脉紊乱（对齐 Windows FloorView.Disorders；无数据返回空集合） */
-  static floorDisorders(scheduleId: number, floorIndex: number): string[] {
+  static floorDisorders(scheduleId: number, floorIndex: number, half: number = 0): string[] {
     const out: string[] = [];
     if (TowerMetadataService.floorsBySchedule === undefined) {
       return out;
     }
     for (const fl of TowerMetadataService.floorsBySchedule.get(scheduleId) ?? []) {
       if (fl.Index === floorIndex) {
-        for (const d of fl.Descriptions ?? []) {
+        const descriptions: string[] | undefined = half === 1 ? fl.FirstDescriptions
+          : half === 2 ? fl.SecondDescriptions : fl.Descriptions;
+        for (const d of descriptions ?? []) {
           out.push(WikiMetaService.cleanText(d));
         }
         break;

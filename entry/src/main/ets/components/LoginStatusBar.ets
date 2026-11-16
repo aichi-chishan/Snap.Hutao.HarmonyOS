@@ -7,6 +7,8 @@ import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Component
 export struct LoginStatusBar {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   @StorageProp('isLoggedIn') isLoggedIn: boolean = false;
   @StorageProp('currentUserName') currentUserName: string = '';
   @StorageProp('currentUserAvatar') currentUserAvatar: string = '';
@@ -96,7 +98,7 @@ export struct LoginStatusBar {
     .constraintSize({ minHeight: 44 })
     .padding(14)
     .borderRadius($r('app.float.card_radius'))
-    .attributeModifier(new CardSurfaceModifier())
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
     .hoverEffect(HoverEffect.Highlight)
     .accessibilityGroup(true)
     .onClick(() => {

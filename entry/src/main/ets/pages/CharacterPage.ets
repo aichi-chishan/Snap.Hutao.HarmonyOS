@@ -3,89 +3,125 @@
  * 我的角色：角色列表 + 选中角色详情（武器/圣遗物/面板属性）。
  * 宽屏：左列表 + 右详情；窄屏：列表 + 详情顺序展示。
  */
-import { router, display } from '@kit.ArkUI';
+import { router } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
-import { CharacterViewModel, AddPlanResult } from '../viewmodel/CharacterViewModel';
-import { CharacterListItem, CharacterDetail, Reliquary, RelicProperty, BaseProperty, Constellation, avatarIconUrl } from '../model/CharacterData';
+import { CharacterViewModel, CharacterSortKind } from '../viewmodel/CharacterViewModel';
+import { CharacterFilterToken } from '../viewmodel/CharacterFilter';
+import { CharacterListItem, CharacterDetail, Reliquary, RelicProperty, BaseProperty, Constellation } from '../model/CharacterData';
 import { ReliquaryScore } from '../common/ReliquaryScore';
 import { RiskUiHelper, RiskVerifyParams } from '../common/RiskUiHelper';
-import { PreferencesStore } from '../data/prefs/PreferencesStore';
-import { AppBackButton } from '../components/AppBackButton';
 import { PageBackdrop } from '../components/PageBackdrop';
-import { PageHeader } from '../components/PageHeader';
+import { PageToolbar } from '../components/PageToolbar';
+import { CharacterFilterBox } from '../components/CharacterFilterBox';
+import { CharacterNameCard, CharacterNameCardData, CharacterNameCardSkill,
+  CharacterNameCardConstellation } from '../components/CharacterNameCard';
 import { NavIcon } from '../components/NavIcon';
-import { AssetIcon } from '../components/AssetIcon';
 import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
 import { MetaIcon } from '../components/MetaIcon';
-import { WikiMetaService, MetaSkill } from '../service/WikiMetaService';
+import { WikiMetaService, WikiAvatarMeta, MetaSkill } from '../service/WikiMetaService';
+import { LocalizedGameDataService } from '../service/LocalizedGameDataService';
 import { CharacterExportService } from '../service/CharacterExportService';
 import { CultivationDraftViewModel } from '../viewmodel/CultivationDraftViewModel';
 import { CultivationDraftEditor } from '../components/CultivationDraftEditor';
+import { ReliquaryScoreEditor } from '../components/ReliquaryScoreEditor';
 import { PromoteState } from '../model/PromoteState';
 import { SkillLevelService, ResolvedAvatarSkill } from '../service/SkillLevelService';
-import { CultivationRepo, CultivateProject } from '../data/repo/CultivationRepo';
 import { Logger } from '../common/Logger';
-import { BackpackScoreProfile } from '../model/BackpackScore';
-import { BackpackScoreService } from '../service/BackpackScoreService';
-import { CardSurfaceModifier } from '../common/UiSurface';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
+import { BackpackScoreEdit, BackpackScoreProfile, CharacterScoreOption } from '../model/BackpackScore';
+import { AppButtonModifier, CardSurfaceModifier, SelectMaterialModifier, UiSurface } from '../common/UiSurface';
 
 const TAG: string = 'CharacterPage';
+const VIEW_MODE_KEY: string = 'Control.PanelSelector.AvatarPropertyPage.Summary.Avatars';
+const SORT_KEY: string = 'Snap::Hutao::AvatarProperty::SortDescriptionKind';
+const SORT_LABELS: string[] = ['默认顺序', '等级', '品质', '命座', '好感度', '生命值上限', '攻击力', '防御力', '元素精通'];
 
 @Entry
 @Component
 export struct CharacterPage {
+  @StorageProp('helpLocaleVersion') @Watch('onLocaleChanged') localeVersion: number = 0;
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
   @StorageLink('currentUid') @Watch('accountChanged') currentUid: string = '';
   @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
   @State vm: CharacterViewModel = new CharacterViewModel();
   @State isWide: boolean = false;
+  @State contentWidth: number = 0;
+  @State showGrid: boolean = false;
+  @State showMobileDetail: boolean = false;
+  @State selectingForPlan: boolean = false;
+  @State propertiesExpanded: boolean = false;
+  @State talentsExpanded: boolean = false;
+  @State relicSetNames: Map<number, string> = new Map<number, string>();
+  private detailScroller: Scroller = new Scroller();
   /** 风控验证弹窗开关（needRiskVerify 时自动弹出，对齐 Windows 验证小窗） */
   @State showVerify: boolean = false;
   /** 当前选中角色详情（页面 @State 驱动刷新；VM 内 @Observed 深属性不触发刷新） */
   @State currentDetail: CharacterDetail | undefined = undefined;
-  /** 评分口径（0=米游社推荐权重，1=双爆分，2=背包评分配置；按角色记忆，对齐 Windows AvatarReliquaryScoreSetting） */
-  @State scoreAlgorithm: number = 0;
-  /** 背包评分配置缓存（口径 2 用；权重在背包页「评分设置」维护） */
-  scoreProfile: BackpackScoreProfile = new BackpackScoreProfile();
+  @State showScoreSheet: boolean = false;
+  @State scoreEdit: BackpackScoreEdit = new BackpackScoreEdit();
+  private scoreEditAvatarId: number = 0;
   /** 当前选中角色 id（页面态） */
   @State selectedId: number = 0;
-  /** 角色列表搜索关键字（名称包含，对齐 Windows AutoSuggestTokenBox 的名称过滤） */
-  @State charKeyword: string = '';
-  /** 角色列表排序：0=默认 1=等级 2=稀有度 3=好感（对齐 Windows AvatarPropertySortDescriptions） */
-  @State charSort: number = 0;
-  /** 元素筛选（空=全部；取 API 原始元素名 Pyro/Hydro/...） */
-  @State charElement: string = '';
+  @State @Watch('keepFilteredSelection') charTokens: CharacterFilterToken[] = [];
+  @State charSort: CharacterSortKind = CharacterSortKind.Default;
   /** 养成计划选择半窗（多项目时让用户选，对齐 Windows 当前养成计划口径） */
   @State showPlanSheet: boolean = false;
   @State draftVm: CultivationDraftViewModel = new CultivationDraftViewModel();
   @State planSelectedIds: number[] = [];
-  /** 待选养成计划列表（bindSheet 数据源） */
-  @State pendingProjects: CultivateProject[] = [];
-  /** 待加入计划的角色详情快照（选项目期间固定） */
-  @State pendingDetail: CharacterDetail | undefined = undefined;
-  /** 加入计划进行中（防重复点击） */
-  @State addingPlan: boolean = false;
+  @State appliedLocaleVersion: number = -1;
+  @State relicNames: Map<number, string> = new Map<number, string>();
+  private attached: boolean = false;
+  private metadataSequence: number = 0;
 
   accountChanged(): void {
-    this.showPlanSheet = false; this.draftVm.cancel(); this.planSelectedIds = []; this.reload();
+    this.showScoreSheet = false;
+    this.showPlanSheet = false; this.draftVm.cancel(); this.planSelectedIds = [];
+    this.selectingForPlan = false; this.showMobileDetail = false; this.selectedId = 0; this.currentDetail = undefined;
+    this.reload();
   }
 
-  aboutToDisappear(): void { this.draftVm.cancel(); }
+  aboutToDisappear(): void {
+    this.attached = false;
+    this.vm.dispose();
+    this.metadataSequence++;
+    this.showScoreSheet = false;
+    this.draftVm.cancel();
+  }
 
   aboutToAppear(): void {
-    this.isWide = CharacterPage.detectWide();
-    // id→图标映射就绪后再加载（列表头像需要）
-    WikiMetaService.ensureIconMaps().then(() => {
-      this.reload();
-    }).catch(() => {
-      this.reload();
-    });
+    this.attached = true;
+    this.vm.activate((): void => { this.onCharacterUpdated(); });
+    this.showGrid = PreferencesStore.getNumber(VIEW_MODE_KEY, 0) === 1;
+    const savedSort: number = PreferencesStore.getNumber(SORT_KEY, CharacterSortKind.Default);
+    this.charSort = Number.isInteger(savedSort) && savedSort >= 0 && savedSort < SORT_LABELS.length
+      ? savedSort as CharacterSortKind : CharacterSortKind.Default;
+    this.loadDisplayMetadata();
+    this.reload();
+  }
+
+  private onLocaleChanged(): void { this.loadDisplayMetadata(); }
+
+  private async loadDisplayMetadata(): Promise<void> {
+    if (!this.attached) { return; }
+    const sequence: number = ++this.metadataSequence;
+    const localeVersion: number = this.localeVersion;
+    await WikiMetaService.ensureIconMaps();
+    if (!this.attached || sequence !== this.metadataSequence) { return; }
+    const names: Map<number, string> = await LocalizedGameDataService.names('Reliquary.json');
+    if (!this.attached || sequence !== this.metadataSequence) { return; }
+    const setNames: Map<number, string> = await LocalizedGameDataService.names('ReliquarySet.json');
+    if (!this.attached || sequence !== this.metadataSequence) { return; }
+    this.relicNames = names; this.relicSetNames = setNames;
+    this.appliedLocaleVersion = localeVersion;
   }
 
   /** 页面显示：检测风控 → 自动弹验证窗（保持当前页上下文） */
   onPageShow(): void {
+    if (this.currentDetail !== undefined) { this.vm.loadScoreOptions(this.currentDetail.id); }
     if (this.vm.needRiskVerify && !this.showVerify) {
       this.showVerify = true;
       return;
@@ -96,25 +132,40 @@ export struct CharacterPage {
     }
   }
 
-  /** VM 加载完成后回填页面详情（@Observed 不深跟踪，页面显式同步） */
+  /** 缓存与每个成功批次直接更新页面，不等待整轮远端刷新。 */
+  private onCharacterUpdated(): void {
+    if (!this.attached) { return; }
+    const visible: CharacterListItem[] = this.filteredItems();
+    if (visible.length === 0) { this.selectedId = 0; this.currentDetail = undefined; return; }
+    const selectionVisible: boolean = visible.some((item: CharacterListItem): boolean => item.id === this.vm.selectedId);
+    if ((this.selectedId === 0 || !selectionVisible) && this.vm.selectedId !== visible[0].id) {
+      this.vm.select(this.currentUid, visible[0].id);
+      return;
+    }
+    this.syncDetail();
+  }
+
+  /** 页面详情使用整体引用替换，保留 V1 状态更新语义。 */
   syncDetail(): void {
+    const previousId: number = this.currentDetail?.id ?? 0;
     this.selectedId = this.vm.selectedId;
     this.currentDetail = this.vm.detailOfSelected();
-    // 评分口径按角色记忆（对齐 Windows AvatarReliquaryScoreSetting 三态；背包配置口径载入活动权重）
-    this.scoreAlgorithm = PreferencesStore.getNumber(`relic.score.algorithm.${this.currentDetail?.id ?? 0}`, 0);
-    if (this.scoreAlgorithm === 2) {
-      this.reloadScoreProfile();
+    if (this.currentDetail !== undefined && this.currentDetail.id !== previousId) {
+      this.vm.loadScoreOptions(this.currentDetail.id);
     }
-    Logger.info(TAG, `syncDetail id=${this.selectedId} detail=${this.currentDetail?.name ?? 'undefined'}`);
   }
 
   /** 选择角色：VM 切换 + 页面回填（守卫过期竞态结果，点击 id 与选中态不一致时丢弃） */
-  selectCharacter(id: number): void {
+  selectCharacter(id: number, reveal: boolean = true): void {
+    if (reveal) { this.showMobileDetail = true; }
     Logger.info(TAG, `selectCharacter id=${id}`);
+    this.showScoreSheet = false;
     this.selectedId = id;
-    this.vm.select(this.currentUid, id).then(() => {
+    const uid: string = this.currentUid;
+    if (this.isWide) { this.detailScroller.scrollEdge(Edge.Top); }
+    this.vm.select(uid, id).then(() => {
       Logger.info(TAG, `selectCharacter done id=${id} pageSel=${this.selectedId} vmSel=${this.vm.selectedId}`);
-      if (this.selectedId !== id) {
+      if (!this.attached || this.currentUid !== uid || this.selectedId !== id) {
         return;
       }
       this.syncDetail();
@@ -123,138 +174,286 @@ export struct CharacterPage {
     });
   }
 
-  private static detectWide(): boolean {
-    try {
-      const d: display.Display = display.getDefaultDisplaySync();
-      const widthVp: number = d.densityPixels > 0 ? d.width / d.densityPixels : d.width;
-      return widthVp >= 840;
-    } catch (e) {
-      return false;
-    }
-  }
-
   reload(): void {
-    this.vm.load(this.currentUid).then(() => {
-      this.syncDetail();
-    });
+    this.vm.load(this.currentUid).catch(() => { Logger.warn(TAG, 'character refresh interrupted'); });
   }
 
-  /** 列表过滤+排序（对齐 Windows AvatarPropertyViewModel 排序/筛选：默认/等级/稀有度/好感） */
   private filteredItems(): CharacterListItem[] {
-    const kw: string = this.charKeyword.trim();
-    const out: CharacterListItem[] = [];
-    // 循环内只读局部快照（lint: 避免循环里反复读状态变量）
-    const element: string = this.charElement;
-    for (const c of this.vm.items) {
-      if (kw.length > 0 && !c.name.includes(kw)) {
-        continue;
-      }
-      if (element.length > 0 && c.element !== element) {
-        continue;
-      }
-      out.push(c);
-    }
-    if (this.charSort === 1) {
-      out.sort((a: CharacterListItem, b: CharacterListItem) => b.level - a.level);
-    } else if (this.charSort === 2) {
-      out.sort((a: CharacterListItem, b: CharacterListItem) =>
-        b.rarity - a.rarity || b.level - a.level);
-    } else if (this.charSort === 3) {
-      out.sort((a: CharacterListItem, b: CharacterListItem) => b.fetter - a.fetter);
-    }
-    return out;
+    return this.vm.filteredItems(this.charTokens, this.charSort, this.appliedLocaleVersion === this.localeVersion);
+  }
+
+  private displayAvatar(id: number): WikiAvatarMeta | undefined {
+    return this.appliedLocaleVersion === this.localeVersion ? WikiMetaService.avatarOf(id) : undefined;
+  }
+
+  private avatarName(id: number, fallback: string): string {
+    return this.displayAvatar(id)?.name || fallback;
+  }
+
+  private currentNameCardPic(): string {
+    const detail: CharacterDetail | undefined = this.currentDetail;
+    if (detail === undefined) { return ''; }
+    return this.displayAvatar(detail.id)?.nameCardPic || WikiMetaService.nameCardPicOf(detail.name);
+  }
+
+  private currentSkills(): MetaSkill[] {
+    const detail: CharacterDetail | undefined = this.currentDetail;
+    if (detail === undefined) { return []; }
+    return this.displayAvatar(detail.id)?.skills ?? WikiMetaService.skillsOfAvatar(detail.name);
+  }
+
+  private constellationMeta(cell: Constellation): MetaSkill | undefined {
+    const detail: CharacterDetail | undefined = this.currentDetail;
+    if (detail === undefined) { return undefined; }
+    return this.displayAvatar(detail.id)?.talents.find((meta: MetaSkill): boolean =>
+      (meta.canonicalName || meta.n) === cell.name);
+  }
+
+  private constellationName(cell: Constellation): string {
+    return this.constellationMeta(cell)?.n || cell.name;
+  }
+
+  private currentWeaponName(): string {
+    const detail: CharacterDetail | undefined = this.currentDetail;
+    if (detail === undefined) { return ''; }
+    const localized: string = this.appliedLocaleVersion === this.localeVersion
+      ? WikiMetaService.nameOfWeapon(detail.weapon.id) : '';
+    return localized || detail.weapon.name;
   }
 
   toast(msg: string): void {
-    this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1500 });
+    this.getUIContext().getPromptAction().showToast({ systemMaterial: UiSurface.dialogMaterial(), message: msg, duration: 1500 });
   }
 
-  /** 列表筛选栏：搜索 + 排序 + 元素 chips（对齐 Windows 角色页筛选/排序） */
+  private keepFilteredSelection(): void {
+    if (!this.attached) { return; }
+    const visible: CharacterListItem[] = this.filteredItems();
+    if (visible.some((item: CharacterListItem): boolean => item.id === this.selectedId)) { return; }
+    if (visible.length === 0) { this.selectedId = 0; this.currentDetail = undefined; return; }
+    this.selectCharacter(visible[0].id, false);
+  }
+
+  private rosterKey(item: CharacterListItem): string {
+    const fields: string[] = [String(item.id), String(item.level), String(item.rarity), String(item.fetter),
+      String(item.activedConstellationNum), String(this.selectedId === item.id),
+      String(this.planSelectedIds.includes(item.id)), String(this.appliedLocaleVersion)];
+    return fields.join('_');
+  }
+
+  private togglePlanSelection(id: number): void {
+    this.planSelectedIds = this.planSelectedIds.includes(id)
+      ? this.planSelectedIds.filter((selected: number): boolean => selected !== id) : this.planSelectedIds.concat(id);
+  }
+
+  private planSelectedCharacters(): void {
+    if (!this.selectingForPlan || this.draftVm.busy) { return; }
+    const selected: CharacterListItem[] = this.vm.items.filter((item: CharacterListItem): boolean =>
+      this.planSelectedIds.includes(item.id));
+    if (selected.length === 0) { return; }
+    this.selectingForPlan = false;
+    this.planSelectedIds = [];
+    this.openBatchCharacterDraft(selected);
+  }
+
+  private activateRosterItem(item: CharacterListItem): void {
+    if (this.selectingForPlan) { this.togglePlanSelection(item.id); }
+    else { this.selectCharacter(item.id); }
+  }
+
+  private selectView(grid: boolean): void {
+    this.showGrid = grid;
+    PreferencesStore.setNumber(VIEW_MODE_KEY, grid ? 1 : 0);
+  }
+
+  private selectSort(index: number): void {
+    if (this.charSort === index) { return; }
+    this.charSort = index as CharacterSortKind;
+    PreferencesStore.setNumber(SORT_KEY, index);
+    const first: CharacterListItem | undefined = this.filteredItems()[0];
+    if (first !== undefined) { this.selectCharacter(first.id, false); }
+  }
+
+  private listIcon(item: CharacterListItem): string {
+    const meta: WikiAvatarMeta | undefined = this.displayAvatar(item.id);
+    return meta?.sideIcon || meta?.icon || item.icon;
+  }
+
+  onBackPress(): boolean {
+    if (!this.isWide && this.showMobileDetail) { this.showMobileDetail = false; return true; }
+    return false;
+  }
+
+  private characterSortOptions(): SelectOption[] {
+    return SORT_LABELS.map((label: string): SelectOption => ({ value: label }));
+  }
+
   @Builder
-  charFilterBar() {
-    Column({ space: 6 }) {
-      Row({ space: 6 }) {
-        TextInput({ placeholder: '搜索角色' })
-          .fontSize(12)
-          .height(30)
-          .layoutWeight(1)
-          .onChange((v: string) => {
-            this.charKeyword = v;
-          })
-        Text(this.charSortLabel())
-          .fontSize(11)
-          .fontColor($r('app.color.app_primary_text'))
-          .padding({ left: 8, right: 8, top: 5, bottom: 5 })
-          .borderRadius(8)
-          .backgroundColor($r('app.color.app_primary_bg'))
-          .hoverEffect(HoverEffect.Highlight)
-          .onClick(() => {
-            // 循环切换排序：默认→等级→稀有度→好感
-            this.charSort = (this.charSort + 1) % 4;
-          })
-      }
-      .width('100%')
-      Scroll() {
-        Row({ space: 4 }) {
-          this.elementChip('', '全部')
-          this.elementChip('Pyro', '火')
-          this.elementChip('Hydro', '水')
-          this.elementChip('Electro', '雷')
-          this.elementChip('Dendro', '草')
-          this.elementChip('Cryo', '冰')
-          this.elementChip('Anemo', '风')
-          this.elementChip('Geo', '岩')
+  viewModeButton(grid: boolean) {
+    Button({ type: ButtonType.Normal, buttonStyle: ButtonStyleMode.TEXTUAL }) {
+      Stack({ alignContent: Alignment.Bottom }) {
+        Row() {
+          SymbolGlyph(grid ? $r('sys.symbol.square_grid_2x2') : $r('sys.symbol.list_bullet'))
+            .fontSize(17).fontColor([$r('app.color.text_primary')])
+        }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+        if (this.showGrid === grid) {
+          Rect().width(16).height(2).borderRadius(1).fill($r('app.color.app_primary')).margin({ bottom: 1 })
         }
-      }
-      .scrollable(ScrollDirection.Horizontal)
-      .scrollBar(BarState.Off)
-      .width('100%')
+      }.width('100%').height('100%')
     }
-    .width('100%')
+    .width(40).height(34).padding(0).borderWidth(0).borderRadius(4)
+    .backgroundColor(this.showGrid === grid ? $r('app.color.nav_selected') : Color.Transparent)
+    .accessibilityText(grid ? '网格视图' : '列表视图').accessibilitySelected(this.showGrid === grid)
+    .hoverEffect(HoverEffect.Highlight).onClick(() => this.selectView(grid))
   }
 
-  /** 当前排序模式名 */
-  private charSortLabel(): string {
-    switch (this.charSort) {
-      case 1:
-        return '等级↓';
-      case 2:
-        return '稀有度↓';
-      case 3:
-        return '好感↓';
-      default:
-        return '默认序';
-    }
-  }
-
-  /** 元素筛选 chip */
   @Builder
-  elementChip(element: string, label: string) {
-    Text(label)
-      .fontSize(11)
-      .fontColor(this.charElement === element ? $r('app.color.on_accent') : $r('app.color.text_secondary'))
-      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-      .borderRadius(10)
-      .backgroundColor(this.charElement === element ? $r('app.color.app_primary') : $r('app.color.card_surface'))
-      .border({ width: 1, color: $r('app.color.card_stroke') })
-      .hoverEffect(HoverEffect.Highlight)
-      .onClick(() => {
-        this.charElement = element;
-      })
+  viewSwitch() {
+    Row() {
+      this.viewModeButton(false)
+      this.viewModeButton(true)
+    }.attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel, false))
+      .border({ width: 0.5, color: $r('app.color.card_stroke'), radius: 6 }).clip(true)
+  }
+
+  @Builder
+  sortSelect() {
+    Select(this.characterSortOptions()).attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel))
+      .font({ size: 13 }).selected(this.charSort).value(SORT_LABELS[this.charSort]).width(108).height(36)
+      .accessibilityDescription('角色排序').hoverEffect(HoverEffect.Highlight)
+      .onSelect((index: number): void => this.selectSort(index))
+  }
+
+  @Builder
+  scoreSelect() {
+    Select(this.scoreSelectOptions()).attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel))
+      .font({ size: 13 }).selected(this.vm.scoreOptionIndex)
+      .value(this.vm.scoreOptions[this.vm.scoreOptionIndex]?.label ?? '米游社推荐属性')
+      .width(this.isWide ? 148 : undefined).layoutWeight(this.isWide ? 0 : 1).height(36)
+      .enabled(this.currentDetail !== undefined).accessibilityDescription($r('app.string.ui_avatar_property_score_algorithm'))
+      .hoverEffect(HoverEffect.Highlight).onSelect((index: number): void => this.setScoreOption(index))
+  }
+
+  @Builder
+  scoreButton() {
+    Button({ type: ButtonType.Normal }) {
+      SymbolGlyph($r('sys.symbol.info_circle')).fontSize(16).fontColor([$r('app.color.text_primary')])
+    }.attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel)).width(36).height(36).padding(0)
+      .accessibilityText('评分配置').enabled(this.currentDetail !== undefined).onClick(() => this.openScoreEditor())
+  }
+
+  @Builder
+  toolbarLeading() {
+    if (!this.isWide && this.showMobileDetail) {
+      Button('返回角色', { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+        .height(44).onClick(() => { this.showMobileDetail = false; })
+      Text(this.currentDetail !== undefined ? this.avatarName(this.currentDetail.id, this.currentDetail.name) : $r('app.string.ui_nav_character'))
+        .fontSize(14).fontColor($r('app.color.text_primary')).layoutWeight(1).maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    } else {
+      this.viewSwitch()
+      if (this.isWide) {
+        this.sortSelect()
+        this.scoreSelect()
+        this.scoreButton()
+        CharacterFilterBox({ tokens: this.charTokens }).layoutWeight(1)
+      } else {
+        Text(String(this.filteredItems().length) + ' 位角色').fontSize(12).fontColor($r('app.color.text_secondary'))
+          .layoutWeight(1).maxLines(1)
+      }
+    }
+  }
+
+  @Builder
+  exportMenu() {
+    Menu() {
+      MenuItem({ content: '导出当前角色' }).enabled(this.currentDetail !== undefined)
+        .onClick(() => this.exportDetailText())
+      MenuItem({ content: '导出所有角色' }).enabled(this.filteredItems().length > 0)
+        .onClick(() => this.exportAllText())
+    }
+  }
+
+  @Builder
+  cultivationMenu() {
+    Menu() {
+      MenuItem({ content: '当前角色与武器' }).enabled(this.selectedId !== 0 && !this.draftVm.busy)
+        .onClick(() => this.addCurrentWithWeapon())
+      MenuItem({ content: '部分角色与武器' }).enabled(this.vm.items.length > 0 && !this.draftVm.busy)
+        .onClick(() => { this.planSelectedIds = []; this.selectingForPlan = true; this.showMobileDetail = false; })
+      MenuItem({ content: '所有角色与武器' }).enabled(this.vm.items.length > 0 && !this.draftVm.busy)
+        .onClick(() => this.openBatchCharacterDraft(this.vm.items))
+    }
+  }
+
+  @Builder
+  moreMenu() {
+    Menu() {
+      if (!this.isWide) {
+        MenuItem({ content: '导出文本到剪贴板', builder: (): void => { this.exportMenu(); } })
+      }
+      if (this.contentWidth < 1200) {
+        MenuItem({ content: '养成计算', builder: (): void => { this.cultivationMenu(); } })
+        MenuItem({ content: '同步角色信息' }).enabled(!this.vm.loading).onClick(() => this.reload())
+      }
+      // 触屏上同样可对选中角色执行列表右键菜单里的单项操作。
+      MenuItem({ content: '添加角色到养成计划' }).enabled(this.selectedId !== 0 && !this.draftVm.busy)
+        .onClick(() => this.addCurrentToPlan())
+      MenuItem({ content: '添加武器到养成计划' }).enabled(this.selectedId !== 0 && !this.draftVm.busy)
+        .onClick(() => this.addCurrentToPlan(true))
+      MenuItem({ content: '米游社攻略' }).enabled(this.currentDetail !== undefined).onClick(() => this.openStrategy('mys'))
+      MenuItem({ content: 'B站攻略' }).enabled(this.currentDetail !== undefined).onClick(() => this.openStrategy('bili'))
+    }
+  }
+
+  @Builder
+  toolbarTrailing() {
+    if (this.isWide) {
+      Button({ type: ButtonType.Normal, buttonStyle: ButtonStyleMode.TEXTUAL }) {
+        Row({ space: 5 }) {
+          SymbolGlyph($r('sys.symbol.arrow_right_to_line')).fontSize(15).fontColor([$r('app.color.text_primary')])
+          Text('导出文本到剪贴板').fontSize(13).fontColor($r('app.color.text_primary'))
+        }
+      }.height(36).padding({ left: 8, right: 8 }).borderRadius(6).backgroundColor(Color.Transparent)
+        .enabled(this.isLoggedIn).hoverEffect(HoverEffect.Highlight)
+        .bindMenu((): void => { this.exportMenu(); }, { systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel) })
+    }
+    if (this.contentWidth >= 1200) {
+      Button('养成计算', { type: ButtonType.Normal, buttonStyle: ButtonStyleMode.TEXTUAL })
+        .height(36).borderRadius(6).fontSize(13).fontColor($r('app.color.text_primary')).backgroundColor(Color.Transparent)
+        .enabled(this.isLoggedIn).hoverEffect(HoverEffect.Highlight)
+        .bindMenu((): void => { this.cultivationMenu(); }, { systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel) })
+      Button('同步角色信息', { type: ButtonType.Normal, buttonStyle: ButtonStyleMode.TEXTUAL })
+        .height(36).borderRadius(6).fontSize(13).fontColor($r('app.color.text_primary')).backgroundColor(Color.Transparent)
+        .enabled(this.isLoggedIn && !this.vm.loading).hoverEffect(HoverEffect.Highlight).onClick(() => this.reload())
+    }
+    Button('···', { type: ButtonType.Normal, buttonStyle: ButtonStyleMode.TEXTUAL })
+      .width(40).height(36).padding(0).borderRadius(6).fontSize(22).fontWeight(FontWeight.Bold)
+      .fontColor($r('app.color.text_primary')).backgroundColor(Color.Transparent).accessibilityText('更多角色操作')
+      .enabled(this.isLoggedIn).hoverEffect(HoverEffect.Highlight)
+      .bindMenu((): void => { this.moreMenu(); }, { systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel) })
+      .bindSheet($$this.showScoreSheet, this.scoreEditorSheet(), { systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel),
+        height: '80%', showClose: true, blurStyle: BlurStyle.Regular, backgroundColor: $r('app.color.sheet_material_tint') })
   }
 
   @Builder
   header() {
-    PageHeader({ title: '我的角色', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
-      Button('刷新')
-        .fontSize(12)
-        .height(28)
-        .backgroundColor($r('app.color.app_primary'))
-        .fontColor($r('app.color.on_accent'))
-        .onClick(() => {
-          this.reload();
-        })
-    }
+    Column({ space: 4 }) {
+      PageToolbar({ embedMode: this.embedMode || (!this.isWide && this.showMobileDetail),
+        leading: (): void => this.toolbarLeading(), trailing: (): void => this.toolbarTrailing() })
+      if (!this.isWide && this.isLoggedIn) {
+        Row({ space: 8 }) {
+          if (this.showMobileDetail) {
+            this.scoreSelect()
+            this.scoreButton()
+          } else {
+            CharacterFilterBox({ tokens: this.charTokens }).layoutWeight(1)
+            this.sortSelect()
+          }
+        }.width('100%').padding({ left: 8, right: 8, top: 2, bottom: 2 })
+          .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel)).borderRadius(8)
+      }
+    }.width('100%').padding({ left: 12, right: 12, bottom: 10 })
   }
 
   @Builder
@@ -265,9 +464,8 @@ export struct CharacterPage {
         .fontSize(17)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary'))
-      Button('去登录')
-        .backgroundColor($r('app.color.app_primary'))
-        .fontColor($r('app.color.on_accent'))
+      Button('去登录', { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true)).constraintSize({ minHeight: 44 })
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -277,480 +475,345 @@ export struct CharacterPage {
   }
 
   @Builder
+  planMark(id: number) {
+    Stack() {
+      if (this.planSelectedIds.includes(id)) {
+        NavIcon({ name: 'Check', iconSize: 14 })
+      }
+    }.width(22).height(22).borderRadius(4)
+      .border({ width: 1, color: this.planSelectedIds.includes(id) ? $r('app.color.app_primary') : $r('app.color.text_secondary') })
+      .accessibilityLevel('no')
+  }
+
+  @Builder
+  rosterActions(item: CharacterListItem) {
+    Menu() {
+      MenuItem({ content: '添加角色到养成计划' }).onClick(() => this.openCharacterDraft([item]))
+      MenuItem({ content: '添加武器到养成计划' }).onClick(() => this.openCharacterDraft([item], true))
+      MenuItem({ content: '添加角色与武器到养成计划' }).onClick(() => this.addCurrentWithWeapon(item))
+    }.enabled(!this.draftVm.busy)
+  }
+
+  @Builder
   characterRow(c: CharacterListItem) {
-    Row({ space: 10 }) {
-      // rawfile 图标按角色 id 从本地元数据映射（WikiMetaService.iconOfAvatar），未命中回退 Enka
-      if (WikiMetaService.iconOfAvatar(c.id).length > 0) {
-        MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(c.id), iconSize: 44 })
-      } else if (c.icon.length > 0) {
-        // 本地元数据图标名（UI_AvatarIcon_xxx）或 http 直图；统一走 MetaIcon（rawfile→CDN 兜底）
-        MetaIcon({ category: 'AvatarIcon', name: c.icon, iconSize: 44, remoteFallback: false })
-      } else {
-        MetaIcon({ category: 'AvatarIcon', name: '', iconSize: 44 })
-      }
-      Column({ space: 2 }) {
-        Row({ space: 5 }) {
-          Text(c.name)
-            .fontSize(15)
-            .fontWeight(this.selectedId === c.id ? FontWeight.Medium : FontWeight.Normal)
-            .fontColor($r('app.color.text_primary'))
-          if (AssetIcon.elemName(c.element).length > 0) {
-            AssetIcon({ name: AssetIcon.elemName(c.element), iconSize: 12 })
+    Button({ type: ButtonType.Normal }) {
+      Row({ space: 10 }) {
+        Column() {
+          if (this.selectedId === c.id) {
+            Rect().width(3).height(30).fill($r('app.color.app_primary')).borderRadius(2)
           }
-        }
-        Text(`Lv.${c.level} ★${c.rarity}`)
-          .fontSize(11)
-          .fontColor($r('app.color.text_secondary'))
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-      Button(this.planSelectedIds.indexOf(c.id) >= 0 ? '✓' : '＋').width(44).height(44)
-        .fontSize(16).hoverEffect(HoverEffect.Highlight)
-        .onClick(() => {
-          this.planSelectedIds = this.planSelectedIds.indexOf(c.id) >= 0
-            ? this.planSelectedIds.filter((id: number): boolean => id !== c.id) : this.planSelectedIds.concat(c.id);
-        })
-      if (this.selectedId === c.id) {
-        Text('▣')
-          .fontSize(12)
-          .fontColor($r('app.color.app_primary_text'))
-      }
+        }.width(3)
+        MetaIcon({ category: 'AvatarIcon', name: this.listIcon(c), iconSize: 42, remoteFallback: true })
+        Column({ space: 3 }) {
+          Text(this.avatarName(c.id, c.name)).fontSize(14)
+            .fontWeight(this.selectedId === c.id ? FontWeight.Medium : FontWeight.Normal)
+            .fontColor($r('app.color.text_primary')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text('Lv. ' + c.level).fontSize(12).fontColor($r('app.color.text_secondary'))
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        if (this.selectingForPlan) { this.planMark(c.id) }
+      }.width('100%').padding({ left: 6, right: 8 })
     }
-    .width('100%')
-    .padding(10)
-    .borderRadius(10)
-    .backgroundColor(this.selectedId === c.id ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
-    .border({ width: 1, color: $r('app.color.card_stroke') })
-    .onClick(() => {
-      this.selectCharacter(c.id);
-    })
+    .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+    .width('100%').height(64).padding(0).border({ width: 0 }).borderRadius(6)
+    .backgroundColor(this.selectedId === c.id ? $r('app.color.app_primary_bg') : Color.Transparent)
+    .accessibilityGroup(true)
+    .accessibilityText(this.avatarName(c.id, c.name) + '，等级 ' + c.level +
+      (this.selectingForPlan ? (this.planSelectedIds.includes(c.id) ? '，已选择' : '，未选择') : ''))
+    .onClick(() => this.activateRosterItem(c))
+    .bindContextMenuWithResponse((): void => { this.rosterActions(c); },
+      { systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel) })
+  }
+
+  @Builder
+  characterTile(c: CharacterListItem) {
+    Button({ type: ButtonType.Normal }) {
+      Column({ space: 4 }) {
+        MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(c.id) || c.icon, iconSize: 60, remoteFallback: true })
+        Text(this.avatarName(c.id, c.name)).fontSize(12).fontColor($r('app.color.text_primary'))
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        Row({ space: 6 }) {
+          Text('Lv. ' + c.level).fontSize(11).fontColor($r('app.color.text_secondary'))
+          if (this.selectingForPlan) { this.planMark(c.id) }
+        }
+      }.width('100%').padding({ top: 8, bottom: 8, left: 4, right: 4 })
+    }
+    .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+    .width('100%').padding(0).constraintSize({ minHeight: 116 }).borderRadius(6)
+    .backgroundColor(this.selectedId === c.id ? $r('app.color.app_primary_bg') : Color.Transparent)
+    .border({ width: this.selectedId === c.id ? 1 : 0, color: $r('app.color.app_primary') })
+    .accessibilityGroup(true).accessibilityText(this.avatarName(c.id, c.name) + '，等级 ' + c.level)
+    .onClick(() => this.activateRosterItem(c))
+    .bindContextMenuWithResponse((): void => { this.rosterActions(c); },
+      { systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel) })
+  }
+
+  @Builder
+  planSelectionActions() {
+    Button($r('app.string.common_cancel'), { type: ButtonType.Normal })
+      .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel)).fontSize(12).height(44)
+      .onClick(() => { this.selectingForPlan = false; this.planSelectedIds = []; })
+    Button('规划所选角色', { type: ButtonType.Normal })
+      .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true)).fontSize(12).height(44)
+      .enabled(this.planSelectedIds.length > 0 && !this.draftVm.busy)
+      .onClick(() => this.planSelectedCharacters())
+  }
+
+  @Builder
+  rosterPanel() {
+    Column({ space: 4 }) {
+      if (this.showGrid) {
+        Scroll() {
+          GridRow({ columns: { xs: 2, sm: 3, md: 4 }, gutter: { x: 6, y: 6 },
+            breakpoints: { value: ['320vp', '600vp'], reference: BreakpointsReference.ComponentSize } }) {
+            ForEach(this.filteredItems(), (item: CharacterListItem) => {
+              GridCol() { this.characterTile(item) }
+            }, (item: CharacterListItem): string => this.rosterKey(item))
+          }.width('100%')
+        }.width('100%').layoutWeight(1).scrollBar(BarState.Auto)
+      } else {
+        List({ space: 2 }) {
+          ForEach(this.filteredItems(), (item: CharacterListItem) => {
+            ListItem() { this.characterRow(item) }
+          }, (item: CharacterListItem): string => this.rosterKey(item))
+        }.width('100%').layoutWeight(1).scrollBar(BarState.Auto)
+      }
+      if (this.selectingForPlan) {
+        Row({ space: 4 }) {
+          Text('已选 ' + this.planSelectedIds.length).fontSize(12).fontColor($r('app.color.text_secondary')).layoutWeight(1)
+          this.planSelectionActions()
+        }.width('100%')
+      }
+      Text('共 ' + this.filteredItems().length + ' 位角色')
+        .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%').textAlign(TextAlign.Center).padding(8)
+    }
+    .width(this.isWide ? (this.showGrid ? 284 : 220) : '100%').height('100%').padding(6)
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel)).borderRadius(8)
+  }
+
+  @Builder
+  propertiesPanel() {
+    Column({ space: 0 }) {
+      Button({ type: ButtonType.Normal }) {
+        Row() {
+          Text('角色属性').fontSize(14).fontColor($r('app.color.text_primary')).layoutWeight(1)
+          SymbolGlyph(this.propertiesExpanded ? $r('sys.symbol.chevron_up') : $r('sys.symbol.chevron_down'))
+            .fontSize(14).fontColor([$r('app.color.text_secondary')])
+        }.width('100%').padding({ left: 14, right: 14 })
+      }
+      .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+      .width('100%').height(48).padding(0).backgroundColor(Color.Transparent)
+      .onClick(() => { this.propertiesExpanded = !this.propertiesExpanded; })
+      if (this.propertiesExpanded && this.currentDetail !== undefined) {
+        GridRow({ columns: this.isWide ? 2 : 1, gutter: { x: 24, y: 8 } }) {
+          ForEach(this.currentDetail.selectedProperties, (property: BaseProperty) => {
+            GridCol() {
+              Row({ space: 10 }) {
+                Text(CharacterPage.propLabel(property.propertyType)).fontSize(12).fontColor($r('app.color.text_secondary')).layoutWeight(1)
+                Text(property.final || property.base + '+' + property.add).fontSize(13).fontColor($r('app.color.text_primary'))
+              }.width('100%').constraintSize({ minHeight: 28 })
+            }
+          }, (property: BaseProperty): string => property.propertyType + '_' + property.final + '_' + property.base + '_' + property.add)
+        }.width('100%').padding({ left: 14, right: 14, bottom: 14 })
+      }
+    }.width('100%').attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel)).borderRadius(8)
+  }
+
+  private recommendation(slot: number): string {
+    const detail: CharacterDetail | undefined = this.currentDetail;
+    if (detail === undefined) { return ''; }
+    let properties: string[] = detail.recommend.subProperties;
+    if (slot === 0) { properties = detail.recommend.sandMainProperties; }
+    else if (slot === 1) { properties = detail.recommend.gobletMainProperties; }
+    else if (slot === 2) { properties = detail.recommend.circletMainProperties; }
+    const labels: string[] = [];
+    for (const property of properties) {
+      const label: string = CharacterPage.propLabel(property);
+      if (!labels.includes(label)) { labels.push(label); }
+    }
+    return labels.length > 0 ? labels.join(' · ') : '未提供推荐';
+  }
+
+  @Builder
+  recommendationTile(slot: number) {
+    Column({ space: 10 }) {
+      Text(['时之沙主属性推荐', '空之杯主属性推荐', '理之冠主属性推荐', '追加属性推荐'][slot])
+        .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+      Row({ space: 8 }) {
+        Text(this.recommendation(slot)).fontSize(14).fontColor($r('app.color.text_primary'))
+          .layoutWeight(1).maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
+        if (slot === 0) {
+          Image($r('app.media.UI_Icon_RelicType3')).width(30).height(30).renderMode(ImageRenderMode.Template)
+            .fillColor($r('app.color.text_secondary')).opacity(0.65).accessibilityLevel('no')
+        } else if (slot === 1) {
+          Image($r('app.media.UI_Icon_RelicType4')).width(30).height(30).renderMode(ImageRenderMode.Template)
+            .fillColor($r('app.color.text_secondary')).opacity(0.65).accessibilityLevel('no')
+        } else if (slot === 2) {
+          Image($r('app.media.UI_Icon_RelicType5')).width(30).height(30).renderMode(ImageRenderMode.Template)
+            .fillColor($r('app.color.text_secondary')).opacity(0.65).accessibilityLevel('no')
+        }
+      }.width('100%')
+    }.width('100%').constraintSize({ minHeight: 92 }).padding(12)
+      .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel)).borderRadius(8)
+  }
+
+  @Builder
+  recommendationPanel() {
+    GridRow({ columns: { xs: 1, sm: 2, md: 4 }, gutter: { x: 10, y: 10 },
+      breakpoints: { value: ['320vp', '800vp'], reference: BreakpointsReference.ComponentSize } }) {
+      ForEach([0, 1, 2, 3], (slot: number) => {
+        GridCol() { this.recommendationTile(slot) }
+      }, (slot: number): string => String(slot))
+    }.width('100%')
+  }
+
+  private relicKey(relic: Reliquary): string {
+    return String(this.selectedId) + '_' + relic.id + '_' + relic.pos + '_' + relic.level + '_' +
+      this.vm.scoreOptionIndex + '_' + this.vm.scoreSettings.revision + '_' + this.appliedLocaleVersion + '_' +
+      relic.mainProperty.value + '_' + JSON.stringify(relic.subProperties);
+  }
+
+  @Builder
+  relicCard(relic: Reliquary) {
+    Column({ space: 10 }) {
+      Row({ space: 10 }) {
+        MetaIcon({ category: 'RelicIcon', name: CharacterPage.relicIconName(relic.icon), iconSize: 42 })
+        Column({ space: 3 }) {
+          Text(this.relicNames.get(relic.id) || relic.name).fontSize(14).fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(this.relicSetNames.get(relic.setId) || relic.setName || relic.posName)
+            .fontSize(12).fontColor($r('app.color.text_secondary')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+      }.width('100%')
+      Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+        Text('+' + relic.level + ' · ' + '★'.repeat(Math.max(0, Math.min(5, relic.rarity))))
+          .fontSize(12).fontColor($r('app.color.text_secondary'))
+        Text(this.relicScoreOf(relic).toFixed(1) + ' 分').fontSize(16).fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.five_star'))
+      }.width('100%')
+      Divider().color($r('app.color.card_stroke'))
+      Row({ space: 8 }) {
+        Text(CharacterPage.relicPropLabel(relic.mainProperty.propertyType)).fontSize(13).fontColor($r('app.color.text_primary')).layoutWeight(1)
+        Text(relic.mainProperty.value).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+      }.width('100%').constraintSize({ minHeight: 32 })
+      Divider().color($r('app.color.card_stroke'))
+      Column({ space: 4 }) {
+        ForEach(relic.subProperties, (property: RelicProperty) => {
+          Row({ space: 7 }) {
+            Text(CharacterPage.relicPropLabel(property.propertyType)).fontSize(12).fontColor($r('app.color.text_secondary'))
+              .layoutWeight(1).maxLines(2)
+            Text(property.value).fontSize(13).fontColor($r('app.color.text_primary'))
+            Text(String(property.times + 1)).fontSize(11).fontColor($r('app.color.four_star'))
+              .width(18).height(18).textAlign(TextAlign.Center).borderRadius(9)
+              .border({ width: 1, color: $r('app.color.four_star') })
+              .accessibilityText('包含初始词条，共 ' + (property.times + 1) + ' 次')
+          }.width('100%').constraintSize({ minHeight: 28 })
+        }, (property: RelicProperty): string => property.propertyType + '_' + property.value + '_' + property.times)
+      }.width('100%')
+    }.width('100%').constraintSize({ minHeight: 244 }).padding(12)
+      .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel)).borderRadius(8)
+  }
+
+  @Builder
+  additionalDetails() {
+    Column({ space: 0 }) {
+      Button(this.talentsExpanded ? '收起天赋与命座详情' : '天赋与命座详情', { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+        .width('100%').height(44).onClick(() => { this.talentsExpanded = !this.talentsExpanded; })
+      if (this.talentsExpanded && this.currentDetail !== undefined) {
+        if (this.currentDetail.weapon.id > 0) {
+          Text(this.currentWeaponName() + ' · ' + PromoteState.label(this.currentDetail.weapon.promoteLevel))
+            .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%').padding(12)
+        }
+        ForEach(this.currentSkills(), (skill: MetaSkill, index: number) => {
+          Column({ space: 6 }) {
+            Text(skill.n + ' ' + this.skillLevelAt(index)).fontSize(14).fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary')).width('100%')
+            Text(WikiMetaService.cleanText(skill.d)).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+          }.width('100%').padding(12)
+        }, (skill: MetaSkill, index: number): string => String(this.selectedId) + '_' + index + '_' + this.appliedLocaleVersion + '_' + this.skillLevelAt(index))
+        ForEach(this.currentDetail.constellations, (entry: Constellation) => {
+          Column({ space: 6 }) {
+            Text(this.constellationName(entry)).fontSize(14).fontColor($r('app.color.text_primary')).width('100%')
+            Text(WikiMetaService.cleanText(this.constellationMeta(entry)?.d || entry.effect)).fontSize(12)
+              .fontColor($r('app.color.text_secondary')).width('100%')
+          }.width('100%').padding(12)
+        }, (entry: Constellation): string => String(this.selectedId) + '_' + entry.id + '_' + this.appliedLocaleVersion)
+      }
+    }.width('100%').attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel)).borderRadius(8)
   }
 
   @Builder
   detailPanel() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      // 角色专属背景：名片大图（NameCardPic，已打包 rawfile；名下无名片时不显示）
-      if (this.currentDetail !== undefined && WikiMetaService.nameCardPicOf(this.currentDetail.name).length > 0) {
-        Image($rawfile(`icons/NameCardPic/${WikiMetaService.nameCardPicOf(this.currentDetail.name)}.png`))
-          .width('100%')
-          .height('100%')
-          .objectFit(ImageFit.Cover)
-          .opacity(0.22)
-      }
-      Column({ space: 10 }) {
+    Column({ space: 12 }) {
       if (this.currentDetail !== undefined) {
         this.detailHeader()
-        // 详情操作命令行（对齐 Windows AvatarView 底部命令区：导出文本 / 加入养成计划）
-        this.detailActions()
-        // 名片 + 攻略外链（对齐 Windows：名片展示 + 米游社/B站攻略入口）
-        if (WikiMetaService.nameCardPicOf(this.currentDetail.name).length > 0) {
-          Column({ space: 6 }) {
-            Row({ space: 8 }) {
-              NavIcon({ name: 'Database', iconSize: 20 })
-              Text('名片')
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary'))
-                .layoutWeight(1)
-            }
-            .width('100%')
-            Image($rawfile(`icons/NameCardPic/${WikiMetaService.nameCardPicOf(this.currentDetail.name)}.png`))
-              .width('100%')
-              .borderRadius(10)
-              .objectFit(ImageFit.Cover)
-          }
-          .width('100%')
-          .padding(12)
-          .borderRadius(12)
-          .attributeModifier(new CardSurfaceModifier())
-          .border({ width: 1, color: $r('app.color.card_stroke') })
-        }
-        Row({ space: 10 }) {
-          Button('米游社攻略')
-            .fontSize(13)
-            .height(44)
-            .layoutWeight(1)
-            .backgroundColor($r('app.color.app_primary_bg'))
-            .fontColor($r('app.color.app_primary_text'))
-            .onClick(() => {
-              this.openStrategy('mys');
-            })
-          Button('B站攻略')
-            .fontSize(13)
-            .height(44)
-            .layoutWeight(1)
-            .backgroundColor($r('app.color.app_primary_bg'))
-            .fontColor($r('app.color.app_primary_text'))
-            .onClick(() => {
-              this.openStrategy('bili');
-            })
-        }
-        .width('100%')
-        // 天赋/技能（本地元数据：普攻/战技/爆发/被动，对齐 Windows 角色详情天赋区）
-        if (WikiMetaService.skillsOfAvatar(this.currentDetail.name).length > 0) {
-          Column({ space: 8 }) {
-            Text('天赋')
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary'))
-              .width('100%')
-            ForEach(WikiMetaService.skillsOfAvatar(this.currentDetail.name), (sk: MetaSkill, idx: number) => {
-              Column({ space: 3 }) {
-                Row({ space: 8 }) {
-                  if (sk.i.length > 0) {
-                    Row() {
-                      MetaIcon({ category: 'Skill', name: sk.i, iconSize: 28 })
-                    }
-                    .width(38)
-                    .height(38)
-                    .borderRadius(10)
-                    .backgroundColor($r('app.color.icon_dark_chip'))
-                    .alignItems(VerticalAlign.Center)
-                    .justifyContent(FlexAlign.Center)
-                  }
-                  Column({ space: 2 }) {
-                    Text(sk.n)
-                      .fontSize(13)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor($r('app.color.text_primary'))
-                    Row({ space: 4 }) {
-                      if (sk.k.length > 0) {
-                        Text(CharacterPage.kindLabel(SkillLevelService.kindOfMetaSkill(this.currentDetail!, sk)))
-                          .fontSize(10)
-                          .fontColor($r('app.color.app_primary_text'))
-                      }
-                      // 战斗天赋等级徽章（对齐 Windows SkillView.Level：普攻/战技/爆发三行 Lv.x）
-                      this.skillLevelBadge(this.currentDetail!.name, idx)
-                    }
-                  }
-                  .alignItems(HorizontalAlign.Start)
-                  .layoutWeight(1)
-                }
-                .width('100%')
-                Text(sk.d)
-                  .fontSize(11)
-                  .fontColor($r('app.color.text_secondary'))
-                  .width('100%')
-              }
-              .width('100%')
-              .padding({ top: 8, bottom: 8, left: 12, right: 12 })
-              .borderRadius(10)
-              .backgroundColor($r('app.color.card_inner_tint'))
-            }, (sk: MetaSkill, idx: number) => `sk_${sk.n}_${this.skillLevelAt(this.currentDetail!.name, idx)}`)
-          }
-          .width('100%')
-          .padding(12)
-          .borderRadius(12)
-          .attributeModifier(new CardSurfaceModifier())
-          .border({ width: 1, color: $r('app.color.card_stroke') })
-        }
-        if (this.currentDetail.weapon.id > 0) {
-          Row({ space: 10 }) {
-            if (WikiMetaService.iconOfWeapon(this.currentDetail.weapon.id).length > 0) {
-              MetaIcon({
-                category: 'EquipIcon',
-                name: WikiMetaService.iconOfWeapon(this.currentDetail.weapon.id),
-                iconSize: 40,
-              })
-            } else {
-              NavIcon({ name: 'AvatarProperty', iconSize: 22 })
-            }
-            Text(`${WikiMetaService.nameOfWeapon(this.currentDetail.weapon.id)} · Lv.${this.currentDetail.weapon.level} ★${this.currentDetail.weapon.rarity} · 精炼${this.currentDetail.weapon.affixLevel} · ${PromoteState.label(this.currentDetail.weapon.promoteLevel)}`)
-              .fontSize(14)
-              .fontColor($r('app.color.text_primary'))
-              .layoutWeight(1)
-          }
-          .width('100%')
-          .padding(12)
-          .borderRadius(12)
-          .attributeModifier(new CardSurfaceModifier())
-          .border({ width: 1, color: $r('app.color.card_stroke') })
-        }
-
-        if (this.currentDetail.selectedProperties.length > 0) {
-          Column({ space: 6 }) {
-            Text('面板属性')
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary'))
-              .width('100%')
-            ForEach(this.currentDetail.selectedProperties, (p: BaseProperty, i: number) => {
-              Row({ space: 8 }) {
-                Text(CharacterPage.propLabel(p.propertyType))
-                  .fontSize(12)
-                  .fontColor($r('app.color.text_secondary'))
-                  .layoutWeight(1)
-                Text(p.final.length > 0 ? p.final : `${p.base}+${p.add}`)
-                  .fontSize(13)
-                  .fontColor($r('app.color.text_primary'))
-              }
-              .width('100%')
-            }, (p: BaseProperty) => `${p.propertyType}_${p.final}`)
-          }
-          .width('100%')
-          .padding(12)
-          .borderRadius(12)
-          .attributeModifier(new CardSurfaceModifier())
-          .border({ width: 1, color: $r('app.color.card_stroke') })
-        }
-
-        if (this.currentDetail.reliquaries.length > 0) {
-          Column({ space: 6 }) {
-            Row({ space: 8 }) {
-              Text('圣遗物')
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary'))
-                .layoutWeight(1)
-              // 评分口径切换（对齐 Windows AvatarPropertyPage ScoreAlgorithm 选择器）
-              Text('评分')
-                .fontSize(10)
-                .fontColor($r('app.color.text_secondary'))
-              Text(this.scoreAlgorithm === 0 ? '米游社推荐' : (this.scoreAlgorithm === 1 ? '双爆分' : '背包评分配置'))
-                .fontSize(10)
-                .fontColor($r('app.color.app_primary'))
-                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                .borderRadius(9)
-                .backgroundColor($r('app.color.app_primary_bg'))
-                .hoverEffect(HoverEffect.Highlight)
-                .accessibilityText('切换评分口径')
-                .onClick(() => {
-                  this.setScoreAlgorithm((this.scoreAlgorithm + 1) % 3);
-                })
-            }
-            .width('100%')
-            Text(this.scoreAlgorithm === 0
-              ? '米游社推荐：按角色推荐副属性加权（无推荐回退双爆分）'
-              : (this.scoreAlgorithm === 1 ? '双爆分 = 暴击率×2 + 暴击伤害×1'
-                : `背包评分配置：${this.scoreProfile.name} · 权重在背包页「评分设置」维护`))
-              .fontSize(10)
-              .fontColor($r('app.color.text_secondary'))
-              .width('100%')
-            ForEach(this.currentDetail.reliquaries, (r: Reliquary, i: number) => {
-              Column({ space: 5 }) {
-                Row({ space: 8 }) {
-                  MetaIcon({
-                    category: 'RelicIcon',
-                    name: CharacterPage.relicIconName(r.icon),
-                    iconSize: 36,
-                  })
-                  Column({ space: 2 }) {
-                    Text(`${r.posName} · ${r.name}`)
-                      .fontSize(12)
-                      .fontColor($r('app.color.text_primary'))
-                    Text(`★${r.rarity} +${r.level}`)
-                      .fontSize(11)
-                      .fontColor($r('app.color.text_secondary'))
-                    // 圣遗物评分徽章（评分口径随上方切换；子词条着色对齐 ReliquarySubStatState）
-                    Text(`${this.relicScoreOf(r)} 分 · ${ReliquaryScore.grade(this.relicScoreOf(r))}`)
-                      .fontSize(10)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor($r('app.color.app_primary_text'))
-                      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                      .borderRadius(9)
-                      .backgroundColor($r('app.color.app_primary_bg'))
-                  }
-                  .alignItems(HorizontalAlign.Start)
-                  .layoutWeight(1)
-                }
-                .width('100%')
-                if (r.mainProperty.propertyType.length > 0) {
-                  Row({ space: 6 }) {
-                    Text(CharacterPage.propLabel(r.mainProperty.propertyType))
-                      .fontSize(11)
-                      .fontColor($r('app.color.text_secondary'))
-                    Text(r.mainProperty.value)
-                      .fontSize(11)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor($r('app.color.text_primary'))
-                    Blank()
-                  }
-                  .width('100%')
-                }
-                if (r.subProperties.length > 0) {
-                  Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
-                    ForEach(r.subProperties, (sp: RelicProperty, j: number) => {
-                      Text(`${CharacterPage.propLabel(sp.propertyType)} +${sp.value}`)
-                        .fontSize(10)
-                        .fontColor(this.subStatColor(sp))
-                        .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                        .margin({ right: 4, bottom: 4 })
-                        .borderRadius(7)
-                        .backgroundColor($r('app.color.card_inner_tint'))
-                    }, (sp: RelicProperty) => `${r.id}_${sp.propertyType}_${sp.value}_${sp.times}`)
-                  }
-                  .width('100%')
-                }
-              }
-              .width('100%')
-              .padding({ top: 8, bottom: 8, left: 12, right: 12 })
-              .borderRadius(10)
-              .backgroundColor($r('app.color.card_inner_tint'))
-            }, (r: Reliquary) => `${r.id}_${r.pos}_${r.level}_${r.subProperties.length}`)
-          }
-          .width('100%')
-          .padding(12)
-          .borderRadius(12)
-          .attributeModifier(new CardSurfaceModifier())
-          .border({ width: 1, color: $r('app.color.card_stroke') })
-        }
-        if (this.currentDetail.constellations.length > 0) {
-          Column({ space: 6 }) {
-            Row({ space: 8 }) {
-              Text('命座')
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary'))
-                .layoutWeight(1)
-              Text(`已激活 ${this.currentDetail.activedConstellationNum < 0 ? '?' : this.currentDetail.activedConstellationNum}/${this.currentDetail.constellations.length}`)
-                .fontSize(11)
-                .fontColor($r('app.color.text_secondary'))
-            }
-            .width('100%')
-            ForEach(this.currentDetail.constellations, (c: Constellation, ci: number) => {
-              Row({ space: 8 }) {
-                Column({ space: 2 }) {
-                  Text(`第 ${c.pos} 层`)
-                    .fontSize(10)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(c.isActived ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
-                    .width(44)
-                    .textAlign(TextAlign.Center)
-                    .padding({ top: 3, bottom: 3 })
-                    .borderRadius(7)
-                    .backgroundColor(c.isActived ? $r('app.color.app_primary_bg') : $r('app.color.card_inner_tint'))
-                  Text(c.name.length > 8 ? `${c.name.substring(0, 8)}…` : c.name)
-                    .fontSize(10)
-                    .fontColor($r('app.color.text_secondary'))
-                    .maxLines(1)
-                }
-                .width(44)
-                Column({ space: 2 }) {
-                  Text(c.name.length > 0 ? c.name : `星座 ${c.pos}`)
-                    .fontSize(12)
-                    .fontWeight(c.isActived ? FontWeight.Medium : FontWeight.Normal)
-                    .fontColor(c.isActived ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
-                    .width('100%')
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(c.effect.length > 0 ? c.effect : '尚未解锁')
-                    .fontSize(10)
-                    .fontColor($r('app.color.text_secondary'))
-                    .width('100%')
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1)
-              }
-              .width('100%')
-              .padding({ top: 4, bottom: 4 })
-            }, (c: Constellation) => `con_${c.id}`)
-          }
-          .width('100%')
-          .padding(12)
-          .borderRadius(12)
-          .attributeModifier(new CardSurfaceModifier())
-          .border({ width: 1, color: $r('app.color.card_stroke') })
-        }
+        this.propertiesPanel()
+        this.recommendationPanel()
+        GridRow({ columns: { xs: 1, sm: 2, md: 3 }, gutter: { x: 10, y: 10 },
+          breakpoints: { value: ['360vp', '720vp'], reference: BreakpointsReference.ComponentSize } }) {
+          ForEach(this.currentDetail.reliquaries, (relic: Reliquary) => {
+            GridCol() { this.relicCard(relic) }
+          }, (relic: Reliquary): string => this.relicKey(relic))
+        }.width('100%')
+        this.additionalDetails()
       }
-      }
-    }
-    .width('100%')
+    }.width('100%')
   }
 
-  /** 详情头部卡（元素图标 + 头像 + 名称等级）——无参：直接读 @State currentDetail，传参会固定快照不刷新 */
+  private nameCardData(): CharacterNameCardData {
+    const card: CharacterNameCardData = new CharacterNameCardData();
+    const detail: CharacterDetail | undefined = this.currentDetail;
+    if (detail === undefined) { return card; }
+    card.avatarId = detail.id;
+    card.name = this.avatarName(detail.id, detail.name);
+    card.icon = WikiMetaService.iconOfAvatar(detail.id) || detail.icon;
+    card.level = detail.level; card.rarity = detail.rarity; card.fetter = detail.fetter;
+    card.scoreText = detail.reliquaries.length > 0 ? this.totalRelicScore().toFixed(1) + ' 分' : '';
+    card.nameCardPic = this.currentNameCardPic();
+    card.weaponName = this.currentWeaponName();
+    card.weaponIcon = WikiMetaService.iconOfWeapon(detail.weapon.id);
+    card.weaponLevel = detail.weapon.level; card.weaponRarity = detail.weapon.rarity;
+    card.refinement = detail.weapon.affixLevel;
+    const metadata: MetaSkill[] = this.currentSkills();
+    for (const kind of ['A', 'E', 'Q']) {
+      const skill: CharacterNameCardSkill = new CharacterNameCardSkill();
+      const index: number = metadata.findIndex((item: MetaSkill): boolean => SkillLevelService.kindOfMetaSkill(detail, item) === kind);
+      if (index >= 0) {
+        const item: MetaSkill = metadata[index];
+        skill.id = index + 1; skill.name = item.n; skill.icon = item.i;
+        skill.description = WikiMetaService.cleanText(item.d);
+        skill.levelText = this.skillLevelAt(index);
+      }
+      card.skills.push(skill);
+    }
+    for (const entry of detail.constellations) {
+      const item: CharacterNameCardConstellation = new CharacterNameCardConstellation();
+      const meta: MetaSkill | undefined = this.constellationMeta(entry);
+      item.id = entry.id; item.pos = entry.pos; item.name = this.constellationName(entry);
+      item.icon = meta?.i || entry.icon; item.active = entry.isActived; item.known = entry.activationKnown;
+      item.description = WikiMetaService.cleanText(meta?.d || entry.effect);
+      card.constellations.push(item);
+    }
+    return card;
+  }
+
+  private showCharacterInfo(title: string, description: string): void {
+    this.getUIContext().showAlertDialog({ systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel),
+      title: title, message: description.length > 0 ? description : '暂无说明',
+      primaryButton: { value: $r('app.string.ui_exception_close'), action: () => {} } });
+  }
+
   @Builder
   detailHeader() {
-    Row({ space: 12 }) {
-      if (this.currentDetail !== undefined) {
-        if (WikiMetaService.iconOfAvatar(this.currentDetail.id).length > 0) {
-          MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(this.currentDetail.id), iconSize: 64 })
-        } else if (this.currentDetail.icon.startsWith('http')) {
-          Image(this.currentDetail.icon)
-            .width(64)
-            .height(64)
-            .borderRadius(32)
-            .objectFit(ImageFit.Cover)
-            .backgroundColor($r('app.color.app_primary_bg'))
-        } else if (this.currentDetail.icon.length > 0) {
-          MetaIcon({ category: 'AvatarIcon', name: this.currentDetail.icon, iconSize: 64 })
-        } else {
-          MetaIcon({ category: 'AvatarIcon', name: '', iconSize: 64 })
-        }
-        Column({ space: 3 }) {
-          Text(this.currentDetail.name)
-            .fontSize(20)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-          Text(`Lv.${this.currentDetail.level} · ★${this.currentDetail.rarity} · 好感 ${this.currentDetail.fetter} · 命座 ${this.currentDetail.activedConstellationNum < 0 ? '?' : this.currentDetail.activedConstellationNum}`)
-            .fontSize(12)
-            .fontColor($r('app.color.text_secondary'))
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-      }
-    }
-    .width('100%')
-    .padding(14)
-    .borderRadius(12)
-    .attributeModifier(new CardSurfaceModifier())
-    .border({ width: 1, color: $r('app.color.card_stroke') })
-  }
-
-  /**
-   * 详情操作命令行（对齐 Windows AvatarPropertyPage 命令区）：
-   * 导出文本（默认模板结构固定拼装 → 剪贴板）/ 加入养成计划（多项目先弹选择）。
-   * 无参 @Builder 直接读 @State，传参会固定快照不刷新（同 detailHeader 约定）。
-   */
-  @Builder
-  detailActions() {
-    Row({ space: 10 }) {
-      Button('导出文本')
-        .fontSize(this.isWide ? 13 : 12)
-        .height(44)
-        .layoutWeight(1)
-        .backgroundColor($r('app.color.app_primary_bg'))
-        .fontColor($r('app.color.app_primary_text'))
-        .hoverEffect(HoverEffect.Highlight)
-        .onClick(() => {
-          this.exportDetailText();
-        })
-      Button('全部导出')
-        .fontSize(12).height(44).layoutWeight(1)
-        .backgroundColor($r('app.color.app_primary_bg')).fontColor($r('app.color.app_primary_text'))
-        .hoverEffect(HoverEffect.Highlight).onClick(() => this.exportAllText())
-      Button('规划角色')
-        .fontSize(this.isWide ? 13 : 12)
-        .height(44)
-        .layoutWeight(1)
-        .backgroundColor($r('app.color.app_primary_bg'))
-        .fontColor($r('app.color.app_primary_text'))
-        .hoverEffect(HoverEffect.Highlight)
-        .onClick(() => {
-          this.addCurrentToPlan();
-        })
-    }
-    .width('100%')
-    Button('规划当前装备武器').height(44).width('100%').hoverEffect(HoverEffect.Highlight)
-      .onClick(() => this.addCurrentToPlan(true))
+    CharacterNameCard({ data: this.nameCardData(), compact: !this.isWide, cardHeight: this.isWide ? Math.min(400, Math.max(320, (this.contentWidth - 244) * 0.46)) : 300,
+      onSkill: (skill: CharacterNameCardSkill) => { this.showCharacterInfo(skill.name + ' · ' + skill.levelText, skill.description); },
+      onConstellation: (entry: CharacterNameCardConstellation) => { this.showCharacterInfo(entry.name, entry.description); } })
   }
 
   @Builder
   planPickerSheet() {
     CultivationDraftEditor({ vm: this.draftVm, uid: this.currentUid,
       onClose: (): void => { this.showPlanSheet = false; this.draftVm.cancel(); } })
-  }
-
-  @Builder
-  batchPlanActions() {
-    Row({ space: 6 }) {
-      Button(`规划所选 ${this.planSelectedIds.length}`).fontSize(12).height(44).layoutWeight(1)
-        .enabled(this.planSelectedIds.length > 0 && !this.draftVm.busy).hoverEffect(HoverEffect.Highlight)
-        .onClick(() => this.openCharacterDraft(this.vm.items.filter((item: CharacterListItem): boolean => this.planSelectedIds.indexOf(item.id) >= 0)))
-      Button('全部规划').fontSize(12).height(44).layoutWeight(1).enabled(!this.draftVm.busy)
-        .hoverEffect(HoverEffect.Highlight).onClick(() => this.openCharacterDraft(this.vm.items))
-    }.width('100%')
   }
 
   /** 导出当前角色文本到剪贴板（对齐 Windows ExportToTextCommand，默认模板固定拼装） */
@@ -760,7 +823,7 @@ export struct CharacterPage {
       return;
     }
     const text: string = CharacterExportService.buildExportText(d,
-      (t: string): string => CharacterPage.propLabel(t));
+      (t: string): string => CharacterPage.propLabel(t), this.vm.scoreWeights(d.id));
     const data: pasteboard.PasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text);
     pasteboard.getSystemPasteboard().setData(data).then(() => {
       this.toast('已复制');
@@ -770,17 +833,21 @@ export struct CharacterPage {
   }
 
   private async exportAllText(): Promise<void> {
+    const visible: CharacterListItem[] = this.filteredItems();
+    if (visible.length === 0) { this.toast('没有可导出的角色'); return; }
     const texts: string[] = [];
-    for (const detail of this.vm.detailMap.values()) {
-      texts.push(CharacterExportService.buildExportText(detail, (type: string): string => CharacterPage.propLabel(type)));
-    }
-    if (texts.length === 0) {
-      this.toast('没有可导出的角色详情');
-      return;
+    for (const item of visible) {
+      const detail: CharacterDetail | undefined = this.vm.detailMap.get(item.id);
+      if (detail === undefined) {
+        this.toast('列表中还有角色缺少详情，请同步角色信息后再导出');
+        return;
+      }
+      texts.push(CharacterExportService.buildExportText(detail,
+        (type: string): string => CharacterPage.propLabel(type), this.vm.scoreWeights(detail.id)));
     }
     try {
       await pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, texts.join('\n\n')));
-      this.toast(`已复制 ${texts.length} 个角色；当前列表共 ${this.vm.items.length} 个`);
+      this.toast(`已复制 ${texts.length} 个角色`);
     } catch (e) {
       this.toast('复制失败');
     }
@@ -797,6 +864,20 @@ export struct CharacterPage {
     this.draftVm.characters(this.currentUid, items.slice(), weaponOnly).then(() => {});
   }
 
+  private addCurrentWithWeapon(character?: CharacterListItem): void {
+    const target: CharacterListItem | undefined = character ??
+      this.vm.items.find((item: CharacterListItem): boolean => item.id === this.selectedId);
+    if (target === undefined || this.draftVm.busy) { return; }
+    this.showPlanSheet = true;
+    this.draftVm.characterAndWeapon(this.currentUid, target).then(() => {});
+  }
+
+  private openBatchCharacterDraft(items: CharacterListItem[]): void {
+    if (this.draftVm.busy || items.length === 0) { return; }
+    this.showPlanSheet = true;
+    this.draftVm.batchCharacters(this.currentUid, items.slice()).then(() => {});
+  }
+
   static kindLabel(k: string): string {
     switch (k) {
       case 'A': return '普攻';
@@ -808,9 +889,9 @@ export struct CharacterPage {
   }
 
   /** Skill IDs join verified metadata; unknown mapping is displayed explicitly. */
-  private skillLevelAt(name: string, idx: number): string {
+  private skillLevelAt(idx: number): string {
     const detail: CharacterDetail | undefined = this.currentDetail;
-    const meta: MetaSkill | undefined = WikiMetaService.skillsOfAvatar(name)[idx];
+    const meta: MetaSkill | undefined = this.currentSkills()[idx];
     if (detail === undefined || meta === undefined) { return ''; }
     const skill: ResolvedAvatarSkill | undefined = SkillLevelService.forMetaSkill(detail, meta);
     return skill !== undefined ? SkillLevelService.formatSkill(skill)
@@ -819,9 +900,9 @@ export struct CharacterPage {
 
   /** 战斗天赋等级徽章（无参读取组件状态；参数 name/idx 为常量槽位，满足 @Builder 刷新规则） */
   @Builder
-  skillLevelBadge(name: string, idx: number) {
-    if (this.skillLevelAt(name, idx).length > 0) {
-      Text(this.skillLevelAt(name, idx))
+  skillLevelBadge(idx: number) {
+    if (this.skillLevelAt(idx).length > 0) {
+      Text(this.skillLevelAt(idx))
         .fontSize(10)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.app_primary_text'))
@@ -868,74 +949,76 @@ export struct CharacterPage {
     return icon;
   }
 
-  static relicScore(r: Reliquary, d: CharacterDetail): number {
-    return Math.round(ReliquaryScore.calculate(r.subProperties, d.recommend.subProperties,
-      d.recommend.energyType, ReliquaryScore.isCritEffective(d.id)) * 10) / 10;
+  private relicScoreOf(reliquary: Reliquary): number {
+    const detail: CharacterDetail | undefined = this.currentDetail;
+    return detail === undefined ? 0 : ReliquaryScore.forCharacter(reliquary, detail, this.vm.scoreWeights(detail.id));
   }
 
-  /** 当前评分口径下的分值：0=米游社推荐权重（默认）；1=双爆分；2=背包评分配置（SavedConfig） */
-  private relicScoreOf(r: Reliquary): number {
-    const d: CharacterDetail | undefined = this.currentDetail;
-    if (d === undefined) {
-      return 0;
-    }
-    if (this.scoreAlgorithm === 1) {
-      return ReliquaryScore.doubleCritScore(r, ReliquaryScore.isCritEffective(d.id));
-    }
-    if (this.scoreAlgorithm === 2) {
-      return ReliquaryScore.profileScore(r.subProperties, this.scoreProfile.weights);
-    }
-    return CharacterPage.relicScore(r, d);
+  private totalRelicScore(): number {
+    const detail: CharacterDetail | undefined = this.currentDetail;
+    return detail === undefined ? 0 : ReliquaryScore.totalForCharacter(detail, this.vm.scoreWeights(detail.id));
   }
 
-  /**
-   * 子词条状态色（对齐 Windows ReliquarySubStatState + 颜色转换器）：
-   * 双爆词条（角色可暴击）=主色强调；推荐词条=正常；其余=无效弱化。
-   */
-  private subStatColor(sp: RelicProperty): Resource {
-    const d: CharacterDetail | undefined = this.currentDetail;
-    if (d === undefined) {
-      return $r('app.color.text_secondary');
-    }
-    const isCrit: boolean = sp.propertyType === 'FIGHT_PROP_CRITICAL'
-      || sp.propertyType === 'FIGHT_PROP_CRITICAL_HURT';
-    if (isCrit && ReliquaryScore.isCritEffective(d.id)) {
-      return $r('app.color.app_primary');
-    }
-    if (d.recommend.subProperties.indexOf(sp.propertyType) >= 0) {
-      return $r('app.color.text_primary');
-    }
-    return $r('app.color.text_hint');
+  private scoreSelectOptions(): SelectOption[] {
+    return this.vm.scoreOptions.map((option: CharacterScoreOption): SelectOption => ({ value: option.label }));
   }
 
-  /** 切换当前角色的评分口径（0=米游社推荐 / 1=双爆分 / 2=背包评分配置） */
-  private setScoreAlgorithm(value: number): void {
-    this.scoreAlgorithm = value;
-    if (value === 2) {
-      this.reloadScoreProfile();
+  private setScoreOption(index: number): void {
+    if (this.currentDetail !== undefined) {
+      this.vm.selectScoreOption(this.currentDetail.id, index);
     }
-    PreferencesStore.setNumber(`relic.score.algorithm.${this.currentDetail?.id ?? 0}`, value);
   }
 
-  /** 载入背包活动评分配置（SavedConfig 指向；无配置时用默认权重） */
-  private reloadScoreProfile(): void {
+  private openScoreEditor(): void {
+    if (this.currentDetail === undefined) { return; }
+    this.scoreEditAvatarId = this.currentDetail.id;
+    this.scoreEdit = this.vm.beginScoreEdit(this.scoreEditAvatarId);
+    this.showScoreSheet = true;
+  }
+
+  private saveScore(profile: BackpackScoreProfile, deletedIds: string[]): void {
     try {
-      this.scoreProfile = BackpackScoreService.active(BackpackScoreService.load());
+      this.vm.saveScore(this.scoreEditAvatarId, this.scoreEdit, profile, deletedIds);
+      this.showScoreSheet = false;
     } catch (e) {
-      Logger.warn('CharacterPage', `load score profile fail: ${(e as Error).message}`);
-      this.scoreProfile = new BackpackScoreProfile();
+      this.toast((e as Error).message);
     }
+  }
+
+  @Builder
+  scoreEditorSheet() {
+    Scroll() {
+      Column() {
+        ReliquaryScoreEditor({
+          initialProfile: this.scoreEdit.profile,
+          savedProfiles: this.vm.scoreSettings.profiles,
+          warning: this.vm.scoreSettings.warning,
+          onConfirm: (profile: BackpackScoreProfile, deletedIds: string[]) => this.saveScore(profile, deletedIds),
+          onCancel: () => { this.showScoreSheet = false; }
+        })
+      }.width('100%').padding(20)
+    }.width('100%').height('100%')
+  }
+
+  static relicPropLabel(type: string): string {
+    if (type === '2' || type === 'FIGHT_PROP_HP') { return '生命值'; }
+    if (type === '5' || type === 'FIGHT_PROP_ATTACK') { return '攻击力'; }
+    if (type === '8' || type === 'FIGHT_PROP_DEFENSE') { return '防御力'; }
+    return CharacterPage.propLabel(type);
   }
 
   /** 属性类型 → 中文标签（兼容：字符串 FIGHT_PROP_* 与数字 FightProperty 枚举） */
   static propLabel(type: string): string {
     switch (type) {
+      case '2':
       case 'FIGHT_PROP_HP':
       case 'FIGHT_PROP_MAX_HP':
       case '2000': return '生命值上限';
+      case '5':
       case 'FIGHT_PROP_ATTACK':
       case 'FIGHT_PROP_CUR_ATTACK':
       case '2001': return '攻击力';
+      case '8':
       case 'FIGHT_PROP_DEFENSE':
       case 'FIGHT_PROP_CUR_DEFENSE':
       case '2002': return '防御力';
@@ -1008,112 +1091,69 @@ export struct CharacterPage {
     }
   }
 
+  @Builder
+  detailViewport() {
+    Scroll(this.detailScroller) {
+      Column({ space: 12 }) {
+        if (this.currentDetail !== undefined) {
+          this.detailPanel()
+        } else if (this.vm.loading || this.vm.detailLoading || this.vm.loadingDetail) {
+          LoadingProgress().width(36).height(36).color($r('app.color.app_primary'))
+          Text('加载详情中...').fontSize(13).fontColor($r('app.color.text_secondary'))
+        } else {
+          Text('选择角色查看详情').fontSize(13).fontColor($r('app.color.text_secondary'))
+        }
+      }.width('100%').padding({ bottom: 16, right: this.isWide ? 4 : 0 })
+    }.width('100%').height('100%').scrollBar(BarState.Auto)
+  }
+
   build() {
     Stack() {
-      // 壁纸衬底：router 独立页透出壁纸，embed 内嵌时由壳层统一铺（组件内渲染为空）
       PageBackdrop({ embedMode: this.embedMode })
-      Column() {
-      this.header()
-      if (!this.isLoggedIn) {
-        this.loginGuide()
-      } else {
-        Flex({ direction: this.isWide ? FlexDirection.Row : FlexDirection.Column, alignItems: ItemAlign.Start }) {
-          // 左侧角色列表
-          Scroll() {
-            Column({ space: 8 }) {
-              if (this.vm.loading) {
-                LoadingProgress().width(36).height(36).color($r('app.color.app_primary'))
-                Text('加载中...').fontSize(13).fontColor($r('app.color.text_secondary'))
-              } else if (this.vm.message.length > 0) {
-                Text(this.vm.message).fontSize(13).fontColor($r('app.color.text_secondary'))
-                Button('重试').fontSize(13).backgroundColor($r('app.color.app_primary'))
-                  .fontColor($r('app.color.on_accent')).onClick(() => {
-                    this.reload();
-                  })
-              } else if (this.vm.items.length === 0) {
-                Text('暂无角色数据').fontSize(13).fontColor($r('app.color.text_secondary'))
-              } else {
-                this.charFilterBar()
-                this.batchPlanActions()
-                ForEach(this.filteredItems(), (c: CharacterListItem) => {
-                  this.characterRow(c)
-                }, (c: CharacterListItem) => `${c.id}_${this.planSelectedIds.indexOf(c.id) >= 0}_${this.selectedId}`)
-              }
-            }
-            .width('100%')
-            .padding({ left: 16, right: 8, bottom: 16 })
+      Column({ space: 0 }) {
+        this.header()
+        if (!this.isLoggedIn) {
+          this.loginGuide()
+        } else {
+          if (this.vm.loading || this.vm.message.length > 0) {
+            Row({ space: 8 }) {
+              if (this.vm.loading) { LoadingProgress().width(20).height(20).color($r('app.color.app_primary')) }
+              Text(this.vm.message || '正在同步角色数据...').fontSize(12).fontColor($r('app.color.text_secondary')).layoutWeight(1)
+            }.width('100%').padding({ left: 16, right: 16, bottom: 8 })
           }
-          .width(this.isWide ? 300 : '100%')
-          .height(this.isWide ? '100%' : '45%')
-          .scrollBar(BarState.Off)
-
-          // 右侧详情（宽屏显示；窄屏也顺序显示）
-          if (this.isWide) {
-            Scroll() {
-              Column({ space: 10 }) {
-                if (this.vm.loadingDetail) {
-                  Text('加载详情中...').fontSize(13).fontColor($r('app.color.text_secondary'))
-                } else if (this.currentDetail !== undefined) {
-                  this.detailPanel()
-                } else {
-                  Text('点击角色查看详情').fontSize(13).fontColor($r('app.color.text_secondary'))
-                }
-              }
-              .width('100%')
-              .padding({ left: 8, right: 16, bottom: 16 })
-            }
-            .layoutWeight(1)
-            .scrollBar(BarState.Off)
+          if (this.vm.items.length === 0 && !this.vm.loading) {
+            Text('暂无角色数据').fontSize(14).fontColor($r('app.color.text_secondary')).padding(24)
+          } else if (this.isWide) {
+            Row({ space: 12 }) {
+              this.rosterPanel()
+              Column() { this.detailViewport() }.layoutWeight(1).height('100%')
+            }.width('100%').layoutWeight(1).padding({ left: 12, right: 12, bottom: 12 })
           } else {
-            // 窄屏详情在列表下方顺序展示
-            Scroll() {
-              Column({ space: 10 }) {
-                if (this.vm.loadingDetail) {
-                  Text('加载详情中...').fontSize(13).fontColor($r('app.color.text_secondary'))
-                } else if (this.currentDetail !== undefined) {
-                  this.detailPanel()
-                }
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, bottom: 16 })
-            }
-            .layoutWeight(1)
-            .scrollBar(BarState.Off)
+            Column() {
+              if (this.showMobileDetail) { this.detailViewport() }
+              else { this.rosterPanel() }
+            }.width('100%').layoutWeight(1).padding({ left: 12, right: 12, bottom: 12 })
           }
         }
-        .width('100%')
-        .layoutWeight(1)
       }
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
-    .onAreaChange((_old: Area, area: Area) => { this.isWide = Number(area.width) >= 840; })
-    .bindSheet(this.showVerify, () => {
-      RiskVerifyDialog({
-        isShow: this.showVerify,
-        gt: this.vm.riskGt,
-        challenge: this.vm.riskChallenge,
-        path: this.vm.riskPath,
-        onDone: (challenge: string) => {
-          // 验证完成：写入待重放 challenge 并触发重放
-          AppStorage.setOrCreate<string>(RiskUiHelper.KEY_PENDING, challenge);
-          this.vm.resetRiskAndReload(this.currentUid);
-        },
+      .width('100%').height('100%')
+      .onAreaChange((_old: Area, area: Area) => {
+        const nextWide: boolean = Number(area.width) >= 840;
+        if (this.isWide && !nextWide && this.currentDetail !== undefined) { this.showMobileDetail = true; }
+        this.contentWidth = Number(area.width); this.isWide = nextWide;
       })
-    }, { height: 420, backgroundColor: $r('app.color.sheet_material_tint'), showClose: false, blurStyle: BlurStyle.Regular })
-    // 养成计划选择半窗（多项目时让用户选目标计划；$$ 双向同步下滑关闭）
-    .bindSheet($$this.showPlanSheet, this.planPickerSheet(), {
-      title: { title: '加入养成计划' },
-      showClose: true,
-      dragBar: true,
-      height: '90%',
-      onDisappear: (): void => { this.draftVm.cancel(); },
-      blurStyle: BlurStyle.Regular,
-      backgroundColor: $r('app.color.sheet_material_tint'),
-    })
-    }
-    .width('100%')
-    .height('100%')
+      .bindSheet(this.showVerify, () => {
+        RiskVerifyDialog({ isShow: this.showVerify, gt: this.vm.riskGt, challenge: this.vm.riskChallenge, path: this.vm.riskPath,
+          onDone: (challenge: string) => {
+            AppStorage.setOrCreate<string>(RiskUiHelper.KEY_PENDING, challenge);
+            this.vm.resetRiskAndReload(this.currentUid);
+          } })
+      }, { systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel), height: 420,
+        backgroundColor: $r('app.color.sheet_material_tint'), showClose: false, blurStyle: BlurStyle.Regular })
+      .bindSheet($$this.showPlanSheet, this.planPickerSheet(), {
+        systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel), title: { title: '加入养成计划' },
+        showClose: true, dragBar: true, height: '90%', onDisappear: (): void => { this.draftVm.cancel(); },
+        blurStyle: BlurStyle.Regular, backgroundColor: $r('app.color.sheet_material_tint') })
+    }.width('100%').height('100%')
   }
 }

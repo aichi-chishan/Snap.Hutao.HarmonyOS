@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "ui_startup_failed_title", "value": "Starten derzeit nicht möglich" },
+    { "name": "ui_startup_failed_body", "value": "Der Start konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut. Ihre vorhandenen Daten werden dabei nicht gelöscht." }
+  ]
+}

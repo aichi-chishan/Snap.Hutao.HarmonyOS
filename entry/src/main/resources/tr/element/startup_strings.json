@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "ui_startup_failed_title", "value": "Başlatılamadı" },
+    { "name": "ui_startup_failed_body", "value": "Başlatma tamamlanamadı. Lütfen yeniden deneyin. Yeniden denemek mevcut verilerinizi silmez." }
+  ]
+}

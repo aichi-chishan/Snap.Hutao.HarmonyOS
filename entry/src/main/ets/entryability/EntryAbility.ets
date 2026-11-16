@@ -1,7 +1,7 @@
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, common } from '@kit.AbilityKit';
 import { bundleManager } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { ComponentContent, UIContext, display, window } from '@kit.ArkUI';
+import { ComponentContent, OverlayManager, UIContext, window } from '@kit.ArkUI';
 import { RelationalStoreHelper } from '../data/db/RelationalStoreHelper';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { BackupService } from '../service/BackupService';
@@ -14,33 +14,50 @@ import { AppContextProvider } from '../common/AppContext';
 import { Motion } from '../common/Motion';
 import { UiSurface } from '../common/UiSurface';
 import { GameDataService } from '../service/GameDataService';
+import { RiskVerifyService } from '../service/RiskVerifyService';
 import { buildRiskVerifyOverlay } from '../components/RiskVerifyModal';
+import { Logger } from '../common/Logger';
+import { AppLocaleService } from '../service/AppLocaleService';
 
 const DOMAIN = 0x4E50;
 const TAG = 'EntryAbility';
 
 export default class EntryAbility extends UIAbility {
   private static runtimeInitialization: Promise<void> | undefined = undefined;
-  private static runtimeReady: boolean = false;
+  private static deferredServicesStarted: boolean = false;
   private windowStage: window.WindowStage | undefined = undefined;
+  private mainWindow: window.Window | undefined = undefined;
+  private windowLayoutReady: boolean = false;
+  private titleButtonListener: ((rect: window.TitleButtonRect) => void) | undefined = undefined;
+  private avoidAreaListener: ((options: window.AvoidAreaOptions) => void) | undefined = undefined;
+  private overlayManager: OverlayManager | undefined = undefined;
+  private riskVerifyContent: ComponentContent<Object> | undefined = undefined;
+  private startupPending: boolean = false;
+  private startupErrorLoaded: boolean = false;
+  private startupRetryListener: (() => void) | undefined = undefined;
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     hilog.info(DOMAIN, TAG, 'Ability onCreate');
   }
 
   onDestroy(): void {
+    this.releaseWindowResources();
+    AutoSignInService.getInstance().setForeground(false);
+    DailyNoteService.getInstance().setForeground(false);
     hilog.info(DOMAIN, TAG, 'Ability onDestroy');
+    Logger.flush();
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {
+    AppLocaleService.onConfigurationUpdate(newConfig.language);
     // 跟随系统主题时，系统深浅切换实时同步（驱动壁纸遮罩/窗口底色/页面配色）
-    const mode: string = PreferencesStore.getThemeMode();
+    const mode: string = PreferencesStore.isReady() ? PreferencesStore.getThemeMode() : 'system';
     if (mode !== 'light' && mode !== 'dark') {
       const sysDark: boolean = newConfig.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
       AppStorage.setOrCreate<boolean>('isDarkMode', sysDark);
       try {
-        const mainWindow: window.Window | undefined = this.windowStage?.getMainWindowSync();
-        if (mainWindow !== undefined) {
+        const mainWindow: window.Window | undefined = this.mainWindow;
+        if (mainWindow !== undefined && this.windowLayoutReady) {
           EntryAbility.applySystemBarColors(mainWindow);
           // 窗口根底色随主题同步（不透明，修复透明窗口合成异常发黄问题）
           EntryAbility.applyWindowBackdrop(mainWindow);
@@ -52,6 +69,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
+    this.releaseWindowResources();
     this.windowStage = windowStage;
     // 沉浸式顶部：加载完成后配置窗口（getMainWindowSync 需在 loadContent 后）
     EntryAbility.bootstrap(this, windowStage);
@@ -62,22 +80,24 @@ export default class EntryAbility extends UIAbility {
    *  PC(2in1)/平板自由窗口：隐藏系统标题栏（应用图标+名称一栏），仅保留右上角三键，
    *  内容区接管原标题栏区域，由应用自绘 TitleBar（透明、透传壁纸）。 */
   private configureImmersive(windowStage: window.WindowStage): void {
+    if (this.windowStage !== windowStage) { return; }
     try {
       const mainWindow: window.Window = windowStage.getMainWindowSync();
+      this.mainWindow = mainWindow;
       // 窗口根背景必须为不透明主题色（setWindowLayoutFullScreen 就绪后设置，见下方 then）。
       // 曾经为"透传桌面"设过透明（#00000000），但模拟器/部分合成器对透明窗口的 alpha 合成
       // 不完整：应用内半透明像素会被未初始化缓冲污染（整窗发黄）。
       // HarmonyOS 也无窗口级桌面模糊 API，透明透色没有实际收益 → 改为跟随主题的不透明底色。
-      // 自由窗口最小尺寸：防止缩得过窄导致手机布局断裂（最小 360x640vp；
-      // setWindowLimits 单位为 px，按设备真实密度换算）
+      // 直接声明 vp 限制，显示器或窗口密度变化后由系统重新换算。
       try {
-        const density: number = display.getDefaultDisplaySync().densityPixels;
-        const d: number = density > 0 ? density : 2;
         mainWindow.setWindowLimits({
-          maxWidth: Math.round(2560 * d),
-          maxHeight: Math.round(1600 * d),
-          minWidth: Math.round(360 * d),
-          minHeight: Math.round(640 * d),
+          maxWidth: 2560,
+          maxHeight: 1600,
+          minWidth: 360,
+          minHeight: 640,
+          pixelUnit: window.PixelUnit.VP,
+        }).catch((e: Error): void => {
+          hilog.warn(DOMAIN, TAG, 'setWindowLimits fail: %{public}s', e.message);
         });
       } catch (e) {
         hilog.warn(DOMAIN, TAG, 'setWindowLimits min size unsupported');
@@ -106,26 +126,32 @@ export default class EntryAbility extends UIAbility {
       }
       EntryAbility.publishTitleButtonRect(mainWindow, decorButtons);
       try {
-        mainWindow.on('windowTitleButtonRectChange', (rect: window.TitleButtonRect) => {
-          EntryAbility.publishTitleButtonRectValue(rect);
-        });
+        const titleListener: (rect: window.TitleButtonRect) => void = (rect: window.TitleButtonRect): void => {
+          if (this.mainWindow === mainWindow) { EntryAbility.publishTitleButtonRectValue(rect); }
+        };
+        mainWindow.on('windowTitleButtonRectChange', titleListener);
+        this.titleButtonListener = titleListener;
       } catch (e) {
         hilog.warn(DOMAIN, TAG, 'on windowTitleButtonRectChange unsupported');
       }
       // 全屏布局（内容延伸至系统栏区域，背景可延伸）
       mainWindow.setWindowLayoutFullScreen(true).then(() => {
+        if (this.mainWindow !== mainWindow) { return; }
+        this.windowLayoutReady = true;
         // 状态栏图标色随深浅色切换（浅色=深图标 / 深色=白图标）
         EntryAbility.applySystemBarColors(mainWindow);
         // 窗口根底色随主题（不透明；窗口就绪后设置，过早调用报 1300002）
         EntryAbility.applyWindowBackdrop(mainWindow);
+        EntryAbility.publishAvoidAreas(mainWindow);
       }).catch((e: Error) => {
         hilog.warn(DOMAIN, TAG, 'setWindowLayoutFullScreen fail: %{public}s', e.message);
       });
       // 自动读取系统规避区高度（px → vp），供页面顶部/底部避让
-      EntryAbility.publishAvoidAreas(mainWindow);
-      mainWindow.on('avoidAreaChange', () => {
-        EntryAbility.publishAvoidAreas(mainWindow);
-      });
+      const avoidListener: (options: window.AvoidAreaOptions) => void = (_options: window.AvoidAreaOptions): void => {
+        if (this.mainWindow === mainWindow && this.windowLayoutReady) { EntryAbility.publishAvoidAreas(mainWindow); }
+      };
+      mainWindow.on('avoidAreaChange', avoidListener);
+      this.avoidAreaListener = avoidListener;
     } catch (e) {
       hilog.warn(DOMAIN, TAG, 'configureImmersive fail: %{public}s', JSON.stringify(e));
     }
@@ -143,26 +169,88 @@ export default class EntryAbility extends UIAbility {
   }
 
   private static publishTitleButtonRectValue(rect: window.TitleButtonRect): void {
-    // TitleButtonRect 相对窗口右上角：占宽 = right(右边距) + width；钳制到合理区间
-    const widthVp: number = Math.min(200, Math.max(0, Math.ceil(rect.right + rect.width)));
+    // TitleButtonRect 已是 vp；保留系统实际占宽，不截断放大后的三键区。
+    const widthVp: number = Math.max(0, Math.ceil(rect.right + rect.width));
     AppStorage.setOrCreate<number>('titleBtnWidthVp', widthVp);
   }
 
   /** 挂载全局人机验证浮层（窗口级 Overlay：位于一切 router 页面之上，随窗口存续） */
-  private static mountRiskVerifyOverlay(windowStage: window.WindowStage): void {
+  private mountRiskVerifyOverlay(): void {
+    const mainWindow: window.Window | undefined = this.mainWindow;
+    if (mainWindow === undefined) { return; }
     try {
-      const mainWindow: window.Window = windowStage.getMainWindowSync();
       const uiContext: UIContext = mainWindow.getUIContext();
-      const content: ComponentContent<Object> =
+      this.overlayManager = uiContext.getOverlayManager();
+      this.riskVerifyContent =
         new ComponentContent<Object>(uiContext, wrapBuilder(buildRiskVerifyOverlay));
-      uiContext.getOverlayManager().addComponentContent(content);
+      this.overlayManager.addComponentContent(this.riskVerifyContent);
       hilog.info(DOMAIN, TAG, 'risk verify overlay mounted');
     } catch (e) {
+      this.releaseRiskVerifyOverlay();
       hilog.error(DOMAIN, TAG, 'mount risk overlay fail: %{public}s', JSON.stringify(e));
     }
   }
 
-  /** 窗口根背景：跟随主题的不透明色（与 WallpaperLayer none 渐变底一致，主题切换实时同步） */
+  private releaseRiskVerifyOverlay(): void {
+    const content: ComponentContent<Object> | undefined = this.riskVerifyContent;
+    const manager: OverlayManager | undefined = this.overlayManager;
+    this.riskVerifyContent = undefined;
+    this.overlayManager = undefined;
+    if (content === undefined) { return; }
+    try {
+      manager?.removeComponentContent(content);
+    } catch (e) {
+      hilog.warn(DOMAIN, TAG, 'remove risk overlay fail: %{public}s', JSON.stringify(e));
+    }
+    try {
+      content.dispose();
+    } catch (e) {
+      hilog.warn(DOMAIN, TAG, 'dispose risk overlay fail: %{public}s', JSON.stringify(e));
+    }
+  }
+
+  private releaseWindowResources(): void {
+    const mainWindow: window.Window | undefined = this.mainWindow;
+    const hadWindowStage: boolean = this.windowStage !== undefined;
+    this.windowStage = undefined;
+    this.mainWindow = undefined;
+    this.windowLayoutReady = false;
+    this.startupPending = false;
+    this.startupErrorLoaded = false;
+    this.stopStartupRetry();
+    // 关闭窗口也结束等待中的验证；初次创建和重复清理不取消新的请求。
+    if (hadWindowStage) { RiskVerifyService.getInstance().cancel(); }
+    // 只解除本 Ability 注册的回调，保留同一窗口中其他功能的订阅。
+    if (mainWindow !== undefined && this.titleButtonListener !== undefined) {
+      try { mainWindow.off('windowTitleButtonRectChange', this.titleButtonListener); }
+      catch (e) { hilog.warn(DOMAIN, TAG, 'off title button listener fail'); }
+    }
+    if (mainWindow !== undefined && this.avoidAreaListener !== undefined) {
+      try { mainWindow.off('avoidAreaChange', this.avoidAreaListener); }
+      catch (e) { hilog.warn(DOMAIN, TAG, 'off avoid area listener fail'); }
+    }
+    this.titleButtonListener = undefined;
+    this.avoidAreaListener = undefined;
+    this.releaseRiskVerifyOverlay();
+    AppStorage.setOrCreate<boolean>('sysDecorButtons', false);
+    AppStorage.setOrCreate<number>('titleBtnWidthVp', 0);
+    AppStorage.setOrCreate<number>('topAvoidVp', 0);
+    AppStorage.setOrCreate<number>('bottomAvoidVp', 0);
+  }
+
+  private enableStartupRetry(windowStage: window.WindowStage): void {
+    if (this.startupRetryListener !== undefined) { return; }
+    this.startupRetryListener = (): void => { EntryAbility.bootstrap(this, windowStage); };
+    this.context.eventHub.on('hutao.startup.retry', this.startupRetryListener);
+  }
+
+  private stopStartupRetry(): void {
+    if (this.startupRetryListener === undefined) { return; }
+    this.context.eventHub.off('hutao.startup.retry', this.startupRetryListener);
+    this.startupRetryListener = undefined;
+  }
+
+  /** 窗口根背景：跟随主题的不透明色，与 WallpaperLayer 的主题底色一致。 */
   static applyWindowBackdrop(mainWindow: window.Window): void {
     const isDark: boolean = AppStorage.get<boolean>('isDarkMode') ?? false;
     try {
@@ -193,9 +281,9 @@ export default class EntryAbility extends UIAbility {
       const bottomAvoid: window.AvoidArea =
         mainWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
       const bottomPx: number = bottomAvoid.bottomRect.height;
-      const density: number = display.getDefaultDisplaySync().densityPixels;
-      const topVp: number = density > 0 ? Math.ceil(topPx / density) : 0;
-      const bottomVp: number = density > 0 ? Math.ceil(bottomPx / density) : 0;
+      const uiContext: UIContext = mainWindow.getUIContext();
+      const topVp: number = Math.ceil(uiContext.px2vp(topPx));
+      const bottomVp: number = Math.ceil(uiContext.px2vp(bottomPx));
       AppStorage.setOrCreate<number>('topAvoidVp', topVp);
       AppStorage.setOrCreate<number>('bottomAvoidVp', bottomVp);
       hilog.info(DOMAIN, TAG, 'avoid area top=%{public}dpx(%{public}d vp) bottom=%{public}dpx',
@@ -221,16 +309,16 @@ export default class EntryAbility extends UIAbility {
   private static async prepareRuntime(context: common.UIAbilityContext): Promise<void> {
     AppContextProvider.init(context);
     await PreferencesStore.init(context);
-    PreferencesStore.bumpLaunchTimes();
     // 界面材质令牌发布（模式/级别 → AppStorage，壳层与各表面即时读取）
     UiSurface.publish();
     await RelationalStoreHelper.init(context);
     await BackgroundTaskService.init(context);
+    const users: UserService = UserService.getInstance();
     // Install before journal repair or any session restoration. A failed fence prevents
     // its dependent account mutation; normal cold start preserves the original opt-in.
-    UserService.getInstance().setSessionInvalidationHook(async (reason: string): Promise<boolean> => {
+    users.setSessionInvalidationHook(async (reason: string): Promise<boolean> => {
       try {
-        if (reason === 'logout' || reason === 'delete' || reason === 'localReplacement') {
+        if (reason === 'logout' || reason === 'localReplacement') {
           await BackgroundTaskService.reset();
           await DailyNoteService.getInstance().clearCardSnapshot();
           return true;
@@ -244,23 +332,76 @@ export default class EntryAbility extends UIAbility {
       }
     });
     await BackupService.getInstance().recoverInterruptedRestore();
-    await GameDataService.initializeSnapshot();
-    await NotificationHelper.init();
-    const restored: boolean = await UserService.getInstance().restoreSession();
-    if (restored) { await BackgroundTaskService.reconcile(); }
-    EntryAbility.runtimeReady = true;
+    AppLocaleService.initialize();
+    await Promise.all([GameDataService.initializeSnapshot(), users.restoreSession()]);
+    PreferencesStore.bumpLaunchTimes();
+    users.addSessionRevisionListener((): void => {
+      if (!users.isSessionTransitionPending()) {
+        EntryAbility.reconcileBackgroundTasks();
+        if (EntryAbility.deferredServicesStarted) { EntryAbility.refreshForegroundNotes(); }
+      }
+    });
+  }
+
+  /** 页面已挂载后再启动联网维护和通知调度，冷启动只等待本地数据。 */
+  private static startDeferredServices(): void {
+    if (EntryAbility.deferredServicesStarted) { return; }
+    EntryAbility.deferredServicesStarted = true;
+    UserService.getInstance().refreshSession().catch((): void => {
+      hilog.warn(DOMAIN, TAG, 'session refresh deferred');
+    });
+    NotificationHelper.init().then((): void => {
+      EntryAbility.reconcileBackgroundTasks();
+    }).catch((): void => {
+      hilog.warn(DOMAIN, TAG, 'notification initialization failed');
+    });
     // These foreground preferences remain independent from explicit OS background opt-in.
     AutoSignInService.getInstance().bootstrapAutoSignIn().catch((e: Error) => {
       hilog.warn(DOMAIN, TAG, 'auto sign in fail: %{public}s', e.message);
     });
-    DailyNoteService.getInstance().bootstrapAutoRefresh().catch((e: Error) => {
-      hilog.warn(DOMAIN, TAG, 'bootstrap auto refresh fail: %{public}s', e.message);
-    });
+    AutoSignInService.getInstance().setForeground(AppStorage.get<boolean>('appForeground') === true);
+    DailyNoteService.getInstance().setForeground(AppStorage.get<boolean>('appForeground') === true);
+    EntryAbility.refreshForegroundNotes();
   }
 
   private static async bootstrap(ability: EntryAbility, windowStage: window.WindowStage): Promise<void> {
-    try { await EntryAbility.initializeRuntime(ability.context); }
-    catch (e) { hilog.error(DOMAIN, TAG, 'init fail: %{public}s', JSON.stringify(e)); }
+    if (ability.windowStage !== windowStage || ability.startupPending) { return; }
+    ability.startupPending = true;
+    AppStorage.setOrCreate<boolean>('startupRetrying', true);
+    try {
+      await EntryAbility.initializeRuntime(ability.context);
+      if (ability.windowStage !== windowStage) { return; }
+      EntryAbility.applyStartupAppearance(ability);
+      ability.startupErrorLoaded = false;
+      await windowStage.loadContent('pages/Index');
+      if (ability.windowStage !== windowStage) { return; }
+      ability.stopStartupRetry();
+      ability.configureImmersive(windowStage);
+      ability.mountRiskVerifyOverlay();
+      EntryAbility.startDeferredServices();
+    } catch (e) {
+      if (ability.windowStage !== windowStage) { return; }
+      hilog.error(DOMAIN, TAG, 'startup fail: %{public}s', e instanceof Error ? e.message : JSON.stringify(e));
+      EntryAbility.applyStartupAppearance(ability);
+      ability.enableStartupRetry(windowStage);
+      if (!ability.startupErrorLoaded) {
+        try {
+          // 保留已有错误页；loadContent 会销毁旧 UIContent，只在确有需要时加载。
+          await windowStage.loadContent('pages/StartupErrorPage');
+          if (ability.windowStage === windowStage) { ability.startupErrorLoaded = true; }
+        } catch (loadError) {
+          hilog.error(DOMAIN, TAG, 'load startup error page fail: %{public}s', JSON.stringify(loadError));
+        }
+      }
+    } finally {
+      if (ability.windowStage === windowStage) {
+        ability.startupPending = false;
+        AppStorage.setOrCreate<boolean>('startupRetrying', false);
+      }
+    }
+  }
+
+  private static applyStartupAppearance(ability: EntryAbility): void {
     try {
       // 恢复流程可能替换偏好；首次创建页面前读取最终值，避免首帧播放旧动效。
       Motion.setReducedMotion(PreferencesStore.getReduceMotionEnabled());
@@ -294,40 +435,46 @@ export default class EntryAbility extends UIAbility {
     } catch (e) {
       hilog.error(DOMAIN, TAG, 'set colorMode fail: %{public}s', JSON.stringify(e));
     }
-    windowStage.loadContent('pages/Index', (err) => {
-      if (err.code) {
-        hilog.error(DOMAIN, TAG, 'load content fail: %{public}s', JSON.stringify(err));
-        return;
-      }
-      hilog.info(DOMAIN, TAG, 'load content ok');
-      // 沉浸式配置需在 loadContent 成功、窗口就绪后执行
-      ability.configureImmersive(windowStage);
-      // 全局人机验证浮层（覆盖所有 router 页面，供 RiskVerifyService 弹出）
-      EntryAbility.mountRiskVerifyOverlay(windowStage);
-    });
+  }
+
+  onWindowStageWillDestroy(windowStage: window.WindowStage): void {
+    // 此时窗口仍有效；到 onWindowStageDestroy 再注销可能已报 1300002。
+    if (this.windowStage === windowStage) { this.releaseWindowResources(); }
   }
 
   onWindowStageDestroy(): void {
+    this.releaseWindowResources();
     hilog.info(DOMAIN, TAG, 'Ability onWindowStageDestroy');
+  }
+
+  private static reconcileBackgroundTasks(): void {
+    BackgroundTaskService.reconcile().catch(() => {
+      hilog.warn(DOMAIN, TAG, 'background scheduling failed');
+    });
+  }
+
+  private static refreshForegroundNotes(): void {
+    DailyNoteService.getInstance().bootstrapAutoRefresh().catch((e: Error): void => {
+      hilog.warn(DOMAIN, TAG, 'foreground note refresh failed: %{public}s', e.message);
+    });
   }
 
   onForeground(): void {
     AppStorage.setOrCreate('appForeground', true);
     hilog.info(DOMAIN, TAG, 'Ability onForeground');
-    if (!EntryAbility.runtimeReady) { return; }
-    if (UserService.getInstance().getCurrentUser() !== undefined) {
-      BackgroundTaskService.reconcile().catch(() => {
-        hilog.warn(DOMAIN, TAG, 'foreground background scheduling failed');
-      });
-    }
+    if (!EntryAbility.deferredServicesStarted) { return; }
+    AutoSignInService.getInstance().setForeground(true);
+    DailyNoteService.getInstance().setForeground(true);
+    EntryAbility.reconcileBackgroundTasks();
     // 回前台：定时器在后台可能被系统冻结，重新对齐并按需补刷（缓存超过刷新间隔才拉）
-    DailyNoteService.getInstance().bootstrapAutoRefresh().catch((e: Error) => {
-      hilog.warn(DOMAIN, TAG, 'foreground auto refresh fail: %{public}s', e.message);
-    });
+    EntryAbility.refreshForegroundNotes();
   }
 
   onBackground(): void {
     AppStorage.setOrCreate('appForeground', false);
+    AutoSignInService.getInstance().setForeground(false);
+    DailyNoteService.getInstance().setForeground(false);
     hilog.info(DOMAIN, TAG, 'Ability onBackground');
+    Logger.flush();
   }
 }

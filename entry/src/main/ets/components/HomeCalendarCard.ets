@@ -1,187 +1,206 @@
 /**
  * HomeCalendarCard.ets
  * 主页日历卡（对齐 Windows CalendarCard）：
- * 顶部周历（周一~周日 7 格，选中今天）+ 本月日期事件网格（带事件标记）
- * + 今日材料（按星期轮换：天赋书/武器矿，取本地元数据图标）+ 今日角色生日（头像+名字）+ 今日活动。
- * 整卡可点击 → 活动日历页。
+ * 七日周历及活动结束标记，支持在首页查看所选日的轮换材料和角色生日。
  */
 import { PressCard } from './PressCard';
 import { NavIcon } from './NavIcon';
 import { MetaIcon } from './MetaIcon';
-import { CalendarWeekService, CalendarWeekData, CalendarWeekDay } from '../service/CalendarWeekService';
+import { calendarDateLabel, calendarWeekdayLabel } from './CalendarWeekdayLabel';
+import { CalendarWeekService, CalendarWeekData, CalendarWeekDay, CalendarWeekMaterial,
+  CalendarBirthday, CalendarMaterialConsumer } from '../service/CalendarWeekService';
 import { GameCalendarRules } from '../service/GameCalendarRules';
-import { RegionUtil } from '../common/Constants';
-
-/** 一周 7 天的日期信息 */
-class WeekDayCell {
-  index: number = 0;
-  label: string = '';
-  dayNum: number = 0;
-  isToday: boolean = false;
-}
-
-/** 今日材料行：星期 → 材料 id（对齐 Windows MaterialIds.cs 周一四/周二五/周三六 分组） */
-class DailyMaterial {
-  id: number = 0;
-  name: string = '';
-  icon: string = '';
-}
-
-/** 今日生日角色 */
-class BirthdayCell {
-  name: string = '';
-  icon: string = '';
-}
+import { AppButtonModifier, SurfaceClass, UiSurface } from '../common/UiSurface';
+import { WishHistoryWikiParams } from '../model/WishHistory';
 
 @Component
 export struct HomeCalendarCard {
-  /** 事件日期集合（活动/卡池起止日 → 标记日），key = 'M-D' */
+  /** 活动或卡池结束时间戳，按周历时区归入对应日期。 */
   @Prop eventDays: number[] = [];
   /** 今日活动名称（最多 2 条） */
   @Prop todayActs: string[] = [];
   onTap: () => void = () => {
   };
   @State week: CalendarWeekData | undefined = undefined;
-  @StorageProp('currentUid') @Watch('loadWeek') currentUid: string = '';
+  @State selectedDateMs: number = 0;
+  @State private popupMaterial: CalendarWeekMaterial | undefined = undefined;
+  @State private popupWidth: number = 320;
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   @StorageProp('calendarSettingsVersion') @Watch('loadWeek') calendarVersion: number = 0;
+  @StorageProp('helpLocaleVersion') @Watch('loadWeek') localeVersion: number = 0;
   private sequence: number = 0;
+  private attached: boolean = false;
+  private clockTimer: number = -1;
 
-  aboutToAppear(): void { this.loadWeek(); }
-  aboutToDisappear(): void { this.sequence++; }
+  aboutToAppear(): void {
+    this.attached = true;
+    this.loadWeek();
+    this.clockTimer = setInterval(() => {
+      const offset: number = this.week?.offsetHours ?? GameCalendarRules.DEFAULT_OFFSET_HOURS;
+      const today: CalendarWeekDay | undefined = this.week?.days.find((day: CalendarWeekDay): boolean => day.isToday);
+      if (today !== undefined && GameCalendarRules.serverDay(Date.now(), offset) !==
+        GameCalendarRules.serverDay(today.dateMs, offset)) {
+        this.loadWeek();
+      }
+    }, 60000);
+  }
+
+  aboutToDisappear(): void {
+    this.attached = false;
+    this.sequence++;
+    this.popupMaterial = undefined;
+    clearInterval(this.clockTimer);
+  }
 
   async loadWeek(): Promise<void> {
+    if (!this.attached) { return; }
     const sequence: number = ++this.sequence;
-    this.week = undefined;
-    const week: CalendarWeekData = await CalendarWeekService.loadWeek();
-    if (sequence === this.sequence) { this.week = week; }
-  }
-
-  private today(): CalendarWeekDay | undefined {
-    return this.week?.days.find((day: CalendarWeekDay) => day.isToday);
-  }
-
-  private todayMaterials(): DailyMaterial[] {
-    const today: CalendarWeekDay | undefined = this.today();
-    if (today === undefined) { return []; }
-    const out: DailyMaterial[] = [];
-    for (const material of today.talentMats.concat(today.weaponMats)) {
-      const item: DailyMaterial = new DailyMaterial();
-      item.id = material.id;
-      item.name = material.name;
-      item.icon = material.icon;
-      out.push(item);
-    }
-    return out;
-  }
-
-  private todayBirthdays(): BirthdayCell[] {
-    const out: BirthdayCell[] = [];
-    for (const birthday of this.today()?.birthdays ?? []) {
-      const item: BirthdayCell = new BirthdayCell();
-      item.name = birthday.name;
-      item.icon = birthday.icon;
-      out.push(item);
-    }
-    return out;
-  }
-
-  private weekDays(): WeekDayCell[] {
-    const out: WeekDayCell[] = [];
-    for (const day of this.week?.days ?? []) {
-      const cell: WeekDayCell = new WeekDayCell();
-      cell.index = out.length;
-      cell.dayNum = Number(day.monthDay.split('/')[1]);
-      cell.label = day.dayName;
-      cell.isToday = day.isToday;
-      out.push(cell);
-    }
-    return out;
-  }
-
-  /** 本月日期格（从今天到月末，最多 2 行 14 格） */
-  private monthDays(): WeekDayCell[] {
-    const out: WeekDayCell[] = [];
-    const offset: number = GameCalendarRules.serverOffset(RegionUtil.regionOfUid(this.currentUid));
-    const now: Date = new Date(Date.now() + offset * 3600000);
-    const lastDay: Date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
-    let count: number = lastDay.getUTCDate() - now.getUTCDate() + 1;
-    if (count > 14) {
-      count = 14;
-    }
-    const d: Date = new Date(now);
-    for (let i = 0; i < count; i++) {
-      d.setUTCDate(now.getUTCDate() + i);
-      const cell: WeekDayCell = new WeekDayCell();
-      cell.index = i;
-      cell.dayNum = d.getUTCDate();
-      cell.label = `${d.getUTCMonth() + 1}.${d.getUTCDate()}`;
-      cell.isToday = i === 0;
-      out.push(cell);
-    }
-    return out;
-  }
-
-  hasEvent(cell: WeekDayCell): boolean {
-    if (cell.dayNum <= 0) {
-      return false;
-    }
-    for (let i = 0; i < this.eventDays.length; i++) {
-      if (this.eventDays[i] === cell.dayNum) {
-        return true;
+    try {
+      const week: CalendarWeekData = await CalendarWeekService.loadWeek();
+      if (sequence !== this.sequence) { return; }
+      const selected: CalendarWeekDay | undefined = this.selectedDay();
+      this.week = week;
+      if (selected === undefined || selected.isToday ||
+        !week.days.some((day: CalendarWeekDay): boolean => day.dateMs === this.selectedDateMs)) {
+        this.selectDate(week.days.find((day: CalendarWeekDay): boolean => day.isToday)?.dateMs ?? 0);
+      }
+      if (this.popupMaterial !== undefined) {
+        this.popupMaterial = this.materialOnDay(this.popupMaterial.id);
+      }
+    } catch (e) {
+      if (sequence === this.sequence) {
+        this.week = undefined;
+        this.popupMaterial = undefined;
       }
     }
-    return false;
   }
 
-    /** 是否撑满 Grid 单元格高度（行内等高） */
-    @Prop fillHeight: boolean = false;
+  private selectedDay(): CalendarWeekDay | undefined {
+    return this.week?.days.find((day: CalendarWeekDay): boolean => day.dateMs === this.selectedDateMs);
+  }
+
+  private selectedMaterials(): CalendarWeekMaterial[] {
+    const day: CalendarWeekDay | undefined = this.selectedDay();
+    return day === undefined ? [] : day.talentMats.concat(day.weaponMats);
+  }
+
+  private selectDate(dateMs: number): void {
+    if (dateMs !== this.selectedDateMs) {
+      this.popupMaterial = undefined;
+      this.selectedDateMs = dateMs;
+    }
+  }
+
+  private materialOnDay(id: number): CalendarWeekMaterial | undefined {
+    const day: CalendarWeekDay | undefined = this.selectedDay();
+    return day?.talentMats.find((item: CalendarWeekMaterial): boolean => item.id === id) ??
+      day?.weaponMats.find((item: CalendarWeekMaterial): boolean => item.id === id);
+  }
+
+  private openMaterial(id: number): void {
+    if (this.attached) { this.popupMaterial = this.materialOnDay(id); }
+  }
+
+  private dismissMaterial(id: number): void {
+    if (this.popupMaterial?.id === id) { this.popupMaterial = undefined; }
+  }
+
+  private async openConsumer(materialId: number, consumer: CalendarMaterialConsumer): Promise<void> {
+    const material: CalendarWeekMaterial | undefined = this.popupMaterial;
+    if (!this.attached || material === undefined || material.id !== materialId) { return; }
+    const listed: boolean = material.consumers.some((item: CalendarMaterialConsumer): boolean =>
+      item.id === consumer.id && item.category === consumer.category);
+    if (!listed) { return; }
+    const params: WishHistoryWikiParams = { itemId: consumer.id };
+    const url: string = material.isTalent ? 'pages/WikiAvatarPage' : 'pages/WikiWeaponPage';
+    this.popupMaterial = undefined;
+    try {
+      await this.getUIContext().getRouter().pushUrl({ url: url, params: params });
+    } catch (_) {
+      if (this.attached) {
+        this.getUIContext().getPromptAction().showToast({ message: '无法打开图鉴，请稍后重试', systemMaterial: UiSurface.dialogMaterial() });
+      }
+    }
+  }
+
+  private qualityColor(rank: number): Resource {
+    if (rank >= 5) { return $r('app.color.five_star'); }
+    if (rank === 4) { return $r('app.color.four_star'); }
+    if (rank === 3) { return $r('app.color.three_star'); }
+    return $r('app.color.divider');
+  }
+
+  private hasEvent(day: CalendarWeekDay): boolean {
+    const offset: number = this.week?.offsetHours ?? GameCalendarRules.DEFAULT_OFFSET_HOURS;
+    const ordinal: number = GameCalendarRules.serverDay(day.dateMs, offset);
+    return this.eventDays.some((endMs: number): boolean => GameCalendarRules.serverDay(endMs, offset) === ordinal);
+  }
+
+  /** 是否撑满 Grid 单元格高度（行内等高） */
+  @Prop fillHeight: boolean = false;
 
   build() {
     PressCard({
       fillHeight: this.fillHeight,
       onTap: () => {
-        this.onTap()
+        if (this.popupMaterial === undefined) { this.onTap(); }
       },
-      cardBg: $r('app.color.card_background'),
       radius: 12,
     }) {
       Column({ space: 8 }) {
         Row({ space: 8 }) {
           NavIcon({ name: 'Database', iconSize: 20 })
-          Text('日历')
+          Text($r('app.string.ui_section_calendar'))
             .fontSize(14)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1)
-          Text('查看全部 ›')
+          Text($r('app.string.ui_setting_key_shortcut_virtual_key_code_action'))
             .fontSize(12)
             .fontColor($r('app.color.app_primary_text'))
         }
         .width('100%')
         .height(24)
         .flexShrink(0)
+        .focusable(true)
+        .hoverEffect(HoverEffect.Highlight)
+        .onClick(() => {
+          this.onTap();
+        })
 
-        // 周历 Segmented（7 格，选中今天）
+        // 子日期按钮优先响应点击，卡片其他区域继续打开活动日历页。
         Row({ space: 4 }) {
-          ForEach(this.weekDays(), (cell: WeekDayCell) => {
-            Column({ space: 2 }) {
-              Text(cell.label)
-                .fontSize(10)
-                .fontColor(cell.isToday ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
-              Text(`${cell.dayNum}`)
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(cell.isToday ? $r('app.color.app_primary') : $r('app.color.text_primary'))
+          ForEach(this.week?.days ?? [], (day: CalendarWeekDay) => {
+            Button({ type: ButtonType.Normal }) {
+              Column({ space: 2 }) {
+                Text(calendarWeekdayLabel(day.weekday))
+                  .fontSize(10)
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .fontColor(this.selectedDateMs === day.dateMs ? $r('app.color.app_primary_text') : $r('app.color.text_secondary'))
+                Text(`${day.dayInMonth}${this.hasEvent(day) ? '·' : ''}`)
+                  .fontSize(14)
+                  .fontWeight(day.isToday ? FontWeight.Bold : FontWeight.Medium)
+                  .fontColor(this.selectedDateMs === day.dateMs ? $r('app.color.app_primary_text') : $r('app.color.text_primary'))
+              }
             }
             .layoutWeight(1)
-            .padding({ top: 3, bottom: 3 })
+            .height(44)
+            .padding(0)
             .borderRadius(8)
-            .backgroundColor(cell.isToday ? $r('app.color.app_primary_bg') : $r('app.color.card_inner_tint'))
-          }, (cell: WeekDayCell) => `wk_${cell.index}_${cell.isToday}`)
+            .backgroundColor(this.selectedDateMs === day.dateMs ? $r('app.color.app_primary_bg') : $r('app.color.card_inner_tint'))
+            .hoverEffect(HoverEffect.Highlight)
+            .accessibilitySelected(this.selectedDateMs === day.dateMs)
+            .accessibilityText(`${calendarDateLabel(this.getUIContext(), day)}${this.hasEvent(day) ? ' 有活动结束' : ''}`)
+            .onClick(() => {
+              this.selectDate(day.dateMs);
+            })
+          }, (day: CalendarWeekDay) => `wk_${day.dateMs}_${day.isToday}_${this.localeVersion}`)
         }
         .width('100%')
         .height(48)
-        .padding(4)
+        .padding(2)
         .borderRadius(10)
         .backgroundColor($r('app.color.card_inner_tint'))
 
@@ -189,44 +208,39 @@ export struct HomeCalendarCard {
         // 正文独立纵向视口兜底；每行横滚保留完整名称，不截掉材料、生日或活动。
         Scroll() {
           Column({ space: 4 }) {
-            if (this.today()?.allMaterialsOpen === true) {
-              Text('全部材料副本均可挑战').fontSize(12).fontColor($r('app.color.text_secondary'))
+            if (this.selectedDay()?.allMaterialsOpen === true) {
+              Text($r('app.string.ui_card_calendar_all_materials_hint'))
+                .fontSize(12).fontColor($r('app.color.text_secondary'))
             }
-            if (this.todayMaterials().length > 0) {
+            if (this.selectedMaterials().length > 0) {
               Row({ space: 6 }) {
-                Text('今日获取')
+                Text('轮换素材')
                   .fontSize(12)
                   .fontColor($r('app.color.text_secondary'))
                 Scroll() {
                   Row({ space: 10 }) {
-                    ForEach(this.todayMaterials(), (m: DailyMaterial) => {
-                      Row({ space: 3 }) {
-                        MetaIcon({ category: 'ItemIcon', name: m.icon, iconSize: 22, remoteFallback: true })
-                        Text(m.name)
-                          .fontSize(12)
-                          .fontColor($r('app.color.text_secondary'))
-                          .maxLines(1)
-                      }
-                    }, (m: DailyMaterial) => `dm_${m.id}_${m.name}_${m.icon}`)
+                    ForEach(this.selectedMaterials(), (m: CalendarWeekMaterial) => {
+                      this.materialButton(m.id)
+                    }, (m: CalendarWeekMaterial) => `dm_${this.selectedDateMs}_${m.id}`)
                   }
                 }
                 .scrollable(ScrollDirection.Horizontal)
                 .scrollBar(BarState.Off)
                 .layoutWeight(1)
-                .height(24)
+                .height(44)
                 .align(Alignment.Start)
               }
               .width('100%')
-              .height(24)
+              .height(44)
             }
-            if (this.todayBirthdays().length > 0) {
+            if ((this.selectedDay()?.birthdays.length ?? 0) > 0) {
               Row({ space: 6 }) {
-                Text('今日生日')
+                Text('角色生日')
                   .fontSize(12)
                   .fontColor($r('app.color.text_secondary'))
                 Scroll() {
                   Row({ space: 10 }) {
-                    ForEach(this.todayBirthdays(), (b: BirthdayCell) => {
+                    ForEach(this.selectedDay()?.birthdays ?? [], (b: CalendarBirthday) => {
                       Row({ space: 3 }) {
                         MetaIcon({ category: 'AvatarIcon', name: b.icon, iconSize: 22, circular: true })
                         Text(b.name)
@@ -234,7 +248,7 @@ export struct HomeCalendarCard {
                           .fontColor($r('app.color.text_primary'))
                           .maxLines(1)
                       }
-                    }, (b: BirthdayCell) => `bd_${b.name}_${b.icon}`)
+                    }, (b: CalendarBirthday) => `bd_${b.name}_${b.icon}`)
                   }
                 }
                 .scrollable(ScrollDirection.Horizontal)
@@ -246,7 +260,7 @@ export struct HomeCalendarCard {
               .width('100%')
               .height(24)
             }
-            if (this.todayActs.length > 0) {
+            if (this.selectedDay()?.isToday === true && this.todayActs.length > 0) {
               Scroll() {
                 Text(`今日活动：${this.todayActs.join(' / ')}`)
                   .fontSize(12)
@@ -272,20 +286,86 @@ export struct HomeCalendarCard {
       .width('100%')
       .height(this.fillHeight ? '100%' : undefined)
       .padding(12)
+      .onAreaChange((_old: Area, area: Area): void => {
+        this.popupWidth = Math.min(320, Math.floor(Number(area.width)));
+      })
     }
   }
 
-  /** 材料名太长截断（保留书名号与后段） */
-  private static shorten(name: string): string {
-    if (name.length <= 6) {
-      return name;
+  @Builder
+  materialButton(id: number) {
+    Button({ type: ButtonType.Normal }) {
+      Row({ space: 4 }) {
+        MetaIcon({ category: 'ItemIcon', name: this.materialOnDay(id)?.icon ?? '', iconSize: 24, remoteFallback: true })
+        Text(this.materialOnDay(id)?.name ?? '').fontSize(12).fontColor($r('app.color.text_primary')).maxLines(1)
+      }
     }
-    if (name.startsWith('「') && name.endsWith('」')) {
-      return name.length > 8 ? `「${name.substring(1, 7)}…」` : name;
-    }
-    if (name.startsWith('高塔') || name.startsWith('凛风') || name.startsWith('狮牙')) {
-      return name;
-    }
-    return `${name.substring(0, 6)}…`;
+    .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+    .height(44).padding({ left: 6, right: 6 })
+    .backgroundColor(this.materialOnDay(id)?.highlighted ? $r('app.color.cultivate_highlight') : Color.Transparent)
+    .accessibilityText(this.materialOnDay(id)?.name ?? '')
+    .onClick(() => { this.openMaterial(id); })
+    .bindPopup(this.popupMaterial?.id === id, {
+      builder: (): void => { this.materialPopup(id); },
+      width: this.popupWidth,
+      placement: Placement.Bottom,
+      focusable: true,
+      autoCancel: true,
+      systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel),
+      backgroundBlurStyle: UiSurface.blurStyle(SurfaceClass.OVERLAY_MODAL, this.surfaceMode, this.surfaceLevel),
+      popupColor: UiSurface.immersiveActive() ? Color.Transparent : $r('app.color.sheet_material_tint'),
+      onStateChange: (event: PopupStateChangeParam): void => {
+        if (!event.isVisible) { this.dismissMaterial(id); }
+      }
+    })
   }
+
+  @Builder
+  materialPopup(materialId: number) {
+    if (this.popupMaterial !== undefined && this.popupMaterial.id === materialId) {
+      Column({ space: 8 }) {
+        Row({ space: 8 }) {
+          MetaIcon({ category: 'ItemIcon', name: this.popupMaterial.icon, iconSize: 44 })
+            .border({ width: 1, color: this.qualityColor(this.popupMaterial.rank), radius: 6 })
+          Column({ space: 2 }) {
+            Text(this.popupMaterial.name).fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+            Text(this.popupMaterial.isTalent ? $r('app.string.ui_wi_ki_avatar_ascension_materials_header') :
+              $r('app.string.ui_model_metadata_material_weapon_ascension_material'))
+              .fontSize(12).fontColor($r('app.color.text_secondary'))
+          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+          Button({ type: ButtonType.Normal }) {
+            NavIcon({ name: 'Close', iconSize: 16, symbolColor: $r('app.color.text_secondary') })
+          }.attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel)).width(44).height(44).padding(0)
+            .accessibilityText($r('app.string.ui_action_close')).onClick(() => { this.popupMaterial = undefined; })
+        }.width('100%')
+        Text(this.popupMaterial.isTalent ? $r('app.string.ui_nav_wiki_avatar') : $r('app.string.ui_nav_wiki_weapon'))
+          .width('100%').fontSize(12).fontColor($r('app.color.text_secondary'))
+        if (this.popupMaterial.consumers.length === 0) {
+          Text($r('app.string.common_empty')).width('100%').fontSize(12).fontColor($r('app.color.text_secondary'))
+        } else {
+          Scroll() {
+            GridRow({ columns: this.popupWidth >= 280 ? 4 : 3, gutter: { x: 4, y: 6 } }) {
+              ForEach(this.popupMaterial.consumers, (consumer: CalendarMaterialConsumer) => {
+                GridCol() {
+                  Button({ type: ButtonType.Normal }) {
+                    Column({ space: 3 }) {
+                      MetaIcon({ category: consumer.category, name: consumer.icon, iconSize: 40 })
+                        .border({ width: 1, color: this.qualityColor(consumer.quality), radius: 6 })
+                      Text(consumer.name).fontSize(11).fontColor($r('app.color.text_primary')).maxLines(2)
+                        .textAlign(TextAlign.Center).textOverflow({ overflow: TextOverflow.Ellipsis })
+                    }.width('100%').padding(3)
+                  }.attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel)).padding(0).width('100%')
+                    .backgroundColor(consumer.highlighted ? $r('app.color.cultivate_highlight') : Color.Transparent)
+                    .accessibilityText(consumer.name)
+                    .onClick(() => { this.openConsumer(materialId, consumer); })
+                }
+              }, (consumer: CalendarMaterialConsumer): string =>
+                `${consumer.category}_${consumer.id}_${consumer.name}_${consumer.highlighted}`)
+            }.width('100%')
+          }.width('100%').constraintSize({ maxHeight: 224 }).scrollBar(BarState.Auto)
+        }
+      }.width('100%').padding(12).alignItems(HorizontalAlign.Start)
+    }
+  }
+
 }

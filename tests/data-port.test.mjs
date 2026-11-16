@@ -34,20 +34,27 @@ const gachaRepo={
   },
 };
 globalThis.__dataPort={gachaRepo};
-const gachaItemUrl=await ets('model/GachaItem.ets');
 const gachaTypeUrl=await ets('model/GachaType.ets');
+const gachaItemUrl=await ets('model/GachaItem.ets',{'./GachaType':gachaTypeUrl});
 const uigfErrorUrl=await ets('model/UigfError.ets');
 const preparationUrl=await ets('model/UigfImportPreparation.ets',{'./GachaItem':gachaItemUrl,'./GachaType':gachaTypeUrl,'./UigfError':uigfErrorUrl});
 const uigfBoundsUrl=await ets('model/UigfBounds.ets',{'./UigfError':uigfErrorUrl});
 const uigfCodecUrl=await ets('service/UigfCodec.ets',{'../model/GachaItem':gachaItemUrl,'../model/GachaType':gachaTypeUrl,'../model/UigfImportPreparation':preparationUrl,'../model/UigfBounds':uigfBoundsUrl,'../model/UigfError':uigfErrorUrl});
 const uigfExportUrl=await ets('service/UigfExportCodec.ets',{'../model/GachaItem':gachaItemUrl,'../model/GachaType':gachaTypeUrl,'../model/UigfBounds':uigfBoundsUrl,'./UigfCodec':uigfCodecUrl});
+const gachaIdentityUrl=await ets('service/GachaItemIdentityService.ets',{
+  '../model/GachaItem':gachaItemUrl,'../model/GachaType':gachaTypeUrl,'../model/LocalePolicy':await ets('model/LocalePolicy.ets'),
+  './GameDataService':url("export const GameDataService={getInstance:()=>({remoteVersion:()=>''})};"),
+  './LocalizedGameDataService':url('export const LocalizedGameDataService={names:async()=>new Map()};'),
+  './WikiMetaService':url('export const WikiMetaService={getAvatars:async()=>[],getWeapons:async()=>[]};'),
+});
 const {UigfService}=await import(await ets('service/UigfService.ets',{
   '../data/repo/GachaRepo':url('export const GachaRepo=globalThis.__dataPort.gachaRepo;'),
   '../model/GachaArchive':await ets('model/GachaArchive.ets'),
   '../model/UigfImportPreparation':preparationUrl,
   './UigfCodec':uigfCodecUrl, './UigfExportCodec':uigfExportUrl,
-  '../model/GachaItem':await ets('model/GachaItem.ets'),
-  '../model/GachaType':await ets('model/GachaType.ets'),
+  './GachaItemIdentityService':gachaIdentityUrl,
+  '../model/GachaItem':gachaItemUrl,
+  '../model/GachaType':gachaTypeUrl,
   '../common/Logger':logger,
   '../common/Constants':url('export const AppConstants={APP_VERSION:"test"};'),
 }));

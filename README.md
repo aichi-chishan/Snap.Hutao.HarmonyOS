@@ -1,166 +1,44 @@
 # Snap.Hutao.HarmonyOS
 
-> 胡桃工具箱（Snap.Hutao）的鸿蒙（HarmonyOS）移植版 · 原神玩家的一站式工具箱
+胡桃工具箱的 HarmonyOS 移植版。项目使用 ArkTS 和 ArkUI，支持 API 26 起的手机、平板和二合一设备。平板和宽窗口采用侧栏、工具栏与列表详情分栏，手机使用底部页签。Windows 行为对照取自 [Snap.Hutao.Remastered 2.0.2.0](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered/tree/3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5)。
 
-把 Windows 版胡桃工具箱（对齐上游为社区重制版 [Snap.Hutao.Remastered](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered)，参考源码在工作区 `Snap.Hutao.Remastered-latest/`）移植到
-HarmonyOS（**compatibleSdkVersion = targetSdkVersion = 26.0.0**），手机 / 平板 / PC（2in1）
-三端自适应布局。本轮按 Windows Remastered **v2.0.2** 对照补齐非注入功能，支持国服与 HoYoLAB 区域路由。
+## 功能
 
-源码基线、差距、实施顺序与验证边界见 [GAP_2026-10-24.md](docs/GAP_2026-10-24.md)（2.0.2 差距清单）。编译通过不代表所有功能已在真机和真实账号上验收。
+| 入口 | 可以做什么 |
+| --- | --- |
+| 主页 | 查看保底计数、成就、实时便笺、旅行者札记、材料周历、签到和游戏公告。卡片顺序与显隐可在设置中调整 |
+| 祈愿、成就、背包 | 按本地档案浏览、筛选和统计。祈愿支持增量与全量刷新、历史、常规祈愿和颂愿。通过 UIGF、UIAF、UIIF 交换各自的数据 |
+| 我的角色、养成计划 | 查看角色属性、装备、天赋、命座和圣遗物评分，按目标等级计算材料并结合项目库存管理 |
+| 周期挑战 | 按期查看深境螺旋、幻想真境剧诗和幽境危战的阵容、战斗与统计，保存并回看已有战绩 |
+| 角色、武器、怪物资料 | 离线查找本地游戏资料，比较等级和突破数值、查看天赋、掉落与材料，从图鉴进入养成计划 |
+| 账号、便笺、签到 | 使用国服米游社账号管理多个角色，按追踪项刷新便笺、配置提醒和系统后台任务 |
+| 设置与数据 | 设置主题、界面材质、壁纸和前景动效，更新游戏数据，备份或恢复业务数据库与偏好 |
+| 账号洞察 | 查看本地历史图表，使用已配置的端侧模型或自定义服务进行分析 |
 
-2026-10-02 UI/UX 专项调研（待实施）：[Windows 工作流对齐与优化清单](docs/UI_UX_RESEARCH_2026-10-02.md)、[API24+ 鸿蒙视觉与交互规格](docs/UI_UX_SPEC_API24_PLUS.md)、[源码及官方 API 证据](docs/UI_UX_EVIDENCE_2026-10-02.md)。包含 18 项优化、分批计划与 24 个验收场景。
+启动游戏使用用户配置的公开启动入口。移植范围排除胡桃云账号服务和注入功能。应用使用的游戏美术、静态 CDN 与第三方库按各自来源和许可使用。
 
-2026-10-02 最新功能复核（待实施）：[非注入功能差距与鸿蒙实现方案](docs/FUNCTION_GAP_ANALYSIS_2026-10-02.md)。按两端固定源码列出 32 项差距、具体实现落点、依赖、优先级及 32 个验收样例，区分功能缺失、平台替代和待验证事项。海外札记/公告、颂愿子池、祈愿预测等仍有缺口；以下功能总览不代表非注入移植已全部完成。
+## 从源码开始
 
-![Platform](https://img.shields.io/badge/Platform-HarmonyOS%206.1.1-007DFF)
-![API](https://img.shields.io/badge/API--24-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
+1. 安装带 HarmonyOS API 26 SDK 的 DevEco Studio，或配好相同版本的 SDK、OHPM 与 Hvigor。
+2. 第一次检出时，将 [无签名工程模板](ci/build-profile.ci.json5) 复制成项目根目录的 `build-profile.json5`。已有本地签名配置的工作区直接沿用它。
+3. 在根目录执行 `ohpm install --all`，然后构建 `entry@default`。静态图标与元数据已随源码提供。参考源码仓和数据生成环境用于维护及更新资源。
 
-[![CI](https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS/actions/workflows/ci.yml/badge.svg)](https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS/actions/workflows/ci.yml)
-
-> 🗺️ 后续完善计划（功能补全 / 体验优化 / 工程化 / 性能）见 [ROADMAP.md](ROADMAP.md)
-
-> ⚠️ **免责声明**：本项目与米哈游 / HoYoverse 无任何关联，仅供学习交流使用。
-> 不包含任何注入、内存读取、进程注入类功能。胡桃云使用独立通行证与凭据存储，上传/删除由用户显式操作；服务可用性以运营方实际响应为准。
-
----
-
-## ✨ 功能总览
-
-### 主页（对齐 Windows 仪表板布局）
-- **卡池横幅**（左上合框）：角色 UP / 武器 UP 横幅，UP 阵容头像 + 剩余时间 + 起止日期
-- **活动与挑战**（右上合框）：渊月螺旋 / 幻想真境剧诗 / 铸境研炼等剩余时间与状态（可在设置隐藏）
-- **仪表板卡组**（UniformPanel 语义）：启动游戏 | 祈愿统计（保底进度）| 成就统计 | 实时便笺 | 旅行者札记 | 日历 | 每日签到
-  ——列数按内容区宽度自适应（最小列宽 300vp / 间距 12vp），卡片恒高 **204vp**（对齐 Windows `HomeAdaptiveCardHeight`），行内等高
-- **胡桃每日一图**：Snap.Hutao 公开壁纸接口，当日缓存；按图片亮度自适应透明度（全量复刻 Windows 合成），亚克力卡片材质（浅/深双主题）
-- **游戏公告**：官方封面图 + 标题，点击查看详情；**前瞻直播兑换码**一键查询复制
-
-### 工具
-| 模块 | 说明 |
-|---|---|
-| 启动游戏 | 保存厂商公开 URI 或已知鸿蒙 Bundle/Ability 后拉起游戏；不猜测 Android 包名，不做注入 |
-| 祈愿记录 | 常规五池 + **千星奇域（颂愿）**总览统计（总抽 / 平均 / 最非最欧 / UP 平均）、五星头像网格、SToken 自动重签刷新、**UIGF v4.2** 导入导出（含 hk4e_ugc，兼容 v4.0 / v3.x）、剪贴板 URL 导入 |
-| 成就管理 | 73 分类 / 1800+ 成就、多档案、分类筛选搜索、UIAF v1.1 导入导出 |
-| 实时便笺 | 树脂 / 派遣 / 每日委托 / 周本折扣 / 洞天宝钱 / 参变仪，阈值系统通知，自动刷新（半屏设置弹窗） |
-| 我的角色 | 角色面板 / 圣遗物评分（Windows 加权算法）/ 名片专属背景 / 武器信息 |
-| 养成计划 | 离线角色/武器/天赋计算、项目材料清单、手工库存与 UIIF 互通、材料缺口 |
-| 深境螺旋 / 幻想真境剧诗 / 幽境危战 | 当期 / 上期战绩、奖章 / 回合统计、敌方阵容真图标 |
-| 角色资料 / 武器资料 / 怪物资料 | 本地元数据百科：属性数值曲线滑条、天赋 / 命座 / 精炼 / 抗性 / 掉落，离线可用 |
-| 账号与数据 | 国服扫码/验证码、国服及 HoYoLAB 官方网页/手动 Cookie、多账号与角色绑定 |
-| 备份 | v2 业务数据库与可迁移偏好备份，兼容 v1；预检、事务回滚、凭据暂存与中断恢复 |
-
-### 风控对抗（对齐 Windows RetryIf1034Async 链路）
-- 战记接口 1034 → createVerification → 统一验证浮层（极验）→ challenge 重放
-- 登录 aigis 会话（x-rpc-aigis）自动验证重放；签到体内极验 challenge+validate+seccode 重放
-- **极验自定义组合接口**（设置 → 无感验证）：配置 `{0}`=gt、`{1}`=challenge 模板后，触发验证时优先自动过验，失败回退弹窗
-- SToken 自动生成 authkey（genAuthKey）；GitHub 直连失败自动回退公共镜像
-
-### 多端适配
-- 手机：底部 HdsTabs 悬浮页签（沉浸光感材质）
-- 平板 / PC：侧边栏导航 + 双栏内容，自由窗口最小尺寸保护，窗口自适应断点（720 / 840 / 1200）
-- 沉浸光感（systemMaterial / ImmersiveMaterial；compatibleSdk 已为 26，运行时门控仅作防御性回退）
-
----
-
-## 🧪 质量与自动化
-
-| 项 | 说明 |
-|---|---|
-| 单元测试 | `entry/src/test`（hypium）及 `tests/run.cjs`（生产逻辑、SQLite、网络契约与失败回滚；不代替真机） |
-| CI | `.github/workflows/ci.yml`：仓库不变量 + 隐私门禁 + lint（0 error 门禁）+ 无签名 HAP 构建 |
-| 回归清单 | [docs/TESTING.md](docs/TESTING.md)（实机验证逐项打勾） |
-| 隐私门禁 | CI 自动扫描已跟踪文件中的私人邮箱 / 本机绝对路径，命中即失败 |
-
-CI 的 lint/build job 需要华为 Command Line Tools（无公开直链）：在仓库
-Settings → Secrets and variables → Actions → Variables 配置 `DEVECO_CLT_URL` 后自动启用，未配置则跳过。
-
----
-
-## 🔧 构建要求
-
-| 项 | 版本 |
-|---|---|
-| [DevEco Studio](https://developer.huawei.com/consumer/cn/deveco-studio/) | 26.0.0（5.1.x 及以上需自行验证） |
-| HarmonyOS SDK | 26.0.0（API 26 编译） |
-| compatibleSdkVersion | 26.0.0 |
-| 真机 / 模拟器 | HarmonyOS 26（API 26）+ |
-
-### 步骤
-
-```bash
-git clone https://github.com/aichi-chishan/Snap.Hutao.HarmonyOS.git
+```sh
+hvigorw assembleHap --mode module -p module=entry@default -p product=default --no-daemon
 ```
 
-1. 用 DevEco Studio 打开工程
-2. `build-profile.json5` **不入库**（含本地签名）：首次构建前在 DevEco 中
-   File → Project Structure → Signing Configs 勾选 Automatically generate，并把 compatibleSdkVersion / targetSdkVersion 配为 `26.0.0`
-3. 构建：`hvigorw.bat assembleHap --mode module -p module=entry@default -p product=default --no-daemon`
-4. 真机安装：`hdc file send entry/build/default/outputs/default/entry-default-signed.hap /data/local/tmp/entry.hap`
-   → `hdc shell bm install -p /data/local/tmp/entry.hap`
+Windows 可在 DevEco Studio 终端运行 `hvigorw.bat`。输出目录为 `entry/build/default/outputs/default/`。Node.js 24 主机回归、原生包校验和 CI 配置见[测试说明](docs/TESTING.md)。
 
-> 模拟器注意：本包 compatibleSdkVersion=26.0.0，需 **API 26 镜像**才能安装（API 23/24 镜像装不上）。
-> Git Bash 下 `hdc file send` 的源路径须为裸文件名，`bm install` 前加 `MSYS_NO_PATHCONV=1`。
+## 维护文档
 
----
+- [工程架构与模块地图](docs/ARCHITECTURE.md) 给出目录、页面入口、状态和持久化归属。
+- [数据与文件交换](docs/DATA_AND_INTERCHANGE.md) 说明档案身份、文件格式、备份恢复及游戏数据更新。
+- [维护者交接](docs/HANDOFF.md) 收录新环境构建步骤、复测方法和后续验证项。
+- [贡献约定](AGENTS.md) 记录 ArkTS、界面材质、资源和仓库操作约定。
+- [文档索引](docs/README.md) 收录各领域专项说明和历次移植记录。
 
-## 📦 素材与元数据
+账号凭据保存在设备安全存储中。**整库备份包含可恢复的游戏登录凭据**，请自行保管备份文件。签名、个人导出、真机截图及调试日志归入本地目录。
 
-- 元数据（角色 / 武器 / 怪物 / 成就 / 曲线，17 个 JSON）与图标（**3754 张 PNG，约 233MB**）**全部内置安装包**，离线可用
-- 素材来源：[Snap.Metadata](https://github.com/DGP-Studio/Snap.Metadata)（精简提取）+ 胡桃静态 CDN
-- 角色立绘（`GachaAvatarIcon`，58MB / 118 张）虽已内置，但按需场景优先走静态 CDN + 沙盒缓存
-- 更新管线：独立数据仓库 [aichi-chishan/snap-hutao-data](https://github.com/aichi-chishan/snap-hutao-data)（本地克隆在工作区 `snap-hutao-data/`，git 独立、不入本库）：`python fetch-assets.py` 增量拉素材 → `gen-manifest.ps1` 重出清单（改 channelVersion）→ push；APP 设置 → 游戏数据更新即热更，**无需整包更新**
-- 云端热更：默认清单已指向 `aichi-chishan/snap-hutao-data`，设置页可改数据源地址
+## 来源与许可
 
----
-
-## 🗂️ 工程结构
-
-```
-entry/src/main/ets/
-├── pages/        页面（@Entry / 内嵌组件，宽屏 embedMode）
-├── viewmodel/    页面状态容器（@Observed）
-├── service/      业务逻辑（网络 / 元数据 / 计算）
-├── data/         db(SQLite) / network(Hoyolab 客户端+DS 签名) / prefs / repo / remote(数据热更)
-├── model/        数据模型 + fromJson
-├── components/   复用组件（MetaIcon / PressCard / Home*Card）
-├── common/       常量 / 日志 / 动效(Motion) / GitHub 镜像
-└── widgets/      桌面卡片（实时便笺）
-
-entry/src/main/resources/
-├── base|dark/element/color.json   主题色（深浅双定义，代码一律 $r('app.color.x')）
-└── rawfile/
-    ├── metadata/   本地元数据（17 个 JSON，远端可热更、rawfile 兜底）
-    ├── icons/      游戏素材图标 3754 张（按 Category 分目录）
-    └── nav/        导航图标
-
-ci/               CI 专用构建配置（无签名）
-docs/             测试与回归清单
-.github/workflows CI（不变量 + 隐私门禁 + lint + 构建）
-```
-
-分层规则：`pages → viewmodel → service → data(repo/network) → model`，页面不发网络请求、不拼 SQL。
-
----
-
-## 🔐 隐私
-
-- 所有账号数据（Cookie / SToken）仅存储在**设备本地**数据库与偏好文件中，经加密保存
-- 默认不自动上传游戏记录。云同步、战绩上传和便笺 Webhook 由用户显式开启/操作；公开资源可能访问 GitHub、胡桃服务、必应或 HoyoPlay。
-- 米哈游/HoYoLAB Cookie 按 HTTPS 精确主机及账号区域隔离，不发送给 GitHub、镜像、胡桃云或 Webhook。云 Bearer Token 使用独立安全存储。
-- 导出业务备份含明文游戏登录凭据，界面会明确提示。设备标识、签名材料、云设备会话与可重新下载的素材不作为可迁移设置。
-- 仓库不含任何签名密钥、账号信息与调试产物（详见 .gitignore）
-- CI 设有**隐私回归门禁**：自动扫描已跟踪文件中的私人邮箱与本机绝对路径，命中即构建失败
-- 提交者身份使用 GitHub noreply 邮箱，不暴露真实邮箱
-
----
-
-## 🙏 致谢
-
-- [DGP-Studio/Snap.Hutao](https://github.com/DGP-Studio/Snap.Hutao) — Windows 版原项目（MIT）
-- [Snap.Metadata](https://github.com/DGP-Studio/Snap.Metadata) — 元数据
-- [UIGF 组织](https://uigf.org/) — 统一祈愿/成就交换标准
-- [ZCode Weekend Build](https://github.com/zai-org) — AI 结对开发（ZCode）
-
-## 📄 许可证
-
-[MIT](LICENSE)（与上游 Snap.Hutao 一致）
+应用代码使用 [MIT 许可证](LICENSE)。感谢 [Snap.Hutao](https://github.com/DGP-Studio/Snap.Hutao)、[Snap.Hutao.Remastered](https://github.com/SnapHutaoRemasteringProject/Snap.Hutao.Remastered)、[Snap.Metadata](https://github.com/SnapHutaoRemasteringProject/Snap.Metadata) 和 [UIGF 组织](https://uigf.org/)。游戏数据更新由[独立数据仓](https://github.com/aichi-chishan/snap-hutao-data)维护。第三方代码许可见 [rawfile/licenses](entry/src/main/resources/rawfile/licenses)，图鉴背景和美术来源记录在 [rawfile/wiki](entry/src/main/resources/rawfile/wiki)。本项目为社区作品，与米哈游和 HoYoverse 无隶属关系。

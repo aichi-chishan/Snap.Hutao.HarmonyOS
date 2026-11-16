@@ -1,0 +1,1244 @@
+{
+  "string": [
+    {
+      "name": "ui_about_restart",
+      "value": "設定呈現語言"
+    },
+    {
+      "name": "ui_account_insights_copied_json",
+      "value": "已複製去識別化統計資料。"
+    },
+    {
+      "name": "ui_account_insights_copy_json",
+      "value": "複製去識別化統計（JSON）"
+    },
+    {
+      "name": "ui_account_insights_delete",
+      "value": "刪除"
+    },
+    {
+      "name": "ui_account_insights_loading",
+      "value": "正在讀取本機歷史紀錄…"
+    },
+    {
+      "name": "ui_account_insights_missing_model",
+      "value": "請輸入模型識別碼。"
+    },
+    {
+      "name": "ui_account_insights_no_account",
+      "value": "請先選擇遊戲帳號及 UID。"
+    },
+    {
+      "name": "ui_account_insights_no_records",
+      "value": "所選帳號沒有可顯示的歷史紀錄。"
+    },
+    {
+      "name": "ui_account_insights_open",
+      "value": "歷史圖表與 AI 分析"
+    },
+    {
+      "name": "ui_account_insights_unit_wish",
+      "value": "抽"
+    },
+    {
+      "name": "ui_action_choose",
+      "value": "選擇"
+    },
+    {
+      "name": "ui_action_clear",
+      "value": "清空"
+    },
+    {
+      "name": "ui_action_clear_cache",
+      "value": "清理快取"
+    },
+    {
+      "name": "ui_action_close",
+      "value": "關閉"
+    },
+    {
+      "name": "ui_action_continue",
+      "value": "繼續"
+    },
+    {
+      "name": "ui_action_disable",
+      "value": "停用"
+    },
+    {
+      "name": "ui_action_edit",
+      "value": "修改"
+    },
+    {
+      "name": "ui_action_enable",
+      "value": "啟用"
+    },
+    {
+      "name": "ui_action_restore",
+      "value": "還原"
+    },
+    {
+      "name": "ui_agent_page_label_delete_conversation",
+      "value": "刪除會話"
+    },
+    {
+      "name": "ui_agent_page_label_model_profile",
+      "value": "模型"
+    },
+    {
+      "name": "ui_agent_page_label_model_provider_profile",
+      "value": "模型提供者設定"
+    },
+    {
+      "name": "ui_agent_page_label_placeholder",
+      "value": "輸入消息..."
+    },
+    {
+      "name": "ui_ai_approval",
+      "value": "需要批准工具調用"
+    },
+    {
+      "name": "ui_ai_continue",
+      "value": "繼續產生"
+    },
+    {
+      "name": "ui_ai_conversation_actions",
+      "value": "對話操作"
+    },
+    {
+      "name": "ui_ai_copied_text",
+      "value": "已複製到剪貼簿"
+    },
+    {
+      "name": "ui_ai_copy_error",
+      "value": "開啟剪貼簿失敗"
+    },
+    {
+      "name": "ui_ai_copy_text",
+      "value": "復制文本"
+    },
+    {
+      "name": "ui_ai_custom_api",
+      "value": "自訂 API"
+    },
+    {
+      "name": "ui_ai_device_generate",
+      "value": "產生裝置端分析"
+    },
+    {
+      "name": "ui_ai_endpoint_placeholder",
+      "value": "介面基址（留空使用官方位址）"
+    },
+    {
+      "name": "ui_ai_initial_request",
+      "value": "請根據本對話中的歷史統計數據，完整分析我的賬號表現、祈願運氣和後續規劃。"
+    },
+    {
+      "name": "ui_ai_key_placeholder",
+      "value": "API 金鑰（留空保留現有金鑰）"
+    },
+    {
+      "name": "ui_ai_mode",
+      "value": "AI 分析通道"
+    },
+    {
+      "name": "ui_ai_on_device",
+      "value": "系統 AI（裝置端）"
+    },
+    {
+      "name": "ui_ai_privacy_body",
+      "value": "傳送訊息時，所選 AI 介面會收到對話和去識別化歷史統計。應用程式不會附加 UID、Cookie、原始物品 ID 或資料庫檔案。對話儲存在本機，API 金鑰存入系統安全資產。工具執行前需要你的核准。"
+    },
+    {
+      "name": "ui_ai_privacy_title",
+      "value": "使用第三方 AI 前請先了解"
+    },
+    {
+      "name": "ui_ai_reasoning_completed",
+      "value": "已思考"
+    },
+    {
+      "name": "ui_ai_reasoning_in_progress",
+      "value": "思考中"
+    },
+    {
+      "name": "ui_ai_return",
+      "value": "返回對話"
+    },
+    {
+      "name": "ui_ai_select_conversation",
+      "value": "選擇對話"
+    },
+    {
+      "name": "ui_ai_workspace",
+      "value": "AI 工作區"
+    },
+    {
+      "name": "ui_announcement_redeem_code_label",
+      "value": "前瞻直播兌換碼"
+    },
+    {
+      "name": "ui_avatar_property_score_algorithm",
+      "value": "聖遺物評分演算法"
+    },
+    {
+      "name": "ui_backpack_category_reliquary",
+      "value": "聖遺物"
+    },
+    {
+      "name": "ui_backpack_category_weapon",
+      "value": "武器"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_name_header",
+      "value": "設定名稱"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_new_config",
+      "value": "新增設定"
+    },
+    {
+      "name": "ui_backpack_sort_count",
+      "value": "數量"
+    },
+    {
+      "name": "ui_backpack_sort_quality",
+      "value": "品質"
+    },
+    {
+      "name": "ui_base_value_slider_level",
+      "value": "等級"
+    },
+    {
+      "name": "ui_bg_choose_folder",
+      "value": "選擇資料夾"
+    },
+    {
+      "name": "ui_bg_folder_picker_failed",
+      "value": "無法選擇背景資料夾"
+    },
+    {
+      "name": "ui_bg_folder_saved",
+      "value": "背景資料夾已更新"
+    },
+    {
+      "name": "ui_bg_folder_temporary",
+      "value": "此資料夾僅在本次執行期間可用"
+    },
+    {
+      "name": "ui_bg_none",
+      "value": "無"
+    },
+    {
+      "name": "ui_card_calendar_all_materials_hint",
+      "value": "全部材料副本均可挑戰"
+    },
+    {
+      "name": "ui_card_sign_in_auto_sign_in",
+      "value": "自動簽到"
+    },
+    {
+      "name": "ui_card_sign_in_claim_re_sign_in_action",
+      "value": "補簽"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_allow",
+      "value": "允許"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_deny",
+      "value": "拒絕"
+    },
+    {
+      "name": "ui_clear_filters",
+      "value": "清除篩選"
+    },
+    {
+      "name": "ui_code_copied",
+      "value": "兌換碼複製成功"
+    },
+    {
+      "name": "ui_common_loading",
+      "value": "載入中…"
+    },
+    {
+      "name": "ui_content_dialog_complete_primary_button_text",
+      "value": "完成"
+    },
+    {
+      "name": "ui_cultivation_add_project_action",
+      "value": "新增"
+    },
+    {
+      "name": "ui_cultivation_material_list_world_level_title",
+      "value": "世界等級"
+    },
+    {
+      "name": "ui_cultivation_navigate_action",
+      "value": "前往"
+    },
+    {
+      "name": "ui_daily_note_notification_setting",
+      "value": "通知設定"
+    },
+    {
+      "name": "ui_calendar_time_pending",
+      "value": "時間待定"
+    },
+    {
+      "name": "ui_daily_note_refresh",
+      "value": "立即重新整理"
+    },
+    {
+      "name": "ui_daily_note_setting_auto_refresh",
+      "value": "自動重新整理"
+    },
+    {
+      "name": "ui_desc_abyss",
+      "value": "當期與上期戰績"
+    },
+    {
+      "name": "ui_desc_account",
+      "value": "多帳號管理與角色綁定"
+    },
+    {
+      "name": "ui_desc_achievement",
+      "value": "匯出 / 匯入 / UIAF"
+    },
+    {
+      "name": "ui_desc_announcements",
+      "value": "版本更新與新聞"
+    },
+    {
+      "name": "ui_desc_backpack",
+      "value": "武器 / 聖遺物 / UIIF"
+    },
+    {
+      "name": "ui_desc_banner_history",
+      "value": "歷次 UP 角色與武器"
+    },
+    {
+      "name": "ui_desc_calendar",
+      "value": "活動 / 卡池 / 簽到"
+    },
+    {
+      "name": "ui_desc_challenge",
+      "value": "單人 / 多人 / 最佳成績"
+    },
+    {
+      "name": "ui_desc_character",
+      "value": "角色屬性 / 聖遺物"
+    },
+    {
+      "name": "ui_desc_cultivation",
+      "value": "材料清單 / 材料統計"
+    },
+    {
+      "name": "ui_desc_daily_note",
+      "value": "原粹樹脂 / 探索派遣 / 通知"
+    },
+    {
+      "name": "ui_desc_launch",
+      "value": "設定公開啟動入口"
+    },
+    {
+      "name": "ui_desc_ledger",
+      "value": "原石與摩拉每月收支"
+    },
+    {
+      "name": "ui_desc_passport",
+      "value": "通行證說明"
+    },
+    {
+      "name": "ui_desc_settings",
+      "value": "顏色主題 / 重新整理 / 語言"
+    },
+    {
+      "name": "ui_desc_sign_in",
+      "value": "每日簽到獎勵"
+    },
+    {
+      "name": "ui_desc_theater",
+      "value": "挑戰星章 / 待命角色"
+    },
+    {
+      "name": "ui_desc_wiki_avatar",
+      "value": "角色元素與技能"
+    },
+    {
+      "name": "ui_desc_wiki_monster",
+      "value": "怪物元素與陣營"
+    },
+    {
+      "name": "ui_desc_wiki_weapon",
+      "value": "武器屬性與攻擊力"
+    },
+    {
+      "name": "ui_desc_wish",
+      "value": "總覽 / 歷史"
+    },
+    {
+      "name": "ui_exception_close",
+      "value": "關閉"
+    },
+    {
+      "name": "ui_filter",
+      "value": "篩選"
+    },
+    {
+      "name": "ui_filter_count",
+      "value": "篩選 (%d)"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_down",
+      "value": "下半"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_up",
+      "value": "上半"
+    },
+    {
+      "name": "ui_gacha_log_orange_avatar_countdown",
+      "value": "五星角色"
+    },
+    {
+      "name": "ui_gacha_log_orange_weapon_countdown",
+      "value": "五星武器"
+    },
+    {
+      "name": "ui_gacha_log_purple_avatar_countdown",
+      "value": "四星角色"
+    },
+    {
+      "name": "ui_gacha_log_purple_weapon_countdown",
+      "value": "四星武器"
+    },
+    {
+      "name": "ui_gacha_log_switch_to_beyond_gacha_mode_header",
+      "value": "頌願"
+    },
+    {
+      "name": "ui_gacha_pool_avatar_event",
+      "value": "角色活動"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_event",
+      "value": "活動頌願"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_permanent",
+      "value": "奇遇回聲"
+    },
+    {
+      "name": "ui_gacha_pool_chronicled",
+      "value": "集錄祈願"
+    },
+    {
+      "name": "ui_gacha_pool_novice",
+      "value": "新手祈願"
+    },
+    {
+      "name": "ui_gacha_pool_permanent",
+      "value": "奔行世間"
+    },
+    {
+      "name": "ui_gacha_pool_weapon_event",
+      "value": "神鑄賦形"
+    },
+    {
+      "name": "ui_grid_view",
+      "value": "網格檢視"
+    },
+    {
+      "name": "ui_history_charts",
+      "value": "歷史圖表"
+    },
+    {
+      "name": "ui_home_greeting",
+      "value": "旅行者，歡迎來到提瓦特大陸！"
+    },
+    {
+      "name": "ui_home_greeting_count",
+      "value": "你已經啟動了胡桃 %s 次"
+    },
+    {
+      "name": "ui_home_greeting_rare",
+      "value": "你說的對，但是《Snap Hutao》是由 DGP Studio 自主研發的一款..."
+    },
+    {
+      "name": "ui_home_greeting_text_default",
+      "value": "旅行者，歡迎來到提瓦特大陸！"
+    },
+    {
+      "name": "ui_home_no_codes",
+      "value": "暫無可用兌換碼"
+    },
+    {
+      "name": "ui_home_no_events",
+      "value": "暫無活動安排"
+    },
+    {
+      "name": "ui_home_recent",
+      "value": "近期活動 / 卡池"
+    },
+    {
+      "name": "ui_hutao_passport_verify_code_action",
+      "value": "獲取驗證碼"
+    },
+    {
+      "name": "ui_info_bar_panel_contract_content",
+      "value": "收起"
+    },
+    {
+      "name": "ui_list_view",
+      "value": "清單檢視"
+    },
+    {
+      "name": "ui_material_frosted",
+      "value": "磨砂半透明與柔和陰影"
+    },
+    {
+      "name": "ui_material_system_glass",
+      "value": "系統玻璃與沉浸光感"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_elec",
+      "value": "雷"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_fire",
+      "value": "火"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_grass",
+      "value": "草"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_ice",
+      "value": "冰"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_rock",
+      "value": "岩"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_water",
+      "value": "水"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_wind",
+      "value": "風"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_blue",
+      "value": "三星"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_green",
+      "value": "二星"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_orange",
+      "value": "五星"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_purple",
+      "value": "四星"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_red",
+      "value": "限定五星"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_white",
+      "value": "一星"
+    },
+    {
+      "name": "ui_model_intrinsic_role_combat_difficulty_level_lunar",
+      "value": "月諭模式"
+    },
+    {
+      "name": "ui_model_metadata_material_weapon_ascension_material",
+      "value": "武器突破素材"
+    },
+    {
+      "name": "ui_nav_announcements",
+      "value": "遊戲公告"
+    },
+    {
+      "name": "ui_nav_banner_history",
+      "value": "UP 歷史"
+    },
+    {
+      "name": "ui_navigation_collapse",
+      "value": "收合導覽列"
+    },
+    {
+      "name": "ui_navigation_expand",
+      "value": "展開導覽列"
+    },
+    {
+      "name": "ui_option_selected",
+      "value": "已選取"
+    },
+    {
+      "name": "ui_option_unselected",
+      "value": "未選取"
+    },
+    {
+      "name": "ui_plugin_setting_back_button",
+      "value": "返回"
+    },
+    {
+      "name": "ui_role_combat_avatar_trial_hint",
+      "value": "試用"
+    },
+    {
+      "name": "ui_role_combat_shortest",
+      "value": "最快演出"
+    },
+    {
+      "name": "ui_role_combat_splendour_buffs_header",
+      "value": "輝彩祝福"
+    },
+    {
+      "name": "ui_role_combat_support",
+      "value": "表演助理"
+    },
+    {
+      "name": "ui_setting_apperance_first_day_of_week_header",
+      "value": "一週中的首日"
+    },
+    {
+      "name": "ui_setting_background_image_custom_folder_header",
+      "value": "自訂背景圖片資料夾"
+    },
+    {
+      "name": "ui_setting_background_media_local_folder",
+      "value": "本機隨機影片"
+    },
+    {
+      "name": "ui_setting_background_media_official_launcher_video",
+      "value": "官方啟動器背景"
+    },
+    {
+      "name": "ui_setting_background_video_is_looping_header",
+      "value": "是否循環播放"
+    },
+    {
+      "name": "ui_setting_background_video_is_muted_header",
+      "value": "是否靜音播放"
+    },
+    {
+      "name": "ui_setting_control_material_default",
+      "value": "預設"
+    },
+    {
+      "name": "ui_setting_create_desktop_shortcut_action",
+      "value": "建立"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_off",
+      "value": "隱藏"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_on",
+      "value": "顯示"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_action",
+      "value": "設定"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_header",
+      "value": "設定驗證請求介面"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_description",
+      "value": "立即生效，關閉後將不再顯示"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_header",
+      "value": "是否開啟遊戲活動日曆顯示"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_description",
+      "value": "默認關閉，不在進行中的事件日期等部分內容將不會正確顯示"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_header",
+      "value": "是否顯示未在進行中的遊戲內版本活動事件"
+    },
+    {
+      "name": "ui_setting_home_card_description",
+      "value": "管理主頁儀表板中的卡片，拖動進行排序"
+    },
+    {
+      "name": "ui_setting_hutao_passport_logout_action",
+      "value": "登出"
+    },
+    {
+      "name": "ui_setting_key_shortcut_virtual_key_code_action",
+      "value": "查看"
+    },
+    {
+      "name": "ui_settings_auto_sign_info",
+      "value": "啟動時為目前 UID 簽到。應用執行期間跨日後為本機國服角色簽到。"
+    },
+    {
+      "name": "ui_settings_backup_credentials",
+      "value": "備份含登入憑證，請妥善保管。"
+    },
+    {
+      "name": "ui_settings_cache",
+      "value": "媒體與圖示快取"
+    },
+    {
+      "name": "ui_settings_cache_size",
+      "value": "快取占用 %s"
+    },
+    {
+      "name": "ui_settings_cancel_update",
+      "value": "取消更新"
+    },
+    {
+      "name": "ui_settings_cancelling",
+      "value": "正在取消…"
+    },
+    {
+      "name": "ui_settings_choose_video",
+      "value": "選擇影片（可複選）"
+    },
+    {
+      "name": "ui_settings_configure",
+      "value": "設定"
+    },
+    {
+      "name": "ui_settings_data_next_launch",
+      "value": "下次啟動時使用所選遊戲資料。"
+    },
+    {
+      "name": "ui_settings_data_source",
+      "value": "資料來源位址"
+    },
+    {
+      "name": "ui_settings_delete_wish",
+      "value": "刪除所有祈願資料"
+    },
+    {
+      "name": "ui_settings_delete_wish_archive",
+      "value": "刪除祈願封存"
+    },
+    {
+      "name": "ui_settings_delete_wish_confirm",
+      "value": "刪除所有 UID 的祈願記錄？此操作無法復原。"
+    },
+    {
+      "name": "ui_settings_download_verify",
+      "value": "下載並驗證"
+    },
+    {
+      "name": "ui_settings_export_backup",
+      "value": "匯出完整備份"
+    },
+    {
+      "name": "ui_settings_feedback",
+      "value": "意見回饋與診斷"
+    },
+    {
+      "name": "ui_settings_game_data",
+      "value": "遊戲資料更新"
+    },
+    {
+      "name": "ui_settings_geetest_help",
+      "value": "把 {0} 用作 gt，{1} 用作 challenge。介面接受 GET，並以 code: 0、challenge 和 validate 表示成功。留空使用彈窗驗證。"
+    },
+    {
+      "name": "ui_settings_help",
+      "value": "離線說明"
+    },
+    {
+      "name": "ui_settings_immersive_material",
+      "value": "進階材質"
+    },
+    {
+      "name": "ui_settings_local_backup_success",
+      "value": "完成"
+    },
+    {
+      "name": "ui_settings_manifest_help",
+      "value": "填寫資料清單位址並儲存，再檢查更新。"
+    },
+    {
+      "name": "ui_settings_material_level",
+      "value": "進階材質等級"
+    },
+    {
+      "name": "ui_settings_material_scope",
+      "value": "材質層次即時更新。內容表面採用磨砂效果，支援的控制項使用系統沉浸光感。"
+    },
+    {
+      "name": "ui_settings_no_wallpaper",
+      "value": "未選擇背景圖片"
+    },
+    {
+      "name": "ui_settings_no_wish_archives",
+      "value": "暫無祈願封存。重新整理或匯入可新增封存。"
+    },
+    {
+      "name": "ui_settings_normal_material",
+      "value": "一般材質"
+    },
+    {
+      "name": "ui_settings_not_logged_in",
+      "value": "未登入"
+    },
+    {
+      "name": "ui_settings_page_description_add_model_provider_profile_to_edit",
+      "value": "請先添加一個模型提供商配置"
+    },
+    {
+      "name": "ui_settings_page_label_add_profile",
+      "value": "新增"
+    },
+    {
+      "name": "ui_settings_page_label_agent_maximum_iterations_per_request",
+      "value": "最大工具調用次數"
+    },
+    {
+      "name": "ui_settings_page_label_agent_system_prompt",
+      "value": "系統提示詞"
+    },
+    {
+      "name": "ui_settings_page_label_agent_user_name",
+      "value": "用戶名稱"
+    },
+    {
+      "name": "ui_settings_page_label_clear_models",
+      "value": "清空模型"
+    },
+    {
+      "name": "ui_settings_page_label_copy_profile",
+      "value": "復制"
+    },
+    {
+      "name": "ui_settings_page_label_delete_model",
+      "value": "刪除模型"
+    },
+    {
+      "name": "ui_settings_page_label_delete_profile",
+      "value": "刪除"
+    },
+    {
+      "name": "ui_settings_page_label_fetch_models",
+      "value": "獲取"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_context_window_tokens",
+      "value": "上下文窗口長度"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_input_tokens",
+      "value": "最大輸入長度"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_output_tokens",
+      "value": "最大輸出長度"
+    },
+    {
+      "name": "ui_settings_page_label_model_name",
+      "value": "模型名稱"
+    },
+    {
+      "name": "ui_settings_page_label_model_omit_reasoning_effort_when_thinking_disabled",
+      "value": "思考推理關閉時省略推理強度"
+    },
+    {
+      "name": "ui_settings_page_label_model_provider_profiles",
+      "value": "模型設定"
+    },
+    {
+      "name": "ui_settings_page_label_model_reasoning_effort",
+      "value": "推理強度"
+    },
+    {
+      "name": "ui_settings_page_label_model_temperature",
+      "value": "溫度採樣"
+    },
+    {
+      "name": "ui_settings_page_label_model_thinking_enabled",
+      "value": "啓用思考推理"
+    },
+    {
+      "name": "ui_settings_page_label_model_top_p",
+      "value": "核採樣 Top P"
+    },
+    {
+      "name": "ui_settings_page_label_profile_model_id",
+      "value": "模型 ID"
+    },
+    {
+      "name": "ui_settings_page_label_profile_name",
+      "value": "配置名稱"
+    },
+    {
+      "name": "ui_settings_page_label_profile_provider_type",
+      "value": "提供商類型"
+    },
+    {
+      "name": "ui_settings_page_label_selected_model",
+      "value": "當前模型"
+    },
+    {
+      "name": "ui_settings_page_option_provider_default",
+      "value": "提供商默認值"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_extra_high",
+      "value": "極高"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_high",
+      "value": "高"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_low",
+      "value": "低"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_medium",
+      "value": "中"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_none",
+      "value": "無"
+    },
+    {
+      "name": "ui_settings_previous_data",
+      "value": "回復上一版遊戲資料"
+    },
+    {
+      "name": "ui_settings_processing",
+      "value": "正在處理…"
+    },
+    {
+      "name": "ui_settings_random_video",
+      "value": "每次載入隨機播放一段已匯入的影片。"
+    },
+    {
+      "name": "ui_settings_reduce_motion",
+      "value": "減少動態效果"
+    },
+    {
+      "name": "ui_settings_reduced_motion_info",
+      "value": "減少頁面轉場與按壓動畫。"
+    },
+    {
+      "name": "ui_settings_reset_builtin",
+      "value": "恢復內建遊戲資料"
+    },
+    {
+      "name": "ui_settings_restore_backup",
+      "value": "從備份還原"
+    },
+    {
+      "name": "ui_settings_restore_confirm",
+      "value": "覆寫現有資料並從備份還原？"
+    },
+    {
+      "name": "ui_settings_restore_scope",
+      "value": "還原帳號、遊戲記錄與偏好"
+    },
+    {
+      "name": "ui_settings_signed_in",
+      "value": "米遊社帳號已登入"
+    },
+    {
+      "name": "ui_settings_stop_download",
+      "value": "停止下載並等候正在進行的驗證完成？"
+    },
+    {
+      "name": "ui_settings_verified_data",
+      "value": "從受信任的 GitHub 提交下載完整資料並驗證。"
+    },
+    {
+      "name": "ui_settings_video_fallback",
+      "value": "背景執行時暫停。影片不可用時顯示背景圖片。"
+    },
+    {
+      "name": "ui_settings_wallpaper_sources",
+      "value": "本機圖片每 5 分鐘輪換。每日一圖來自 Snap Hutao，圖片版權歸原作者。"
+    },
+    {
+      "name": "ui_spiral_abyss_hutao_statistics",
+      "value": "本期統計"
+    },
+    {
+      "name": "ui_spiral_abyss_upload_record_homa_not_login_primary_button_text",
+      "value": "前往登入"
+    },
+    {
+      "name": "ui_travelers_diary_no_income_source_hint",
+      "value": "本月暫無原石收入記錄"
+    },
+    {
+      "name": "ui_travelers_diary_today",
+      "value": "今日"
+    },
+    {
+      "name": "ui_update_cancel",
+      "value": "取消檢查"
+    },
+    {
+      "name": "ui_update_cancelled",
+      "value": "已取消"
+    },
+    {
+      "name": "ui_update_channel",
+      "value": "發行通道"
+    },
+    {
+      "name": "ui_update_check_failed",
+      "value": "檢查更新時發生錯誤"
+    },
+    {
+      "name": "ui_update_checking",
+      "value": "正在檢查更新…"
+    },
+    {
+      "name": "ui_update_compare_unknown",
+      "value": "版本資訊不足，無法比較"
+    },
+    {
+      "name": "ui_update_compatibility_unknown",
+      "value": "暫無安裝相容性資訊"
+    },
+    {
+      "name": "ui_update_conflict",
+      "value": "版本名稱與版本代碼不一致"
+    },
+    {
+      "name": "ui_update_current",
+      "value": "目前已是最新版本"
+    },
+    {
+      "name": "ui_update_hap_listed",
+      "value": "發行中列出鴻蒙安裝套件"
+    },
+    {
+      "name": "ui_update_installed",
+      "value": "本機版本 %s"
+    },
+    {
+      "name": "ui_update_invalid",
+      "value": "發行資訊無效"
+    },
+    {
+      "name": "ui_update_local_newer",
+      "value": "本機版本高於發行通道"
+    },
+    {
+      "name": "ui_update_no_hap",
+      "value": "發行中未辨識到鴻蒙安裝套件"
+    },
+    {
+      "name": "ui_update_no_notes",
+      "value": "此版本暫無發行說明"
+    },
+    {
+      "name": "ui_update_no_release",
+      "value": "此通道暫無公開版本"
+    },
+    {
+      "name": "ui_update_notes_error",
+      "value": "無法開啟發行說明"
+    },
+    {
+      "name": "ui_update_preview",
+      "value": "包含預發行"
+    },
+    {
+      "name": "ui_update_project_releases",
+      "value": "開啟專案發行清單"
+    },
+    {
+      "name": "ui_update_rate_limit",
+      "value": "GitHub 請求受限，請稍後重試"
+    },
+    {
+      "name": "ui_update_recent_only",
+      "value": "僅檢查最近 300 筆發行記錄"
+    },
+    {
+      "name": "ui_update_required_api",
+      "value": "最低 API %d"
+    },
+    {
+      "name": "ui_update_skipped",
+      "value": "已跳過版本 %s，啟動時將不再自動提示該版本，你仍可在設定中手動檢查更新"
+    },
+    {
+      "name": "ui_update_stable",
+      "value": "穩定發行"
+    },
+    {
+      "name": "ui_update_unavailable",
+      "value": "發行倉庫暫無法存取"
+    },
+    {
+      "name": "ui_update_unknown",
+      "value": "未知"
+    },
+    {
+      "name": "ui_update_unskip",
+      "value": "取消略過此版本"
+    },
+    {
+      "name": "ui_user_copy_cookie_action",
+      "value": "複製 Cookie"
+    },
+    {
+      "name": "ui_web_daily_note_attendance_reward_status_finished_non_reward",
+      "value": "已完成"
+    },
+    {
+      "name": "ui_web_hoyolab_game_record_act_calendar_hard_challenge_locked",
+      "value": "尚未解鎖"
+    },
+    {
+      "name": "ui_weekday_friday",
+      "value": "週五"
+    },
+    {
+      "name": "ui_weekday_monday",
+      "value": "週一"
+    },
+    {
+      "name": "ui_weekday_saturday",
+      "value": "週六"
+    },
+    {
+      "name": "ui_weekday_sunday",
+      "value": "週日"
+    },
+    {
+      "name": "ui_weekday_thursday",
+      "value": "週四"
+    },
+    {
+      "name": "ui_weekday_tuesday",
+      "value": "週二"
+    },
+    {
+      "name": "ui_weekday_wednesday",
+      "value": "週三"
+    },
+    {
+      "name": "ui_wi_ki_avatar_ascension_materials_header",
+      "value": "養成材料"
+    },
+    {
+      "name": "ui_wi_ki_avatar_auto_suggest_box_place_holder",
+      "value": "篩選角色"
+    },
+    {
+      "name": "ui_wi_ki_avatar_name_card_header",
+      "value": "名片"
+    },
+    {
+      "name": "ui_wi_ki_avatar_special_food_title",
+      "value": "特殊料理"
+    },
+    {
+      "name": "ui_wi_ki_weapon_auto_suggest_box_place_holder",
+      "value": "篩選武器"
+    },
+    {
+      "name": "ui_wish_show_empty_history",
+      "value": "無記錄的歷史祈願活動"
+    },
+    {
+      "name": "ui_wish_show_empty_overview",
+      "value": "無記錄的祈願總覽"
+    },
+    {
+      "name": "ui_wish_show_unobtained",
+      "value": "未抽取到的祈願物品"
+    },
+    {
+      "name": "ui_gacha_pivot_overview",
+      "value": "總覽"
+    },
+    {
+      "name": "ui_gacha_pivot_history",
+      "value": "歷史"
+    },
+    {
+      "name": "ui_gacha_pivot_avatar",
+      "value": "角色"
+    },
+    {
+      "name": "ui_gacha_pivot_weapon",
+      "value": "武器"
+    },
+    {
+      "name": "ui_gacha_pivot_countdown",
+      "value": "計時"
+    },
+    {
+      "name": "ui_gacha_pivot_statistics",
+      "value": "全球祈願統計"
+    },
+    {
+      "name": "ui_gacha_full_refresh",
+      "value": "全量式重新整理"
+    },
+    {
+      "name": "ui_gacha_full_refresh_selected",
+      "value": "✓ 全量式重新整理"
+    },
+    {
+      "name": "ui_gacha_card_statistics",
+      "value": "統計"
+    },
+    {
+      "name": "ui_gacha_card_ratio",
+      "value": "比例"
+    },
+    {
+      "name": "ui_gacha_card_five_average",
+      "value": "五星平均抽數"
+    },
+    {
+      "name": "ui_gacha_card_four_average",
+      "value": "四星平均抽數"
+    },
+    {
+      "name": "ui_gacha_card_up_average",
+      "value": "UP 平均抽數"
+    },
+    {
+      "name": "ui_gacha_card_to_five",
+      "value": "距上個五星"
+    },
+    {
+      "name": "ui_gacha_card_to_four",
+      "value": "距上個四星"
+    },
+    {
+      "name": "ui_gacha_card_to_three",
+      "value": "距上個三星"
+    },
+    {
+      "name": "ui_travelers_diary_month",
+      "value": "本月"
+    },
+    {
+      "name": "ui_travelers_diary_primogems",
+      "value": "原石"
+    },
+    {
+      "name": "ui_travelers_diary_mora",
+      "value": "摩拉"
+    }
+  ]
+}

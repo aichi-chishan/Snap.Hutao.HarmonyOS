@@ -13,7 +13,7 @@
 | B3 | **颂愿（千星奇域）子池与专属物品元数据**：UP 子池、专属物品展示缺失 | `BeyondItem` 元数据、颂愿子池 | 数据仓上游有 `BeyondItem.json`，rawfile/热更清单未接入 | 数据仓 pipeline 提取 → 热更 → 祈愿颂愿页子池/专属物品展示 | **P1** / M |
 | B4 | **圣遗物评分预设与排序**（SavedConfig）：自定义权重配置、按分排序 | `AvatarReliquaryScoreSetting(SavedConfig)`、`BackpackReliquaryScoreConfig` | 已做「米游社推荐/双爆」口径切换；无自定义权重与排序 | 评分配置页（权重编辑+持久化）+ 背包/角色列表按分排序 | P1 / L |
 | B5 | ~~角色页批量规划入口语义~~ **已核销（2026-10-25 复核）**：四处入口均"先编辑目标再保存"——角色页 规划角色/规划当前装备武器（`openCharacterDraft` → `CultivationDraftEditor`）、图鉴角色/武器页 加入计划（`draftVm.offline` → 编辑器） | `AvatarPropertyPage` 批量/临时计算命令 | ✅ 齐备 | 无需改动 | P1 / S |
-| B6 | **UIGF 版本选择与选择性导入/导出**：导出固定 v4.2；导入不能按池/按时间段筛选 | `Service/UIGF` 多版本 | 导入兼容 v3/v4.x；导出仅 4.2 全量 | 导出增加 v4.0/3.x 选项与按池/时间范围筛选；导入预览确认 | P2 / M |
+| B6 | ~~UIGF 版本选择与选择性导入/导出~~ **已核销（2026-10-25 复核）**：导出版本 v2.2–v4.2 可选、按 UID 勾选、导入预览+合并策略确认均已齐备；Windows `UIGFExportOptions`/`UIGFImportOptions` 本身无按池/时间段筛选，该子项属 Windows 没有的功能，按「不做额外扩展」口径不做 | `Service/UIGF` 多版本 | ✅ 对齐且导入侧更细 | 无需改动 | P2 / M |
 | B7 | **后台刷新/跨日签到增强**：多 UID 覆盖、结果可观测 | WorkScheduler 已有 opt-in 单 UID 方案（见 [NATIVE_BACKGROUND_TASKS](NATIVE_BACKGROUND_TASKS_2026-10-05.md)） | 已有默认关闭的账号+单 UID 刷新；不做精确跨日承诺 | 支持勾选多 UID；刷新历史/失败原因记录页；保持系统调度语义不夸大 | P2 / M |
 | B8 | **背景视频/媒体离线管理**：缓存清理与来源管理 UI | Windows 存储设置 | `BackgroundMediaService` 已有本地目录+缓存；缺管理界面 | 设置→存储 增加媒体缓存管理（占用/清理/重新选择） | P2 / S |
 | B9 | **可操作诊断收集**：一键复制环境/日志摘要辅助排障 | Windows 反馈/日志 | 有文件日志（app.log）与 HelpPage；无汇总复制 | 诊断卡：版本/设备/API/最近错误摘要 → 剪贴板 | P2 / S |

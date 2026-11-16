@@ -1,0 +1,40 @@
+{
+  "string": [
+    {
+      "name": "ui_home_pity_title",
+      "value": "Conteggio pietà"
+    },
+    {
+      "name": "ui_home_pity_five",
+      "value": "Cinque stelle"
+    },
+    {
+      "name": "ui_home_pity_four",
+      "value": "Quattro stelle"
+    },
+    {
+      "name": "ui_wallpaper_copyright",
+      "value": "Informazioni sul copyright dell'immagine"
+    },
+    {
+      "name": "ui_wallpaper_none",
+      "value": "Nessuno sfondo"
+    },
+    {
+      "name": "ui_wallpaper_local",
+      "value": "Immagine locale casuale"
+    },
+    {
+      "name": "ui_wallpaper_bing",
+      "value": "Sfondo del giorno di Bing"
+    },
+    {
+      "name": "ui_wallpaper_daily",
+      "value": "Sfondo del giorno di Snap Hutao"
+    },
+    {
+      "name": "ui_wallpaper_launcher",
+      "value": "Sfondo launcher ufficiale"
+    }
+  ]
+}

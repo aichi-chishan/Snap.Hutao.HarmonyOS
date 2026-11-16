@@ -7,6 +7,43 @@ export class CultivationSkillDraft {
   target: number = 10;
 }
 
+export enum CultivationBatchField {
+  AvatarLevel, SkillA, SkillE, SkillQ, WeaponLevel,
+}
+
+/** Shared targets are editor input, separate from a saved role or weapon draft. */
+export class CultivationBatchTargets {
+  levels: number[] = [90, 10, 10, 10, 90];
+
+  static maxLevel(field: number): number {
+    return field === CultivationBatchField.AvatarLevel || field === CultivationBatchField.WeaponLevel ? 90 : 10;
+  }
+
+  static validate(targets: CultivationBatchTargets): void {
+    if (!Array.isArray(targets.levels) || targets.levels.length !== 5) { throw new Error('批量目标不完整'); }
+    for (let field: number = 0; field < targets.levels.length; field++) {
+      const level: number = targets.levels[field];
+      const max: number = CultivationBatchTargets.maxLevel(field);
+      if (!Number.isInteger(level) || level < 1 || level > max) {
+        throw new Error('角色与武器目标须为 1–90 级，三项天赋目标须为 1–10 级');
+      }
+    }
+  }
+
+  static load(text: string): CultivationBatchTargets {
+    try {
+      const targets: CultivationBatchTargets = new CultivationBatchTargets();
+      targets.levels = JSON.parse(text) as number[];
+      CultivationBatchTargets.validate(targets);
+      return targets;
+    } catch (_) { return new CultivationBatchTargets(); }
+  }
+}
+
+export enum CultivationSaveMode {
+  Preserve, Overwrite, CreateNew,
+}
+
 export class CultivationDraft {
   version: number = 1;
   kind: string = 'avatar';

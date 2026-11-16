@@ -1,4 +1,4 @@
-/** Regional travelers' diary. Every retry re-signs and retains its original account/UID owner. */
+/** 国服旅行者札记。重试重新签名并检查账号及角色归属。 */
 import { Ledger } from '../model/Ledger';
 import { ApiResponse } from '../model/ApiResponse';
 import { ApiClient } from '../data/network/ApiClient';
@@ -16,13 +16,9 @@ export class LedgerService {
   static getInstance(): LedgerService { return LedgerService.instance; }
 
   static query(month: number, uid: string, region: string): Record<string, string> {
+    if (!RegionUtil.isCnUid(uid)) { throw new Error('旅行者札记仅支持国服角色'); }
     if (!Number.isInteger(month) || month < 0 || month > 12 || RegionUtil.regionOfUid(uid) !== region) {
       throw new Error('札记 UID、区服或月份无效');
-    }
-    HoyolabEndpoints.requireRegion(region);
-    if (RegionUtil.isOverseaRegion(region)) {
-      const oversea: Record<string, string> = { 'month': String(month), 'region': region, 'uid': uid, 'lang': 'zh-cn' };
-      return oversea;
     }
     const chinese: Record<string, string> = {
       'month': String(month), 'bind_uid': uid, 'bind_region': region,
@@ -37,7 +33,7 @@ export class LedgerService {
     if (current !== user || user.id !== userId || (isCurrent !== undefined && !isCurrent())) {
       throw new Error('账号或札记查询已改变，已丢弃旧请求');
     }
-    if (user.isOversea !== RegionUtil.isOverseaRegion(region)) { throw new Error('当前账号与角色区服不匹配，请切换账号'); }
+    if (user.isOversea) { throw new Error('当前账号与国服角色区服不匹配，请切换账号'); }
     const role: UserGameRole | undefined = user.roles.find((candidate: UserGameRole): boolean => candidate.gameUid === uid);
     if (role === undefined || role.region !== region || (role.userId > 0 && role.userId !== userId)) {
       throw new Error('请选择当前账号已绑定的游戏角色');
@@ -50,12 +46,7 @@ export class LedgerService {
     const query: string = DsSigner.sortQuery(LedgerService.query(month, uid, region));
     const ds: string = await DsSigner.signGen2(HoyolabEndpoints.gameRecordSalt(region), DsSigner.nowTimestamp(), DsSigner.randomNumber(), '', query);
     this.checkOwner(user, ownerId, uid, region, isCurrent);
-    const headers: Record<string, string> = {};
-    const base: Record<string, string> = HoyolabClient.getBaseHeaders(region);
-    for (const key of Object.keys(base)) {
-      // Pinned upstream XRpc3 has no Referer; never carry the China webstatic header overseas.
-      if (!user.isOversea || key.toLowerCase() !== 'referer') { headers[key] = base[key]; }
-    }
+    const headers: Record<string, string> = HoyolabClient.getBaseHeaders(region);
     headers['DS'] = ds;
     headers['Cookie'] = user.gameRecordCookie();
     if (headers['Cookie'].length === 0) { throw new Error('账号缺少札记凭据，请重新登录'); }
@@ -66,35 +57,39 @@ export class LedgerService {
   }
 
   async fetchMonth(month: number, uid: string, isCurrent?: () => boolean): Promise<Ledger> {
-    const user: User | undefined = UserService.getInstance().getCurrentUser();
+    const users: UserService = UserService.getInstance();
+    const user: User | undefined = users.getCurrentUser();
     if (user === undefined || !user.hasCookie()) { throw new Error('请先登录'); }
     const region: string = RegionUtil.regionOfUid(uid);
     LedgerService.query(month, uid, region);
     const ownerId: number = user.id;
-    this.checkOwner(user, ownerId, uid, region, isCurrent);
-    if (user.cookieToken.length === 0) {
-      await UserService.getInstance().refreshCookieTokenForced(user);
-      this.checkOwner(user, ownerId, uid, region, isCurrent);
-    }
+    const revision: number = users.sessionRevision();
+    const owns: () => boolean = (): boolean => users.sessionRevision() === revision && (isCurrent?.() ?? true);
+    this.checkOwner(user, ownerId, uid, region, owns);
     let refreshed: boolean = false;
+    if (user.cookieToken.length === 0) {
+      refreshed = true;
+      const ok: boolean = await users.refreshCookieTokenForced(user);
+      this.checkOwner(user, ownerId, uid, region, owns);
+      if (!ok) { throw new Error('账号缺少札记凭据，请重新登录'); }
+    }
     let verified: boolean = false;
     let challenge: string = '';
     while (true) {
-      const response: ApiResponse = await this.request(month, uid, region, user, ownerId, challenge, isCurrent);
-      this.checkOwner(user, ownerId, uid, region, isCurrent);
+      const response: ApiResponse = await this.request(month, uid, region, user, ownerId, challenge, owns);
+      this.checkOwner(user, ownerId, uid, region, owns);
       if (response.isRiskControl()) {
-        if (user.isOversea) { throw new Error('HoYoLAB 札记需要验证，请在官方 HoYoLAB 完成验证后重试'); }
         if (verified) { throw new Error('札记验证后仍被拦截，请稍后重试'); }
         verified = true;
         challenge = await RiskVerifier.tryResolveRisk(response, user.gameRecordCookie(), 'event/ys_ledger/monthInfo');
-        this.checkOwner(user, ownerId, uid, region, isCurrent);
+        this.checkOwner(user, ownerId, uid, region, owns);
         if (challenge.length === 0) { throw new Error('人机验证未完成或被取消，显示的数据未刷新'); }
         continue;
       }
       if (!response.success && UserService.isCookieAuthError(response) && !refreshed) {
         refreshed = true;
-        const ok: boolean = await UserService.getInstance().refreshCookieTokenForced(user);
-        this.checkOwner(user, ownerId, uid, region, isCurrent);
+        const ok: boolean = await users.refreshCookieTokenForced(user);
+        this.checkOwner(user, ownerId, uid, region, owns);
         if (!ok) { throw new Error('札记登录态已失效，请重新登录对应区服的账号'); }
         challenge = '';
         continue;
@@ -114,13 +109,7 @@ export class LedgerService {
         if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim().length === 0 ||
           !Number.isSafeInteger(Number(value)) || Number(value) < 0) { throw new Error('札记月度统计数据不完整'); }
       }
-      const ledger: Ledger = Ledger.fromJson(response.data);
-      if (!Number.isFinite(ledger.monthData.currentPrimogems) || !Number.isFinite(ledger.monthData.currentMora)) {
-        throw new Error('札记统计数据无效');
-      }
-      ledger.optionalMonth = ledger.optionalMonth.filter((value: number, index: number, months: number[]): boolean =>
-        Number.isInteger(value) && value >= 1 && value <= 12 && months.indexOf(value) === index);
-      return ledger;
+      return Ledger.fromJson(response.data);
     }
   }
 }

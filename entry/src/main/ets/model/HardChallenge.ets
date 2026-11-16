@@ -66,6 +66,11 @@ export class HardChallengeBest {
   icon: string = '';
   /** 难度名（本地化） */
   name: string = '';
+
+  difficultyLabel(): string {
+    const labels: string[] = ['', '普通', '进阶', '困难', '险恶', '无畏', '绝境'];
+    return labels[this.difficulty] || this.name;
+  }
 }
 
 /** 单挑/联机数据组（DataEntry） */
@@ -228,7 +233,10 @@ export class HardChallengeRoot {
       c.monster.name = HardChallengeRoot.str(monster['name']);
       c.monster.icon = HardChallengeRoot.str(monster['icon']);
       c.monster.level = HardChallengeRoot.number(monster['level'], 0);
-      c.monster.desc = HardChallengeRoot.str(monster['desc']);
+      const descriptions: Object = monster['desc'];
+      c.monster.desc = Array.isArray(descriptions)
+        ? (descriptions as Object[]).map((line: Object): string => HardChallengeRoot.str(line)).join('\n')
+        : HardChallengeRoot.str(descriptions);
       const tags = monster['tags'] as Array<Object>;
       if (tags !== undefined && tags !== null) {
         for (let i = 0; i < tags.length; i++) {

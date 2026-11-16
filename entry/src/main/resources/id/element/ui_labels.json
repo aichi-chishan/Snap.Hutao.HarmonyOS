@@ -1,0 +1,1244 @@
+{
+  "string": [
+    {
+      "name": "ui_about_restart",
+      "value": "Atur bahasa"
+    },
+    {
+      "name": "ui_account_insights_copied_json",
+      "value": "De-identified statistics copied to clipboard."
+    },
+    {
+      "name": "ui_account_insights_copy_json",
+      "value": "Copy de-identified statistics (JSON)"
+    },
+    {
+      "name": "ui_account_insights_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_account_insights_loading",
+      "value": "Loading saved records…"
+    },
+    {
+      "name": "ui_account_insights_missing_model",
+      "value": "Enter a model identifier."
+    },
+    {
+      "name": "ui_account_insights_no_account",
+      "value": "Select a game account and UID first."
+    },
+    {
+      "name": "ui_account_insights_no_records",
+      "value": "No saved records available for charting."
+    },
+    {
+      "name": "ui_account_insights_open",
+      "value": "History charts and AI insights"
+    },
+    {
+      "name": "ui_account_insights_unit_wish",
+      "value": "wishes"
+    },
+    {
+      "name": "ui_action_choose",
+      "value": "Pilih"
+    },
+    {
+      "name": "ui_action_clear",
+      "value": "Kosongkan"
+    },
+    {
+      "name": "ui_action_clear_cache",
+      "value": "Bersihkan cache"
+    },
+    {
+      "name": "ui_action_close",
+      "value": "Tutup"
+    },
+    {
+      "name": "ui_action_continue",
+      "value": "Lanjutkan"
+    },
+    {
+      "name": "ui_action_disable",
+      "value": "Nonaktifkan"
+    },
+    {
+      "name": "ui_action_edit",
+      "value": "Edit"
+    },
+    {
+      "name": "ui_action_enable",
+      "value": "Aktifkan"
+    },
+    {
+      "name": "ui_action_restore",
+      "value": "Pulihkan"
+    },
+    {
+      "name": "ui_agent_page_label_delete_conversation",
+      "value": "Delete conversation"
+    },
+    {
+      "name": "ui_agent_page_label_model_profile",
+      "value": "Model"
+    },
+    {
+      "name": "ui_agent_page_label_model_provider_profile",
+      "value": "Model Provider Profile"
+    },
+    {
+      "name": "ui_agent_page_label_placeholder",
+      "value": "Type a message..."
+    },
+    {
+      "name": "ui_ai_approval",
+      "value": "Tool approval required"
+    },
+    {
+      "name": "ui_ai_continue",
+      "value": "Lanjutkan pembuatan"
+    },
+    {
+      "name": "ui_ai_conversation_actions",
+      "value": "Tindakan percakapan"
+    },
+    {
+      "name": "ui_ai_copied_text",
+      "value": "Disalin ke clipboard"
+    },
+    {
+      "name": "ui_ai_copy_error",
+      "value": "Gagal membuka clipboard"
+    },
+    {
+      "name": "ui_ai_copy_text",
+      "value": "Copy Text"
+    },
+    {
+      "name": "ui_ai_custom_api",
+      "value": "API kustom"
+    },
+    {
+      "name": "ui_ai_device_generate",
+      "value": "Analisis di perangkat"
+    },
+    {
+      "name": "ui_ai_endpoint_placeholder",
+      "value": "URL dasar (kosong untuk bawaan)"
+    },
+    {
+      "name": "ui_ai_initial_request",
+      "value": "Analyze my account performance, wish results and future priorities using the historical statistics in this chat."
+    },
+    {
+      "name": "ui_ai_key_placeholder",
+      "value": "Kunci API (kosong untuk mempertahankan)"
+    },
+    {
+      "name": "ui_ai_mode",
+      "value": "Mode analisis AI"
+    },
+    {
+      "name": "ui_ai_on_device",
+      "value": "AI di perangkat"
+    },
+    {
+      "name": "ui_ai_privacy_body",
+      "value": "Saat Anda mengirim pesan, layanan AI yang dipilih menerima percakapan dan statistik riwayat tanpa identitas. Aplikasi tidak menyertakan UID, cookie, ID item mentah, atau file basis data. Percakapan disimpan di perangkat ini dan kunci API diamankan oleh sistem. Alat memerlukan persetujuan Anda."
+    },
+    {
+      "name": "ui_ai_privacy_title",
+      "value": "Before using third-party AI"
+    },
+    {
+      "name": "ui_ai_reasoning_completed",
+      "value": "Thought"
+    },
+    {
+      "name": "ui_ai_reasoning_in_progress",
+      "value": "Thinking"
+    },
+    {
+      "name": "ui_ai_return",
+      "value": "Kembali ke percakapan"
+    },
+    {
+      "name": "ui_ai_select_conversation",
+      "value": "Pilih percakapan"
+    },
+    {
+      "name": "ui_ai_workspace",
+      "value": "Ruang kerja AI"
+    },
+    {
+      "name": "ui_announcement_redeem_code_label",
+      "value": "Kode penukaran program khusus"
+    },
+    {
+      "name": "ui_avatar_property_score_algorithm",
+      "value": "Algoritma Penilaian Artefak"
+    },
+    {
+      "name": "ui_backpack_category_reliquary",
+      "value": "Artefak"
+    },
+    {
+      "name": "ui_backpack_category_weapon",
+      "value": "Senjata"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_name_header",
+      "value": "Nama Konfigurasi"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_new_config",
+      "value": "Konfigurasi Baru"
+    },
+    {
+      "name": "ui_backpack_sort_count",
+      "value": "Jumlah"
+    },
+    {
+      "name": "ui_backpack_sort_quality",
+      "value": "Kualitas"
+    },
+    {
+      "name": "ui_base_value_slider_level",
+      "value": "Level"
+    },
+    {
+      "name": "ui_bg_choose_folder",
+      "value": "Pilih folder"
+    },
+    {
+      "name": "ui_bg_folder_picker_failed",
+      "value": "Tidak dapat memilih folder latar"
+    },
+    {
+      "name": "ui_bg_folder_saved",
+      "value": "Folder latar diperbarui"
+    },
+    {
+      "name": "ui_bg_folder_temporary",
+      "value": "Folder hanya dapat diakses pada sesi ini"
+    },
+    {
+      "name": "ui_bg_none",
+      "value": "Tidak ada"
+    },
+    {
+      "name": "ui_card_calendar_all_materials_hint",
+      "value": "Semua domain material dapat ditantang"
+    },
+    {
+      "name": "ui_card_sign_in_auto_sign_in",
+      "value": "Otomatis masuk"
+    },
+    {
+      "name": "ui_card_sign_in_claim_re_sign_in_action",
+      "value": "Check-in Ulang"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_allow",
+      "value": "Allow"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_deny",
+      "value": "Deny"
+    },
+    {
+      "name": "ui_clear_filters",
+      "value": "Hapus filter"
+    },
+    {
+      "name": "ui_code_copied",
+      "value": "Berhasil menyalin kode penukaran"
+    },
+    {
+      "name": "ui_common_loading",
+      "value": "Memuat…"
+    },
+    {
+      "name": "ui_content_dialog_complete_primary_button_text",
+      "value": "Selesai"
+    },
+    {
+      "name": "ui_cultivation_add_project_action",
+      "value": "Buat"
+    },
+    {
+      "name": "ui_cultivation_material_list_world_level_title",
+      "value": "Level Dunia"
+    },
+    {
+      "name": "ui_cultivation_navigate_action",
+      "value": "Mulai"
+    },
+    {
+      "name": "ui_daily_note_notification_setting",
+      "value": "Pengaturan notifikasi"
+    },
+    {
+      "name": "ui_calendar_time_pending",
+      "value": "Jadwal akan diumumkan"
+    },
+    {
+      "name": "ui_daily_note_refresh",
+      "value": "Segarkan sekarang"
+    },
+    {
+      "name": "ui_daily_note_setting_auto_refresh",
+      "value": "Otomatis Refresh"
+    },
+    {
+      "name": "ui_desc_abyss",
+      "value": "Periode kini dan sebelumnya"
+    },
+    {
+      "name": "ui_desc_account",
+      "value": "Kelola akun dan karakter tertaut"
+    },
+    {
+      "name": "ui_desc_achievement",
+      "value": "Ekspor / Impor / UIAF"
+    },
+    {
+      "name": "ui_desc_announcements",
+      "value": "Pembaruan dan berita"
+    },
+    {
+      "name": "ui_desc_backpack",
+      "value": "Senjata / Artefak / UIIF"
+    },
+    {
+      "name": "ui_desc_banner_history",
+      "value": "Karakter dan senjata unggulan"
+    },
+    {
+      "name": "ui_desc_calendar",
+      "value": "Event / Permohonan / Check-in"
+    },
+    {
+      "name": "ui_desc_challenge",
+      "value": "Solo / Kooperatif / Waktu terbaik"
+    },
+    {
+      "name": "ui_desc_character",
+      "value": "Atribut Karakter / Artefak"
+    },
+    {
+      "name": "ui_desc_cultivation",
+      "value": "Checklist Material / Statistik Material"
+    },
+    {
+      "name": "ui_desc_daily_note",
+      "value": "Original Resin / Ekspedisi / Pemberitahuan"
+    },
+    {
+      "name": "ui_desc_launch",
+      "value": "Pintasan peluncuran"
+    },
+    {
+      "name": "ui_desc_ledger",
+      "value": "Catatan Primogem dan Mora bulanan"
+    },
+    {
+      "name": "ui_desc_passport",
+      "value": "Informasi paspor"
+    },
+    {
+      "name": "ui_desc_settings",
+      "value": "Tema Warna / Muat ulang / Bahasa"
+    },
+    {
+      "name": "ui_desc_sign_in",
+      "value": "Hadiah check-in harian"
+    },
+    {
+      "name": "ui_desc_theater",
+      "value": "Medali Tantangan / Karakter Cadangan"
+    },
+    {
+      "name": "ui_desc_wiki_avatar",
+      "value": "Elemen dan keahlian karakter"
+    },
+    {
+      "name": "ui_desc_wiki_monster",
+      "value": "Elemen dan faksi monster"
+    },
+    {
+      "name": "ui_desc_wiki_weapon",
+      "value": "Statistik dan serangan senjata"
+    },
+    {
+      "name": "ui_desc_wish",
+      "value": "Pratinjau / Sejarah"
+    },
+    {
+      "name": "ui_exception_close",
+      "value": "Tutup"
+    },
+    {
+      "name": "ui_filter",
+      "value": "Filter"
+    },
+    {
+      "name": "ui_filter_count",
+      "value": "Filter (%d)"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_down",
+      "value": "Paruh kedua"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_up",
+      "value": "Paruh pertama"
+    },
+    {
+      "name": "ui_gacha_log_orange_avatar_countdown",
+      "value": "Karakter Bintang Lima"
+    },
+    {
+      "name": "ui_gacha_log_orange_weapon_countdown",
+      "value": "Senjata Bintang Lima"
+    },
+    {
+      "name": "ui_gacha_log_purple_avatar_countdown",
+      "value": "Karakter Bintang Empat"
+    },
+    {
+      "name": "ui_gacha_log_purple_weapon_countdown",
+      "value": "Senjata Bintang Empat"
+    },
+    {
+      "name": "ui_gacha_log_switch_to_beyond_gacha_mode_header",
+      "value": "Wish"
+    },
+    {
+      "name": "ui_gacha_pool_avatar_event",
+      "value": "Event Wish Karakter"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_event",
+      "value": "Wish Event"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_permanent",
+      "value": "Echo Petualangan"
+    },
+    {
+      "name": "ui_gacha_pool_chronicled",
+      "value": "Kumpulan Wish"
+    },
+    {
+      "name": "ui_gacha_pool_novice",
+      "value": "Wish Pemula"
+    },
+    {
+      "name": "ui_gacha_pool_permanent",
+      "value": "Wanderlust Invocation"
+    },
+    {
+      "name": "ui_gacha_pool_weapon_event",
+      "value": "Epitome Invocation"
+    },
+    {
+      "name": "ui_grid_view",
+      "value": "Tampilan kisi"
+    },
+    {
+      "name": "ui_history_charts",
+      "value": "Grafik riwayat"
+    },
+    {
+      "name": "ui_home_greeting",
+      "value": "Selamat datang di Teyvat, Traveler!"
+    },
+    {
+      "name": "ui_home_greeting_count",
+      "value": "Anda telah meluncurkan Snap Hutao sebanyak %s kali"
+    },
+    {
+      "name": "ui_home_greeting_rare",
+      "value": "Anda benar, tapi Snap Hutao dikembangkan oleh DGP Studio..."
+    },
+    {
+      "name": "ui_home_greeting_text_default",
+      "value": "Selamat datang di Teyvat, Traveler!"
+    },
+    {
+      "name": "ui_home_no_codes",
+      "value": "Tidak ada kode penukaran"
+    },
+    {
+      "name": "ui_home_no_events",
+      "value": "Belum ada event terjadwal"
+    },
+    {
+      "name": "ui_home_recent",
+      "value": "Event dan permohonan mendatang"
+    },
+    {
+      "name": "ui_hutao_passport_verify_code_action",
+      "value": "Dapatkan OTP"
+    },
+    {
+      "name": "ui_info_bar_panel_contract_content",
+      "value": "Ciutkan"
+    },
+    {
+      "name": "ui_list_view",
+      "value": "Tampilan daftar"
+    },
+    {
+      "name": "ui_material_frosted",
+      "value": "Transparansi buram dan bayangan lembut"
+    },
+    {
+      "name": "ui_material_system_glass",
+      "value": "Kaca sistem dan pencahayaan imersif"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_elec",
+      "value": "Electro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_fire",
+      "value": "Pyro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_grass",
+      "value": "Dendro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_ice",
+      "value": "Cryo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_rock",
+      "value": "Geo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_water",
+      "value": "Hydro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_wind",
+      "value": "Anemo"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_blue",
+      "value": "Tiga Bintang"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_green",
+      "value": "Dua Bintang"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_orange",
+      "value": "Lima Bintang"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_purple",
+      "value": "Empat Bintang"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_red",
+      "value": "Lima Bintang Terbatas"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_white",
+      "value": "Satu Bintang"
+    },
+    {
+      "name": "ui_model_intrinsic_role_combat_difficulty_level_lunar",
+      "value": "Mode Lunar"
+    },
+    {
+      "name": "ui_model_metadata_material_weapon_ascension_material",
+      "value": "Bahan Kenaikan Senjata"
+    },
+    {
+      "name": "ui_nav_announcements",
+      "value": "Pengumuman game"
+    },
+    {
+      "name": "ui_nav_banner_history",
+      "value": "Riwayat banner"
+    },
+    {
+      "name": "ui_navigation_collapse",
+      "value": "Ciutkan navigasi"
+    },
+    {
+      "name": "ui_navigation_expand",
+      "value": "Luaskan navigasi"
+    },
+    {
+      "name": "ui_option_selected",
+      "value": "Dipilih"
+    },
+    {
+      "name": "ui_option_unselected",
+      "value": "Tidak dipilih"
+    },
+    {
+      "name": "ui_plugin_setting_back_button",
+      "value": "Kembali"
+    },
+    {
+      "name": "ui_role_combat_avatar_trial_hint",
+      "value": "Uji Coba"
+    },
+    {
+      "name": "ui_role_combat_shortest",
+      "value": "Pertunjukan Tercepat"
+    },
+    {
+      "name": "ui_role_combat_splendour_buffs_header",
+      "value": "Berkat Cemerlang"
+    },
+    {
+      "name": "ui_role_combat_support",
+      "value": "Dukungan"
+    },
+    {
+      "name": "ui_setting_apperance_first_day_of_week_header",
+      "value": "Hari pertama dalam seminggu"
+    },
+    {
+      "name": "ui_setting_background_image_custom_folder_header",
+      "value": "Folder gambar latar kustom"
+    },
+    {
+      "name": "ui_setting_background_media_local_folder",
+      "value": "Video acak lokal"
+    },
+    {
+      "name": "ui_setting_background_media_official_launcher_video",
+      "value": "Latar belakang peluncur resmi"
+    },
+    {
+      "name": "ui_setting_background_video_is_looping_header",
+      "value": "Putar berulang?"
+    },
+    {
+      "name": "ui_setting_background_video_is_muted_header",
+      "value": "Putar tanpa suara?"
+    },
+    {
+      "name": "ui_setting_control_material_default",
+      "value": "Default"
+    },
+    {
+      "name": "ui_setting_create_desktop_shortcut_action",
+      "value": "Buat"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_off",
+      "value": "Sembunyikan"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_on",
+      "value": "Tampilkan"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_action",
+      "value": "Konfigurasi"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_header",
+      "value": "Titik Akhir Verifikasi Geetest dalam Konfigurasi"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_description",
+      "value": "Berlaku segera, jika dinonaktifkan tidak akan ditampilkan lagi."
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_header",
+      "value": "Aktifkan tampilan kalender kegiatan game?"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_description",
+      "value": "Dinonaktifkan secara default, sebagian konten seperti tanggal acara yang tidak sedang berlangsung tidak akan ditampilkan dengan benar."
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_header",
+      "value": "Tampilkan acara kegiatan versi dalam game yang tidak sedang berlangsung?"
+    },
+    {
+      "name": "ui_setting_home_card_description",
+      "value": "Mengelola Cards di dasbor utama"
+    },
+    {
+      "name": "ui_setting_hutao_passport_logout_action",
+      "value": "Keluar Akun"
+    },
+    {
+      "name": "ui_setting_key_shortcut_virtual_key_code_action",
+      "value": "Lihat"
+    },
+    {
+      "name": "ui_settings_auto_sign_info",
+      "value": "Check-in untuk UID saat dibuka dan karakter CN lokal saat berganti hari selama aplikasi berjalan."
+    },
+    {
+      "name": "ui_settings_backup_credentials",
+      "value": "Cadangan berisi kredensial masuk. Simpan dengan aman."
+    },
+    {
+      "name": "ui_settings_cache",
+      "value": "Cache media dan ikon"
+    },
+    {
+      "name": "ui_settings_cache_size",
+      "value": "Ukuran cache %s"
+    },
+    {
+      "name": "ui_settings_cancel_update",
+      "value": "Batalkan pembaruan"
+    },
+    {
+      "name": "ui_settings_cancelling",
+      "value": "Membatalkan…"
+    },
+    {
+      "name": "ui_settings_choose_video",
+      "value": "Pilih video"
+    },
+    {
+      "name": "ui_settings_configure",
+      "value": "Konfigurasi"
+    },
+    {
+      "name": "ui_settings_data_next_launch",
+      "value": "Data yang dipilih digunakan saat aplikasi dibuka kembali."
+    },
+    {
+      "name": "ui_settings_data_source",
+      "value": "URL sumber data"
+    },
+    {
+      "name": "ui_settings_delete_wish",
+      "value": "Hapus semua data permohonan"
+    },
+    {
+      "name": "ui_settings_delete_wish_archive",
+      "value": "Hapus arsip permohonan"
+    },
+    {
+      "name": "ui_settings_delete_wish_confirm",
+      "value": "Hapus riwayat permohonan semua UID? Tindakan ini tidak bisa dibatalkan."
+    },
+    {
+      "name": "ui_settings_download_verify",
+      "value": "Unduh dan verifikasi"
+    },
+    {
+      "name": "ui_settings_export_backup",
+      "value": "Ekspor cadangan lengkap"
+    },
+    {
+      "name": "ui_settings_feedback",
+      "value": "Masukan dan diagnostik"
+    },
+    {
+      "name": "ui_settings_game_data",
+      "value": "Pembaruan data game"
+    },
+    {
+      "name": "ui_settings_geetest_help",
+      "value": "Gunakan {0} untuk gt dan {1} untuk challenge. Respons GET harus memuat code: 0, challenge, dan validate. Kosongkan untuk verifikasi interaktif."
+    },
+    {
+      "name": "ui_settings_help",
+      "value": "Bantuan luring"
+    },
+    {
+      "name": "ui_settings_immersive_material",
+      "value": "Material imersif"
+    },
+    {
+      "name": "ui_settings_local_backup_success",
+      "value": "Selesai"
+    },
+    {
+      "name": "ui_settings_manifest_help",
+      "value": "Simpan URL manifes, lalu periksa pembaruan."
+    },
+    {
+      "name": "ui_settings_material_level",
+      "value": "Tingkat material imersif"
+    },
+    {
+      "name": "ui_settings_material_scope",
+      "value": "Tingkat material diperbarui langsung. Permukaan konten memakai efek buram. Kontrol yang didukung memakai efek imersif sistem."
+    },
+    {
+      "name": "ui_settings_no_wallpaper",
+      "value": "Belum ada wallpaper dipilih"
+    },
+    {
+      "name": "ui_settings_no_wish_archives",
+      "value": "Belum ada arsip permohonan. Segarkan atau impor untuk menambah."
+    },
+    {
+      "name": "ui_settings_normal_material",
+      "value": "Material standar"
+    },
+    {
+      "name": "ui_settings_not_logged_in",
+      "value": "Belum masuk"
+    },
+    {
+      "name": "ui_settings_page_description_add_model_provider_profile_to_edit",
+      "value": "Add a model provider profile first"
+    },
+    {
+      "name": "ui_settings_page_label_add_profile",
+      "value": "Add"
+    },
+    {
+      "name": "ui_settings_page_label_agent_maximum_iterations_per_request",
+      "value": "Maximum Tool Iterations Per Request"
+    },
+    {
+      "name": "ui_settings_page_label_agent_system_prompt",
+      "value": "System Prompt"
+    },
+    {
+      "name": "ui_settings_page_label_agent_user_name",
+      "value": "User Name"
+    },
+    {
+      "name": "ui_settings_page_label_clear_models",
+      "value": "Clear Models"
+    },
+    {
+      "name": "ui_settings_page_label_copy_profile",
+      "value": "Copy"
+    },
+    {
+      "name": "ui_settings_page_label_delete_model",
+      "value": "Delete Model"
+    },
+    {
+      "name": "ui_settings_page_label_delete_profile",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_settings_page_label_fetch_models",
+      "value": "Fetch"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_context_window_tokens",
+      "value": "Context Window Length"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_input_tokens",
+      "value": "Input Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_output_tokens",
+      "value": "Output Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_name",
+      "value": "Model Name"
+    },
+    {
+      "name": "ui_settings_page_label_model_omit_reasoning_effort_when_thinking_disabled",
+      "value": "Omit reasoning effort when Thinking is off"
+    },
+    {
+      "name": "ui_settings_page_label_model_provider_profiles",
+      "value": "Model Provider Profiles"
+    },
+    {
+      "name": "ui_settings_page_label_model_reasoning_effort",
+      "value": "Reasoning Effort"
+    },
+    {
+      "name": "ui_settings_page_label_model_temperature",
+      "value": "Temperature"
+    },
+    {
+      "name": "ui_settings_page_label_model_thinking_enabled",
+      "value": "Enable Thinking"
+    },
+    {
+      "name": "ui_settings_page_label_model_top_p",
+      "value": "Top P"
+    },
+    {
+      "name": "ui_settings_page_label_profile_model_id",
+      "value": "Model ID"
+    },
+    {
+      "name": "ui_settings_page_label_profile_name",
+      "value": "Profile Name"
+    },
+    {
+      "name": "ui_settings_page_label_profile_provider_type",
+      "value": "Provider Type"
+    },
+    {
+      "name": "ui_settings_page_label_selected_model",
+      "value": "Selected Model"
+    },
+    {
+      "name": "ui_settings_page_option_provider_default",
+      "value": "Provider default"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_extra_high",
+      "value": "Extra high"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_high",
+      "value": "High"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_low",
+      "value": "Low"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_medium",
+      "value": "Medium"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_none",
+      "value": "None"
+    },
+    {
+      "name": "ui_settings_previous_data",
+      "value": "Pulihkan data game sebelumnya"
+    },
+    {
+      "name": "ui_settings_processing",
+      "value": "Memproses…"
+    },
+    {
+      "name": "ui_settings_random_video",
+      "value": "Putar video impor acak saat memuat."
+    },
+    {
+      "name": "ui_settings_reduce_motion",
+      "value": "Kurangi gerakan"
+    },
+    {
+      "name": "ui_settings_reduced_motion_info",
+      "value": "Kurangi transisi halaman dan animasi penekanan."
+    },
+    {
+      "name": "ui_settings_reset_builtin",
+      "value": "Pulihkan data game bawaan"
+    },
+    {
+      "name": "ui_settings_restore_backup",
+      "value": "Pulihkan dari cadangan"
+    },
+    {
+      "name": "ui_settings_restore_confirm",
+      "value": "Ganti data saat ini dengan cadangan ini?"
+    },
+    {
+      "name": "ui_settings_restore_scope",
+      "value": "Pulihkan akun, catatan game, dan preferensi"
+    },
+    {
+      "name": "ui_settings_signed_in",
+      "value": "Masuk ke akun game"
+    },
+    {
+      "name": "ui_settings_stop_download",
+      "value": "Hentikan unduhan dan tunggu verifikasi selesai?"
+    },
+    {
+      "name": "ui_settings_verified_data",
+      "value": "Unduh dan verifikasi data lengkap dari commit GitHub tepercaya."
+    },
+    {
+      "name": "ui_settings_video_fallback",
+      "value": "Jeda di latar belakang. Tampilkan wallpaper saat video tidak tersedia."
+    },
+    {
+      "name": "ui_settings_wallpaper_sources",
+      "value": "Gambar lokal berganti tiap lima menit. Wallpaper harian dari Snap Hutao. Hak gambar milik pembuatnya."
+    },
+    {
+      "name": "ui_spiral_abyss_hutao_statistics",
+      "value": "Statistik"
+    },
+    {
+      "name": "ui_spiral_abyss_upload_record_homa_not_login_primary_button_text",
+      "value": "Buka Halaman Login"
+    },
+    {
+      "name": "ui_travelers_diary_no_income_source_hint",
+      "value": "Belum ada catatan pendapatan Primogem bulan ini"
+    },
+    {
+      "name": "ui_travelers_diary_today",
+      "value": "Hari Ini"
+    },
+    {
+      "name": "ui_update_cancel",
+      "value": "Batalkan pemeriksaan"
+    },
+    {
+      "name": "ui_update_cancelled",
+      "value": "Dibatalkan"
+    },
+    {
+      "name": "ui_update_channel",
+      "value": "Kanal rilis"
+    },
+    {
+      "name": "ui_update_check_failed",
+      "value": "Terjadi kesalahan saat memeriksa pembaruan"
+    },
+    {
+      "name": "ui_update_checking",
+      "value": "Memeriksa pembaruan…"
+    },
+    {
+      "name": "ui_update_compare_unknown",
+      "value": "Informasi versi tidak cukup"
+    },
+    {
+      "name": "ui_update_compatibility_unknown",
+      "value": "Kompatibilitas pemasangan tidak diketahui"
+    },
+    {
+      "name": "ui_update_conflict",
+      "value": "Nama dan kode versi tidak cocok"
+    },
+    {
+      "name": "ui_update_current",
+      "value": "Sudah versi terbaru"
+    },
+    {
+      "name": "ui_update_hap_listed",
+      "value": "Paket HarmonyOS tercantum"
+    },
+    {
+      "name": "ui_update_installed",
+      "value": "Versi terpasang %s"
+    },
+    {
+      "name": "ui_update_invalid",
+      "value": "Informasi rilis tidak valid"
+    },
+    {
+      "name": "ui_update_local_newer",
+      "value": "Versi terpasang lebih baru"
+    },
+    {
+      "name": "ui_update_no_hap",
+      "value": "Tidak ada paket HarmonyOS yang tercantum"
+    },
+    {
+      "name": "ui_update_no_notes",
+      "value": "Tidak ada catatan untuk versi ini"
+    },
+    {
+      "name": "ui_update_no_release",
+      "value": "Tidak ada rilis publik di kanal ini"
+    },
+    {
+      "name": "ui_update_notes_error",
+      "value": "Tidak dapat membuka catatan rilis"
+    },
+    {
+      "name": "ui_update_preview",
+      "value": "Sertakan prarilis"
+    },
+    {
+      "name": "ui_update_project_releases",
+      "value": "Rilis proyek"
+    },
+    {
+      "name": "ui_update_rate_limit",
+      "value": "Permintaan GitHub dibatasi. Coba lagi nanti."
+    },
+    {
+      "name": "ui_update_recent_only",
+      "value": "Memeriksa 300 rilis terbaru"
+    },
+    {
+      "name": "ui_update_required_api",
+      "value": "API minimum %d"
+    },
+    {
+      "name": "ui_update_skipped",
+      "value": "Pembaharuan telah dilewati %s, saat masuk tidak akan otomatis muncul notifikasi pembaharuan versi, Anda tetap bisa memeriksa pembaharuan secara manual melalui pengaturan"
+    },
+    {
+      "name": "ui_update_stable",
+      "value": "Rilis stabil"
+    },
+    {
+      "name": "ui_update_unavailable",
+      "value": "Repositori rilis tidak tersedia"
+    },
+    {
+      "name": "ui_update_unknown",
+      "value": "Tidak diketahui"
+    },
+    {
+      "name": "ui_update_unskip",
+      "value": "Batalkan lewati versi ini"
+    },
+    {
+      "name": "ui_user_copy_cookie_action",
+      "value": "Salin Cookie"
+    },
+    {
+      "name": "ui_web_daily_note_attendance_reward_status_finished_non_reward",
+      "value": "Selesai"
+    },
+    {
+      "name": "ui_web_hoyolab_game_record_act_calendar_hard_challenge_locked",
+      "value": "Belum terbuka"
+    },
+    {
+      "name": "ui_weekday_friday",
+      "value": "Jum"
+    },
+    {
+      "name": "ui_weekday_monday",
+      "value": "Sen"
+    },
+    {
+      "name": "ui_weekday_saturday",
+      "value": "Sab"
+    },
+    {
+      "name": "ui_weekday_sunday",
+      "value": "Min"
+    },
+    {
+      "name": "ui_weekday_thursday",
+      "value": "Kam"
+    },
+    {
+      "name": "ui_weekday_tuesday",
+      "value": "Sel"
+    },
+    {
+      "name": "ui_weekday_wednesday",
+      "value": "Rab"
+    },
+    {
+      "name": "ui_wi_ki_avatar_ascension_materials_header",
+      "value": "Bahan Peningkatan"
+    },
+    {
+      "name": "ui_wi_ki_avatar_auto_suggest_box_place_holder",
+      "value": "Filter Karakter"
+    },
+    {
+      "name": "ui_wi_ki_avatar_name_card_header",
+      "value": "Name Card"
+    },
+    {
+      "name": "ui_wi_ki_avatar_special_food_title",
+      "value": "Masakan Spesial"
+    },
+    {
+      "name": "ui_wi_ki_weapon_auto_suggest_box_place_holder",
+      "value": "Saring Senjata"
+    },
+    {
+      "name": "ui_wish_show_empty_history",
+      "value": "Tampilkan Acara Keinginan Tanpa Riwayat Wish"
+    },
+    {
+      "name": "ui_wish_show_empty_overview",
+      "value": "Ikhtisar Wish Tanpa Catatan"
+    },
+    {
+      "name": "ui_wish_show_unobtained",
+      "value": "Item Permohonan yang Belum Diperoleh"
+    },
+    {
+      "name": "ui_gacha_pivot_overview",
+      "value": "Pratinjau"
+    },
+    {
+      "name": "ui_gacha_pivot_history",
+      "value": "Sejarah"
+    },
+    {
+      "name": "ui_gacha_pivot_avatar",
+      "value": "Role"
+    },
+    {
+      "name": "ui_gacha_pivot_weapon",
+      "value": "Senjata"
+    },
+    {
+      "name": "ui_gacha_pivot_countdown",
+      "value": "Hitung Mundur"
+    },
+    {
+      "name": "ui_gacha_pivot_statistics",
+      "value": "Statistik"
+    },
+    {
+      "name": "ui_gacha_full_refresh",
+      "value": "Segarkan Seutuhnya"
+    },
+    {
+      "name": "ui_gacha_full_refresh_selected",
+      "value": "✓ Segarkan Seutuhnya"
+    },
+    {
+      "name": "ui_gacha_card_statistics",
+      "value": "Statistik"
+    },
+    {
+      "name": "ui_gacha_card_ratio",
+      "value": "Proporsi"
+    },
+    {
+      "name": "ui_gacha_card_five_average",
+      "value": "Rata-rata 5 Stars wish #"
+    },
+    {
+      "name": "ui_gacha_card_four_average",
+      "value": "Rata-rata jumlah gacha 4 bintang"
+    },
+    {
+      "name": "ui_gacha_card_up_average",
+      "value": "Rata-rata Keberuntungan"
+    },
+    {
+      "name": "ui_gacha_card_to_five",
+      "value": "5 Stars Terakhir"
+    },
+    {
+      "name": "ui_gacha_card_to_four",
+      "value": "4 Stars Terakhir"
+    },
+    {
+      "name": "ui_gacha_card_to_three",
+      "value": "Sejak Tiga Bintang Terakhir"
+    },
+    {
+      "name": "ui_travelers_diary_month",
+      "value": "Bulan Ini"
+    },
+    {
+      "name": "ui_travelers_diary_primogems",
+      "value": "Primogem"
+    },
+    {
+      "name": "ui_travelers_diary_mora",
+      "value": "Mora"
+    }
+  ]
+}

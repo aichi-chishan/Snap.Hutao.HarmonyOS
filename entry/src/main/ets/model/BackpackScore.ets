@@ -1,31 +1,37 @@
-/** Scoring/presets adapted from Snap.Hutao.Remastered@3f0d1f3 (MIT, Copyright (c) DGP Studio).
- * Source identities and exact semantics: docs/BACKPACK_SCORING_2026-10-05.md.
- */
+/** Scoring and presets adapted from Snap.Hutao.Remastered (MIT, Copyright (c) DGP Studio). */
 import { ReliquaryAffixReference } from './ReliquaryAffixReference';
 
-/** Pure config values. This score is independent of a character's recommended-stat score. */
+/** Shared scoring configuration for backpack relics and character equipment. */
 export class BackpackScoreProfile {
   id: string = '';
-  name: string = '默认';
+  name: string = '';
   preset: number = 0;
   algorithm: number = 1;
   /** Crit, crit damage, ATK%, ER, EM, HP%, DEF%. */
   weights: number[] = [1, 1, 0.2, 0.2, 0.2, 0, 0];
 
-  static readonly PRESETS: string[] = ['默认', '攻击收益', '生命收益', '防御收益', '精通收益', '自定义'];
+  static readonly CUSTOM_PRESET: number = 5;
+  static readonly PRESETS: string[] = ['通用', '攻双暴', '生双暴', '防双暴', '精通流', '自定义'];
   static readonly LABELS: string[] = ['暴击率', '暴击伤害', '攻击力%', '元素充能效率', '元素精通', '生命值%', '防御力%'];
   static readonly PROPERTIES: number[] = [20, 22, 6, 23, 28, 3, 9];
 
   static create(preset: number): BackpackScoreProfile {
     const profile: BackpackScoreProfile = new BackpackScoreProfile();
     profile.preset = preset;
-    profile.name = BackpackScoreProfile.PRESETS[preset] ?? '自定义';
     if (preset >= 1 && preset <= 4) {
       profile.weights = [1, 1, 0, 0, 0, 0, 0];
       const slots: number[] = [2, 5, 6, 4];
       profile.weights[slots[preset - 1]] = 1;
     }
     return profile;
+  }
+
+  static displayName(profile: BackpackScoreProfile): string {
+    return profile.name.length > 0 ? profile.name : BackpackScoreProfile.PRESETS[profile.preset];
+  }
+
+  static isTransientDefault(profile: BackpackScoreProfile): boolean {
+    return profile.id.length === 0 && profile.name.length === 0 && profile.preset === 0;
   }
 
   static clone(source: BackpackScoreProfile): BackpackScoreProfile {
@@ -40,12 +46,24 @@ export class BackpackScoreProfile {
 
   static validate(profile: BackpackScoreProfile): void {
     if (profile === null || typeof profile !== 'object' || typeof profile.id !== 'string' ||
-      profile.id.length > 100 || typeof profile.name !== 'string' || profile.name.trim().length === 0 ||
-      profile.name.length > 80 || profile.algorithm !== 1 || !Number.isInteger(profile.preset) ||
-      profile.preset < 0 || profile.preset > 5 || !Array.isArray(profile.weights) || profile.weights.length !== 7 ||
+      profile.id.length > 100 || typeof profile.name !== 'string' || profile.name.length > 80 ||
+      profile.algorithm !== 1 || !Number.isInteger(profile.preset) || profile.preset < 0 ||
+      profile.preset > BackpackScoreProfile.CUSTOM_PRESET || !Array.isArray(profile.weights) || profile.weights.length !== 7 ||
       profile.weights.some((weight: number): boolean => typeof weight !== 'number' || !Number.isFinite(weight) || weight < 0 || weight > 1)) {
-      throw new Error('评分配置无效：名称须为 1–80 字，七项权重须为 0–1');
+      throw new Error('评分配置无效：名称最多 80 字，七项权重须为 0–1');
     }
+  }
+}
+
+export class CharacterScoreOption {
+  key: string;
+  label: string;
+  profile?: BackpackScoreProfile;
+
+  constructor(key: string, label: string, profile?: BackpackScoreProfile) {
+    this.key = key;
+    this.label = label;
+    this.profile = profile;
   }
 }
 
@@ -90,7 +108,7 @@ export class BackpackScoring {
       for (const row of ReliquaryAffixReference.rows) { BackpackScoring.affixes.set(row[0], row); }
     }
     const result: BackpackScoreResult = new BackpackScoreResult();
-    result.profileName = profile.name;
+    result.profileName = BackpackScoreProfile.displayName(profile);
     if (appendIds.length === 0) {
       result.reason = '未提供副词条记录';
       return result;

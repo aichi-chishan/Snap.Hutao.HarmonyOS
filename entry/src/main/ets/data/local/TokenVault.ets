@@ -5,9 +5,11 @@
  */
 import { asset } from '@kit.AssetStoreKit';
 import { util } from '@kit.ArkTS';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { Logger } from '../../common/Logger';
 
 const TAG: string = 'TokenVault';
+const ASSET_NOT_FOUND: number = 24000002;
 
 export class TokenVault {
   private static aliasOf(userId: number): Uint8Array {
@@ -33,7 +35,7 @@ export class TokenVault {
     attr.set(asset.Tag.CONFLICT_RESOLUTION, asset.ConflictResolution.OVERWRITE);
     try {
       await asset.add(attr);
-      Logger.info(TAG, `saved cookie for user ${userId}`);
+      Logger.info(TAG, 'saved cookie');
     } catch (e) {
       // 已存在则更新
       try {
@@ -42,9 +44,9 @@ export class TokenVault {
         const update: asset.AssetMap = new Map();
         update.set(asset.Tag.SECRET, TokenVault.strToBytes(cookie));
         await asset.update(query, update);
-        Logger.info(TAG, `updated cookie for user ${userId}`);
+        Logger.info(TAG, 'updated cookie');
       } catch (e2) {
-        Logger.warn(TAG, `save cookie fail: ${JSON.stringify(e2)}`);
+        Logger.warn(TAG, `save cookie failed code=${(e2 as BusinessError).code}`);
         throw new Error('凭据安全存储失败，未完成账号保存');
       }
     }
@@ -67,21 +69,26 @@ export class TokenVault {
       const bytes: Uint8Array = secret as Uint8Array;
       return TokenVault.bytesToStr(bytes);
     } catch (e) {
-      Logger.warn(TAG, `load cookie fail: ${JSON.stringify(e)}`);
-      if (strict) { throw new Error('凭据安全存储读取失败，已取消备份'); }
+      const code: number = (e as BusinessError).code;
+      if (code === ASSET_NOT_FOUND) { return ''; }
+      Logger.warn(TAG, `load cookie failed code=${code}`);
+      if (strict) { throw new Error('读取登录凭证失败，请稍后重试'); }
       return '';
     }
   }
 
-  /** 删除某账号的关键资产（退出登录/删除账号时） */
-  static async removeCookie(userId: number): Promise<void> {
+  /** 删除某账号的关键资产。 */
+  static async removeCookie(userId: number, strict: boolean = false): Promise<void> {
     const query: asset.AssetMap = new Map();
     query.set(asset.Tag.ALIAS, TokenVault.aliasOf(userId));
     try {
       await asset.remove(query);
-      Logger.info(TAG, `removed cookie for user ${userId}`);
+      Logger.info(TAG, 'removed cookie');
     } catch (e) {
-      Logger.warn(TAG, `remove cookie fail: ${JSON.stringify(e)}`);
+      const code: number = (e as BusinessError).code;
+      if (code === ASSET_NOT_FOUND) { return; }
+      Logger.warn(TAG, `remove cookie failed code=${code}`);
+      if (strict) { throw new Error('删除登录凭证失败，请稍后重试'); }
     }
   }
 }

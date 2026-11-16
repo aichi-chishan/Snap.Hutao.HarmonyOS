@@ -14,9 +14,16 @@ let revision = 0, transitionPending = false;
 let journal = '';
 let failInit = false;
 let registrationError = false, getCount = 0, postCount = 0, refreshCount = 0, uiCalls = 0;
-let infoResponse, signResponse, fetchHook, noteHook;
+let infoResponse, signResponse, fetchHook, noteHook, renewHook;
+let webhookUrl = '', allowNotifications = false;
 const budgetTimers = new Map();
+const dailySignTimers = new Map(), signGets = [];
+let dailySignTimerId = 0;
 const tasks = new Map(), starts = [], stops = [], appStorage = new Map(), users = new Map(), cache = new Map();
+const trackedByUser = new Map(), noteGets = [], webhookCalls = [], notificationCalls = [];
+const noteRequests = [], trackedNoteRecords = new Map(), thresholdWrites = [];
+let keepTrackedNoteRecords = false;
+const renewals = [];
 function resultSet(rows) {
   let index = -1;
   return { goToFirstRow() { index = 0; return rows.length > 0; }, goToNextRow() { return ++index < rows.length; },
@@ -35,9 +42,18 @@ const store = {
   },
 };
 const userService = { getCurrentUser: () => users.get(selected), sessionRevision: () => revision, isSessionTransitionPending: () => transitionPending,
-  completeTokenChainPublic() { uiCalls++; throw new Error('No background auth refresh'); } };
+  completeTokenChainPublic() { uiCalls++; throw new Error('No interactive credential refresh'); },
+  async refreshCookieTokenForced(user, active) {
+    renewals.push(user.id);
+    if (renewHook) await renewHook(user);
+    if (!await active()) return false;
+    user.cookieToken = 'renewed-fixture';
+    return true;
+  },
+};
 const repos = { UserRepo: {
   getCurrentUser: async () => users.get(selected), getUserById: async id => users.get(id),
+  getAllUsers: async () => [...users.values()],
   getSelectedUserId: async () => selected,
   getDefaultRole: async id => users.get(id)?.roles.find(role => role.gameUid === selectedUid),
 } };
@@ -45,6 +61,7 @@ const scheduler = {
   NetworkType: { NETWORK_TYPE_ANY: 0 },
   async obtainAllWorks() { return [...tasks.values()]; },
   startWork(work) { if (registrationError) throw new Error('OS rejected');
+    if (work.isRepeat && work.repeatCycleTime < 7200000) throw new Error('invalid repeat cycle');
     if (tasks.has(work.workId)) throw new Error('duplicate task');
     tasks.set(work.workId, work); starts.push(work); },
   stopWork(work, cancel) { stops.push({ work, cancel }); if (cancel) tasks.delete(work.workId); },
@@ -56,12 +73,17 @@ const mocks = new Map([
   ['common/Logger', { Logger: { info() {}, warn() {}, error() {} } }],
   ['data/db/RelationalStoreHelper', { RelationalStoreHelper: { init: async () => {} } }],
   ['data/prefs/PreferencesStore', { PreferencesStore: { init: async () => {}, getCurrentUid: () => selectedUid, getCurrentUserId: () => selected,
-    getAutoSignInEnabled: () => autoSign, getBackupJournal: () => journal, getRefreshIntervalMinutes: () => interval } }],
+    getAutoSignInEnabled: () => autoSign, getBackupJournal: () => journal, getRefreshIntervalMinutes: () => interval,
+    getTrackedUids: id => trackedByUser.get(id) ?? [], getString: (key, fallback) => key === 'dailynote.webhook_url' ? webhookUrl : fallback } }],
   ['data/repo/UserRepo', repos], ['service/UserService', { UserService: { getInstance: () => userService } }],
   ['data/network/HoyolabClient', { HoyolabClient: {
-    fetchSignInfo: async () => { getCount++; if (fetchHook) await fetchHook(); return infoResponse; },
+    fetchSignInfo: async uid => { getCount++; signGets.push(uid); if (fetchHook) await fetchHook(uid); return infoResponse; },
     signIn: async () => { postCount++; return signResponse; },
-    fetchDailyNote: async () => { refreshCount++; if (noteHook) await noteHook(); return infoResponse; },
+    fetchDailyNote: async (uid, region, cookie) => {
+      refreshCount++; noteGets.push(uid); noteRequests.push({ uid, cookie });
+      if (noteHook) await noteHook(uid, cookie);
+      return infoResponse;
+    },
   } }],
 ]);
 function load(relative) {
@@ -80,8 +102,16 @@ function load(relative) {
   const AppStorage = { get: key => appStorage.get(key), setOrCreate: (key, val) => appStorage.set(key, val) };
   vm.runInNewContext(`(function(require,module,exports){${output.outputText}\n})`, {
     Date: Clock, setTimeout: (callback, delay) => {
+      if (name === 'service/AutoSignInService') {
+        const id = ++dailySignTimerId;
+        dailySignTimers.set(id, { callback, at: now + delay });
+        return id;
+      }
       const timer = setTimeout(callback, delay); if (delay === 80000) budgetTimers.set(timer, callback); return timer;
-    }, clearTimeout: timer => { budgetTimers.delete(timer); clearTimeout(timer); }, AppStorage, canIUse: () => supported, console,
+    }, clearTimeout: timer => {
+      if (name === 'service/AutoSignInService') { dailySignTimers.delete(timer); return; }
+      budgetTimers.delete(timer); clearTimeout(timer);
+    }, AppStorage, Observed: value => value, canIUse: () => supported, console,
   })(requireMock, module, module.exports);
   return module.exports;
 }
@@ -99,14 +129,28 @@ users.set(1, account(1, selectedUid)); users.set(2, account(2, '100000002'));
 // Load the actual noninteractive DailyNote method; mock unrelated foreground-only imports.
 for (const [name, value] of [
   ['@kit.FormKit', { formProvider: {}, formBindingData: {}, formInfo: {} }],
-  ['data/repo/DailyNoteRepo', { DailyNoteRepo: { upsert: async (id, uid, note, guard) => {
-    if (await guard()) persisted.push({ id, uid, note });
-  } } }],
-  ['data/local/NotificationHelper', { NotificationHelper: {} }],
+  ['data/repo/DailyNoteRepo', { DailyNoteRepo: { get: async (id, uid) => trackedNoteRecords.get(`${id}:${uid}`),
+    upsert: async (id, uid, note, guard) => {
+      if (guard !== undefined && !await guard()) return;
+      persisted.push({ id, uid, note });
+      if (keepTrackedNoteRecords) trackedNoteRecords.set(`${id}:${uid}`, {
+        note, resinNotifyThreshold: 120, homeCoinNotifyThreshold: 1800, notifyFlags: 31,
+      });
+    },
+    updateThresholds: async (id, uid, resin, home, flags) => {
+      const record = trackedNoteRecords.get(`${id}:${uid}`);
+      Object.assign(record, { resinNotifyThreshold: resin, homeCoinNotifyThreshold: home, notifyFlags: flags });
+      thresholdWrites.push({ id, uid, resin, home });
+    },
+  } }],
+  ['data/local/NotificationHelper', { NotificationHelper: {
+    isEnabled: () => allowNotifications, publish: async (title, text, id) => { notificationCalls.push({ title, text, id }); },
+  } }],
   ['data/local/FormSnapshot', { FormSnapshot: {} }],
-  ['data/network/DailyNoteWebhookClient', { DailyNoteWebhookClient: { send() { uiCalls++; } } }],
+  ['data/network/DailyNoteWebhookClient', { DailyNoteWebhookClient: { send: async (...args) => { webhookCalls.push(args); } } }],
   ['data/network/RiskVerifier', { RiskVerifier: { tryResolveRisk() { uiCalls++; } } }],
-  ['service/DailyNoteReminderService', { DailyNoteReminderService: {} }],
+  ['service/DailyNoteReminderService', { DailyNoteReminderService: { sync: async () => {} } }],
+  ['service/LocalizedGameDataService', { LocalizedGameDataService: { current: () => 'zh-Hans', readJson: async () => [] } }],
   ['data/network/CardVerifyApi', { DAILY_NOTE_PATH: '' }],
 ]) mocks.set(name, value);
 const persisted = [], cards = [];
@@ -142,7 +186,7 @@ async function setup(kind = K.SIGN_IN) {
   assert.equal(Policy.day('cn_gf01', Date.UTC(2026, 9, 4, 16)), 'cn_gf01:2026-10-05');
   assert.equal(Policy.day('os_usa', Date.UTC(2026, 9, 5, 4, 59)), 'os_usa:2026-10-04');
   await setup(K.DAILY_NOTE);
-  assert.equal(work(K.DAILY_NOTE).repeatCycleTime, 1200000);
+  assert.equal(work(K.DAILY_NOTE).repeatCycleTime, 7200000);
   assert.equal(work(K.DAILY_NOTE).isPersisted, true);
   assert.deepEqual(Object.keys(work(K.DAILY_NOTE).parameters), ['epoch']);
   const initialStarts = starts.length;
@@ -298,7 +342,7 @@ async function setup(kind = K.SIGN_IN) {
   supported = true; await Service.invalidateAccount(1);
   assert.equal((await Service.getState(K.SIGN_IN)).enabled, false);
   assert.equal((await Service.getState(K.SIGN_IN)).uid, '', 'account invalidation clears stale binding identity');
-  assert.equal(uiCalls, 0, 'no background verification, auth exchange, permission or webhook');
+  assert.equal(uiCalls, 0, 'no background verification, interactive login or permission request');
 
   // Pending extension initialization cannot resurrect a task after onWorkStop.
   const Extension = load('background/HutaoWorkSchedulerExtensionAbility').default;
@@ -424,6 +468,218 @@ async function setup(kind = K.SIGN_IN) {
   const widgetSource = fs.readFileSync(path.join(root, 'widgets/DailyNoteFormExtensionAbility.ets'), 'utf8');
   assert.doesNotMatch(widgetSource, /restoreSession|completeTokenChain|refreshForCard|Logger|JSON.stringify\(want/);
 
+  // Foreground startup signs only the selected role. The daily timer handles all saved mainland roles.
+  await setup(K.SIGN_IN);
+  const signService = AutoSignInService.getInstance();
+  const selectedAccount = users.get(1);
+  const extraRole = UserGameRole.of('500000001', 'cn_qd01', '', 1);
+  selectedAccount.roles.push(extraRole);
+  const overseas = account(3, '600000001');
+  overseas.isOversea = true;
+  overseas.roles[0].region = 'os_usa';
+  assert.equal(Policy.owns(overseas, '600000001', 'os_usa'), false, 'legacy background bindings cannot send overseas requests');
+  users.set(3, overseas);
+  now = Date.UTC(2026, 9, 11, 15, 59);
+  infoResponse = response(0, { is_sign: false });
+  let start = signGets.length;
+  await signService.bootstrapAutoSignIn();
+  assert.deepEqual(signGets.slice(start), ['100000001']);
+  signService.setForeground(true);
+  const expectedMidnight = Date.UTC(2026, 9, 11, 16);
+  const deadline = [...dailySignTimers.values()][0].at;
+  assert.ok(deadline >= expectedMidnight && deadline < expectedMidnight + 60000);
+  signService.setForeground(false);
+  assert.equal(dailySignTimers.size, 0);
+  now = deadline;
+  signService.setForeground(true);
+  async function fireDailySignIn() {
+    const [[id, timer]] = dailySignTimers.entries();
+    dailySignTimers.delete(id);
+    now = timer.at;
+    timer.callback();
+    await tick();
+  }
+  start = signGets.length;
+  await fireDailySignIn();
+  assert.deepEqual(signGets.slice(start), ['100000001', '500000001', '100000002']);
+  assert.equal(selected, 1);
+  assert.equal(selectedUid, '100000001');
+  assert.equal((await Repo.operation(K.SIGN_IN, 2, '100000002', 'cn_gf01')).completedDay, 'cn_gf01:2026-10-12');
+
+  start = signGets.length;
+  const postsBeforeDisable = postCount;
+  fetchHook = async () => { autoSign = false; };
+  await fireDailySignIn();
+  assert.deepEqual(signGets.slice(start), ['100000001']);
+  assert.equal(postCount, postsBeforeDisable, 'disabling during status fetch cancels the claim and remaining roles');
+
+  start = signGets.length;
+  autoSign = true;
+  fetchHook = async () => { users.delete(1); revision++; };
+  await fireDailySignIn();
+  assert.deepEqual(signGets.slice(start), ['100000001']);
+  assert.equal(postCount, postsBeforeDisable, 'a removed account cannot continue an in-flight sweep');
+  signService.setForeground(false);
+  assert.equal(dailySignTimers.size, 0);
+  users.set(1, selectedAccount);
+
+  // Explicitly expanding the saved scope still registers one job per kind and retains the current selection.
+  await Service.reset();
+  autoSign = true; fetchHook = undefined;
+  trackedByUser.set(1, [selectedUid, extraRole.gameUid]);
+  trackedByUser.set(2, ['100000002']);
+  trackedByUser.set(3, ['600000001']);
+  const untrackedRole = UserGameRole.of('100000004', 'cn_gf01', '', 1);
+  users.get(2).roles.push(untrackedRole);
+  await Service.setEnabled(K.DAILY_NOTE, true, Service.captureBinding(true));
+  assert.equal((await Service.getState(K.DAILY_NOTE)).allAccounts(), true);
+  assert.equal(tasks.size, 1);
+  webhookUrl = 'https://fixture.example/note';
+  allowNotifications = true;
+  infoResponse = response(0, { current_resin: 190, max_resin: 200 });
+  const updatedCards = [];
+  DailyNoteService.getInstance().updateCardSnapshot = async (note, name, ownerId, uid) => { updatedCards.push(uid); };
+  let before = noteGets.length;
+  await Service.onWorkStart(work(K.DAILY_NOTE));
+  assert.deepEqual(noteGets.slice(before).sort(), ['100000001', '100000002', '500000001']);
+  assert.deepEqual(updatedCards, ['100000001'], 'another role never replaces the selected desktop card');
+  assert.deepEqual(webhookCalls.map(call => call[1]).sort(), ['100000001', '100000002', '500000001']);
+  assert.ok(webhookCalls.every(call => call[0] === webhookUrl && JSON.parse(call[2]).current_resin === 190));
+  assert.ok(notificationCalls.some(call => call.title.includes('UID 100000002')));
+  assert.match((await Service.getState(K.DAILY_NOTE)).message, /已处理 3 个/);
+
+  // Fencing a selection change requeues the same global scope with a new epoch.
+  const oldGlobalWork = work(K.DAILY_NOTE);
+  await Service.stopAndInvalidate();
+  selected = 2; selectedUid = '100000002'; revision++;
+  await Service.reconcile();
+  assert.notEqual(work(K.DAILY_NOTE).parameters.epoch, oldGlobalWork.parameters.epoch);
+  assert.equal((await Service.getState(K.DAILY_NOTE)).allAccounts(), true);
+  assert.equal(tasks.size, 1);
+  before = noteGets.length;
+  await Service.onWorkStart(oldGlobalWork);
+  assert.equal(noteGets.length, before, 'stale epoch cannot send new requests');
+
+  await Service.setEnabled(K.SIGN_IN, true, Service.captureBinding(true));
+  assert.equal(tasks.size, 2);
+  fetchHook = async uid => { infoResponse = uid === '100000002' ? response(1034) : response(0, { is_sign: false }); };
+  start = signGets.length;
+  await Service.onWorkStart(work(K.SIGN_IN));
+  assert.deepEqual(signGets.slice(start).sort(), ['100000001', '100000002', '100000004', '500000001']);
+  assert.equal((await Service.getState(K.SIGN_IN)).status, 'partial');
+  assert.equal(selected, 2);
+  assert.equal(selectedUid, '100000002');
+
+  now += 86400000;
+  let releaseAll;
+  fetchHook = async () => { await new Promise(resolve => { releaseAll = resolve; }); };
+  start = signGets.length;
+  const pendingAll = Service.onWorkStart(work(K.SIGN_IN));
+  while (!releaseAll) await tick();
+  await Service.setEnabled(K.SIGN_IN, false);
+  releaseAll();
+  await pendingAll;
+  assert.equal(signGets.length, start + 1, 'closing a running global task stops remaining roles');
+  assert.equal(tasks.size, 1);
+  fetchHook = undefined;
+
+  // With a saved token, expired credentials renew once and the retry checks the server state first.
+  await setup(K.SIGN_IN);
+  selectedAccount.stoken = 'fixture-stored-token';
+  infoResponse = response(-100);
+  renewHook = async () => { infoResponse = response(0, { is_sign: false }); };
+  let getsBeforeRenewal = getCount;
+  let postsBeforeRenewal = postCount;
+  await Service.onWorkStart(work(K.SIGN_IN));
+  assert.deepEqual(renewals, [1]);
+  assert.equal(getCount, getsBeforeRenewal + 2);
+  assert.equal(postCount, postsBeforeRenewal + 1);
+  assert.equal((await Service.getState(K.SIGN_IN)).status, 'success');
+
+  await setup(K.SIGN_IN);
+  signResponse = response(-100);
+  renewHook = async () => { infoResponse = response(0, { is_sign: true }); };
+  getsBeforeRenewal = getCount;
+  postsBeforeRenewal = postCount;
+  await Service.onWorkStart(work(K.SIGN_IN));
+  assert.equal(renewals.length, 2);
+  assert.equal(getCount, getsBeforeRenewal + 2);
+  assert.equal(postCount, postsBeforeRenewal + 1, 'a retry never posts again once the server reports success');
+  assert.equal((await Service.getState(K.SIGN_IN)).status, 'already_signed');
+
+  await setup(K.SIGN_IN);
+  infoResponse = response(-100);
+  let releaseRenewal;
+  renewHook = () => new Promise(resolve => { releaseRenewal = resolve; });
+  getsBeforeRenewal = getCount;
+  postsBeforeRenewal = postCount;
+  const pendingRenewal = Service.onWorkStart(work(K.SIGN_IN));
+  while (!releaseRenewal) await tick();
+  await Service.setEnabled(K.SIGN_IN, false);
+  releaseRenewal();
+  await pendingRenewal;
+  assert.equal(getCount, getsBeforeRenewal + 1);
+  assert.equal(postCount, postsBeforeRenewal);
+  selectedAccount.stoken = '';
+  renewHook = undefined;
+
+  const daily = DailyNoteService.getInstance();
+  DailyNoteService.delay = async () => {};
+  keepTrackedNoteRecords = true;
+  selected = 1;
+  selectedUid = '100000001';
+  users.get(1).ltoken = 'note-ltoken-1';
+  users.get(2).ltoken = 'note-ltoken-2';
+  users.get(2).roles.push(UserGameRole.of(selectedUid, 'cn_gf01', '另一账号的角色', 1));
+  trackedByUser.set(2, ['100000002', selectedUid]);
+  infoResponse = response(0, { current_resin: 75, max_resin: 200, max_home_coin: 2400 });
+  const initialTracked = await daily.trackedEntries();
+  assert.deepEqual(Array.from(initialTracked, row => `${row.userId}:${row.uid}`).sort(),
+    ['1:100000001', '1:500000001', '2:100000001', '2:100000002']);
+  assert.ok(initialTracked.every(row => row.record === undefined));
+  for (const entry of initialTracked) {
+    const role = users.get(entry.userId).roles.find(role => role.gameUid === entry.uid);
+    assert.deepEqual([entry.nickname, entry.region, entry.level], [role.nickname, role.region, role.level],
+      'tracked card metadata comes from its owning game role, including equal UIDs in different accounts');
+  }
+
+  noteHook = async () => { selected = 2; revision++; };
+  await daily.refreshTrackedEntry(1, selectedUid);
+  assert.equal(persisted.at(-1).id, 1, 'switching accounts mid-request retains the originating cache owner');
+  assert.match(noteRequests.at(-1).cookie, /ltoken=note-ltoken-1/);
+  assert.equal(trackedNoteRecords.has('2:100000001'), false);
+
+  noteHook = undefined;
+  const trackedStart = noteRequests.length;
+  const total = await daily.refreshTrackedList();
+  assert.equal(total.total, 4);
+  assert.equal(total.succeeded, 4);
+  assert.deepEqual(noteRequests.slice(trackedStart).map(request =>
+    `${request.uid}:${request.cookie.includes('note-ltoken-1') ? 1 : 2}`).sort(),
+    ['100000001:1', '100000001:2', '100000002:2', '500000001:1']);
+  assert.ok((await daily.trackedEntries()).every(row => row.record !== undefined));
+  assert.equal(selected, 2);
+  assert.equal(selectedUid, '100000001');
+
+  const { DailyNoteViewModel } = load('viewmodel/DailyNoteViewModel');
+  const noteView = new DailyNoteViewModel();
+  assert.equal(await noteView.openUidSettings(2, selectedUid), true);
+  assert.equal(noteView.settingsResinMax, 200);
+  assert.equal(noteView.settingsHomeMax, 2400);
+  selected = 1; revision++;
+  await Promise.all([noteView.setUidResinThreshold(0), noteView.setUidHomeThreshold(2400)]);
+  await noteView.setUidResinThreshold(201);
+  await noteView.setUidHomeThreshold(-1);
+  assert.equal(thresholdWrites.length, 2);
+  assert.deepEqual(thresholdWrites.at(-1), { id: 2, uid: '100000001', resin: 0, home: 2400 });
+  assert.equal(trackedNoteRecords.get('1:100000001').resinNotifyThreshold, 120);
+
+  const savedBeforeUntrack = persisted.length;
+  noteHook = async () => { trackedByUser.set(1, [extraRole.gameUid]); };
+  await assert.rejects(daily.refreshTrackedEntry(1, selectedUid), /已停止追踪/);
+  assert.equal(persisted.length, savedBeforeUntrack);
+  noteHook = undefined;
+
   // OS identifiers and parameters remain opaque; no service/module privileged background mode.
   for (const task of starts) {
     assert.equal(JSON.stringify(task).includes('100000001'), false);
@@ -431,5 +687,5 @@ async function setup(kind = K.SIGN_IN) {
   }
   const moduleText = fs.readFileSync(path.join(root, '../module.json5'), 'utf8');
   assert.match(moduleText, /"type": "workScheduler"/); assert.doesNotMatch(moduleText, /KEEP_BACKGROUND_RUNNING/);
-  console.log('background-tasks: PASS (real SQLite leases, duplicate jobs, server day, opt-in, bounded ownership, disable/reset, risk/auth/manual, registration failures and no interactive auth)');
+  console.log('background-tasks: PASS (scheduler, owned tracked refresh and per-role thresholds)');
 })().catch(error => { console.error(error); process.exitCode = 1; });

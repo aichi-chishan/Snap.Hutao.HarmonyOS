@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "Cancelar"
+    },
+    {
+      "name": "common_confirm",
+      "value": "Confirmar"
+    },
+    {
+      "name": "common_refresh",
+      "value": "Actualizar"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "Historial de gachapón"
+    },
+    {
+      "name": "page_title_home",
+      "value": "Inicio"
+    },
+    {
+      "name": "page_title_login",
+      "value": "Iniciar sesión"
+    },
+    {
+      "name": "page_title_note",
+      "value": "Nota diaria"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "Ajustes"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "Historial de gachapón"
+    },
+    {
+      "name": "tab_home",
+      "value": "Inicio"
+    },
+    {
+      "name": "tab_mine",
+      "value": "Perfil"
+    },
+    {
+      "name": "tab_note",
+      "value": "Nota diaria"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "Exportar"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "Importar"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "Guardar"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "Generate analysis"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "Account history charts and AI insights"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "Stop generation"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "Test connection"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "Comprobar actualizaciones"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "Datos"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "Horario"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "Sistema"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "Herramientas"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "Vuelve a abrir la aplicación para usar el idioma del sistema"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "Seguir al sistema"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "Abismo Espiral"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "Gestión de logros"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "Objetos del inventario"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "Conflagración estigia"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "Mis personajes"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "Plan de Desarrollo"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "Lanzador del juego"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "Diario del viajero"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Hutao Passport"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "Teatro Imaginario"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "Datos del personaje"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "Datos de monstruos"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "Datos de armas"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "Acerca de"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "Cuenta"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "Apariencia"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "Imagen de fondo"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "Fondo de video"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "Copia y restauración"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "Calendario"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "Inicio"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "Configuración de la zona de eventos del juego en la página principal"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "Tarjeta de inicio"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "Idioma"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "Material de fondo"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "Otros"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "Registrarse"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "Almacenamiento"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "Tema de color"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "Verificación CAPTCHA"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "Historial de gachapón"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "Migración de datos"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "Oscuro"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "Claro"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "La versión %s de Hutao ya está disponible"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "Notas de la versión"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "Omitir esta versión"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "Actualizar la aplicación"
+    }
+  ]
+}

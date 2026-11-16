@@ -1,0 +1,1244 @@
+{
+  "string": [
+    {
+      "name": "ui_about_restart",
+      "value": "表示言語を設定する"
+    },
+    {
+      "name": "ui_account_insights_copied_json",
+      "value": "個人識別情報を除いた統計をコピーしました。"
+    },
+    {
+      "name": "ui_account_insights_copy_json",
+      "value": "識別情報を除いた統計をコピー（JSON）"
+    },
+    {
+      "name": "ui_account_insights_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_account_insights_loading",
+      "value": "保存済みの履歴を読み込み中…"
+    },
+    {
+      "name": "ui_account_insights_missing_model",
+      "value": "モデルIDを入力してください。"
+    },
+    {
+      "name": "ui_account_insights_no_account",
+      "value": "ゲームアカウントとUIDを選択してください。"
+    },
+    {
+      "name": "ui_account_insights_no_records",
+      "value": "グラフ化できる保存済みの履歴がありません。"
+    },
+    {
+      "name": "ui_account_insights_open",
+      "value": "履歴グラフとAI分析"
+    },
+    {
+      "name": "ui_account_insights_unit_wish",
+      "value": "回"
+    },
+    {
+      "name": "ui_action_choose",
+      "value": "選択"
+    },
+    {
+      "name": "ui_action_clear",
+      "value": "消去"
+    },
+    {
+      "name": "ui_action_clear_cache",
+      "value": "キャッシュを消去"
+    },
+    {
+      "name": "ui_action_close",
+      "value": "閉じる"
+    },
+    {
+      "name": "ui_action_continue",
+      "value": "続行"
+    },
+    {
+      "name": "ui_action_disable",
+      "value": "無効にする"
+    },
+    {
+      "name": "ui_action_edit",
+      "value": "編集"
+    },
+    {
+      "name": "ui_action_enable",
+      "value": "有効にする"
+    },
+    {
+      "name": "ui_action_restore",
+      "value": "復元"
+    },
+    {
+      "name": "ui_agent_page_label_delete_conversation",
+      "value": "Delete conversation"
+    },
+    {
+      "name": "ui_agent_page_label_model_profile",
+      "value": "Model"
+    },
+    {
+      "name": "ui_agent_page_label_model_provider_profile",
+      "value": "Model Provider Profile"
+    },
+    {
+      "name": "ui_agent_page_label_placeholder",
+      "value": "Type a message..."
+    },
+    {
+      "name": "ui_ai_approval",
+      "value": "Tool approval required"
+    },
+    {
+      "name": "ui_ai_continue",
+      "value": "生成を続ける"
+    },
+    {
+      "name": "ui_ai_conversation_actions",
+      "value": "会話の操作"
+    },
+    {
+      "name": "ui_ai_copied_text",
+      "value": "クリップボードにコピーしました。"
+    },
+    {
+      "name": "ui_ai_copy_error",
+      "value": "クリップボードを開けませんでした"
+    },
+    {
+      "name": "ui_ai_copy_text",
+      "value": "Copy Text"
+    },
+    {
+      "name": "ui_ai_custom_api",
+      "value": "カスタム API"
+    },
+    {
+      "name": "ui_ai_device_generate",
+      "value": "端末内で分析"
+    },
+    {
+      "name": "ui_ai_endpoint_placeholder",
+      "value": "ベース URL（空欄で既定値）"
+    },
+    {
+      "name": "ui_ai_initial_request",
+      "value": "Analyze my account performance, wish results and future priorities using the historical statistics in this chat."
+    },
+    {
+      "name": "ui_ai_key_placeholder",
+      "value": "API キー（空欄で現在のキーを保持）"
+    },
+    {
+      "name": "ui_ai_mode",
+      "value": "AI 分析モード"
+    },
+    {
+      "name": "ui_ai_on_device",
+      "value": "端末内 AI"
+    },
+    {
+      "name": "ui_ai_privacy_body",
+      "value": "メッセージを送信すると、選択した AI 接続先に会話と識別情報を除いた履歴統計が送られます。アプリは UID、Cookie、元のアイテム ID、データベースファイルを添付しません。会話は端末に保存され、API キーはシステムで安全に保管されます。ツールの実行には承認が必要です。"
+    },
+    {
+      "name": "ui_ai_privacy_title",
+      "value": "外部AIを利用する前に"
+    },
+    {
+      "name": "ui_ai_reasoning_completed",
+      "value": "Thought"
+    },
+    {
+      "name": "ui_ai_reasoning_in_progress",
+      "value": "Thinking"
+    },
+    {
+      "name": "ui_ai_return",
+      "value": "会話に戻る"
+    },
+    {
+      "name": "ui_ai_select_conversation",
+      "value": "会話を選択"
+    },
+    {
+      "name": "ui_ai_workspace",
+      "value": "AI ワークスペース"
+    },
+    {
+      "name": "ui_announcement_redeem_code_label",
+      "value": "予告番組交換コード"
+    },
+    {
+      "name": "ui_avatar_property_score_algorithm",
+      "value": "聖遺物スコアアルゴリズム"
+    },
+    {
+      "name": "ui_backpack_category_reliquary",
+      "value": "聖遺物"
+    },
+    {
+      "name": "ui_backpack_category_weapon",
+      "value": "武器"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_name_header",
+      "value": "設定名"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_new_config",
+      "value": "新規設定"
+    },
+    {
+      "name": "ui_backpack_sort_count",
+      "value": "個数"
+    },
+    {
+      "name": "ui_backpack_sort_quality",
+      "value": "品質"
+    },
+    {
+      "name": "ui_base_value_slider_level",
+      "value": "レベル"
+    },
+    {
+      "name": "ui_bg_choose_folder",
+      "value": "フォルダを開く"
+    },
+    {
+      "name": "ui_bg_folder_picker_failed",
+      "value": "背景フォルダーを選択できませんでした"
+    },
+    {
+      "name": "ui_bg_folder_saved",
+      "value": "背景フォルダーを更新しました"
+    },
+    {
+      "name": "ui_bg_folder_temporary",
+      "value": "このフォルダーは現在のセッションでのみ利用できます"
+    },
+    {
+      "name": "ui_bg_none",
+      "value": "なし"
+    },
+    {
+      "name": "ui_card_calendar_all_materials_hint",
+      "value": "すべての秘境が挑戦できます"
+    },
+    {
+      "name": "ui_card_sign_in_auto_sign_in",
+      "value": "自動チェックイン"
+    },
+    {
+      "name": "ui_card_sign_in_claim_re_sign_in_action",
+      "value": "埋め合せ"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_allow",
+      "value": "Allow"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_deny",
+      "value": "Deny"
+    },
+    {
+      "name": "ui_clear_filters",
+      "value": "絞り込みを解除"
+    },
+    {
+      "name": "ui_code_copied",
+      "value": "交換コードがコピーされました"
+    },
+    {
+      "name": "ui_common_loading",
+      "value": "読み込み中…"
+    },
+    {
+      "name": "ui_content_dialog_complete_primary_button_text",
+      "value": "完了"
+    },
+    {
+      "name": "ui_cultivation_add_project_action",
+      "value": "新規"
+    },
+    {
+      "name": "ui_cultivation_material_list_world_level_title",
+      "value": "世界ランク"
+    },
+    {
+      "name": "ui_cultivation_navigate_action",
+      "value": "移動"
+    },
+    {
+      "name": "ui_daily_note_notification_setting",
+      "value": "通知設定"
+    },
+    {
+      "name": "ui_calendar_time_pending",
+      "value": "日時未定"
+    },
+    {
+      "name": "ui_daily_note_refresh",
+      "value": "すぐに更新"
+    },
+    {
+      "name": "ui_daily_note_setting_auto_refresh",
+      "value": "自動更新"
+    },
+    {
+      "name": "ui_desc_abyss",
+      "value": "今期と前期の記録"
+    },
+    {
+      "name": "ui_desc_account",
+      "value": "アカウントと連携キャラクターの管理"
+    },
+    {
+      "name": "ui_desc_achievement",
+      "value": "エクスポート / インポート / UIAF"
+    },
+    {
+      "name": "ui_desc_announcements",
+      "value": "更新とニュース"
+    },
+    {
+      "name": "ui_desc_backpack",
+      "value": "武器 / 聖遺物 / UIIF"
+    },
+    {
+      "name": "ui_desc_banner_history",
+      "value": "ピックアップのキャラクターと武器"
+    },
+    {
+      "name": "ui_desc_calendar",
+      "value": "イベント / 祈願 / ログイン"
+    },
+    {
+      "name": "ui_desc_challenge",
+      "value": "ソロ / マルチ / ベストタイム"
+    },
+    {
+      "name": "ui_desc_character",
+      "value": "ステータス情報 / 聖遺物"
+    },
+    {
+      "name": "ui_desc_cultivation",
+      "value": "素材リスト / 素材情報"
+    },
+    {
+      "name": "ui_desc_daily_note",
+      "value": "天然樹脂 / 探索派遣 / 通知"
+    },
+    {
+      "name": "ui_desc_launch",
+      "value": "起動ショートカット"
+    },
+    {
+      "name": "ui_desc_ledger",
+      "value": "原石とモラの月間記録"
+    },
+    {
+      "name": "ui_desc_passport",
+      "value": "パスポートの案内"
+    },
+    {
+      "name": "ui_desc_settings",
+      "value": "カラーテーマ / 更新 / 言語設定"
+    },
+    {
+      "name": "ui_desc_sign_in",
+      "value": "デイリーログイン報酬"
+    },
+    {
+      "name": "ui_desc_theater",
+      "value": "スター挑戦星章 / 待機キャスト"
+    },
+    {
+      "name": "ui_desc_wiki_avatar",
+      "value": "元素とスキル"
+    },
+    {
+      "name": "ui_desc_wiki_monster",
+      "value": "敵の元素と勢力"
+    },
+    {
+      "name": "ui_desc_wiki_weapon",
+      "value": "武器ステータスと攻撃力"
+    },
+    {
+      "name": "ui_desc_wish",
+      "value": "一覧 / 履歴"
+    },
+    {
+      "name": "ui_exception_close",
+      "value": "閉じる"
+    },
+    {
+      "name": "ui_filter",
+      "value": "絞り込み"
+    },
+    {
+      "name": "ui_filter_count",
+      "value": "絞り込み (%d)"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_down",
+      "value": "後半"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_up",
+      "value": "前半"
+    },
+    {
+      "name": "ui_gacha_log_orange_avatar_countdown",
+      "value": "星5キャラクター"
+    },
+    {
+      "name": "ui_gacha_log_orange_weapon_countdown",
+      "value": "星5武器"
+    },
+    {
+      "name": "ui_gacha_log_purple_avatar_countdown",
+      "value": "星4キャラクター"
+    },
+    {
+      "name": "ui_gacha_log_purple_weapon_countdown",
+      "value": "星4武器"
+    },
+    {
+      "name": "ui_gacha_log_switch_to_beyond_gacha_mode_header",
+      "value": "祈願"
+    },
+    {
+      "name": "ui_gacha_pool_avatar_event",
+      "value": "イベント"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_event",
+      "value": "イベント祈願"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_permanent",
+      "value": "奇遇エコー"
+    },
+    {
+      "name": "ui_gacha_pool_chronicled",
+      "value": "集録祈願"
+    },
+    {
+      "name": "ui_gacha_pool_novice",
+      "value": "初心者祈願"
+    },
+    {
+      "name": "ui_gacha_pool_permanent",
+      "value": "奔走世間"
+    },
+    {
+      "name": "ui_gacha_pool_weapon_event",
+      "value": "神鋳賦形"
+    },
+    {
+      "name": "ui_grid_view",
+      "value": "グリッド表示"
+    },
+    {
+      "name": "ui_history_charts",
+      "value": "履歴グラフ"
+    },
+    {
+      "name": "ui_home_greeting",
+      "value": "旅人、テイワットへようこそ！"
+    },
+    {
+      "name": "ui_home_greeting_count",
+      "value": "あなたは胡桃を %s 回起動しました"
+    },
+    {
+      "name": "ui_home_greeting_rare",
+      "value": "キミの言う通りだが、しかし「胡桃」は DGP Studio が自主開発したの..."
+    },
+    {
+      "name": "ui_home_greeting_text_default",
+      "value": "旅人、テイワットへようこそ！"
+    },
+    {
+      "name": "ui_home_no_codes",
+      "value": "利用できる交換コードはありません"
+    },
+    {
+      "name": "ui_home_no_events",
+      "value": "予定されているイベントはありません"
+    },
+    {
+      "name": "ui_home_recent",
+      "value": "開催中・開催予定のイベントと祈願"
+    },
+    {
+      "name": "ui_hutao_passport_verify_code_action",
+      "value": "認証コードを送信"
+    },
+    {
+      "name": "ui_info_bar_panel_contract_content",
+      "value": "折りたたむ"
+    },
+    {
+      "name": "ui_list_view",
+      "value": "リスト表示"
+    },
+    {
+      "name": "ui_material_frosted",
+      "value": "すりガラスと柔らかな影"
+    },
+    {
+      "name": "ui_material_system_glass",
+      "value": "システムガラスと没入型照明"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_elec",
+      "value": "雷"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_fire",
+      "value": "炎"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_grass",
+      "value": "草"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_ice",
+      "value": "氷"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_rock",
+      "value": "岩"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_water",
+      "value": "水"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_wind",
+      "value": "風"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_blue",
+      "value": "星3"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_green",
+      "value": "星2"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_orange",
+      "value": "星5"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_purple",
+      "value": "星4"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_red",
+      "value": "限定星5"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_white",
+      "value": "星1"
+    },
+    {
+      "name": "ui_model_intrinsic_role_combat_difficulty_level_lunar",
+      "value": "月諭モード"
+    },
+    {
+      "name": "ui_model_metadata_material_weapon_ascension_material",
+      "value": "武器強化素材"
+    },
+    {
+      "name": "ui_nav_announcements",
+      "value": "ゲームのお知らせ"
+    },
+    {
+      "name": "ui_nav_banner_history",
+      "value": "祈願履歴"
+    },
+    {
+      "name": "ui_navigation_collapse",
+      "value": "ナビゲーションを折りたたむ"
+    },
+    {
+      "name": "ui_navigation_expand",
+      "value": "ナビゲーションを展開"
+    },
+    {
+      "name": "ui_option_selected",
+      "value": "選択済み"
+    },
+    {
+      "name": "ui_option_unselected",
+      "value": "未選択"
+    },
+    {
+      "name": "ui_plugin_setting_back_button",
+      "value": "戻る"
+    },
+    {
+      "name": "ui_role_combat_avatar_trial_hint",
+      "value": "お試し"
+    },
+    {
+      "name": "ui_role_combat_shortest",
+      "value": "最も早い公演"
+    },
+    {
+      "name": "ui_role_combat_splendour_buffs_header",
+      "value": "シャイニングブレス"
+    },
+    {
+      "name": "ui_role_combat_support",
+      "value": "サポート"
+    },
+    {
+      "name": "ui_setting_apperance_first_day_of_week_header",
+      "value": "週の開始日"
+    },
+    {
+      "name": "ui_setting_background_image_custom_folder_header",
+      "value": "カスタム背景フォルダーを開く"
+    },
+    {
+      "name": "ui_setting_background_media_local_folder",
+      "value": "ローカルのランダムな動画"
+    },
+    {
+      "name": "ui_setting_background_media_official_launcher_video",
+      "value": "公式ランチャー背景"
+    },
+    {
+      "name": "ui_setting_background_video_is_looping_header",
+      "value": "ループ再生するかどうか"
+    },
+    {
+      "name": "ui_setting_background_video_is_muted_header",
+      "value": "ミュートして再生するかどうか"
+    },
+    {
+      "name": "ui_setting_control_material_default",
+      "value": "デフォルト"
+    },
+    {
+      "name": "ui_setting_create_desktop_shortcut_action",
+      "value": "新規作成"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_off",
+      "value": "非表示"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_on",
+      "value": "表示"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_action",
+      "value": "構成"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_header",
+      "value": "Geetest認証サービスの設定"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_description",
+      "value": "即時に有効になります。オフにすると表示されなくなります"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_header",
+      "value": "ゲームイベントカレンダー表示を有効にするかどうか"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_description",
+      "value": "デフォルトではオフです。進行中でないイベントの日付など一部の内容は正しく表示されません"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_header",
+      "value": "進行中でないゲーム内バージョンイベントを表示するかどうか"
+    },
+    {
+      "name": "ui_setting_home_card_description",
+      "value": "ホームのダッシュボードでカードを管理し、ドラッグして並べ替えます"
+    },
+    {
+      "name": "ui_setting_hutao_passport_logout_action",
+      "value": "ログアウト"
+    },
+    {
+      "name": "ui_setting_key_shortcut_virtual_key_code_action",
+      "value": "表示"
+    },
+    {
+      "name": "ui_settings_auto_sign_info",
+      "value": "起動時に現在の UID でログイン報酬を受け取り、実行中の日付変更時に端末内の中国サーバーキャラクターで受け取ります。"
+    },
+    {
+      "name": "ui_settings_backup_credentials",
+      "value": "バックアップにはログイン情報が含まれます。安全に保管してください。"
+    },
+    {
+      "name": "ui_settings_cache",
+      "value": "メディアとアイコンのキャッシュ"
+    },
+    {
+      "name": "ui_settings_cache_size",
+      "value": "キャッシュ使用量 %s"
+    },
+    {
+      "name": "ui_settings_cancel_update",
+      "value": "更新をキャンセル"
+    },
+    {
+      "name": "ui_settings_cancelling",
+      "value": "キャンセル中…"
+    },
+    {
+      "name": "ui_settings_choose_video",
+      "value": "動画を選択"
+    },
+    {
+      "name": "ui_settings_configure",
+      "value": "構成"
+    },
+    {
+      "name": "ui_settings_data_next_launch",
+      "value": "選択したゲームデータは次回起動時に適用されます。"
+    },
+    {
+      "name": "ui_settings_data_source",
+      "value": "データソース URL"
+    },
+    {
+      "name": "ui_settings_delete_wish",
+      "value": "すべての祈願データを削除"
+    },
+    {
+      "name": "ui_settings_delete_wish_archive",
+      "value": "祈願アーカイブを削除"
+    },
+    {
+      "name": "ui_settings_delete_wish_confirm",
+      "value": "すべての UID の祈願記録を削除しますか？この操作は取り消せません。"
+    },
+    {
+      "name": "ui_settings_download_verify",
+      "value": "ダウンロードして検証"
+    },
+    {
+      "name": "ui_settings_export_backup",
+      "value": "完全バックアップをエクスポート"
+    },
+    {
+      "name": "ui_settings_feedback",
+      "value": "フィードバックと診断"
+    },
+    {
+      "name": "ui_settings_game_data",
+      "value": "ゲームデータ更新"
+    },
+    {
+      "name": "ui_settings_geetest_help",
+      "value": "{0} は gt、{1} は challenge です。GET 応答には code: 0、challenge、validate が必要です。対話認証には空欄にします。"
+    },
+    {
+      "name": "ui_settings_help",
+      "value": "オフラインヘルプ"
+    },
+    {
+      "name": "ui_settings_immersive_material",
+      "value": "没入型マテリアル"
+    },
+    {
+      "name": "ui_settings_local_backup_success",
+      "value": "完了"
+    },
+    {
+      "name": "ui_settings_manifest_help",
+      "value": "マニフェスト URL を保存して更新を確認します。"
+    },
+    {
+      "name": "ui_settings_material_level",
+      "value": "没入型マテリアルの強度"
+    },
+    {
+      "name": "ui_settings_material_scope",
+      "value": "マテリアルの強度はすぐに反映されます。コンテンツ面にはすりガラス効果を使用し、対応コントロールにはシステムの没入効果を使用します。"
+    },
+    {
+      "name": "ui_settings_no_wallpaper",
+      "value": "壁紙が選択されていません"
+    },
+    {
+      "name": "ui_settings_no_wish_archives",
+      "value": "祈願アーカイブがありません。更新またはインポートで追加できます。"
+    },
+    {
+      "name": "ui_settings_normal_material",
+      "value": "標準マテリアル"
+    },
+    {
+      "name": "ui_settings_not_logged_in",
+      "value": "未ログイン"
+    },
+    {
+      "name": "ui_settings_page_description_add_model_provider_profile_to_edit",
+      "value": "Add a model provider profile first"
+    },
+    {
+      "name": "ui_settings_page_label_add_profile",
+      "value": "Add"
+    },
+    {
+      "name": "ui_settings_page_label_agent_maximum_iterations_per_request",
+      "value": "Maximum Tool Iterations Per Request"
+    },
+    {
+      "name": "ui_settings_page_label_agent_system_prompt",
+      "value": "System Prompt"
+    },
+    {
+      "name": "ui_settings_page_label_agent_user_name",
+      "value": "User Name"
+    },
+    {
+      "name": "ui_settings_page_label_clear_models",
+      "value": "Clear Models"
+    },
+    {
+      "name": "ui_settings_page_label_copy_profile",
+      "value": "Copy"
+    },
+    {
+      "name": "ui_settings_page_label_delete_model",
+      "value": "Delete Model"
+    },
+    {
+      "name": "ui_settings_page_label_delete_profile",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_settings_page_label_fetch_models",
+      "value": "Fetch"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_context_window_tokens",
+      "value": "Context Window Length"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_input_tokens",
+      "value": "Input Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_output_tokens",
+      "value": "Output Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_name",
+      "value": "Model Name"
+    },
+    {
+      "name": "ui_settings_page_label_model_omit_reasoning_effort_when_thinking_disabled",
+      "value": "Omit reasoning effort when Thinking is off"
+    },
+    {
+      "name": "ui_settings_page_label_model_provider_profiles",
+      "value": "Model Provider Profiles"
+    },
+    {
+      "name": "ui_settings_page_label_model_reasoning_effort",
+      "value": "Reasoning Effort"
+    },
+    {
+      "name": "ui_settings_page_label_model_temperature",
+      "value": "Temperature"
+    },
+    {
+      "name": "ui_settings_page_label_model_thinking_enabled",
+      "value": "Enable Thinking"
+    },
+    {
+      "name": "ui_settings_page_label_model_top_p",
+      "value": "Top P"
+    },
+    {
+      "name": "ui_settings_page_label_profile_model_id",
+      "value": "Model ID"
+    },
+    {
+      "name": "ui_settings_page_label_profile_name",
+      "value": "Profile Name"
+    },
+    {
+      "name": "ui_settings_page_label_profile_provider_type",
+      "value": "Provider Type"
+    },
+    {
+      "name": "ui_settings_page_label_selected_model",
+      "value": "Selected Model"
+    },
+    {
+      "name": "ui_settings_page_option_provider_default",
+      "value": "Provider default"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_extra_high",
+      "value": "Extra high"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_high",
+      "value": "High"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_low",
+      "value": "Low"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_medium",
+      "value": "Medium"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_none",
+      "value": "None"
+    },
+    {
+      "name": "ui_settings_previous_data",
+      "value": "前のゲームデータに戻す"
+    },
+    {
+      "name": "ui_settings_processing",
+      "value": "処理中…"
+    },
+    {
+      "name": "ui_settings_random_video",
+      "value": "読み込み時に取り込んだ動画をランダム再生します。"
+    },
+    {
+      "name": "ui_settings_reduce_motion",
+      "value": "視差効果を減らす"
+    },
+    {
+      "name": "ui_settings_reduced_motion_info",
+      "value": "ページ遷移と押下時のアニメーションを抑えます。"
+    },
+    {
+      "name": "ui_settings_reset_builtin",
+      "value": "内蔵ゲームデータを復元"
+    },
+    {
+      "name": "ui_settings_restore_backup",
+      "value": "バックアップから復元"
+    },
+    {
+      "name": "ui_settings_restore_confirm",
+      "value": "現在のデータをこのバックアップで上書きしますか？"
+    },
+    {
+      "name": "ui_settings_restore_scope",
+      "value": "アカウント、ゲーム記録、設定を復元します"
+    },
+    {
+      "name": "ui_settings_signed_in",
+      "value": "ゲームアカウントにログイン済み"
+    },
+    {
+      "name": "ui_settings_stop_download",
+      "value": "ダウンロードを中止し、検証の完了を待ちますか？"
+    },
+    {
+      "name": "ui_settings_verified_data",
+      "value": "信頼できる GitHub コミットからデータ一式を取得し検証します。"
+    },
+    {
+      "name": "ui_settings_video_fallback",
+      "value": "バックグラウンドでは一時停止します。動画がなければ壁紙を表示します。"
+    },
+    {
+      "name": "ui_settings_wallpaper_sources",
+      "value": "ローカル画像は5分ごとに切り替わります。日替わり壁紙は Snap Hutao から取得します。画像の権利は制作者に帰属します。"
+    },
+    {
+      "name": "ui_spiral_abyss_hutao_statistics",
+      "value": "今期の統計"
+    },
+    {
+      "name": "ui_spiral_abyss_upload_record_homa_not_login_primary_button_text",
+      "value": "今すぐログイン"
+    },
+    {
+      "name": "ui_travelers_diary_no_income_source_hint",
+      "value": "今月の原石収入の記録はありません"
+    },
+    {
+      "name": "ui_travelers_diary_today",
+      "value": "本日"
+    },
+    {
+      "name": "ui_update_cancel",
+      "value": "確認をキャンセル"
+    },
+    {
+      "name": "ui_update_cancelled",
+      "value": "キャンセル済み"
+    },
+    {
+      "name": "ui_update_channel",
+      "value": "配信チャネル"
+    },
+    {
+      "name": "ui_update_check_failed",
+      "value": "更新の確認中にエラーが発生しました"
+    },
+    {
+      "name": "ui_update_checking",
+      "value": "更新を確認中…"
+    },
+    {
+      "name": "ui_update_compare_unknown",
+      "value": "バージョン情報が不足しています"
+    },
+    {
+      "name": "ui_update_compatibility_unknown",
+      "value": "インストール互換性は不明です"
+    },
+    {
+      "name": "ui_update_conflict",
+      "value": "バージョン名とコードが一致しません"
+    },
+    {
+      "name": "ui_update_current",
+      "value": "現在のバージョンは最新です"
+    },
+    {
+      "name": "ui_update_hap_listed",
+      "value": "HarmonyOS パッケージあり"
+    },
+    {
+      "name": "ui_update_installed",
+      "value": "インストール済み %s"
+    },
+    {
+      "name": "ui_update_invalid",
+      "value": "リリース情報が無効です"
+    },
+    {
+      "name": "ui_update_local_newer",
+      "value": "インストール済みのバージョンが新しいです"
+    },
+    {
+      "name": "ui_update_no_hap",
+      "value": "HarmonyOS パッケージなし"
+    },
+    {
+      "name": "ui_update_no_notes",
+      "value": "このバージョンのリリースノートはありません"
+    },
+    {
+      "name": "ui_update_no_release",
+      "value": "このチャネルに公開版はありません"
+    },
+    {
+      "name": "ui_update_notes_error",
+      "value": "リリースノートを開けませんでした"
+    },
+    {
+      "name": "ui_update_preview",
+      "value": "プレリリースを含める"
+    },
+    {
+      "name": "ui_update_project_releases",
+      "value": "プロジェクトのリリース"
+    },
+    {
+      "name": "ui_update_rate_limit",
+      "value": "GitHub のリクエスト制限中です。後で再試行してください。"
+    },
+    {
+      "name": "ui_update_recent_only",
+      "value": "最新の 300 件のリリースを確認しました"
+    },
+    {
+      "name": "ui_update_required_api",
+      "value": "最小 API %d"
+    },
+    {
+      "name": "ui_update_skipped",
+      "value": "バージョン %s をスキップしました。起動時にこのバージョンは自動で通知されませんが、設定から手動で更新を確認できます"
+    },
+    {
+      "name": "ui_update_stable",
+      "value": "安定版"
+    },
+    {
+      "name": "ui_update_unavailable",
+      "value": "リリースリポジトリにアクセスできません"
+    },
+    {
+      "name": "ui_update_unknown",
+      "value": "不明"
+    },
+    {
+      "name": "ui_update_unskip",
+      "value": "このバージョンのスキップを解除"
+    },
+    {
+      "name": "ui_user_copy_cookie_action",
+      "value": "Cookieをコピーする"
+    },
+    {
+      "name": "ui_web_daily_note_attendance_reward_status_finished_non_reward",
+      "value": "完了しました。"
+    },
+    {
+      "name": "ui_web_hoyolab_game_record_act_calendar_hard_challenge_locked",
+      "value": "未解放"
+    },
+    {
+      "name": "ui_weekday_friday",
+      "value": "金"
+    },
+    {
+      "name": "ui_weekday_monday",
+      "value": "月"
+    },
+    {
+      "name": "ui_weekday_saturday",
+      "value": "土"
+    },
+    {
+      "name": "ui_weekday_sunday",
+      "value": "日"
+    },
+    {
+      "name": "ui_weekday_thursday",
+      "value": "木"
+    },
+    {
+      "name": "ui_weekday_tuesday",
+      "value": "火"
+    },
+    {
+      "name": "ui_weekday_wednesday",
+      "value": "水"
+    },
+    {
+      "name": "ui_wi_ki_avatar_ascension_materials_header",
+      "value": "育成素材"
+    },
+    {
+      "name": "ui_wi_ki_avatar_auto_suggest_box_place_holder",
+      "value": "キャラクターフィルター"
+    },
+    {
+      "name": "ui_wi_ki_avatar_name_card_header",
+      "value": "名刺"
+    },
+    {
+      "name": "ui_wi_ki_avatar_special_food_title",
+      "value": "オリジナル料理"
+    },
+    {
+      "name": "ui_wi_ki_weapon_auto_suggest_box_place_holder",
+      "value": "武器フィルター"
+    },
+    {
+      "name": "ui_wish_show_empty_history",
+      "value": "無記録の過去の祈願"
+    },
+    {
+      "name": "ui_wish_show_empty_overview",
+      "value": "無記録の過去の祈願"
+    },
+    {
+      "name": "ui_wish_show_unobtained",
+      "value": "未抽選の祈願アイテム"
+    },
+    {
+      "name": "ui_gacha_pivot_overview",
+      "value": "一覧"
+    },
+    {
+      "name": "ui_gacha_pivot_history",
+      "value": "履歴"
+    },
+    {
+      "name": "ui_gacha_pivot_avatar",
+      "value": "キャラクター"
+    },
+    {
+      "name": "ui_gacha_pivot_weapon",
+      "value": "武器"
+    },
+    {
+      "name": "ui_gacha_pivot_countdown",
+      "value": "タイマー"
+    },
+    {
+      "name": "ui_gacha_pivot_statistics",
+      "value": "グローバル祈願統計"
+    },
+    {
+      "name": "ui_gacha_full_refresh",
+      "value": "完全更新"
+    },
+    {
+      "name": "ui_gacha_full_refresh_selected",
+      "value": "✓ 完全更新"
+    },
+    {
+      "name": "ui_gacha_card_statistics",
+      "value": "統計"
+    },
+    {
+      "name": "ui_gacha_card_ratio",
+      "value": "割合"
+    },
+    {
+      "name": "ui_gacha_card_five_average",
+      "value": "星5獲得平均数"
+    },
+    {
+      "name": "ui_gacha_card_four_average",
+      "value": "星4獲得平均数"
+    },
+    {
+      "name": "ui_gacha_card_up_average",
+      "value": "UP 獲得平均数"
+    },
+    {
+      "name": "ui_gacha_card_to_five",
+      "value": "前回の星5から"
+    },
+    {
+      "name": "ui_gacha_card_to_four",
+      "value": "前回の星4から"
+    },
+    {
+      "name": "ui_gacha_card_to_three",
+      "value": "前回の星3から"
+    },
+    {
+      "name": "ui_travelers_diary_month",
+      "value": "今月"
+    },
+    {
+      "name": "ui_travelers_diary_primogems",
+      "value": "原石"
+    },
+    {
+      "name": "ui_travelers_diary_mora",
+      "value": "モラ"
+    }
+  ]
+}

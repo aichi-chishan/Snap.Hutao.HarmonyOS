@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "ui_startup_failed_title", "value": "Démarrage impossible" },
+    { "name": "ui_startup_failed_body", "value": "Le démarrage n’a pas pu être terminé. Veuillez réessayer. Une nouvelle tentative n’effacera pas vos données existantes." }
+  ]
+}

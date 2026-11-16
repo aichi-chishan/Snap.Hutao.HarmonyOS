@@ -1,5 +1,5 @@
 import { CultivationDraft } from '../model/CultivationDraft';
-import { CultivationService } from '../service/CultivationService';
+import { CultivationProgressUpdate, CultivationService } from '../service/CultivationService';
 import { CultivationPreparedEntry, CultivationSaveReport } from '../data/repo/CultivationRepo';
 import { UserService } from '../service/UserService';
 /**
@@ -9,20 +9,26 @@ import { UserService } from '../service/UserService';
  */
 import { CharacterListItem } from '../model/CharacterData';
 import { OfflineCultivationService } from '../service/OfflineCultivationService';
-import { WikiMetaService, WikiAvatarMeta } from '../service/WikiMetaService';
+import { GachaEventMeta, MetaMaterial, WikiMetaService, WikiAvatarMeta, WikiWeaponMeta } from '../service/WikiMetaService';
 import { CharacterService } from '../service/CharacterService';
-import { CalculateService, CalAvatarDelta, CalSkillDelta, CalWeaponDelta } from '../service/CalculateService';
-import { CalBatchResult, CalItem } from '../model/Calculate';
+import { CalculateService, CalculateInventoryCatalog, CalAvatarDelta } from '../service/CalculateService';
+import { CalBatchResult } from '../model/Calculate';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
-import { CultivationRepo, CultivateProject, CultivateEntry } from '../data/repo/CultivationRepo';
+import { CultivationRepo, CultivateProject, CultivateEntry, CultivateEntryItem } from '../data/repo/CultivationRepo';
 import { ResinStatisticsService, ResinStatisticsResult, ResinDropDistribution } from '../service/ResinStatisticsService';
 import { InventoryRepo } from '../data/repo/InventoryRepo';
 import { InventoryService } from '../service/InventoryService';
+import { BackpackService } from '../service/BackpackService';
+import { BackpackArchive } from '../model/BackpackData';
 import { Logger } from '../common/Logger';
+import { GameCalendarRules } from '../service/GameCalendarRules';
+import { InventoryMaterialReference } from '../model/InventoryMaterialReference';
+import { CultivationFilterKind, CultivationFilterToken } from '../model/CultivationFilterToken';
 
 const TAG: string = 'CultivationViewModel';
 /** 树脂统计世界等级偏好键（对齐 Windows SettingKeys.ResinStatisticsSelectedDropDistribution） */
 const KEY_RESIN_WORLD_LEVEL: string = 'cultivation_resin_world_level';
+const KEY_CURRENT_PROJECT: string = 'cultivation.current_project_id';
 
 /** 养成候选角色 */
 export class CultivateTarget {
@@ -51,8 +57,13 @@ export class CultivateTarget {
 export class InventoryMaterialView {
   itemId: number = 0;
   name: string = '';
+  icon: string = '';
+  planned: number = 0;
   required: number = 0;
   current: number = 0;
+  shortfall: number = 0;
+  known: boolean = false;
+  availableToday: boolean = false;
 }
 
 @Observed
@@ -73,8 +84,16 @@ export class CultivationViewModel {
   planEntries: CultivateEntry[] = [];
   /** 计划写操作进行中（防连点） */
   planBusy: boolean = false;
+  planLoading: boolean = false;
+  planMessage: string = '';
+  materialLabelVersion: number = 0;
   inventoryRows: InventoryMaterialView[] = [];
-  private computedDeltas: CalAvatarDelta[] = [];
+  private entryRequest: number = 0;
+  private projectListRequest: number = 0;
+  private bannerEvents: GachaEventMeta[] = [];
+  private avatarMetadata: Map<number, WikiAvatarMeta> = new Map<number, WikiAvatarMeta>();
+  private weaponMetadata: Map<number, WikiWeaponMeta> = new Map<number, WikiWeaponMeta>();
+  private materialNames: Map<number, string> = new Map<number, string>();
   private prepared: CultivationPreparedEntry[] = [];
   private revision: number = 0;
   private loadedUid: string = '';
@@ -124,6 +143,7 @@ export class CultivationViewModel {
           target.weaponId = detail.weapon.id; target.weaponLevel = detail.weapon.level;
           list.push(target);
         }
+        this.applyTargetNames(list, await WikiMetaService.getAvatars());
       }
       if (revision !== this.revision || account !== (UserService.getInstance().getCurrentUser()?.id ?? 0)) { return; }
       const saved: string = PreferencesStore.getString(`cultivation.selection.${uid || 'offline'}`, '');
@@ -143,6 +163,21 @@ export class CultivationViewModel {
       if (uid.length === 0) { this.message = '离线计划可正常使用；当前进度可手动编辑，登录后可重新同步'; }
     } catch (e) { if (revision === this.revision) { this.message = (e as Error).message; } }
     finally { if (revision === this.revision) { this.loading = false; this.loaded = true; } }
+  }
+
+  private applyTargetNames(targets: CultivateTarget[], avatars: WikiAvatarMeta[]): void {
+    const names: Map<number, string> = new Map<number, string>();
+    for (const avatar of avatars) { names.set(avatar.id, avatar.name); }
+    for (const target of targets) { target.name = names.get(target.avatarId) ?? target.name; }
+  }
+
+  async refreshDisplay(): Promise<void> {
+    const revision: number = this.revision;
+    const avatars: WikiAvatarMeta[] = await WikiMetaService.getAvatars();
+    if (revision !== this.revision) { return; }
+    this.applyTargetNames(this.targets, avatars);
+    this.targets = this.targets.slice();
+    await this.loadPlan();
   }
 
   toggle(index: number): void {
@@ -256,202 +291,277 @@ export class CultivationViewModel {
 
   // ================= 持久化计划 =================
 
-  /** 加载计划：项目列表（无项目时自动建默认项目）+ 当前项目条目 */
   async loadPlan(): Promise<void> {
+    if (this.planBusy) { return; }
+    const request: number = ++this.projectListRequest;
     try {
-      let projects: CultivateProject[] = await CultivationRepo.getProjects();
-      if (projects.length === 0) {
-        await CultivationRepo.createProject('默认计划');
-        projects = await CultivationRepo.getProjects();
-      }
+      const projects: CultivateProject[] = await CultivationRepo.getProjects();
+      if (request !== this.projectListRequest || this.planBusy) { return; }
       this.projects = projects;
-      let current: number = this.currentProjectId || PreferencesStore.getNumber('cultivation.current_project_id', 0);
-      if (current <= 0 || !CultivationViewModel.containsProject(projects, current)) {
-        current = projects[0].id;
-      }
-      this.currentProjectId = current;
-      PreferencesStore.setNumber('cultivation.current_project_id', current);
+      const preferred: number = this.currentProjectId || PreferencesStore.getNumber(KEY_CURRENT_PROJECT, 0);
+      const current: number = projects.some((project: CultivateProject): boolean => project.id === preferred)
+        ? preferred : (projects[0]?.id ?? 0);
+      this.setActiveProject(current);
       await this.reloadEntries();
-    } catch (e) {
-      this.message = `读取计划失败：${(e as Error).message}`;
-      Logger.warn(TAG, this.message);
-    }
+    } catch (e) { this.planMessage = `读取计划失败：${(e as Error).message}`; }
   }
 
-  private static containsProject(projects: CultivateProject[], id: number): boolean {
-    for (const p of projects) {
-      if (p.id === id) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /** 重读当前项目条目（并联动刷新树脂统计） */
-  async reloadEntries(): Promise<void> {
-    if (this.currentProjectId <= 0) {
+  private setActiveProject(id: number): void {
+    if (this.currentProjectId !== id) {
+      this.currentProjectId = id;
       this.planEntries = [];
+      this.inventoryRows = [];
+      this.materialNames = new Map<number, string>();
       this.resinStats = undefined;
-      return;
+      this.planMessage = '';
     }
+    if (PreferencesStore.getNumber(KEY_CURRENT_PROJECT, 0) !== id) {
+      PreferencesStore.setNumber(KEY_CURRENT_PROJECT, id);
+      const version: number = AppStorage.get<number>('calendarSettingsVersion') ?? 0;
+      AppStorage.setOrCreate<number>('calendarSettingsVersion', version + 1);
+    }
+  }
+
+  currentProjectOffset(): number {
+    const current: CultivateProject | undefined = this.projects.find((project: CultivateProject): boolean => project.id === this.currentProjectId);
+    return current?.serverTimeZoneOffset ?? GameCalendarRules.DEFAULT_OFFSET_HOURS;
+  }
+
+  isTodayItem(itemId: number): boolean {
+    const offset: number = this.currentProjectOffset();
+    const now: number = Date.now();
+    const weekday: number = new Date(now + (offset - 4) * 3600000).getUTCDay();
+    return ResinStatisticsService.isItemOfToday(itemId, weekday)
+      || (ResinStatisticsService.dayPairOf(itemId) !== 0 && GameCalendarRules.allMaterialsOpen(now, this.bannerEvents, offset));
+  }
+
+  async reloadEntries(): Promise<void> {
+    const request: number = ++this.entryRequest;
     const projectId: number = this.currentProjectId;
-    const entries: CultivateEntry[] = await CultivationRepo.getEntries(projectId);
-    if (projectId !== this.currentProjectId) { return; }
-    this.planEntries = entries;
-    await this.reloadInventory();
-    await this.refreshResinStats();
-  }
-
-  /** 树脂统计：聚合当前项目未完成材料 → 折算树脂/脆弱树脂/天数（对齐 Windows ResinStatistics） */
-  async refreshResinStats(): Promise<void> {
+    this.planLoading = projectId > 0;
+    if (projectId <= 0) { return; }
     try {
+      const entries: CultivateEntry[] = await CultivationRepo.getEntries(projectId);
+      const counts: Map<number, number> = await InventoryRepo.getInventory(projectId);
       const dist: ResinDropDistribution = ResinStatisticsService.distributionOf(this.resinWorldLevel);
-      const inventory: Map<number, number> = await InventoryRepo.getInventory(this.currentProjectId);
-      this.resinStats = await ResinStatisticsService.compute(this.planEntries, dist, inventory);
-    } catch (e) {
-      Logger.warn(TAG, `resin stats fail ${(e as Error).message}`);
-      this.resinStats = undefined;
-    }
-  }
+      const stats: ResinStatisticsResult = await ResinStatisticsService.compute(entries, dist, counts);
+      const materials: Map<number, MetaMaterial> = await WikiMetaService.getMaterials();
+      const catalog: Map<number, MetaMaterial> = await BackpackService.cultivationMaterialMetadata()
+        .catch((): Map<number, MetaMaterial> => new Map<number, MetaMaterial>());
+      const avatars: WikiAvatarMeta[] = await WikiMetaService.getAvatars();
+      const weapons: WikiWeaponMeta[] = await WikiMetaService.getWeapons();
+      const events: GachaEventMeta[] = await WikiMetaService.getGachaEvents().catch((): GachaEventMeta[] => []);
+      if (request !== this.entryRequest || projectId !== this.currentProjectId) { return; }
 
-  async reloadInventory(): Promise<void> {
-    const counts: Map<number, number> = await InventoryRepo.getInventory(this.currentProjectId);
-    const rows: Map<number, InventoryMaterialView> = new Map<number, InventoryMaterialView>();
-    const materials = await WikiMetaService.getMaterials();
-    for (const entry of this.planEntries) {
-      for (const item of entry.items) {
-        let row: InventoryMaterialView | undefined = rows.get(item.itemId);
-        if (row === undefined) {
-          row = new InventoryMaterialView();
-          row.itemId = item.itemId;
-          row.name = item.name;
-          rows.set(item.itemId, row);
-        }
-        if (!item.finished) {
-          row.required += item.count;
-        }
-      }
-    }
-    for (const id of counts.keys()) {
-      let row: InventoryMaterialView | undefined = rows.get(id);
-      if (row === undefined) {
-        row = new InventoryMaterialView();
+      this.bannerEvents = events;
+      this.avatarMetadata = new Map<number, WikiAvatarMeta>();
+      this.weaponMetadata = new Map<number, WikiWeaponMeta>();
+      for (const avatar of avatars) { this.avatarMetadata.set(avatar.id, avatar); }
+      for (const weapon of weapons) { this.weaponMetadata.set(weapon.id, weapon); }
+      const rows: Map<number, InventoryMaterialView> = new Map<number, InventoryMaterialView>();
+      const ids: Set<number> = new Set<number>(InventoryMaterialReference.itemIds());
+      for (const id of counts.keys()) { ids.add(id); }
+      for (const id of ids) {
+        const row: InventoryMaterialView = new InventoryMaterialView();
+        const meta: MetaMaterial | undefined = materials.get(id) ?? catalog.get(id);
         row.itemId = id;
-        row.name = materials.get(id)?.n ?? `材料 ${id}`;
+        row.name = meta?.n ?? `材料 ${id}`;
+        row.icon = meta?.i ?? '';
         rows.set(id, row);
       }
-    }
-    for (const row of rows.values()) {
-      row.current = counts.get(row.itemId) ?? 0;
-    }
-    this.inventoryRows = Array.from(rows.values());
+      for (const entry of entries) {
+        for (const item of entry.items) {
+          let row: InventoryMaterialView | undefined = rows.get(item.itemId);
+          if (row === undefined) {
+            row = new InventoryMaterialView();
+            row.itemId = item.itemId; row.name = item.name; row.icon = item.icon;
+            rows.set(item.itemId, row);
+          }
+          row.planned += item.count;
+          if (!item.finished) { row.required += item.count; }
+        }
+      }
+      for (const row of rows.values()) {
+        row.known = counts.has(row.itemId);
+        row.current = counts.get(row.itemId) ?? 0;
+        row.shortfall = stats.materialShortfalls.get(row.itemId) ?? 0;
+        row.availableToday = this.isTodayItem(row.itemId);
+      }
+      const names: Map<number, string> = new Map<number, string>();
+      for (const row of rows.values()) { names.set(row.itemId, row.name); }
+      this.materialNames = names;
+      this.planEntries = entries;
+      this.inventoryRows = Array.from(rows.values());
+      this.resinStats = stats;
+      this.materialLabelVersion = AppStorage.get<number>('helpLocaleVersion') ?? 0;
+    } finally { if (request === this.entryRequest) { this.planLoading = false; } }
   }
 
-  async setInventoryCount(itemId: number, count: number): Promise<void> {
-    try {
-      await InventoryRepo.setCount(this.currentProjectId, itemId, count);
-      await this.reloadInventory();
-      await this.refreshResinStats();
-      this.message = '已更新库存';
-    } catch (e) {
-      this.message = (e as Error).message;
-    }
+  entryName(entry: CultivateEntry): string {
+    return this.avatarMetadata.get(entry.avatarId)?.name ?? this.weaponMetadata.get(entry.avatarId)?.name ?? entry.name;
   }
 
-  async importInventoryText(text: string): Promise<void> {
-    try {
-      await InventoryService.importInventory(this.currentProjectId, text);
-      await this.reloadInventory();
-      await this.refreshResinStats();
-      this.message = '已合并导入库存';
-    } catch (e) {
-      this.message = (e as Error).message;
-    }
+  materialName(item: CultivateEntryItem): string { return this.materialNames.get(item.itemId) ?? item.name; }
+
+  private static filterValues(tokens: CultivationFilterToken[], kind: CultivationFilterKind): string[] {
+    const options: string[] = CultivationFilterToken.options(kind);
+    return tokens.filter((token: CultivationFilterToken): boolean => token.kind === kind &&
+      (kind === CultivationFilterKind.Name ? token.value.length > 0 : options.includes(token.value)))
+      .map((token: CultivationFilterToken): string => token.value);
   }
 
-  async syncInventory(): Promise<void> {
-    if (this.planBusy) { return; }
-    const projectId: number = this.currentProjectId;
-    const revision: number = this.revision;
-    const accountId: number = UserService.getInstance().getCurrentUser()?.id ?? 0;
-    const uid: string = this.loadedUid;
-    this.planBusy = true;
-    try {
-      const drafts: CultivationDraft[] = this.planEntries.filter((entry: CultivateEntry): boolean => entry.inputJson.length > 0)
-        .map((entry: CultivateEntry): CultivationDraft => CultivationDraft.decode(entry.inputJson));
-      const deltas: CalAvatarDelta[] = CultivationService.calculatorInputs(drafts, uid);
-      const result: CalBatchResult = await CalculateService.getInstance().batchCompute(deltas);
-      if (revision !== this.revision || projectId !== this.currentProjectId
-        || accountId !== (UserService.getInstance().getCurrentUser()?.id ?? 0)) { return; }
-      const count: number = await InventoryService.syncFromCalculator(projectId, result);
-      if (projectId !== this.currentProjectId) { return; }
-      await this.reloadInventory(); await this.refreshResinStats();
-      this.message = `已同步 ${count} 种计划材料库存（并非完整背包）`;
-    } catch (e) { if (revision === this.revision) { this.message = (e as Error).message; } }
-    finally { this.planBusy = false; }
-  }
+  filteredEntries(tokens: CultivationFilterToken[]): CultivateEntry[] {
+    if (tokens.length === 0) { return this.planEntries; }
+    const names: string[] = CultivationViewModel.filterValues(tokens, CultivationFilterKind.Name)
+      .map((name: string): string => name.toLocaleLowerCase());
+    const targets: string[] = CultivationViewModel.filterValues(tokens, CultivationFilterKind.Target);
+    const qualities: string[] = CultivationViewModel.filterValues(tokens, CultivationFilterKind.Quality);
+    const weaponTypes: string[] = CultivationViewModel.filterValues(tokens, CultivationFilterKind.Weapon);
+    const elements: string[] = CultivationViewModel.filterValues(tokens, CultivationFilterKind.Element);
+    const hasSharedGroup: boolean = names.length > 0 || targets.length > 0 || qualities.length > 0 || weaponTypes.length > 0;
 
-  /** 切换树脂统计世界等级（持久化 + 重算，对齐 Windows SelectedDropDistribution） */
-  async setResinWorldLevel(worldLevel: number): Promise<void> {
-    if (worldLevel === this.resinWorldLevel) {
-      return;
-    }
-    this.resinWorldLevel = worldLevel;
-    try {
-      PreferencesStore.setNumber(KEY_RESIN_WORLD_LEVEL, worldLevel);
-    } catch (e) {
-      Logger.warn(TAG, `save resin world level fail ${(e as Error).message}`);
-    }
-    await this.refreshResinStats();
-  }
-
-  selectProject(id: number): void {
-    if (this.currentProjectId === id) {
-      return;
-    }
-    this.currentProjectId = id;
-    PreferencesStore.setNumber('cultivation.current_project_id', id);
-    this.reloadEntries().catch(() => {
+    return this.planEntries.filter((entry: CultivateEntry): boolean => {
+      const isAvatar: boolean = entry.avatarId >= 10000000;
+      // Windows ignores the element group for a weapon, but an entry must match at least one applicable group.
+      const checkElement: boolean = isAvatar && elements.length > 0;
+      if (!hasSharedGroup && !checkElement) { return false; }
+      const avatar: WikiAvatarMeta | undefined = this.avatarMetadata.get(entry.avatarId);
+      const weapon: WikiWeaponMeta | undefined = this.weaponMetadata.get(entry.avatarId);
+      if (targets.length > 0 && !targets.includes(isAvatar ? '1' : '2')) { return false; }
+      if (qualities.length > 0 && !qualities.includes(String(avatar?.quality ?? weapon?.rankLevel ?? 0))) { return false; }
+      if (weaponTypes.length > 0 && !weaponTypes.includes(String(avatar?.weapon ?? weapon?.weaponType ?? 0))) { return false; }
+      if (checkElement && !elements.includes(avatar?.vision ?? '')) { return false; }
+      if (names.length === 0) { return true; }
+      const savedName: string = entry.name.toLocaleLowerCase();
+      const displayName: string = this.entryName(entry).toLocaleLowerCase();
+      const id: string = String(entry.avatarId);
+      return names.some((name: string): boolean => savedName.includes(name) || displayName.includes(name) || id.includes(name));
     });
   }
 
-  async createProject(name: string): Promise<void> {
-    if (this.planBusy || name.trim().length === 0) {
-      return;
-    }
+  private async writePlan(projectId: number, action: () => Promise<string>): Promise<string> {
+    if (projectId <= 0 || projectId !== this.currentProjectId) { return '养成项目已切换，请重新操作'; }
+    if (this.planBusy || this.planLoading) { return '养成项目正在更新，请稍候'; }
     this.planBusy = true;
     try {
-      const p: CultivateProject = await CultivationRepo.createProject(name.trim());
-      this.projects = await CultivationRepo.getProjects();
-      this.currentProjectId = p.id;
-      PreferencesStore.setNumber('cultivation.current_project_id', p.id);
-      await this.reloadEntries();
-    } finally {
-      this.planBusy = false;
+      this.planMessage = await action();
+      try { await this.reloadEntries(); }
+      catch (e) { this.planMessage += `，列表刷新失败：${(e as Error).message}`; }
+    } catch (e) { this.planMessage = (e as Error).message; }
+    finally { this.planBusy = false; }
+    return this.planMessage;
+  }
+
+  async setInventoryCount(projectId: number, itemId: number, count: number): Promise<string> {
+    return this.writePlan(projectId, async (): Promise<string> => {
+      await InventoryRepo.setCount(projectId, itemId, count);
+      return '已更新库存';
+    });
+  }
+
+  getBackpackArchives(): Promise<BackpackArchive[]> { return BackpackService.getArchives(); }
+
+  async clearInventory(projectId: number): Promise<string> {
+    return this.writePlan(projectId, async (): Promise<string> => {
+      await InventoryService.clear(projectId);
+      return '已清空项目库存';
+    });
+  }
+
+  async syncBackpackInventory(archiveId: number, projectId: number): Promise<string> {
+    return this.writePlan(projectId, async (): Promise<string> => {
+      const count: number = await BackpackService.syncMaterials(archiveId, projectId, true);
+      return `已从背包同步 ${count} 种养成材料`;
+    });
+  }
+
+  async importInventoryText(projectId: number, text: string): Promise<string> {
+    return this.writePlan(projectId, async (): Promise<string> => {
+      const count: number = await InventoryService.importInventory(projectId, text);
+      return `已合并导入 ${count} 种材料`;
+    });
+  }
+
+  private requireAccount(revision: number, accountId: number): void {
+    if (revision !== this.revision || accountId !== (UserService.getInstance().getCurrentUser()?.id ?? 0)) {
+      throw new Error('账号已切换，请重新同步');
     }
   }
 
-  /** 删除当前项目（项目数 >1 时允许；删后切到第一个项目） */
-  async deleteCurrentProject(): Promise<void> {
-    if (this.planBusy || this.projects.length <= 1 || this.currentProjectId <= 0) {
-      return;
-    }
-    this.planBusy = true;
-    try {
-      await CultivationRepo.deleteProject(this.currentProjectId);
-      this.projects = await CultivationRepo.getProjects();
-      this.currentProjectId = this.projects.length > 0 ? this.projects[0].id : 0;
-      PreferencesStore.setNumber('cultivation.current_project_id', this.currentProjectId);
-      await this.reloadEntries();
-    } finally {
-      this.planBusy = false;
-    }
+  async syncInventory(): Promise<string> {
+    const uid: string = this.loadedUid;
+    const projectId: number = this.currentProjectId;
+    const revision: number = this.revision;
+    const accountId: number = UserService.getInstance().getCurrentUser()?.id ?? 0;
+    return this.writePlan(projectId, async (): Promise<string> => {
+      if (uid.length === 0) { throw new Error('请先登录并选择游戏 UID'); }
+      const calculator: CalculateService = CalculateService.getInstance();
+      const catalog: CalculateInventoryCatalog = await calculator.fetchInventoryCatalog();
+      const deltas: CalAvatarDelta[] = await CultivationService.inventoryCalculatorInputs(catalog);
+      this.requireAccount(revision, accountId);
+      const result: CalBatchResult = await calculator.batchCompute(deltas, uid);
+      this.requireAccount(revision, accountId);
+      const count: number = await InventoryService.syncFromCalculator(projectId, result);
+      return `已同步计算器返回的 ${count} 种材料库存`;
+    });
   }
 
-  /**
-   * 把本次计算结果保存到当前项目（每个已选角色一条目；items[i] 与 deltas 顺序一一对应）。
-   * 结果不存在/未选角色时置 message 提示。
-   */
+  async syncProjectProgress(): Promise<string> {
+    const projectId: number = this.currentProjectId;
+    const revision: number = this.revision;
+    const accountId: number = UserService.getInstance().getCurrentUser()?.id ?? 0;
+    return this.writePlan(projectId, async (): Promise<string> => {
+      const update: CultivationProgressUpdate = await CultivationService.prepareProjectProgress(this.loadedUid, this.planEntries);
+      this.requireAccount(revision, accountId);
+      if (update.entries.length === 0) { return `没有可更新的角色进度，跳过 ${update.skipped} 项`; }
+      const report: CultivationSaveReport = await CultivationService.save(projectId, update.entries, true);
+      return `已同步 ${report.updated} 个角色目标的当前进度，跳过 ${update.skipped} 项`;
+    });
+  }
+
+  async setResinWorldLevel(worldLevel: number): Promise<void> {
+    if (worldLevel === this.resinWorldLevel || this.planBusy) { return; }
+    this.resinWorldLevel = worldLevel;
+    try {
+      PreferencesStore.setNumber(KEY_RESIN_WORLD_LEVEL, worldLevel);
+      await this.reloadEntries();
+    } catch (e) { this.planMessage = `刷新树脂统计失败：${(e as Error).message}`; }
+  }
+
+  async selectProject(id: number): Promise<void> {
+    if (this.planBusy || id === this.currentProjectId) { return; }
+    try {
+      this.setActiveProject(id);
+      await this.reloadEntries();
+    } catch (e) { this.planMessage = `读取计划失败：${(e as Error).message}`; }
+  }
+
+  async createProject(name: string, serverTimeZoneOffset: number): Promise<boolean> {
+    if (this.planBusy || this.planLoading) { return false; }
+    this.planBusy = true;
+    this.projectListRequest++;
+    try {
+      const project: CultivateProject = await CultivationRepo.createProject(name, serverTimeZoneOffset);
+      this.projects = this.projects.concat([project]);
+      this.setActiveProject(project.id);
+      this.planMessage = `已创建「${project.name}」`;
+      try { await this.reloadEntries(); } catch (e) { this.planMessage += `，列表刷新失败：${(e as Error).message}`; }
+      return true;
+    } catch (e) { this.planMessage = (e as Error).message; return false; }
+    finally { this.planBusy = false; }
+  }
+
+  async deleteCurrentProject(projectId: number): Promise<string> {
+    return this.writePlan(projectId, async (): Promise<string> => {
+      this.projectListRequest++;
+      await CultivationRepo.deleteProject(projectId);
+      this.projects = this.projects.filter((project: CultivateProject): boolean => project.id !== projectId);
+      this.setActiveProject(this.projects[0]?.id ?? 0);
+      return '已删除养成项目';
+    });
+  }
+
+  /** The legacy calculation path still commits the exact reviewed inputs. */
   async saveResultToPlan(): Promise<boolean> {
     if (this.planBusy || this.prepared.length === 0) { this.message = '请先计算并确认目标'; return false; }
     this.planBusy = true;
@@ -465,32 +575,19 @@ export class CultivationViewModel {
     finally { this.planBusy = false; }
   }
 
-  /** 删除单个培养条目 */
-  async removeEntry(entry: CultivateEntry): Promise<void> {
-    if (this.planBusy) {
-      return;
-    }
-    this.planBusy = true;
-    try {
+  async removeEntry(entry: CultivateEntry): Promise<string> {
+    return this.writePlan(entry.projectId, async (): Promise<string> => {
       await CultivationRepo.removeEntry(entry.id);
-      await this.reloadEntries();
-    } finally {
-      this.planBusy = false;
-    }
+      return '已移除培养目标';
+    });
   }
 
-  /** 切换材料勾选状态 */
-  async togglePlanItem(entry: CultivateEntry, itemId: number): Promise<void> {
-    try {
-      for (const it of entry.items) {
-        if (it.id === itemId) {
-          await CultivationRepo.toggleItem(itemId, !it.finished);
-          break;
-        }
-      }
-      await this.reloadEntries();
-    } catch (e) {
-      Logger.warn(TAG, `toggleItem fail ${(e as Error).message}`);
-    }
+  async togglePlanItem(entry: CultivateEntry, itemId: number): Promise<string> {
+    return this.writePlan(entry.projectId, async (): Promise<string> => {
+      const item: CultivateEntryItem | undefined = entry.items.find((value: CultivateEntryItem): boolean => value.id === itemId);
+      if (item === undefined) { throw new Error('材料条目已变更'); }
+      await CultivationRepo.toggleItem(itemId, !item.finished);
+      return item.finished ? '已取消备齐标记' : '已标记为备齐';
+    });
   }
 }

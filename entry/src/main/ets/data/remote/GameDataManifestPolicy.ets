@@ -1,3 +1,7 @@
+import { GameTextCatalog } from '../../model/GameTextCatalog';
+import { AvatarWikiSkillCatalog } from '../../model/AvatarWikiSkill';
+import { LocalePolicy } from '../../model/LocalePolicy';
+
 /** Trusted immutable Git tree + bounded cohort contract. Local receipts are not publisher signatures. */
 export class ItemType {
   static readonly Text: string = 'text';
@@ -30,14 +34,19 @@ export class GameDataManifestPolicy {
   static readonly RAW_ROOT: string = 'https://raw.githubusercontent.com/aichi-chishan/snap-hutao-data/';
   static readonly MAX_MANIFEST_BYTES: number = 4 * 1024 * 1024;
   static readonly MAX_FILE_BYTES: number = 8 * 1024 * 1024;
+  private static readonly MAX_LANGUAGE_BYTES: number = 16 * 1024 * 1024;
   static readonly MAX_SNAPSHOT_BYTES: number = 512 * 1024 * 1024;
   static readonly METADATA: string[] = ['Achievement.json', 'AchievementGoal.json', 'AvatarCurve.json',
     'AvatarPromote.json', 'avatar_meta.json', 'GachaEvent.json', 'material_meta.json', 'MonsterCurve.json',
     'monster_meta.json', 'NameCard.json', 'RoleCombatSchedule.json', 'TowerFloor.json', 'TowerLevel.json',
     'TowerSchedule.json', 'WeaponCurve.json', 'WeaponPromote.json', 'weapon_meta.json'];
+  private static readonly OPTIONAL_METADATA: string[] = ['avatar_associations.json', 'BeyondItem.json',
+    'Chapter.json', 'HardChallengeSchedule.json', 'ProfilePicture.json', 'monster_drop_meta.json'];
+  static readonly MAX_CACHED_METADATA_FILES: number = GameDataManifestPolicy.METADATA.length + GameDataManifestPolicy.OPTIONAL_METADATA.length;
 
+  static stripBom(text: string): string { return text.charCodeAt(0) === 0xFEFF ? text.substring(1) : text; }
   static parseJson(text: string): Object {
-    return JSON.parse(text.charCodeAt(0) === 0xFEFF ? text.substring(1) : text) as Object;
+    return JSON.parse(GameDataManifestPolicy.stripBom(text)) as Object;
   }
   static object(value: Object | undefined, label: string): Record<string, Object> {
     if (value === undefined || value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -73,10 +82,38 @@ export class GameDataManifestPolicy {
     const source: GameDataSource = new GameDataSource(); source.ref = parts[0]; return source;
   }
 
+  static isLanguagePath(path: string): boolean {
+    const name: string = path.substring('metadata/'.length);
+    return (path.startsWith('metadata/locale_') && GameTextCatalog.isFile(name)) ||
+      GameDataManifestPolicy.isAvatarSkillPath(path);
+  }
+
+  private static isAvatarSkillPath(path: string): boolean {
+    return path.startsWith('metadata/avatar_skill_') && LocalePolicy.locales().some((locale: string): boolean =>
+      path === `metadata/${AvatarWikiSkillCatalog.fileName(locale)}`);
+  }
+
+  static maxFileBytes(path: string): number {
+    return path.startsWith('metadata/locale_') && GameDataManifestPolicy.isLanguagePath(path)
+      ? GameDataManifestPolicy.MAX_LANGUAGE_BYTES : GameDataManifestPolicy.MAX_FILE_BYTES;
+  }
+
+  static validateLanguageText(path: string, text: string): void {
+    if (GameDataManifestPolicy.isAvatarSkillPath(path)) {
+      const locale: string = path.substring('metadata/avatar_skill_'.length, path.length - '.json'.length);
+      AvatarWikiSkillCatalog.parse(GameDataManifestPolicy.stripBom(text), locale);
+      return;
+    }
+    const locale: string = path.substring('metadata/locale_'.length, path.length - '.json'.length);
+    GameTextCatalog.parse(GameDataManifestPolicy.stripBom(text), locale);
+  }
+
   static validatePath(path: string, type: string): void {
     if (/[\s\\%?#]/.test(path)) { throw new Error('文件路径包含不安全字符'); }
     if (type === ItemType.Text) {
-      if (!GameDataManifestPolicy.METADATA.some((name: string): boolean => path === `metadata/${name}`)) {
+      const name: string = path.startsWith('metadata/') ? path.substring('metadata/'.length) : '';
+      if (!GameDataManifestPolicy.METADATA.includes(name) && !GameDataManifestPolicy.OPTIONAL_METADATA.includes(name) &&
+        !GameDataManifestPolicy.isLanguagePath(path)) {
         throw new Error('清单包含未知元数据路径');
       }
     } else if (type === ItemType.Icon) {
@@ -134,7 +171,7 @@ export class GameDataManifestPolicy {
       if (hasSize || hasHash || result.schema === 2) {
         item.size = GameDataManifestPolicy.integer(entry['size'], 'size', 1);
         item.sha256 = GameDataManifestPolicy.text(entry['sha256'], 'sha256');
-        if (item.size > GameDataManifestPolicy.MAX_FILE_BYTES || item.sha256.length !== 64 || !/^[0-9a-f]{64}$/.test(item.sha256)) {
+        if (item.size > GameDataManifestPolicy.maxFileBytes(item.path) || item.sha256.length !== 64 || !/^[0-9a-f]{64}$/.test(item.sha256)) {
           throw new Error('文件大小或摘要无效');
         }
         bytes += item.size;
@@ -147,7 +184,7 @@ export class GameDataManifestPolicy {
   }
 
   static validateBytes(item: GameDataItem, bytes: Uint8Array, digest: string): void {
-    if (bytes.length < 1 || bytes.length > GameDataManifestPolicy.MAX_FILE_BYTES ||
+    if (bytes.length < 1 || bytes.length > GameDataManifestPolicy.maxFileBytes(item.path) ||
       (item.size > 0 && item.size !== bytes.length) || (item.sha256 !== '' && item.sha256 !== digest)) {
       throw new Error('文件长度或 SHA256 校验失败');
     }
@@ -237,6 +274,28 @@ export class GameDataManifestPolicy {
 
   /** Cohort structural/reference checks; not a complete formal model of game rules. */
   static validateModels(metadata: Map<string, string>): void {
+    if (metadata.has('metadata/Chapter.json')) {
+      const chapters: Record<string, Object>[] = GameDataManifestPolicy.rows(metadata, 'Chapter.json');
+      GameDataManifestPolicy.ids(chapters, 'Id');
+      for (const chapter of chapters) {
+        const questType: number = GameDataManifestPolicy.integer(chapter['QuestType'], 'chapter QuestType');
+        if (questType === 0) {
+          GameDataManifestPolicy.text(chapter['Number'], 'chapter Number');
+          GameDataManifestPolicy.text(chapter['Title'], 'chapter Title');
+        }
+      }
+    }
+    if (metadata.has('metadata/ProfilePicture.json')) {
+      const pictures: Record<string, Object>[] = GameDataManifestPolicy.rows(metadata, 'ProfilePicture.json');
+      GameDataManifestPolicy.ids(pictures, 'Id');
+      for (const picture of pictures) {
+        // The upstream custom-avatar placeholder deliberately has an empty Icon and unlock type 5.
+        GameDataManifestPolicy.text(picture['Icon'], 'profile picture icon');
+        GameDataManifestPolicy.text(picture['Name'], 'profile picture name');
+        GameDataManifestPolicy.integer(picture['UnlockType'], 'profile picture unlock type');
+        GameDataManifestPolicy.integer(picture['UnlockParameter'], 'profile picture unlock parameter');
+      }
+    }
     const materialText: string | undefined = metadata.get('metadata/material_meta.json');
     if (materialText === undefined) { throw new Error('缺少材料数据'); }
     const materials: Record<string, Object> = GameDataManifestPolicy.object(GameDataManifestPolicy.parseJson(materialText), 'materials');

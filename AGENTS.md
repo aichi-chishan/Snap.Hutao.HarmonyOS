@@ -18,7 +18,7 @@
 - **DevEco Code**：npm `@deveco/deveco-code`（bin `deveco`，当前 0.2.4），自带技能安装与 MCP 服务，更新走 `npm i -g @deveco/deveco-code@latest`。
 - **MCP（配置在 `.agents/mcp.json`，顶层 `mcpServers`）**：`deveco-mcp`（`devecocli serve mcp`，ArkTS/C++ 静态语法检查；codegenie 无独立 CLI 入口，为 DevEco Studio 内部插件，不配置）。
 - 编译：`hvigorw.bat assembleHap --mode module -p module=entry@default -p product=default --no-daemon`（DevEco Studio 自带，也可 `devecocli build`）。
-- 主机回归：`npm ci --prefix ci --ignore-scripts` 后 `TYPESCRIPT_PATH=<工作区>/ci/node_modules/typescript node tests/run.cjs`（当前 39/39）。
+- 主机回归：`npm ci --prefix ci --ignore-scripts` 后 `TYPESCRIPT_PATH=<工作区>/ci/node_modules/typescript node tests/run.cjs`。完整命令与验证范围见 [测试说明](docs/TESTING.md)。
 - 模拟器：API 26 镜像待下载后 `devecocli emulator start "<镜像名>"`；hdc 在 SDK 的 `openharmony/toolchains/hdc.exe`（`E:\APP\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe`）。
 - **hdc 注意（Git Bash）**：`file send` 源路径必须是**裸文件名**（cd 到 outputs 目录后 `hdc file send entry-default-signed.hap /data/local/tmp/entry.hap`），相对子路径会被追加成目录树；`bm install -p /data/...` 要加 `MSYS_NO_PATHCONV=1` 防止路径被转换。
 
@@ -38,6 +38,7 @@
 - `snap-hutao-data/`：独立数据仓库（素材/元数据 pipeline，git 独立）。两者均被 .gitignore 忽略。
 - `example/`：Windows 版界面截图（参考 UI）。
 - `PORTING_PLAN.md`：Windows 版对齐方案（导航/主页/背景图/图标/图鉴）；`docs/GAP_2026-10-24.md`：2.0.2 差距清单与实施批次。
+- 当前工程地图、模块入口和接手步骤分别见 [架构](docs/ARCHITECTURE.md)、[数据与交换](docs/DATA_AND_INTERCHANGE.md) 和 [维护交接](docs/HANDOFF.md)。带日期的审计记录应对照当前实现使用。
 
 ## 架构与分层规则（重要）
 - 严格分层：`pages → viewmodel → service → data(repo/network) → model`。页面不直接发网络请求、不直接拼 SQL；Service 不写 UI。

@@ -1,3 +1,4 @@
+import { AppButtonModifier, UiSurface } from '../common/UiSurface';
 /**
  * SignInPage.ets（@Entry）
  * 每日签到：奖励日历/列表、本月累计天数、签到按钮、已签状态、未登录引导。
@@ -6,22 +7,42 @@ import { router, ShowDialogSuccessResponse } from '@kit.ArkUI';
 import { SignInViewModel } from '../viewmodel/SignInViewModel';
 import { SignInInfo, SignInReward } from '../model/SignInInfo';
 import { SignInResult, ResignInfo } from '../service/SignInService';
+import { ChallengeSession } from '../service/ChallengeSession';
 import { PageHeader } from '../components/PageHeader';
 import { NavIcon } from '../components/NavIcon';
 
 @Entry
 @Component
 export struct SignInPage {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
   @StorageLink('currentUid') currentUid: string = '';
   @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
+  @StorageProp('officialSignInVersion') @Watch('onOfficialSignInClosed') officialSignInVersion: number = 0;
   @State vm: SignInViewModel = new SignInViewModel();
   @State todayDay: number = new Date().getDate();
 
   aboutToAppear(): void {
     this.loadData();
+  }
+
+  onOfficialSignInClosed(): void { this.loadData(); }
+
+  private async signOnce(): Promise<void> {
+    const owner: ChallengeSession | undefined = ChallengeSession.capture(this.currentUid);
+    if (owner === undefined) { return; }
+    const result: SignInResult = await this.vm.doSign(owner.uid);
+    if (!owner.isCurrent()) { return; }
+    const reward: string = result.rewardText.length > 0 ? `，${result.rewardText}` : '';
+    this.toast(result.alreadySigned ? '今日已签到' : `${result.message}${reward}`);
+    if (result.shouldOpenOfficialPage()) {
+      router.pushUrl({ url: 'pages/OfficialWebPage', params: { kind: 'sign-in' } }).catch(() => {
+        this.toast('无法打开米游社官方签到');
+      });
+    }
   }
 
   loadData(): void {
@@ -32,7 +53,7 @@ export struct SignInPage {
   }
 
   toast(msg: string): void {
-    this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1800 });
+    this.getUIContext().getPromptAction().showToast({ systemMaterial: UiSurface.dialogMaterial(), message: msg, duration: 1800 });
   }
 
   @Builder
@@ -48,9 +69,8 @@ export struct SignInPage {
         .fontSize(17)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary'))
-      Button('去登录')
-        .backgroundColor($r('app.color.app_primary'))
-        .fontColor($r('app.color.on_accent'))
+      Button('去登录', { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true)).constraintSize({ minHeight: 44 })
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -125,14 +145,10 @@ export struct SignInPage {
         .fontSize(11)
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
-      Button(this.vm.resigning ? '补签中...' : '补签一天')
+      Button(this.vm.resigning ? '补签中...' : '补签一天', { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
         .width('100%')
-        .height(38)
-        .fontSize(14)
-        .backgroundColor(resign.canResign() ? $r('app.color.app_primary') : $r('app.color.card_background'))
-        .fontColor(resign.canResign() ? $r('app.color.on_accent') : $r('app.color.text_secondary'))
-        .borderRadius(10)
-        .border({ width: 1, color: $r('app.color.divider') })
+        .height(44)
         .enabled(resign.canResign() && !this.vm.resigning)
         .onClick(() => {
           this.confirmResign(resign);
@@ -147,7 +163,7 @@ export struct SignInPage {
 
   /** 补签确认（对齐 Windows 补签确认弹窗：展示花费与剩余配额） */
   confirmResign(resign: ResignInfo): void {
-    this.getUIContext().getPromptAction().showDialog({
+    this.getUIContext().getPromptAction().showDialog({ systemMaterial: UiSurface.dialogMaterial(),
       title: '确认补签',
       message: `将消耗 米游币 ${resign.coinCost}（剩余补签次数 ${resign.leftCount()}），补签最近漏签的一天。是否继续？`,
       buttons: [
@@ -229,9 +245,8 @@ export struct SignInPage {
           Text('请先在「账号与数据」选择默认 UID')
             .fontSize(15)
             .fontColor($r('app.color.text_secondary'))
-          Button('前往')
-            .backgroundColor($r('app.color.app_primary'))
-            .fontColor($r('app.color.on_accent'))
+          Button('前往', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true)).constraintSize({ minHeight: 44 })
             .onClick(() => {
               router.pushUrl({ url: 'pages/UserPage' });
             })
@@ -256,10 +271,9 @@ export struct SignInPage {
                     .fontSize(13)
                     .fontColor($r('app.color.danger'))
                 }
-                Button('重试')
+                Button('重试', { type: ButtonType.Normal })
+                  .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true)).constraintSize({ minHeight: 44 })
                   .fontSize(13)
-                  .backgroundColor($r('app.color.app_primary'))
-                  .fontColor($r('app.color.on_accent'))
                   .onClick(() => {
                     this.loadData();
                   })
@@ -289,22 +303,15 @@ export struct SignInPage {
               .rowsGap(8)
               .width('100%')
 
-              Button(this.vm.info.isTodaySigned(this.todayDay) ? '今日已签到' : (this.vm.signing ? '签到中...' : '立即签到'))
+              Button(this.vm.info.isTodaySigned(this.todayDay) ? '今日已签到' : (this.vm.signing ? '签到中...' : '立即签到'),
+                { type: ButtonType.Normal })
+                .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel,
+                  !this.vm.info.isTodaySigned(this.todayDay)))
                 .width('100%')
                 .height(46)
-                .fontSize(16)
                 .fontWeight(FontWeight.Medium)
-                .backgroundColor(this.vm.info.isTodaySigned(this.todayDay) ? $r('app.color.card_background') : $r('app.color.app_primary'))
-                .fontColor(this.vm.info.isTodaySigned(this.todayDay) ? $r('app.color.text_secondary') : Color.White)
-                .borderRadius(12)
-                .border({ width: 1, color: $r('app.color.divider') })
                 .enabled(!this.vm.info.isTodaySigned(this.todayDay) && !this.vm.signing)
-                .onClick(() => {
-                  this.vm.doSign(this.currentUid).then((r: SignInResult) => {
-                    const text: string = r.rewardText.length > 0 ? `，${r.rewardText}` : '';
-                    this.toast(r.alreadySigned ? '今日已签到' : `${r.message}${text}`);
-                  });
-                })
+                .onClick(() => { this.signOnce(); })
             }
           }
           .width('100%')

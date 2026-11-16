@@ -46,7 +46,7 @@ export class UigfImportTransfer {
       throw new UigfError(wire[1]);
     }
     if (wire.length < 5 || wire.length > 3 + 2 * UigfBounds.MAX_ARCHIVES + UigfImportTransfer.ROW_FIELDS * UigfBounds.MAX_ROWS ||
-      wire[0] !== UigfImportTransfer.FORMAT || UigfCodec.VERSIONS.indexOf(wire[1]) < 0) { throw new UigfError('UIGF 后台结果无效'); }
+      wire[0] !== UigfImportTransfer.FORMAT || !UigfCodec.supportsImportVersion(wire[1])) { throw new UigfError('UIGF 后台结果无效'); }
     const archiveCount: number = UigfImportTransfer.integer(wire[2], 1, UigfBounds.MAX_ARCHIVES);
     const archives: Map<string, GachaItem[]> = new Map<string, GachaItem[]>();
     const preview: UigfImportPreview = new UigfImportPreview();
@@ -88,11 +88,11 @@ export class UigfImportTransfer {
           if (UigfCodec.normalizeTime(item.time, timezone, timezone) !== item.time) { throw new UigfError('UIGF 后台时间无效'); }
           item.name = wire[cursor++];
           item.itemType = wire[cursor++];
-          item.rankType = UigfImportTransfer.integer(wire[cursor++], 3, 5);
+          item.rankType = UigfImportTransfer.integer(wire[cursor++], 1, 5);
           item.scheduleId = UigfImportTransfer.integer(wire[cursor++], 0, Number.MAX_SAFE_INTEGER);
           UigfCodec.validateItem(item);
           const beyond: boolean = GachaType.isBeyond(item.gachaType);
-          const key: string = `${beyond ? 'b' : 's'}:${item.gachaId}`;
+          const key: string = GachaItem.recordKey(item);
           if (ids.has(key)) { throw new UigfError('UIGF 后台结果包含重复记录'); }
           ids.add(key);
           items.push(item);

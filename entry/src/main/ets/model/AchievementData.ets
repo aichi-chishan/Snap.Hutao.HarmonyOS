@@ -9,6 +9,7 @@
 export class AchievementEntry {
   id: number = 0;
   name: string = '';
+  canonicalName: string = '';
   desc: string = '';
   /** 原石奖励 */
   reward: number = 0;
@@ -35,6 +36,7 @@ export class AchievementEntry {
 export class AchievementCategory {
   id: number = 0;
   name: string = '';
+  canonicalName: string = '';
   /** 分类图标名（UI_AchievementIcon_*；paimon 分类按顺序映射到已有图标池） */
   icon: string = '';
   entries: AchievementEntry[] = [];
@@ -54,7 +56,7 @@ export class AchievementRecord {
   achId: number = 0;
   /** 实际进度，如 30/40 的 30；0 也可能是已完成但进度未知 */
   current: number = 0;
-  /** UIAF: 0=无效、1=未完成、2=已完成、3=奖励已领取 */
+  /** UIAF：-1=未识别、0=无效、1=未完成、2=已完成、3=奖励已领取 */
   status: number = 1;
   /** 完成时间戳（秒） */
   timestamp: number = 0;
@@ -99,12 +101,12 @@ export class UiafCodec {
     return value as Record<string, Object>;
   }
 
-  private static integer(value: Object, label: string, min: number, max: number): number {
-    if (typeof value !== 'number' || !Number.isSafeInteger(value as number)
-      || (value as number) < min || (value as number) > max) {
+  private static integer(value: Object, label: string, min: number, max: number, allowString: boolean = false): number {
+    const numeric: Object = allowString && typeof value === 'string' && /^-?\d+$/.test(value) ? Number(value) : value;
+    if (typeof numeric !== 'number' || !Number.isSafeInteger(numeric) || numeric < min || numeric > max) {
       throw new Error(`${label} 必须是 ${min} 到 ${max} 之间的整数`);
     }
-    return value as number;
+    return numeric;
   }
 
   static parse(text: string, archiveId: number): AchievementRecord[] {
@@ -113,14 +115,14 @@ export class UiafCodec {
     if (info['uiaf_version'] !== 'v1.1') {
       throw new Error('仅支持 UIAF v1.1，请先转换文件版本');
     }
-    if (typeof info['export_app'] !== 'string') {
-      throw new Error('info.export_app 必须是字符串');
+    for (const key of ['export_app', 'export_app_version']) {
+      const value: Object = info[key];
+      if (value !== undefined && value !== null && typeof value !== 'string') {
+        throw new Error(`info.${key} 必须是字符串`);
+      }
     }
-    if (info['export_app_version'] !== undefined && typeof info['export_app_version'] !== 'string') {
-      throw new Error('info.export_app_version 必须是字符串');
-    }
-    if (info['export_timestamp'] !== undefined) {
-      UiafCodec.integer(info['export_timestamp'], 'info.export_timestamp', 0, 253402300799);
+    if (info['export_timestamp'] !== undefined && info['export_timestamp'] !== null) {
+      UiafCodec.integer(info['export_timestamp'], 'info.export_timestamp', -62135596800, 253402300799, true);
     }
     if (!Array.isArray(root['list'])) {
       throw new Error('list 必须是数组');
@@ -133,11 +135,11 @@ export class UiafCodec {
       const item: Record<string, Object> = UiafCodec.object(rawList[i], label);
       const record: AchievementRecord = new AchievementRecord();
       record.archiveId = archiveId;
-      record.achId = UiafCodec.integer(item['id'], `${label}.id`, 1, 4294967295);
-      record.current = UiafCodec.integer(item['current'], `${label}.current`, 0, 4294967295);
-      record.status = UiafCodec.integer(item['status'], `${label}.status`, 0, 3);
+      record.achId = UiafCodec.integer(item['id'], `${label}.id`, 1, 4294967295, true);
+      record.current = UiafCodec.integer(item['current'], `${label}.current`, 0, 4294967295, true);
+      record.status = UiafCodec.integer(item['status'], `${label}.status`, -1, 3);
       // 保留秒级值及未知时间哨兵；毫秒时间不再猜测性转换，避免改写原始数据。
-      record.timestamp = UiafCodec.integer(item['timestamp'], `${label}.timestamp`, -62135596800, 253402300799);
+      record.timestamp = UiafCodec.integer(item['timestamp'], `${label}.timestamp`, -62135596800, 253402300799, true);
       if (ids.has(record.achId)) {
         throw new Error(`文件包含重复成就 ID：${record.achId}`);
       }

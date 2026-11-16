@@ -12,6 +12,8 @@ export class GachaType {
   static readonly UGC_STANDARD: number = 1000;
   /** 千星奇域（颂愿）：活动颂愿 */
   static readonly UGC_AVATAR_EVENT: number = 2000;
+  private static readonly AVATAR_EVENT_TYPES: number[] = [GachaType.AVATAR_EVENT, 400];
+  private static readonly UGC_AVATAR_EVENT_TYPES: number[] = [GachaType.UGC_AVATAR_EVENT, 20011, 20012, 20021, 20022];
 
   /** 常规查询顺序（含集录） */
   static readonly QUERY_ORDER: number[] = [
@@ -36,6 +38,8 @@ export class GachaType {
         return '常驻祈愿';
       case GachaType.AVATAR_EVENT:
         return '角色活动祈愿';
+      case 400:
+        return '角色活动祈愿-2';
       case GachaType.WEAPON_EVENT:
         return '武器活动祈愿';
       case GachaType.CHRONICLE:
@@ -44,6 +48,12 @@ export class GachaType {
         return '常驻颂愿';
       case GachaType.UGC_AVATAR_EVENT:
         return '活动颂愿';
+      case 20011:
+      case 20012:
+        return '活动颂愿-男';
+      case 20021:
+      case 20022:
+        return '活动颂愿-女';
       default:
         return `卡池 ${gachaType}`;
     }
@@ -58,7 +68,20 @@ export class GachaType {
 
   /** 是否千星奇域卡池类型 */
   static isBeyond(gachaType: number): boolean {
-    return gachaType === GachaType.UGC_STANDARD || gachaType === GachaType.UGC_AVATAR_EVENT;
+    return gachaType === GachaType.UGC_STANDARD || GachaType.UGC_AVATAR_EVENT_TYPES.includes(gachaType);
+  }
+
+  /** 用查询池聚合历史，记录中保留原始池号。 */
+  static queryTypeOf(gachaType: number): number {
+    if (GachaType.AVATAR_EVENT_TYPES.includes(gachaType)) { return GachaType.AVATAR_EVENT; }
+    if (GachaType.UGC_AVATAR_EVENT_TYPES.includes(gachaType)) { return GachaType.UGC_AVATAR_EVENT; }
+    return gachaType;
+  }
+
+  static storedTypes(queryType: number): number[] {
+    if (queryType === GachaType.AVATAR_EVENT) { return GachaType.AVATAR_EVENT_TYPES.slice(); }
+    if (queryType === GachaType.UGC_AVATAR_EVENT) { return GachaType.UGC_AVATAR_EVENT_TYPES.slice(); }
+    return [queryType];
   }
 
   /** 是否有效卡池类型 */

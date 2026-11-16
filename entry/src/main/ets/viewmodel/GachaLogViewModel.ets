@@ -7,15 +7,20 @@ import { GachaRepo } from '../data/repo/GachaRepo';
 import { GachaType } from '../model/GachaType';
 import { GachaArchive } from '../model/GachaArchive';
 import { GachaItem } from '../model/GachaItem';
-import { GachaStatistics, PoolStatistics, FiveStarDetail } from '../model/GachaStatistics';
+import { GachaStatistics, PoolStatistics } from '../model/GachaStatistics';
+import { GachaStatisticsService } from '../service/GachaStatisticsService';
+import { GachaItemIdentityService } from '../service/GachaItemIdentityService';
 import { RefreshProgress } from '../model/RefreshProgress';
 import { WikiMetaService, GachaEventMeta } from '../service/WikiMetaService';
 import { UigfImportJob } from '../service/UigfImportJob';
 import { UigfService, UigfImportResult } from '../service/UigfService';
 import { UigfImportPreparation, UigfImportPreview } from '../model/UigfImportPreparation';
 import { Logger } from '../common/Logger';
+import { GachaCollection, GachaCollectionService } from '../service/GachaCollectionService';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 
 const TAG: string = 'GachaLogViewModel';
+const HISTORY_ITEM_LIMIT: number = 100000;
 
 @Observed
 export class GachaLogViewModel {
@@ -103,8 +108,6 @@ export class GachaLogViewModel {
     this.currentArchiveId = selected?.id ?? 0;
     this.currentUid = selected?.uid ?? '';
     await this.reloadStats();
-    if (generation !== this.loadGeneration) { return; }
-    await this.reloadItems();
     if (generation === this.loadGeneration) { this.loaded = true; }
   }
 
@@ -170,7 +173,7 @@ export class GachaLogViewModel {
     this.importUids = [];
   }
 
-  async confirmImport(): Promise<UigfImportResult> {
+  async confirmImport(fillGaps: boolean = false): Promise<UigfImportResult> {
     if (this.isRefreshing || this.isTransferring) { throw new Error('请等待当前操作完成'); }
     const prepared: UigfImportPreparation | undefined = this.preparedImport;
     if (prepared === undefined) { throw new Error('请先选择并预览 UIGF 文件'); }
@@ -183,7 +186,7 @@ export class GachaLogViewModel {
         if (generation !== this.importGeneration || operation !== this.operationGeneration || prepared !== this.preparedImport) {
           throw new Error('UIGF 预览已失效，未写入数据');
         }
-      });
+      }, fillGaps);
       if (result.ok) {
         AppStorage.setOrCreate<number>('gachaDataVersion', Date.now());
         if (generation !== this.importGeneration || operation !== this.operationGeneration) { return result; }
@@ -198,51 +201,74 @@ export class GachaLogViewModel {
     } finally { this.isTransferring = false; }
   }
 
-  /** 切换池子：重算全池统计（保证六项统计随池切换刷新）并重载当前池记录 */
+  /** 归档统计与选中的历史池无关。 */
   async selectPool(gachaType: number): Promise<void> {
     this.currentPoolType = gachaType;
     Logger.info(TAG, `selectPool -> ${GachaType.nameOf(gachaType)}(${gachaType})`);
-    await this.reloadStats();
     await this.reloadItems();
   }
 
-  /** 重算统计 */
+  /** 统计、收藏和当前池历史使用同一次归档读取。 */
   async reloadStats(): Promise<void> {
     const generation: number = ++this.statsGeneration;
+    const itemsGeneration: number = ++this.itemsGeneration;
     const archiveId: number = this.currentArchiveId;
+    const selectedPool: number = this.currentPoolType;
     const stats: GachaStatistics = new GachaStatistics();
     stats.uid = this.currentUid;
     stats.archiveId = archiveId;
-    if (archiveId > 0) {
-      const pools: PoolStatistics[] = [];
-      let total: number = 0;
-      // 常规池 + 千星奇域颂愿池一起聚合（颂愿卡片仅在颂愿模式展示）
-      const allTypes: number[] = GachaType.QUERY_ORDER.concat(GachaType.BEYOND_ORDER);
-      for (let i = 0; i < allTypes.length; i++) {
-        const type: number = allTypes[i];
-        try {
-          const pool: PoolStatistics = await this.buildPoolStats(archiveId, type);
-          if (generation !== this.statsGeneration || archiveId !== this.currentArchiveId) { return; }
-          if (GachaType.isStandard(type)) {
-            total += pool.totalCount;
-          }
-          pools.push(pool);
-        } catch (e) {
-          Logger.warn(TAG, `buildPoolStats type=${type} fail: ${(e as Error).message}`);
-          pools.push(GachaLogViewModel.emptyPool(type));
-        }
-      }
-      stats.pools = pools;
-      stats.totalPulls = total;
-      Logger.info(TAG, `reloadStats archive=${this.currentArchiveId} total=${total} pools=${pools.length}`);
-      for (let i = 0; i < pools.length; i++) {
-        const p: PoolStatistics = pools[i];
-        Logger.info(TAG, `summary pool ${p.typeName}: total=${p.totalCount} ` +
-          `5star=${p.fiveStarCount} 4star=${p.fourStarCount} since=${p.sinceLastFive} ` +
-          `avg=${p.averageOrangePull} min=${p.minOrangePull} max=${p.maxOrangePull} date=[${p.startDate}~${p.endDate}]`);
+    if (archiveId <= 0) {
+      this.stats = stats;
+      this.items = [];
+      return;
+    }
+    const stored: GachaItem[] = await GachaRepo.getItemsByArchive(archiveId);
+    if (generation !== this.statsGeneration || archiveId !== this.currentArchiveId) { return; }
+    const allItems: GachaItem[] = await GachaItemIdentityService.resolveMissing(stored);
+    if (generation !== this.statsGeneration || archiveId !== this.currentArchiveId) { return; }
+    const events: GachaEventMeta[] = await WikiMetaService.getGachaEvents();
+    const collection: GachaCollection = GachaCollectionService.count(allItems,
+      await WikiMetaService.getAvatars(), await WikiMetaService.getWeapons(), events,
+      PreferencesStore.getBool(PreferencesStore.KEY_GACHA_UNOBTAINED, false));
+    if (generation !== this.statsGeneration || archiveId !== this.currentArchiveId) { return; }
+
+    const grouped: Map<number, GachaItem[]> = new Map<number, GachaItem[]>();
+    for (const item of allItems) {
+      const type: number = GachaType.queryTypeOf(item.gachaType);
+      const group: GachaItem[] = grouped.get(type) ?? [];
+      group.push(item);
+      grouped.set(type, group);
+    }
+    const timezone: number = UigfService.timezoneOfUid(stats.uid);
+    for (const type of GachaType.QUERY_ORDER.concat(GachaType.BEYOND_ORDER)) {
+      try {
+        const pool: PoolStatistics = GachaStatisticsService.buildPool(grouped.get(type) ?? [], type, events, timezone);
+        if (GachaType.isStandard(type)) { stats.totalPulls += pool.totalCount; }
+        stats.pools.push(pool);
+      } catch (e) {
+        Logger.warn(TAG, `buildPoolStats type=${type} fail: ${(e as Error).message}`);
+        stats.pools.push(GachaLogViewModel.emptyPool(type));
       }
     }
-    if (generation === this.statsGeneration && archiveId === this.currentArchiveId) { this.stats = stats; }
+    stats.avatars = collection.avatars;
+    stats.weapons = collection.weapons;
+    Logger.info(TAG, `reloadStats archive=${archiveId} total=${stats.totalPulls} pools=${stats.pools.length}`);
+    for (const pool of stats.pools) {
+      Logger.info(TAG, `summary pool ${pool.typeName}: total=${pool.totalCount} ` +
+        `5star=${pool.fiveStarCount} 4star=${pool.fourStarCount} since=${pool.sinceLastFive} ` +
+        `avg=${pool.averageOrangePull} min=${pool.minOrangePull} max=${pool.maxOrangePull} date=[${pool.startDate}~${pool.endDate}]`);
+    }
+    this.stats = stats;
+    if (!this.ownsHistoryRead(itemsGeneration, archiveId, selectedPool)) { return; }
+    const history: GachaItem[] = grouped.get(selectedPool) ?? allItems.filter(
+      (item: GachaItem): boolean => item.gachaType === selectedPool);
+    // 上限作用于去重后的逻辑记录，并与本次统计共享同一快照。
+    const items: GachaItem[] = history.slice(-HISTORY_ITEM_LIMIT).sort((left: GachaItem, right: GachaItem): number => {
+        const order: number = GachaItem.compareIds(right.gachaId, left.gachaId);
+        if (order !== 0 || left.time === right.time) { return order; }
+        return left.time < right.time ? 1 : -1;
+      });
+    if (this.ownsHistoryRead(itemsGeneration, archiveId, selectedPool)) { this.items = items; }
   }
 
   private static emptyPool(gachaType: number): PoolStatistics {
@@ -252,144 +278,13 @@ export class GachaLogViewModel {
     return pool;
   }
 
-  private async buildPoolStats(archiveId: number, gachaType: number): Promise<PoolStatistics> {
-    const pool: PoolStatistics = new PoolStatistics();
-    pool.gachaType = gachaType;
-    pool.typeName = GachaType.nameOf(gachaType);
-    const items: GachaItem[] = await GachaRepo.getItemsByType(archiveId, gachaType);
-    pool.totalCount = items.length;
-    if (items.length === 0) {
-      return pool;
-    }
-    // 纯本地同步聚合（数据量级小，无需 TaskPool，避免序列化/返回值解析导致统计为 0）
-    let fiveStar: number = 0;
-    let fourStar: number = 0;
-    let sinceLastFive: number = 0;
-    let sinceLastFour: number = 0;
-    const fiveNames: string[] = [];
-    const fiveTimes: string[] = [];
-    const fiveItemTypes: string[] = [];
-    const fiveItems: GachaItem[] = [];
-    const events: GachaEventMeta[] = await WikiMetaService.getGachaEvents();
-    const archive = this.archives.find((item: GachaArchive): boolean => item.id === archiveId);
-    const timezone: number = UigfService.timezoneOfUid(archive?.uid ?? this.currentUid);
-    // 五星出金之间的抽数序列（升序遍历）
-    const fiveSpans: number[] = [];
-    let spanSinceLastFive: number = 0;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].rankType === 5) {
-        fiveStar++;
-        fiveNames.push(items[i].name);
-        fiveItems.push(items[i]);
-        fiveTimes.push(items[i].time);
-        fiveItemTypes.push(items[i].itemType);
-        fiveSpans.push(spanSinceLastFive + 1);
-        spanSinceLastFive = 0;
-      } else if (items[i].rankType === 4) {
-        fourStar++;
-        spanSinceLastFive++;
-      } else {
-        spanSinceLastFive++;
-      }
-    }
-    // 当前垫数（最新距上次五星/四星）
-    for (let i = items.length - 1; i >= 0; i--) {
-      if (items[i].rankType === 5) {
-        break;
-      }
-      sinceLastFive++;
-    }
-    for (let i = items.length - 1; i >= 0; i--) {
-      if (items[i].rankType === 4) {
-        break;
-      }
-      sinceLastFour++;
-    }
-    pool.fiveStarCount = fiveStar;
-    pool.fourStarCount = fourStar;
-    pool.sinceLastFive = sinceLastFive;
-    pool.sinceLastFour = sinceLastFour;
-    // 池日期范围（升序查询：首条最早、末条最新）
-    pool.startDate = GachaLogViewModel.formatPoolDate(items[0].time);
-    pool.endDate = GachaLogViewModel.formatPoolDate(items[items.length - 1].time);
-    // 五星平均抽数 / 最非 / 最欧
-    if (fiveStar > 0) {
-      pool.averageOrangePull = Math.round(fiveSpans.reduce((sum: number, span: number): number => sum + span, 0) / fiveStar);
-      pool.maxOrangePull = 0;
-      pool.minOrangePull = 0;
-      for (let i = 0; i < fiveSpans.length; i++) {
-        if (pool.maxOrangePull === 0 || fiveSpans[i] > pool.maxOrangePull) {
-          pool.maxOrangePull = fiveSpans[i];
-        }
-        if (pool.minOrangePull === 0 || fiveSpans[i] < pool.minOrangePull) {
-          pool.minOrangePull = fiveSpans[i];
-        }
-      }
-    }
-    // 四星平均抽数
-    if (fourStar > 0) {
-      pool.averagePurplePull = Math.round((items.length - sinceLastFour) / fourStar);
-    }
-    if (fiveNames.length > 0) {
-      pool.lastFiveName = fiveNames[fiveNames.length - 1];
-      pool.lastFiveTime = fiveTimes[fiveTimes.length - 1];
-    }
-    const cycles: number[] = [];
-    let cycle: number = 0;
-    for (let i: number = 0; i < fiveItems.length; i++) {
-      cycle += fiveSpans[i];
-      const up: boolean | undefined = GachaLogViewModel.isEventUp(fiveItems[i], events, timezone);
-      cycles.push(up === true ? cycle : 0);
-      if (up === true) {
-        cycle = 0;
-      }
-    }
-    // 出金历史（倒序）+ 每角色用抽数明细（itemType 优先用服务端实际记录）
-    for (let i = fiveNames.length - 1; i >= 0; i--) {
-      const copied: GachaItem = new GachaItem();
-      copied.name = fiveNames[i];
-      copied.time = fiveTimes[i];
-      copied.rankType = 5;
-      pool.fiveHistory.push(copied);
-      const detail: FiveStarDetail = new FiveStarDetail();
-      detail.name = fiveNames[i];
-      detail.time = fiveTimes[i];
-      detail.lastPull = fiveSpans.length > i ? fiveSpans[i] : 0;
-      const up: boolean | undefined = GachaLogViewModel.isEventUp(fiveItems[i], events, timezone);
-      detail.isUp = up === true;
-      detail.upKnown = up !== undefined;
-      detail.totalCyclePull = cycles[i];
-      detail.itemType = fiveItemTypes.length > i && fiveItemTypes[i].length > 0
-        ? fiveItemTypes[i]
-        : (gachaType === GachaType.WEAPON_EVENT ? '武器' : '角色');
-      pool.fiveDetails.push(detail);
-    }
-    Logger.info(TAG, `pool ${gachaType} stats: ${pool.toString()}`);
-    return pool;
+  private static async readPoolItems(archiveId: number, pool: number): Promise<GachaItem[]> {
+    return archiveId > 0
+      ? await GachaItemIdentityService.resolveMissing(await GachaRepo.getItems(archiveId, pool, HISTORY_ITEM_LIMIT, 0)) : [];
   }
 
-  /** 'yyyy-MM-dd HH:mm:ss' → 'yyyy.MM.dd'（不足则原样返回） */
-  private static formatPoolDate(time: string): string {
-    if (time.length < 10) {
-      return time;
-    }
-    return `${time.substring(0, 4)}.${time.substring(5, 7)}.${time.substring(8, 10)}`;
-  }
-
-  /** 只按当期池元数据判定UP；缺失元数据时保留未知，不推测中奖。 */
-  private static isEventUp(item: GachaItem, events: GachaEventMeta[], timezone: number): boolean | undefined {
-    let timestamp: number = 0;
-    try {
-      timestamp = Date.parse(UigfService.normalizeTime(item.time, timezone, 0).replace(' ', 'T') + 'Z');
-    } catch (e) {
-      return undefined;
-    }
-    for (const event of events) {
-      if (event.type === item.gachaType && timestamp >= event.from && timestamp <= event.to) {
-        return event.upOrange.indexOf(item.itemId) >= 0;
-      }
-    }
-    return undefined;
+  private ownsHistoryRead(generation: number, archiveId: number, pool: number): boolean {
+    return generation === this.itemsGeneration && archiveId === this.currentArchiveId && pool === this.currentPoolType;
   }
 
   /** 重载当前池历史；旧选档/旧池结果不能覆盖新上下文。 */
@@ -397,10 +292,8 @@ export class GachaLogViewModel {
     const generation: number = ++this.itemsGeneration;
     const archiveId: number = this.currentArchiveId;
     const pool: number = this.currentPoolType;
-    const items: GachaItem[] = archiveId > 0 ? await GachaRepo.getItems(archiveId, pool, 100000, 0) : [];
-    if (generation === this.itemsGeneration && archiveId === this.currentArchiveId && pool === this.currentPoolType) {
-      this.items = items;
-    }
+    const items: GachaItem[] = await GachaLogViewModel.readPoolItems(archiveId, pool);
+    if (this.ownsHistoryRead(generation, archiveId, pool)) { this.items = items; }
   }
 
   /** 自动鉴权仅针对登录账号 UID，绝不借用离线选档 UID。onlyTypes 限定池（失败池单项重试）。 */
@@ -422,7 +315,7 @@ export class GachaLogViewModel {
           this.onProgressChanged();
         }, this.fullRefresh, onlyTypes);
       // 已发生的持久化变更仍需通知其它页面，但不能恢复过期的页面状态。
-      if (result.ok) { AppStorage.setOrCreate<number>('gachaDataVersion', Date.now()); }
+      if (result.ok || result.fetchedCount > 0) { AppStorage.setOrCreate<number>('gachaDataVersion', Date.now()); }
       if (operation !== this.operationGeneration) { return false; }
       this.message = result.message;
       await this.load(this.gameAccountUid);
@@ -437,7 +330,7 @@ export class GachaLogViewModel {
   }
 
   /** URL 自带鉴权；归属由服务端响应校验，不能借用选档或登录账号。 */
-  async importByUrl(url: string): Promise<boolean> {
+  async importByUrl(url: string, onlyTypes: number[] | undefined = undefined): Promise<boolean> {
     if (this.isRefreshing || this.isTransferring) { return false; }
     const operation: number = ++this.operationGeneration;
     this.isRefreshing = true;
@@ -448,8 +341,8 @@ export class GachaLogViewModel {
           if (operation !== this.operationGeneration) { return; }
           this.progress = p;
           this.onProgressChanged();
-        }, this.fullRefresh);
-      if (result.ok) { AppStorage.setOrCreate<number>('gachaDataVersion', Date.now()); }
+        }, this.fullRefresh, onlyTypes);
+      if (result.ok || result.fetchedCount > 0) { AppStorage.setOrCreate<number>('gachaDataVersion', Date.now()); }
       if (operation !== this.operationGeneration) { return false; }
       this.message = result.message;
       await this.load(this.gameAccountUid, result.uid);

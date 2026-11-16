@@ -2,8 +2,12 @@
  * ErrorHint.ets
  * 统一错误态组件（含重试）。
  */
+import { AppButtonModifier } from '../common/UiSurface';
+
 @Component
 export struct ErrorHint {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   @Prop text: string = '';
   @Prop icon: string = '⚠️';
   onRetry: () => void = () => {
@@ -22,13 +26,12 @@ export struct ErrorHint {
       Button({ type: ButtonType.Normal }) {
         Text($r('app.string.common_retry'))
           .fontSize(13)
-          .fontColor($r('sys.color.font_on_primary'))
+          .fontColor($r('app.color.on_accent'))
           .textAlign(TextAlign.Center)
       }
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
         .constraintSize({ minHeight: 44 })
-        .padding({ left: 20, right: 20, top: 10, bottom: 10 })
-        .borderRadius(12)
-        .backgroundColor($r('app.color.app_primary'))
+        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
         .hoverEffect(HoverEffect.Highlight)
         .accessibilityText($r('app.string.common_retry'))
         .onClick(() => {

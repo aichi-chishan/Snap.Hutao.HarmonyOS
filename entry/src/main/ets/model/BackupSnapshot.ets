@@ -127,11 +127,24 @@ export class BackupSnapshotValidator {
     }
   }
 
+  private static readonly EXACT_PORTABLE_PREFERENCES: Set<string> = new Set<string>([
+    'calendar.first_day_of_week',
+    'cultivation_resin_world_level',
+    'wiki.avatar.grid', 'wiki.weapon.grid', 'wiki.monster.grid',
+    'background.media.type', 'background.media.muted', 'background.media.loop',
+    'official_web.share_mode',
+    'Control.PanelSelector.AvatarPropertyPage.Summary.Avatars',
+    'ai.provider',
+  ]);
+
   static portableKey(key: string): boolean {
     if (/device|cookie|token|secret|password|authkey|formId|form_id/i.test(key)) {
       return false;
     }
-    return /^(app\.|theme\.|home\.|dailynote\.|signin\.|gacha\.|cultivation\.|risk\.|game\.|launcher\.|data\.|resource\.|wallpaper\.)/.test(key);
+    return BackupSnapshotValidator.EXACT_PORTABLE_PREFERENCES.has(key)
+      || /^Control\.PanelSelector\.StatisticsCard\.SummaryList\d+$/.test(key)
+      || /^relic\.score\.algorithm\.[1-9]\d{7}$/.test(key)
+      || /^(app\.|theme\.|home\.|dailynote\.|signin\.|gacha\.|cultivation\.|risk\.|game\.|launcher\.|data\.|resource\.|wallpaper\.)/.test(key);
   }
 
   static validate(snapshot: BackupSnapshot): void {
@@ -163,6 +176,15 @@ export class BackupSnapshotValidator {
             (value !== null && typeof value !== 'string' && typeof value !== 'number') ||
             (typeof value === 'number' && !Number.isFinite(value))) {
             throw new Error('备份含无效字段');
+          }
+        }
+        if (table.name === 'cultivate_projects') {
+          const offset: BackupCell = row['server_timezone_offset'];
+          if (snapshot.schemaVersion >= 9 && (typeof offset !== 'number' || ![-5, 1, 8].includes(offset))) {
+            throw new Error('养成项目的服务器时区无效');
+          }
+          if (snapshot.schemaVersion < 9 && Object.keys(row).includes('server_timezone_offset')) {
+            throw new Error('旧版备份不支持养成项目的服务器时区');
           }
         }
         if (table.name === 'cultivate_entries') {

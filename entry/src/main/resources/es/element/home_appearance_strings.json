@@ -1,0 +1,40 @@
+{
+  "string": [
+    {
+      "name": "ui_home_pity_title",
+      "value": "Conteo de la Compasión"
+    },
+    {
+      "name": "ui_home_pity_five",
+      "value": "Cinco estrellas"
+    },
+    {
+      "name": "ui_home_pity_four",
+      "value": "Cuatro estrellas"
+    },
+    {
+      "name": "ui_wallpaper_copyright",
+      "value": "Información de derechos de autor de la imagen"
+    },
+    {
+      "name": "ui_wallpaper_none",
+      "value": "Sin imagen de fondo"
+    },
+    {
+      "name": "ui_wallpaper_local",
+      "value": "Imagen local aleatoria"
+    },
+    {
+      "name": "ui_wallpaper_bing",
+      "value": "Imagen diaria de Bing"
+    },
+    {
+      "name": "ui_wallpaper_daily",
+      "value": "Imagen diaria de Snap Hutao"
+    },
+    {
+      "name": "ui_wallpaper_launcher",
+      "value": "Fondo del lanzador oficial"
+    }
+  ]
+}

@@ -7,6 +7,7 @@
  * 因此 rawfile 图标通过 resourceManager.getRawFileContent 读入后落盘 cacheDir/rawicons/，
  * Image 以 file:// 引用；同一图标进程内缓存，避免重复读包。
  */
+import { bundleManager } from '@kit.AbilityKit';
 import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { ResourcePackService } from '../data/remote/ResourcePackService';
 import { StandardIconService } from '../data/remote/StandardIconService';
@@ -23,6 +24,13 @@ const META_TAG: string = 'MetaIcon';
  */
 const RAW_CACHE_LIMIT: number = 512;
 const RAW_CACHE: Map<string, string> = new Map();
+
+class RawIconLoad {
+  owners: (() => boolean)[] = [];
+  result: Promise<string> | undefined = undefined;
+}
+
+const RAW_PENDING: Map<string, RawIconLoad> = new Map();
 
 /** 写入并维护 LRU 顺序（Map 迭代序 = 插入序，重设键即移到最新）。 */
 function cachePut(key: string, path: string): void {
@@ -58,6 +66,7 @@ class MetaIconFrame {
 
 @Component
 export struct MetaIcon {
+  private static bundleKey: Promise<string> | undefined = undefined;
   /** 图标类别目录 */
   @Prop @Watch('onMetaChanged') category: string = 'ItemIcon';
   /** 图标名（不含扩展名，如 UI_AvatarIcon_Ayaka）；也兼容 http/file:// 完整源 */
@@ -139,114 +148,112 @@ export struct MetaIcon {
     });
   }
 
-  /** 逐级创建目录（fileIo.mkdirSync 非递归；父目录缺失时避免 openSync 失败） */
-  private static async ensureDirChain(full: string): Promise<void> {
-    try {
-      fileIo.mkdirSync(full);
-      return;
-    } catch (e) {
-      // 已存在或父目录缺失：逐级创建
+  private static installedBundle(): Promise<string> {
+    if (MetaIcon.bundleKey === undefined) {
+      MetaIcon.bundleKey = bundleManager.getBundleInfoForSelf(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT)
+        .then((info: bundleManager.BundleInfo): string => `${info.versionCode}-${info.updateTime}`)
+        .catch((): string => `run-${Date.now()}`);
     }
-    const segs: string[] = full.split('/');
-    let cur: string = full.startsWith('/') ? '/' : '';
-    for (let i = 0; i < segs.length; i++) {
-      if (segs[i].length === 0) {
-        continue;
-      }
-      cur += (cur.length > 0 && !cur.endsWith('/') ? '/' : '') + segs[i];
-      try {
-        fileIo.mkdirSync(cur);
-      } catch (e) {
-        // 已存在则忽略
-      }
-    }
+    return MetaIcon.bundleKey;
   }
 
-  /** rawfile 读入并缓存（幂等，按需单张）；进程内命中直接复用 */
+  private static async exists(path: string): Promise<boolean> {
+    try { return await fileIo.access(path); } catch (_) { return false; }
+  }
+
   private async loadRawfileCached(category: string, name: string, token: number): Promise<void> {
-    const key: string = `${category}/${name}`;
-    const cached: string | undefined = RAW_CACHE.get(key);
-    if (cached !== undefined) {
-      try {
-        if (fileIo.accessSync(cached)) {
-          cachePut(key, cached); // 命中即刷新 LRU 位置，使最近访问的图标不被淘汰
-          if (this.attached && token === this.resolveToken) { this.publishSource(fileUri.getUriFromPath(cached)); }
-          return;
-        }
-      } catch (_) { /* Evicted cache entries are retried below. */ }
-      RAW_CACHE.delete(key);
-    }
-    const dir: string = `${AppContextProvider.getCacheDir()}/rawicons/${category}`;
-    const dest: string = `${dir}/${name}.png`;
-    try {
-      if (fileIo.accessSync(dest)) {
-        cachePut(key, dest);
-        if (this.attached && token === this.resolveToken) {
-          this.publishSource(fileUri.getUriFromPath(dest));
-        }
-        return;
-      }
-    } catch (e) {
-      // 未缓存，继续
-    }
-    try {
-      const rm = AppContextProvider.getResourceManager();
-      const raw: Uint8Array = await rm.getRawFileContent(`icons/${category}/${name}.png`);
-      if (!this.attached || token !== this.resolveToken) { return; }
-      await MetaIcon.ensureDirChain(dir);
-      if (!this.attached || token !== this.resolveToken) { return; }
-      MetaIcon.writeCache(dest, raw);
-      const src: string = fileUri.getUriFromPath(dest);
-      cachePut(key, dest);
-      if (this.attached && token === this.resolveToken) {
-        this.publishSource(src);
-      }
-    } catch (e) {
-      Logger.warn(META_TAG, `rawfile ${category}/${name} fail: ${(e as Error).message}`);
-      if (this.attached && token === this.resolveToken) {
-        this.publishSource('');
-      }
-      if (this.remoteFallback) {
-        this.tryRemote(category, name, token).catch((error: Error) => {
-            Logger.warn(META_TAG, `remote icon failed: ${error.message}`);
-          });
-      }
+    const root: string = AppContextProvider.getCacheDir();
+    const key: string = `${root}/${category}/${name}`;
+    const current = (): boolean => this.attached && token === this.resolveToken;
+    const path: string = await MetaIcon.rawPath(root, key, category, name, current);
+    if (!current()) { return; }
+    if (path.length > 0) {
+      this.publishSource(fileUri.getUriFromPath(path));
+    } else if (this.remoteFallback) {
+      await this.tryRemote(category, name, key, token);
     }
   }
 
-/** rawfile 缺失时从远端拉取（幂等）：标准图标静态 CDN 优先，云端资源包清单次之 */
-  private async tryRemote(category: string, name: string, token: number): Promise<void> {
-    if (!this.attached || token !== this.resolveToken || !this.remoteFallback || name.length === 0) {
-      return;
+  private static rawPath(root: string, key: string, category: string, name: string,
+    owner: () => boolean): Promise<string> {
+    const pending: RawIconLoad | undefined = RAW_PENDING.get(key);
+    if (pending?.result !== undefined) {
+      pending.owners.push(owner);
+      return pending.result;
     }
+    const request: RawIconLoad = new RawIconLoad();
+    request.owners.push(owner);
+    RAW_PENDING.set(key, request);
+    const wanted = (): boolean => {
+      if (request.owners.some((isCurrent: () => boolean): boolean => isCurrent())) { return true; }
+      if (RAW_PENDING.get(key) === request) { RAW_PENDING.delete(key); }
+      return false;
+    };
+    const result: Promise<string> = MetaIcon.materializeRaw(root, key, category, name, wanted)
+      .catch((error: Error): string => {
+        Logger.warn(META_TAG, `rawfile ${category}/${name} fail: ${error.message}`);
+        return '';
+      }).finally(() => {
+        if (RAW_PENDING.get(key) === request) { RAW_PENDING.delete(key); }
+      });
+    request.result = result;
+    return result;
+  }
+
+  private static async materializeRaw(root: string, key: string, category: string, name: string,
+    wanted: () => boolean): Promise<string> {
+    const cached: string | undefined = RAW_CACHE.get(key);
+    if (cached !== undefined && await MetaIcon.exists(cached)) {
+      cachePut(key, cached);
+      return cached;
+    }
+    if (RAW_CACHE.get(key) === cached) { RAW_CACHE.delete(key); }
+    const bundle: string = await MetaIcon.installedBundle();
+    const directory: string = `${root}/rawicons/${bundle}/${category}`;
+    const dest: string = `${directory}/${name}.png`;
+    if (await MetaIcon.exists(dest)) {
+      cachePut(key, dest);
+      return dest;
+    }
+    if (!wanted()) { return ''; }
+    const bytes: Uint8Array = await AppContextProvider.getResourceManager().getRawFileContent(`icons/${category}/${name}.png`);
+    if (!wanted()) { return ''; }
+    try { await fileIo.mkdir(directory, true); }
+    catch (error) { if (!(await fileIo.stat(directory)).isDirectory()) { throw error as Error; } }
+    if (!wanted() || !await MetaIcon.writeCache(dest, bytes, wanted)) { return ''; }
+    cachePut(key, dest);
+    return dest;
+  }
+
+  /** Raw assets absent from the package may use a static CDN when the caller enables it. */
+  private async tryRemote(category: string, name: string, key: string, token: number): Promise<void> {
     let found: string = await StandardIconService.ensure(category, name);
     if (!this.attached || token !== this.resolveToken || !this.remoteFallback) { return; }
-    if (found.length === 0) {
-      found = await ResourcePackService.ensure(category, name);
-    }
-    if (found.length > 0) {
-      const src: string = fileUri.getUriFromPath(found);
-      cachePut(`${category}/${name}`, found);
-      if (this.attached && token === this.resolveToken) {
-        this.publishSource(src);
-      }
+    if (found.length === 0) { found = await ResourcePackService.ensure(category, name); }
+    if (found.length > 0 && this.attached && token === this.resolveToken && this.remoteFallback) {
+      if (!RAW_CACHE.has(key)) { cachePut(key, found); }
+      this.publishSource(fileUri.getUriFromPath(found));
     }
   }
 
   /** Publish only a complete, closed write from an OS-unique staging directory. */
-  private static writeCache(dest: string, raw: Uint8Array): void {
-    const staging: string = fileIo.mkdtempSync(`${dest}.stage-XXXXXX`);
-    const temporary: string = `${staging}/image.png`;
+  private static async writeCache(dest: string, raw: Uint8Array, wanted: () => boolean): Promise<boolean> {
+    const staging: string = await fileIo.mkdtemp(`${dest}.stage-XXXXXX`);
     try {
-      const file = fileIo.openSync(temporary, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
+      if (!wanted()) { return false; }
+      const temporary: string = `${staging}/image.png`;
+      const file: fileIo.File = await fileIo.open(temporary,
+        fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.CREATE | fileIo.OpenMode.NOFOLLOW);
       try {
+        if (!wanted()) { return false; }
         const buffer: ArrayBuffer = new Uint8Array(raw).buffer as ArrayBuffer;
-        if (fileIo.writeSync(file.fd, buffer) !== buffer.byteLength) { throw new Error('Incomplete icon cache write'); }
-      } finally { fileIo.closeSync(file); }
-      fileIo.renameSync(temporary, dest);
+        if (await fileIo.write(file.fd, buffer) !== buffer.byteLength) { throw new Error('Incomplete icon cache write'); }
+      } finally { await fileIo.close(file); }
+      if (!wanted()) { return false; }
+      await fileIo.rename(temporary, dest);
+      return true;
     } finally {
-      // The OS returned this directory to this operation; never remove the shared cache parent.
-      try { fileIo.rmdirSync(staging); } catch (_) { /* Cache cleanup is best effort. */ }
+      try { await fileIo.rmdir(staging); } catch (_) { /* Cache cleanup is best effort. */ }
     }
   }
 

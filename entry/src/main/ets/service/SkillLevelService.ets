@@ -54,8 +54,9 @@ export class SkillLevelService {
 
   /** Presentation metadata has no IDs: require exact name+icon within the verified avatar profile. */
   static forMetaSkill(detail: CharacterDetail, meta: MetaSkill): ResolvedAvatarSkill | undefined {
+    const name: string = meta.canonicalName || meta.n;
     return SkillLevelService.resolve(detail).find((skill: ResolvedAvatarSkill): boolean =>
-      skill.name === meta.n && skill.icon === meta.i);
+      skill.name === name && skill.icon === meta.i);
   }
 
   /** Old compact metadata mislabels prefixed non-upgradable jump/sprint entries by position. */

@@ -1,0 +1,40 @@
+{
+  "string": [
+    {
+      "name": "ui_home_pity_title",
+      "value": "Garantiezähler"
+    },
+    {
+      "name": "ui_home_pity_five",
+      "value": "5 Sterne"
+    },
+    {
+      "name": "ui_home_pity_four",
+      "value": "4 Sterne"
+    },
+    {
+      "name": "ui_wallpaper_copyright",
+      "value": "Informationen zum Bildurheberrecht"
+    },
+    {
+      "name": "ui_wallpaper_none",
+      "value": "Kein Hintergrundbild"
+    },
+    {
+      "name": "ui_wallpaper_local",
+      "value": "Lokales Zufallsbild"
+    },
+    {
+      "name": "ui_wallpaper_bing",
+      "value": "Bing Tages-Hintergrundbild"
+    },
+    {
+      "name": "ui_wallpaper_daily",
+      "value": "Snap Hutao Tages-Hintergrundbild"
+    },
+    {
+      "name": "ui_wallpaper_launcher",
+      "value": "Offizielles Genshin Launcher-Hintergrundbild"
+    }
+  ]
+}

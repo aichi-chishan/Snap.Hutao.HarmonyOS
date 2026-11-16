@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "common_confirm",
+      "value": "確認"
+    },
+    {
+      "name": "common_refresh",
+      "value": "重新整理"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "祈願紀錄"
+    },
+    {
+      "name": "page_title_home",
+      "value": "主頁"
+    },
+    {
+      "name": "page_title_login",
+      "value": "登入"
+    },
+    {
+      "name": "page_title_note",
+      "value": "即時便箋"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "設定"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "祈願紀錄"
+    },
+    {
+      "name": "tab_home",
+      "value": "主頁"
+    },
+    {
+      "name": "tab_mine",
+      "value": "我的"
+    },
+    {
+      "name": "tab_note",
+      "value": "即時便箋"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "匯出"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "匯入"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "儲存"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "新增模型"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "複製對話"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "生成分析評價"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "帳號歷史圖表與 AI 分析"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "新對話"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "重新生成"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "發送"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "停止生成"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "測試 API 連線"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "檢查更新"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "資料"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "週期"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "系統"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "工具"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "關閉後重新開啟應用程式以跟隨系統語言"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "跟隨系統"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "深境螺旋"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "成就管理"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "背包物品"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "幽境危戰"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "我的角色"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "養成計劃"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "啟動遊戲"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "旅行者札記"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Hutao Passport"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "幻想真境劇詩"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "角色資料"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "怪物資料"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "武器資料"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "關於"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "帳號"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "模型設置"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "外觀"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "背景圖片"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "影片背景"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "備份與還原"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "日曆"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "主頁"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "首頁遊戲活動區域設定"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "主頁卡片"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "語言"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "背景材質"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "其他"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "簽到"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "儲存空間"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "顏色主題"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "無感驗證"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "祈願紀錄"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "資料遷移"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "深色"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "淺色"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "胡桃 %s 版本現已可用"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "查看發行說明"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "跳過此版本"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "應用程式更新"
+    }
+  ]
+}

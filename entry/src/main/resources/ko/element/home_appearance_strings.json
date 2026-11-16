@@ -1,0 +1,40 @@
+{
+  "string": [
+    {
+      "name": "ui_home_pity_title",
+      "value": "천장 카운트"
+    },
+    {
+      "name": "ui_home_pity_five",
+      "value": "5성"
+    },
+    {
+      "name": "ui_home_pity_four",
+      "value": "4성"
+    },
+    {
+      "name": "ui_wallpaper_copyright",
+      "value": "이미지 저작권 정보"
+    },
+    {
+      "name": "ui_wallpaper_none",
+      "value": "배경화면 없음"
+    },
+    {
+      "name": "ui_wallpaper_local",
+      "value": "로컬 랜덤 이미지"
+    },
+    {
+      "name": "ui_wallpaper_bing",
+      "value": "Bing 일일 배경화면"
+    },
+    {
+      "name": "ui_wallpaper_daily",
+      "value": "호두 일일 배경화면"
+    },
+    {
+      "name": "ui_wallpaper_launcher",
+      "value": "공식 런처 배경화면"
+    }
+  ]
+}

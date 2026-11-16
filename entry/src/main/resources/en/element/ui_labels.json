@@ -1,0 +1,1244 @@
+{
+  "string": [
+    {
+      "name": "ui_about_restart",
+      "value": "Set language"
+    },
+    {
+      "name": "ui_account_insights_copied_json",
+      "value": "De-identified statistics copied to clipboard."
+    },
+    {
+      "name": "ui_account_insights_copy_json",
+      "value": "Copy de-identified statistics (JSON)"
+    },
+    {
+      "name": "ui_account_insights_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_account_insights_loading",
+      "value": "Loading saved records…"
+    },
+    {
+      "name": "ui_account_insights_missing_model",
+      "value": "Enter a model identifier."
+    },
+    {
+      "name": "ui_account_insights_no_account",
+      "value": "Select a game account and UID first."
+    },
+    {
+      "name": "ui_account_insights_no_records",
+      "value": "No saved records available for charting."
+    },
+    {
+      "name": "ui_account_insights_open",
+      "value": "History charts and AI insights"
+    },
+    {
+      "name": "ui_account_insights_unit_wish",
+      "value": "wishes"
+    },
+    {
+      "name": "ui_action_choose",
+      "value": "Choose"
+    },
+    {
+      "name": "ui_action_clear",
+      "value": "Clear"
+    },
+    {
+      "name": "ui_action_clear_cache",
+      "value": "Clear cache"
+    },
+    {
+      "name": "ui_action_close",
+      "value": "Close"
+    },
+    {
+      "name": "ui_action_continue",
+      "value": "Continue"
+    },
+    {
+      "name": "ui_action_disable",
+      "value": "Disable"
+    },
+    {
+      "name": "ui_action_edit",
+      "value": "Edit"
+    },
+    {
+      "name": "ui_action_enable",
+      "value": "Enable"
+    },
+    {
+      "name": "ui_action_restore",
+      "value": "Restore"
+    },
+    {
+      "name": "ui_agent_page_label_delete_conversation",
+      "value": "Delete conversation"
+    },
+    {
+      "name": "ui_agent_page_label_model_profile",
+      "value": "Model"
+    },
+    {
+      "name": "ui_agent_page_label_model_provider_profile",
+      "value": "Model Provider Profile"
+    },
+    {
+      "name": "ui_agent_page_label_placeholder",
+      "value": "Type a message..."
+    },
+    {
+      "name": "ui_ai_approval",
+      "value": "Tool approval required"
+    },
+    {
+      "name": "ui_ai_continue",
+      "value": "Continue generating"
+    },
+    {
+      "name": "ui_ai_conversation_actions",
+      "value": "Conversation actions"
+    },
+    {
+      "name": "ui_ai_copied_text",
+      "value": "Copied to clipboard"
+    },
+    {
+      "name": "ui_ai_copy_error",
+      "value": "Failed to open clipboard"
+    },
+    {
+      "name": "ui_ai_copy_text",
+      "value": "Copy Text"
+    },
+    {
+      "name": "ui_ai_custom_api",
+      "value": "Custom API"
+    },
+    {
+      "name": "ui_ai_device_generate",
+      "value": "Analyze on device"
+    },
+    {
+      "name": "ui_ai_endpoint_placeholder",
+      "value": "Base URL (blank for default)"
+    },
+    {
+      "name": "ui_ai_initial_request",
+      "value": "Analyze my account performance, wish results and future priorities using the historical statistics in this chat."
+    },
+    {
+      "name": "ui_ai_key_placeholder",
+      "value": "API key (blank to keep current)"
+    },
+    {
+      "name": "ui_ai_mode",
+      "value": "AI analysis mode"
+    },
+    {
+      "name": "ui_ai_on_device",
+      "value": "On-device AI"
+    },
+    {
+      "name": "ui_ai_privacy_body",
+      "value": "When you send a message, the selected AI endpoint receives the conversation and de-identified history statistics. The app does not attach UIDs, cookies, raw item IDs, or database files. Conversations stay on this device and API keys are stored securely by the system. Tools require your approval."
+    },
+    {
+      "name": "ui_ai_privacy_title",
+      "value": "Before using third-party AI"
+    },
+    {
+      "name": "ui_ai_reasoning_completed",
+      "value": "Thought"
+    },
+    {
+      "name": "ui_ai_reasoning_in_progress",
+      "value": "Thinking"
+    },
+    {
+      "name": "ui_ai_return",
+      "value": "Back to conversation"
+    },
+    {
+      "name": "ui_ai_select_conversation",
+      "value": "Select conversation"
+    },
+    {
+      "name": "ui_ai_workspace",
+      "value": "AI workspace"
+    },
+    {
+      "name": "ui_announcement_redeem_code_label",
+      "value": "Special Program Redemption Code"
+    },
+    {
+      "name": "ui_avatar_property_score_algorithm",
+      "value": "Artifact Score Algorithm"
+    },
+    {
+      "name": "ui_backpack_category_reliquary",
+      "value": "Artifacts"
+    },
+    {
+      "name": "ui_backpack_category_weapon",
+      "value": "Weapons"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_name_header",
+      "value": "Config Name"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_new_config",
+      "value": "New Config"
+    },
+    {
+      "name": "ui_backpack_sort_count",
+      "value": "Count"
+    },
+    {
+      "name": "ui_backpack_sort_quality",
+      "value": "Quality"
+    },
+    {
+      "name": "ui_base_value_slider_level",
+      "value": "Level"
+    },
+    {
+      "name": "ui_bg_choose_folder",
+      "value": "Choose Folder"
+    },
+    {
+      "name": "ui_bg_folder_picker_failed",
+      "value": "Could not choose a background folder"
+    },
+    {
+      "name": "ui_bg_folder_saved",
+      "value": "Background folder updated"
+    },
+    {
+      "name": "ui_bg_folder_temporary",
+      "value": "Folder access is available for this session only"
+    },
+    {
+      "name": "ui_bg_none",
+      "value": "None"
+    },
+    {
+      "name": "ui_card_calendar_all_materials_hint",
+      "value": "All material copies can be challenged"
+    },
+    {
+      "name": "ui_card_sign_in_auto_sign_in",
+      "value": "Auto sign in"
+    },
+    {
+      "name": "ui_card_sign_in_claim_re_sign_in_action",
+      "value": "Make up for check-in"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_allow",
+      "value": "Allow"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_deny",
+      "value": "Deny"
+    },
+    {
+      "name": "ui_clear_filters",
+      "value": "Clear filters"
+    },
+    {
+      "name": "ui_code_copied",
+      "value": "Redemption code copied successfully"
+    },
+    {
+      "name": "ui_common_loading",
+      "value": "Loading…"
+    },
+    {
+      "name": "ui_content_dialog_complete_primary_button_text",
+      "value": "Completed"
+    },
+    {
+      "name": "ui_cultivation_add_project_action",
+      "value": "Create"
+    },
+    {
+      "name": "ui_cultivation_material_list_world_level_title",
+      "value": "WL"
+    },
+    {
+      "name": "ui_cultivation_navigate_action",
+      "value": "Go"
+    },
+    {
+      "name": "ui_daily_note_notification_setting",
+      "value": "Notification Settings"
+    },
+    {
+      "name": "ui_calendar_time_pending",
+      "value": "Schedule to be announced"
+    },
+    {
+      "name": "ui_daily_note_refresh",
+      "value": "Refresh"
+    },
+    {
+      "name": "ui_daily_note_setting_auto_refresh",
+      "value": "Auto Refresh"
+    },
+    {
+      "name": "ui_desc_abyss",
+      "value": "Current and previous periods"
+    },
+    {
+      "name": "ui_desc_account",
+      "value": "Manage accounts and linked characters"
+    },
+    {
+      "name": "ui_desc_achievement",
+      "value": "Export / Import / UIAF"
+    },
+    {
+      "name": "ui_desc_announcements",
+      "value": "Updates and news"
+    },
+    {
+      "name": "ui_desc_backpack",
+      "value": "Weapons / Artifacts / UIIF"
+    },
+    {
+      "name": "ui_desc_banner_history",
+      "value": "Featured characters and weapons"
+    },
+    {
+      "name": "ui_desc_calendar",
+      "value": "Events / Wishes / Check-ins"
+    },
+    {
+      "name": "ui_desc_challenge",
+      "value": "Solo / Co-op / Best times"
+    },
+    {
+      "name": "ui_desc_character",
+      "value": "Character Attributes / Artifacts"
+    },
+    {
+      "name": "ui_desc_cultivation",
+      "value": "Material Checklist / Material Statistics"
+    },
+    {
+      "name": "ui_desc_daily_note",
+      "value": "Original Resin / Expeditions / Notification"
+    },
+    {
+      "name": "ui_desc_launch",
+      "value": "Launch shortcuts"
+    },
+    {
+      "name": "ui_desc_ledger",
+      "value": "Monthly Primogem and Mora records"
+    },
+    {
+      "name": "ui_desc_passport",
+      "value": "Passport information"
+    },
+    {
+      "name": "ui_desc_settings",
+      "value": "Theme / Refresh / Language"
+    },
+    {
+      "name": "ui_desc_sign_in",
+      "value": "Daily check-in rewards"
+    },
+    {
+      "name": "ui_desc_theater",
+      "value": "Star Challenge Stellas / Alternate Cast members"
+    },
+    {
+      "name": "ui_desc_wiki_avatar",
+      "value": "Character elements and skills"
+    },
+    {
+      "name": "ui_desc_wiki_monster",
+      "value": "Monster elements and factions"
+    },
+    {
+      "name": "ui_desc_wiki_weapon",
+      "value": "Weapon stats and attack"
+    },
+    {
+      "name": "ui_desc_wish",
+      "value": "Overview / History"
+    },
+    {
+      "name": "ui_exception_close",
+      "value": "Close"
+    },
+    {
+      "name": "ui_filter",
+      "value": "Filter"
+    },
+    {
+      "name": "ui_filter_count",
+      "value": "Filter (%d)"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_down",
+      "value": "Second Half"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_up",
+      "value": "First Half"
+    },
+    {
+      "name": "ui_gacha_log_orange_avatar_countdown",
+      "value": "Five Star Roles"
+    },
+    {
+      "name": "ui_gacha_log_orange_weapon_countdown",
+      "value": "Five Star Weapons"
+    },
+    {
+      "name": "ui_gacha_log_purple_avatar_countdown",
+      "value": "Four Star Roles"
+    },
+    {
+      "name": "ui_gacha_log_purple_weapon_countdown",
+      "value": "Four Star Weapons"
+    },
+    {
+      "name": "ui_gacha_log_switch_to_beyond_gacha_mode_header",
+      "value": "Odes"
+    },
+    {
+      "name": "ui_gacha_pool_avatar_event",
+      "value": "Character Event Wish"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_event",
+      "value": "Event Ode"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_permanent",
+      "value": "Encounter Echoes"
+    },
+    {
+      "name": "ui_gacha_pool_chronicled",
+      "value": "Chronicled Wish"
+    },
+    {
+      "name": "ui_gacha_pool_novice",
+      "value": "Novice Wish"
+    },
+    {
+      "name": "ui_gacha_pool_permanent",
+      "value": "Wanderlust Invocation"
+    },
+    {
+      "name": "ui_gacha_pool_weapon_event",
+      "value": "Epitome Invocation"
+    },
+    {
+      "name": "ui_grid_view",
+      "value": "Grid view"
+    },
+    {
+      "name": "ui_history_charts",
+      "value": "History charts"
+    },
+    {
+      "name": "ui_home_greeting",
+      "value": "Welcome to Teyvat, Traveler!"
+    },
+    {
+      "name": "ui_home_greeting_count",
+      "value": "You have launched Snap Hutao %s times"
+    },
+    {
+      "name": "ui_home_greeting_rare",
+      "value": "You're right, but Snap Hutao was developed by DGP Studio..."
+    },
+    {
+      "name": "ui_home_greeting_text_default",
+      "value": "Welcome to Teyvat, Traveler!"
+    },
+    {
+      "name": "ui_home_no_codes",
+      "value": "No redeem codes available"
+    },
+    {
+      "name": "ui_home_no_events",
+      "value": "No scheduled events"
+    },
+    {
+      "name": "ui_home_recent",
+      "value": "Upcoming events and wishes"
+    },
+    {
+      "name": "ui_hutao_passport_verify_code_action",
+      "value": "Get Verification Code"
+    },
+    {
+      "name": "ui_info_bar_panel_contract_content",
+      "value": "Collapse"
+    },
+    {
+      "name": "ui_list_view",
+      "value": "List view"
+    },
+    {
+      "name": "ui_material_frosted",
+      "value": "Frosted translucency and soft shadows"
+    },
+    {
+      "name": "ui_material_system_glass",
+      "value": "System glass and immersive lighting"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_elec",
+      "value": "Electro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_fire",
+      "value": "Pyro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_grass",
+      "value": "Dendro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_ice",
+      "value": "Cryo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_rock",
+      "value": "Geo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_water",
+      "value": "Hydro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_wind",
+      "value": "Anemo"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_blue",
+      "value": "3 Stars"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_green",
+      "value": "2 Stars"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_orange",
+      "value": "5 Stars"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_purple",
+      "value": "4 Stars"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_red",
+      "value": "Event Exclusive"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_white",
+      "value": "1 Star"
+    },
+    {
+      "name": "ui_model_intrinsic_role_combat_difficulty_level_lunar",
+      "value": "Lunar Mode"
+    },
+    {
+      "name": "ui_model_metadata_material_weapon_ascension_material",
+      "value": "Weapon Ascension Materials"
+    },
+    {
+      "name": "ui_nav_announcements",
+      "value": "Game announcements"
+    },
+    {
+      "name": "ui_nav_banner_history",
+      "value": "Banner history"
+    },
+    {
+      "name": "ui_navigation_collapse",
+      "value": "Collapse navigation"
+    },
+    {
+      "name": "ui_navigation_expand",
+      "value": "Expand navigation"
+    },
+    {
+      "name": "ui_option_selected",
+      "value": "Selected"
+    },
+    {
+      "name": "ui_option_unselected",
+      "value": "Not selected"
+    },
+    {
+      "name": "ui_plugin_setting_back_button",
+      "value": "Back"
+    },
+    {
+      "name": "ui_role_combat_avatar_trial_hint",
+      "value": "Trial"
+    },
+    {
+      "name": "ui_role_combat_shortest",
+      "value": "Fastest performance"
+    },
+    {
+      "name": "ui_role_combat_splendour_buffs_header",
+      "value": "Brilliant Blessings"
+    },
+    {
+      "name": "ui_role_combat_support",
+      "value": "Support"
+    },
+    {
+      "name": "ui_setting_apperance_first_day_of_week_header",
+      "value": "First day of week"
+    },
+    {
+      "name": "ui_setting_background_image_custom_folder_header",
+      "value": "Custom Background Image Folder"
+    },
+    {
+      "name": "ui_setting_background_media_local_folder",
+      "value": "Local Random Video"
+    },
+    {
+      "name": "ui_setting_background_media_official_launcher_video",
+      "value": "Official Launcher Background"
+    },
+    {
+      "name": "ui_setting_background_video_is_looping_header",
+      "value": "Loop Playback"
+    },
+    {
+      "name": "ui_setting_background_video_is_muted_header",
+      "value": "Mute Playback"
+    },
+    {
+      "name": "ui_setting_control_material_default",
+      "value": "Default"
+    },
+    {
+      "name": "ui_setting_create_desktop_shortcut_action",
+      "value": "Create"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_off",
+      "value": "Hide"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_on",
+      "value": "Show"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_action",
+      "value": "Configuration"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_header",
+      "value": "Config Geetest Verification Endpoint"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_description",
+      "value": "Takes effect immediately. Once disabled, it will no longer be displayed"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_header",
+      "value": "Enable Game Event Calendar"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_description",
+      "value": "Disabled by default, some content such as event dates that are not in progress will not be displayed correctly"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_header",
+      "value": "Whether to display in-game version event activities that are not currently in progress"
+    },
+    {
+      "name": "ui_setting_home_card_description",
+      "value": "Manage cards on home dashboard, drag to sort"
+    },
+    {
+      "name": "ui_setting_hutao_passport_logout_action",
+      "value": "Sign out"
+    },
+    {
+      "name": "ui_setting_key_shortcut_virtual_key_code_action",
+      "value": "View"
+    },
+    {
+      "name": "ui_settings_auto_sign_info",
+      "value": "Checks in for the current UID on launch and for local CN characters at the next day boundary while running."
+    },
+    {
+      "name": "ui_settings_backup_credentials",
+      "value": "The backup contains login credentials. Keep it private."
+    },
+    {
+      "name": "ui_settings_cache",
+      "value": "Media and icon cache"
+    },
+    {
+      "name": "ui_settings_cache_size",
+      "value": "Cache size %s"
+    },
+    {
+      "name": "ui_settings_cancel_update",
+      "value": "Cancel update"
+    },
+    {
+      "name": "ui_settings_cancelling",
+      "value": "Cancelling…"
+    },
+    {
+      "name": "ui_settings_choose_video",
+      "value": "Choose videos"
+    },
+    {
+      "name": "ui_settings_configure",
+      "value": "Configuration"
+    },
+    {
+      "name": "ui_settings_data_next_launch",
+      "value": "Selected game data takes effect next launch."
+    },
+    {
+      "name": "ui_settings_data_source",
+      "value": "Data source URL"
+    },
+    {
+      "name": "ui_settings_delete_wish",
+      "value": "Delete all wish data"
+    },
+    {
+      "name": "ui_settings_delete_wish_archive",
+      "value": "Delete wish archive"
+    },
+    {
+      "name": "ui_settings_delete_wish_confirm",
+      "value": "Delete wish records for all UIDs? This cannot be undone."
+    },
+    {
+      "name": "ui_settings_download_verify",
+      "value": "Download and verify"
+    },
+    {
+      "name": "ui_settings_export_backup",
+      "value": "Export full backup"
+    },
+    {
+      "name": "ui_settings_feedback",
+      "value": "Feedback and diagnostics"
+    },
+    {
+      "name": "ui_settings_game_data",
+      "value": "Game data updates"
+    },
+    {
+      "name": "ui_settings_geetest_help",
+      "value": "Use {0} for gt and {1} for challenge. The GET response must return code: 0, challenge and validate. Leave blank for interactive verification."
+    },
+    {
+      "name": "ui_settings_help",
+      "value": "Offline help"
+    },
+    {
+      "name": "ui_settings_immersive_material",
+      "value": "Immersive material"
+    },
+    {
+      "name": "ui_settings_local_backup_success",
+      "value": "Completed"
+    },
+    {
+      "name": "ui_settings_manifest_help",
+      "value": "Save the manifest URL, then check for updates."
+    },
+    {
+      "name": "ui_settings_material_level",
+      "value": "Immersive material level"
+    },
+    {
+      "name": "ui_settings_material_scope",
+      "value": "Material levels update immediately. Content surfaces use a frosted effect. Supported controls use the system immersive effect."
+    },
+    {
+      "name": "ui_settings_no_wallpaper",
+      "value": "No wallpaper selected"
+    },
+    {
+      "name": "ui_settings_no_wish_archives",
+      "value": "No wish archives. Refresh or import to add one."
+    },
+    {
+      "name": "ui_settings_normal_material",
+      "value": "Standard material"
+    },
+    {
+      "name": "ui_settings_not_logged_in",
+      "value": "Signed out"
+    },
+    {
+      "name": "ui_settings_page_description_add_model_provider_profile_to_edit",
+      "value": "Add a model provider profile first"
+    },
+    {
+      "name": "ui_settings_page_label_add_profile",
+      "value": "Add"
+    },
+    {
+      "name": "ui_settings_page_label_agent_maximum_iterations_per_request",
+      "value": "Maximum Tool Iterations Per Request"
+    },
+    {
+      "name": "ui_settings_page_label_agent_system_prompt",
+      "value": "System Prompt"
+    },
+    {
+      "name": "ui_settings_page_label_agent_user_name",
+      "value": "User Name"
+    },
+    {
+      "name": "ui_settings_page_label_clear_models",
+      "value": "Clear Models"
+    },
+    {
+      "name": "ui_settings_page_label_copy_profile",
+      "value": "Copy"
+    },
+    {
+      "name": "ui_settings_page_label_delete_model",
+      "value": "Delete Model"
+    },
+    {
+      "name": "ui_settings_page_label_delete_profile",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_settings_page_label_fetch_models",
+      "value": "Fetch"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_context_window_tokens",
+      "value": "Context Window Length"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_input_tokens",
+      "value": "Input Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_output_tokens",
+      "value": "Output Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_name",
+      "value": "Model Name"
+    },
+    {
+      "name": "ui_settings_page_label_model_omit_reasoning_effort_when_thinking_disabled",
+      "value": "Omit reasoning effort when Thinking is off"
+    },
+    {
+      "name": "ui_settings_page_label_model_provider_profiles",
+      "value": "Model Provider Profiles"
+    },
+    {
+      "name": "ui_settings_page_label_model_reasoning_effort",
+      "value": "Reasoning Effort"
+    },
+    {
+      "name": "ui_settings_page_label_model_temperature",
+      "value": "Temperature"
+    },
+    {
+      "name": "ui_settings_page_label_model_thinking_enabled",
+      "value": "Enable Thinking"
+    },
+    {
+      "name": "ui_settings_page_label_model_top_p",
+      "value": "Top P"
+    },
+    {
+      "name": "ui_settings_page_label_profile_model_id",
+      "value": "Model ID"
+    },
+    {
+      "name": "ui_settings_page_label_profile_name",
+      "value": "Profile Name"
+    },
+    {
+      "name": "ui_settings_page_label_profile_provider_type",
+      "value": "Provider Type"
+    },
+    {
+      "name": "ui_settings_page_label_selected_model",
+      "value": "Selected Model"
+    },
+    {
+      "name": "ui_settings_page_option_provider_default",
+      "value": "Provider default"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_extra_high",
+      "value": "Extra high"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_high",
+      "value": "High"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_low",
+      "value": "Low"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_medium",
+      "value": "Medium"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_none",
+      "value": "None"
+    },
+    {
+      "name": "ui_settings_previous_data",
+      "value": "Restore previous game data"
+    },
+    {
+      "name": "ui_settings_processing",
+      "value": "Processing…"
+    },
+    {
+      "name": "ui_settings_random_video",
+      "value": "Play a random imported video on load."
+    },
+    {
+      "name": "ui_settings_reduce_motion",
+      "value": "Reduce motion"
+    },
+    {
+      "name": "ui_settings_reduced_motion_info",
+      "value": "Reduce page transitions and press animations."
+    },
+    {
+      "name": "ui_settings_reset_builtin",
+      "value": "Restore built-in game data"
+    },
+    {
+      "name": "ui_settings_restore_backup",
+      "value": "Restore from backup"
+    },
+    {
+      "name": "ui_settings_restore_confirm",
+      "value": "Replace current data with this backup?"
+    },
+    {
+      "name": "ui_settings_restore_scope",
+      "value": "Restore accounts, game records and preferences"
+    },
+    {
+      "name": "ui_settings_signed_in",
+      "value": "Signed in to the game account"
+    },
+    {
+      "name": "ui_settings_stop_download",
+      "value": "Stop the download and wait for verification to finish?"
+    },
+    {
+      "name": "ui_settings_verified_data",
+      "value": "Download and verify the full data set from a trusted GitHub commit."
+    },
+    {
+      "name": "ui_settings_video_fallback",
+      "value": "Pauses in the background. Shows the wallpaper if video is unavailable."
+    },
+    {
+      "name": "ui_settings_wallpaper_sources",
+      "value": "Local images rotate every five minutes. Daily wallpaper is from Snap Hutao. Image rights belong to their creators."
+    },
+    {
+      "name": "ui_spiral_abyss_hutao_statistics",
+      "value": "Statistics"
+    },
+    {
+      "name": "ui_spiral_abyss_upload_record_homa_not_login_primary_button_text",
+      "value": "Log in Now"
+    },
+    {
+      "name": "ui_travelers_diary_no_income_source_hint",
+      "value": "No primogem income recorded this month"
+    },
+    {
+      "name": "ui_travelers_diary_today",
+      "value": "Today"
+    },
+    {
+      "name": "ui_update_cancel",
+      "value": "Cancel check"
+    },
+    {
+      "name": "ui_update_cancelled",
+      "value": "Cancelled"
+    },
+    {
+      "name": "ui_update_channel",
+      "value": "Release channel"
+    },
+    {
+      "name": "ui_update_check_failed",
+      "value": "Failed to check updates"
+    },
+    {
+      "name": "ui_update_checking",
+      "value": "Checking for updates…"
+    },
+    {
+      "name": "ui_update_compare_unknown",
+      "value": "Insufficient version information"
+    },
+    {
+      "name": "ui_update_compatibility_unknown",
+      "value": "Installation compatibility unknown"
+    },
+    {
+      "name": "ui_update_conflict",
+      "value": "Version name and code disagree"
+    },
+    {
+      "name": "ui_update_current",
+      "value": "You are up to date."
+    },
+    {
+      "name": "ui_update_hap_listed",
+      "value": "HarmonyOS package listed"
+    },
+    {
+      "name": "ui_update_installed",
+      "value": "Installed version %s"
+    },
+    {
+      "name": "ui_update_invalid",
+      "value": "Invalid release information"
+    },
+    {
+      "name": "ui_update_local_newer",
+      "value": "Installed version is newer"
+    },
+    {
+      "name": "ui_update_no_hap",
+      "value": "No HarmonyOS package listed"
+    },
+    {
+      "name": "ui_update_no_notes",
+      "value": "No release notes for this version"
+    },
+    {
+      "name": "ui_update_no_release",
+      "value": "No public releases in this channel"
+    },
+    {
+      "name": "ui_update_notes_error",
+      "value": "Could not open release notes"
+    },
+    {
+      "name": "ui_update_preview",
+      "value": "Include prereleases"
+    },
+    {
+      "name": "ui_update_project_releases",
+      "value": "Project releases"
+    },
+    {
+      "name": "ui_update_rate_limit",
+      "value": "GitHub request limited. Try again later."
+    },
+    {
+      "name": "ui_update_recent_only",
+      "value": "Checked the latest 300 releases"
+    },
+    {
+      "name": "ui_update_required_api",
+      "value": "Minimum API %d"
+    },
+    {
+      "name": "ui_update_skipped",
+      "value": "Version %s has been skipped. It will no longer be prompted automatically on startup, but you can still check for updates manually in Settings"
+    },
+    {
+      "name": "ui_update_stable",
+      "value": "Stable releases"
+    },
+    {
+      "name": "ui_update_unavailable",
+      "value": "Release repository unavailable"
+    },
+    {
+      "name": "ui_update_unknown",
+      "value": "Unknown"
+    },
+    {
+      "name": "ui_update_unskip",
+      "value": "Unskip this version"
+    },
+    {
+      "name": "ui_user_copy_cookie_action",
+      "value": "Copy Cookie"
+    },
+    {
+      "name": "ui_web_daily_note_attendance_reward_status_finished_non_reward",
+      "value": "Finished"
+    },
+    {
+      "name": "ui_web_hoyolab_game_record_act_calendar_hard_challenge_locked",
+      "value": "Locked"
+    },
+    {
+      "name": "ui_weekday_friday",
+      "value": "Fri"
+    },
+    {
+      "name": "ui_weekday_monday",
+      "value": "Mon"
+    },
+    {
+      "name": "ui_weekday_saturday",
+      "value": "Sat"
+    },
+    {
+      "name": "ui_weekday_sunday",
+      "value": "Sun"
+    },
+    {
+      "name": "ui_weekday_thursday",
+      "value": "Thu"
+    },
+    {
+      "name": "ui_weekday_tuesday",
+      "value": "Tue"
+    },
+    {
+      "name": "ui_weekday_wednesday",
+      "value": "Wed"
+    },
+    {
+      "name": "ui_wi_ki_avatar_ascension_materials_header",
+      "value": "Ascension Materials"
+    },
+    {
+      "name": "ui_wi_ki_avatar_auto_suggest_box_place_holder",
+      "value": "Filter Characters"
+    },
+    {
+      "name": "ui_wi_ki_avatar_name_card_header",
+      "value": "Namecard"
+    },
+    {
+      "name": "ui_wi_ki_avatar_special_food_title",
+      "value": "Special Dish"
+    },
+    {
+      "name": "ui_wi_ki_weapon_auto_suggest_box_place_holder",
+      "value": "Filter Weapons"
+    },
+    {
+      "name": "ui_wish_show_empty_history",
+      "value": "Display History with No Wish Records"
+    },
+    {
+      "name": "ui_wish_show_empty_overview",
+      "value": "Display Overview with No Wish Records"
+    },
+    {
+      "name": "ui_wish_show_unobtained",
+      "value": "Display Undrawn Wish Items"
+    },
+    {
+      "name": "ui_gacha_pivot_overview",
+      "value": "Overview"
+    },
+    {
+      "name": "ui_gacha_pivot_history",
+      "value": "History"
+    },
+    {
+      "name": "ui_gacha_pivot_avatar",
+      "value": "Role"
+    },
+    {
+      "name": "ui_gacha_pivot_weapon",
+      "value": "Weapon"
+    },
+    {
+      "name": "ui_gacha_pivot_countdown",
+      "value": "Countdown"
+    },
+    {
+      "name": "ui_gacha_pivot_statistics",
+      "value": "Global Wish Stats"
+    },
+    {
+      "name": "ui_gacha_full_refresh",
+      "value": "Full Refresh"
+    },
+    {
+      "name": "ui_gacha_full_refresh_selected",
+      "value": "✓ Full Refresh"
+    },
+    {
+      "name": "ui_gacha_card_statistics",
+      "value": "Statistics"
+    },
+    {
+      "name": "ui_gacha_card_ratio",
+      "value": "Proportion"
+    },
+    {
+      "name": "ui_gacha_card_five_average",
+      "value": "Avg 5 Stars wish"
+    },
+    {
+      "name": "ui_gacha_card_four_average",
+      "value": "Avg 4 Stars wish"
+    },
+    {
+      "name": "ui_gacha_card_up_average",
+      "value": "Luckiness Avg"
+    },
+    {
+      "name": "ui_gacha_card_to_five",
+      "value": "Last 5 Star"
+    },
+    {
+      "name": "ui_gacha_card_to_four",
+      "value": "Last 4 Star"
+    },
+    {
+      "name": "ui_gacha_card_to_three",
+      "value": "Last 3 Star"
+    },
+    {
+      "name": "ui_travelers_diary_month",
+      "value": "This Month"
+    },
+    {
+      "name": "ui_travelers_diary_primogems",
+      "value": "Primogem"
+    },
+    {
+      "name": "ui_travelers_diary_mora",
+      "value": "Mora"
+    }
+  ]
+}

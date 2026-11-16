@@ -8,6 +8,7 @@
 import { UigfService } from './UigfService';
 import { GachaArchive } from '../model/GachaArchive';
 import { GachaRepo } from '../data/repo/GachaRepo';
+import { GachaItemIdentityService } from './GachaItemIdentityService';
 import { GachaItem } from '../model/GachaItem';
 import { GachaType } from '../model/GachaType';
 import { GachaEventMeta, WikiMetaService, WikiAvatarMeta, WikiWeaponMeta } from './WikiMetaService';
@@ -19,6 +20,7 @@ const TAG: string = 'GachaHistoryService';
 export class HistoryUpItem {
   itemId: number = 0;
   name: string = '';
+  canonicalName: string = '';
   /** MetaIcon 图标名（AvatarIcon/EquipIcon 文件名） */
   icon: string = '';
   /** MetaIcon 类目目录名 */
@@ -56,6 +58,7 @@ export class GachaHistoryService {
       const it: HistoryUpItem = new HistoryUpItem();
       it.itemId = a.id;
       it.name = a.name;
+      it.canonicalName = a.canonicalName;
       it.icon = a.icon;
       it.category = 'AvatarIcon';
       map.set(a.id, it);
@@ -65,6 +68,7 @@ export class GachaHistoryService {
       const it: HistoryUpItem = new HistoryUpItem();
       it.itemId = w.id;
       it.name = w.name;
+      it.canonicalName = w.canonicalName;
       it.icon = w.icon;
       it.category = 'EquipIcon';
       map.set(w.id, it);
@@ -76,7 +80,7 @@ export class GachaHistoryService {
    * 构建全部期次汇总（常规池 301/400/302/500；按开始时间倒序返回）。
    * 无归档数据时返回空数组。
    */
-  async buildHistory(archiveId: number): Promise<HistoryWishView[]> {
+  async buildHistory(archiveId: number, showEmpty: boolean = false): Promise<HistoryWishView[]> {
     if (archiveId <= 0) {
       return [];
     }
@@ -87,8 +91,13 @@ export class GachaHistoryService {
     const archive: GachaArchive | undefined = (await GachaRepo.getAllArchives())
       .find((entry: GachaArchive): boolean => entry.id === archiveId);
     const timezone: number = UigfService.timezoneOfUid(archive?.uid ?? '');
-    const items: GachaItem[] = await GachaRepo.getItemsByArchive(archiveId);
-    if (items.length === 0) {
+    const items: GachaItem[] = await GachaItemIdentityService.resolveMissing(await GachaRepo.getItemsByArchive(archiveId));
+    return await this.buildFromItems(items, events, timezone, showEmpty);
+  }
+
+  async buildFromItems(items: GachaItem[], events: GachaEventMeta[], timezone: number,
+    showEmpty: boolean = false): Promise<HistoryWishView[]> {
+    if (items.length === 0 && !showEmpty) {
       return [];
     }
     // 按池类型分桶（只参与常规祈愿期次；新手/常驻无期次元数据）
@@ -110,8 +119,8 @@ export class GachaHistoryService {
     const views: HistoryWishView[] = [];
     for (const ev of events) {
       // 400 期次匹配 gachaType=400 的条目；UIGF 导入合并为 301 的部分由 301 期次按时间兜住
-      const bucket: GachaItem[] | undefined = buckets.get(ev.type);
-      if (bucket === undefined) {
+      const bucket: GachaItem[] = buckets.get(ev.type) ?? [];
+      if (bucket.length === 0 && !showEmpty) {
         continue;
       }
       const view: HistoryWishView = new HistoryWishView();
@@ -128,11 +137,15 @@ export class GachaHistoryService {
         const up: HistoryUpItem = new HistoryUpItem();
         up.itemId = id;
         up.name = meta !== undefined ? meta.name : `${id}`;
+        up.canonicalName = meta?.canonicalName ?? '';
         up.icon = meta !== undefined ? meta.icon : '';
         up.category = meta !== undefined ? meta.category : 'AvatarIcon';
         list.push(up);
         upIndex.set(id, up);
         upByName.set(up.name, up);
+        if (up.canonicalName.length > 0 && !upByName.has(up.canonicalName)) {
+          upByName.set(up.canonicalName, up);
+        }
       };
       for (const id of ev.upOrange) {
         registerUp(id, view.orangeUps);
@@ -154,12 +167,13 @@ export class GachaHistoryService {
           up.count++;
         }
       }
-      // 无任何抽卡记录的期次不展示（对齐 Windows HistoryWishBuilder.IsEmpty）
-      if (view.totalCount > 0) {
+      if (view.totalCount > 0 || showEmpty) {
         views.push(view);
       }
     }
-    views.sort((a: HistoryWishView, b: HistoryWishView) => b.from - a.from);
+    const order: number[] = [301, 400, 302, 500, 200, 100];
+    views.sort((a: HistoryWishView, b: HistoryWishView): number =>
+      b.from - a.from || order.indexOf(a.type) - order.indexOf(b.type));
     Logger.info(TAG, `history wishes built: ${views.length}`);
     return views;
   }

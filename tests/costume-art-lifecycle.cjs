@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require(process.env.TYPESCRIPT_PATH || '../ci/node_modules/typescript');
 const filename = path.resolve(__dirname, '../entry/src/main/ets/pages/WikiAvatarPage.ets');
-const original = fs.readFileSync(filename, 'utf8');
+const original = fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n');
 const splash = original.slice(0, original.indexOf('\n@Entry'));
 const methods = (splash.slice(0, splash.indexOf('  build() {')) + '}')
   .replace('@Component\n', '').replace('export struct SplashArtView', 'export class SplashArtView');

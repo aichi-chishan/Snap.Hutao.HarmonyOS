@@ -6,3 +6,8 @@
 # 二进制资源由 text=auto 自动识别，不受影响。
 # ============================================================
 * text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary

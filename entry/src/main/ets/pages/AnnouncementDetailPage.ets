@@ -181,7 +181,7 @@ ${c}
         Text('‹')
           .fontSize(26)
           .fontColor($r('app.color.text_primary'))
-          .accessibilityText('返回')
+          .accessibilityText($r('app.string.ui_plugin_setting_back_button'))
           .accessibilityLevel('yes')
           .onClick(() => {
             router.back();

@@ -1,9 +1,10 @@
 import { http } from '@kit.NetworkKit';
 import { bundleManager, common } from '@kit.AbilityKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
-import { AppUpdatePolicy, AppUpdateResult, UpdateCatalog, UpdateChannel, UpdateClient, UpdateStatus } from '../model/AppUpdate';
+import { AppRelease, AppUpdatePolicy, AppUpdateResult, UpdateCatalog, UpdateChannel, UpdateClient, UpdateStatus } from '../model/AppUpdate';
+import { PreferencesStore } from '../data/prefs/PreferencesStore';
 
-/** One caller-owned read-only check. No shared ApiClient, cookies, auth, package bytes, or background checks. */
+/** One caller-owned read-only release check. */
 export class AppUpdateRequest {
   private cancelled: boolean = false;
   private handle: http.HttpRequest | undefined = undefined;
@@ -58,6 +59,40 @@ export class AppUpdateRequest {
   }
 }
 export class AppUpdateService {
+  private static readonly SKIPPED_KEY: string = 'app.update.skipped';
+  private static startup?: Promise<AppUpdateResult>;
+
+  static startupCheck(): Promise<AppUpdateResult> {
+    if (AppUpdateService.startup === undefined) { AppUpdateService.startup = AppUpdateService.checkStableAtStartup(); }
+    return AppUpdateService.startup;
+  }
+
+  private static async checkStableAtStartup(): Promise<AppUpdateResult> {
+    const request: AppUpdateRequest = new AppUpdateRequest();
+    let timer: number = -1;
+    const deadline: Promise<AppUpdateResult> = new Promise<AppUpdateResult>((resolve) => {
+      timer = setTimeout(() => {
+        request.cancel();
+        const result: AppUpdateResult = new AppUpdateResult();
+        result.status = UpdateStatus.Cancelled;
+        resolve(result);
+      }, 3000);
+    });
+    try { return await Promise.race<AppUpdateResult>([request.run(AppUpdateService.readClient(), UpdateChannel.Stable), deadline]); }
+    finally { clearTimeout(timer); }
+  }
+
+  static skippedTag(): string { return PreferencesStore.getString(AppUpdateService.SKIPPED_KEY, ''); }
+
+  static setSkippedTag(tag: string): void {
+    PreferencesStore.setString(AppUpdateService.SKIPPED_KEY, tag);
+    AppStorage.setOrCreate<string>('appUpdateSkippedTag', tag);
+  }
+
+  static releaseForNotice(result: AppUpdateResult): AppRelease | undefined {
+    return result.status === UpdateStatus.Newer ? result.release : undefined;
+  }
+
   static readClient(): UpdateClient {
     const client: UpdateClient = new UpdateClient();
     try {

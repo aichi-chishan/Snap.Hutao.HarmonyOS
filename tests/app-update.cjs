@@ -11,7 +11,7 @@ const read = name => fs.readFileSync(path.join(root, name + '.ets'), 'utf8');
 const deferred = () => { let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject}; };
 const flush = async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
 function harness(){
- const state={requests:[],queue:[],links:[],linkGate:undefined,client:{name:'com.example.snaphutaoharmonyos',versionName:'1.21.0',versionCode:1002100},api:24,reads:0};
+ const state={requests:[],queue:[],links:[],linkGate:undefined,client:{name:'com.example.snaphutaoharmonyos',versionName:'1.21.0',versionCode:1002100},api:24,reads:0,prefs:new Map(),appStorage:new Map(),timer:undefined};
  const kits={
   '@kit.NetworkKit':{http:{RequestMethod:{GET:'GET'},HttpDataType:{STRING:'STRING'},createHttp:()=>{
    const handle={destroyed:0,destroy(){this.destroyed++;},async request(url,options){state.requests.push({url,options,handle});const next=state.queue.shift();if(next instanceof Error)throw next;if(next?.promise)return next.promise;return next||{responseCode:200,result:'[]'};}};return handle;
@@ -20,14 +20,18 @@ function harness(){
   '@kit.BasicServicesKit':{deviceInfo:{get sdkApiVersion(){return state.api;}}}
  };
  // UpdatePage 的「跳过此版本」读本机偏好；测试侧桩为空值（默认未跳过）。
- const prefs={getString:()=>'',setString:()=>{},getNumber:()=>0,setNumber:()=>{},getBool:()=>false,setBool:()=>{}};
+ const prefs={getString:(key,fallback)=>state.prefs.get(key)??fallback,setString:(key,value)=>state.prefs.set(key,value)};
  const cache=new Map();
   function load(name){
    if(kits[name])return kits[name];if(cache.has(name))return cache.get(name);if(name.startsWith('components/'))return {};
    if(name==='data/prefs/PreferencesStore')return {PreferencesStore:prefs};
   let source=read(name);if(name==='pages/UpdatePage')source=source.slice(0,source.indexOf('  @Builder'))+'}';source=source.replace('export struct UpdatePage','export class UpdatePage');
   const out=ts.transpileModule(source,{reportDiagnostics:true,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}});assert.equal(out.diagnostics.length,0,name);
-  const module={exports:{}};vm.runInNewContext(`(function(require,module,exports){${out.outputText}\n})`,{Observed:v=>v,Entry:v=>v,Component:v=>v,Prop:()=>{},State:()=>{},StorageProp:()=>()=>{}})(id=>load(id.startsWith('@')?id:path.posix.normalize(path.posix.join(path.posix.dirname(name),id))),module,module.exports);cache.set(name,module.exports);return module.exports;
+  const module={exports:{}};vm.runInNewContext(`(function(require,module,exports){${out.outputText}\n})`,{
+   Observed:v=>v,Entry:v=>v,Component:v=>v,Prop:()=>{},State:()=>{},StorageProp:()=>()=>{},
+   AppStorage:{setOrCreate:(key,value)=>state.appStorage.set(key,value)},
+   setTimeout:(callback,delay)=>{state.timer={callback,delay};return 1;},clearTimeout:()=>{state.timer=undefined;}
+  })(id=>load(id.startsWith('@')?id:path.posix.normalize(path.posix.join(path.posix.dirname(name),id))),module,module.exports);cache.set(name,module.exports);return module.exports;
  }
  const policy=load('model/AppUpdate');const service=load('service/AppUpdateService');
  return {...policy,...service,state,load,VM:load('viewmodel/UpdateViewModel').UpdateViewModel,context:{openLink:async url=>{state.links.push(url);if(state.linkGate)await state.linkGate.promise;}},page:()=>new (load('pages/UpdatePage').UpdatePage)()};
@@ -40,7 +44,10 @@ function strictTypes() {
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hutao-update-types-'));
  const names=['model/AppUpdate','service/AppUpdateService','viewmodel/UpdateViewModel'];
  for(const name of names){const filename=path.join(dir,name+'.ts');fs.mkdirSync(path.dirname(filename),{recursive:true});fs.writeFileSync(filename,read(name));}
+ const prefs=path.join(dir,'data/prefs/PreferencesStore.ts');fs.mkdirSync(path.dirname(prefs),{recursive:true});
+ fs.writeFileSync(prefs,'export class PreferencesStore {static getString(key:string,fallback:string):string{return fallback;}static setString(key:string,value:string):void{}}');
  fs.writeFileSync(path.join(dir,'globals.d.ts'),`declare function Observed<T extends new (...args:never[])=>object>(value:T):T;
+ declare const AppStorage:{setOrCreate<T>(key:string,value:T):void};
  declare module '@kit.AbilityKit' {export namespace common {interface UIAbilityContext {openLink(url:string):Promise<void>}};export namespace bundleManager {interface BundleInfo {name:string;versionName:string;versionCode:number};enum BundleFlag {GET_BUNDLE_INFO_DEFAULT};function getBundleInfoForSelfSync(flag:BundleFlag):BundleInfo}}
  declare module '@kit.BasicServicesKit' {export const deviceInfo:{sdkApiVersion:number};}
  declare module '@kit.NetworkKit' {export namespace http {interface HttpResponse {responseCode:number;result:string|Object|ArrayBuffer};interface HttpRequest {destroy():void;request(url:string,options:{method:RequestMethod;header:Record<string,string>;connectTimeout:number;readTimeout:number;expectDataType:HttpDataType;maxLimit:number;maxRedirects:number;usingCache:boolean}):Promise<HttpResponse>};enum RequestMethod {GET};enum HttpDataType {STRING};function createHttp():HttpRequest;}}`);
@@ -135,6 +142,27 @@ function strictTypes() {
   const h=harness(),page=h.page();page.aboutToAppear();page.onPageShow();assert.equal(h.state.reads,1);assert.equal(h.state.requests.length,0);
   const gate=deferred();h.state.queue.push(gate);const pending=page.vm.check();page.onPageHide();page.aboutToDisappear();gate.resolve(response([row('v99.0')]));await pending;assert.equal(page.vm.result.status,'cancelled');assert.equal(h.state.requests[0].handle.destroyed,1);
   const source=read('pages/UpdatePage');assert.match(source,/Number\(area.width\) >= 840/);assert(!/installBundle|startAbility|request\.agent|browser_download_url/.test(source));assert.match(source,/hoverEffect/);
+ });
+ await test('startup reads the stable release once and shares the persisted skip with the manual page',async()=>{
+  const h=harness();
+  h.state.queue.push(response([row('v1.22.0'),row('v1.23.0-beta.1',{prerelease:true})]));
+  const first=h.AppUpdateService.startupCheck(),second=h.AppUpdateService.startupCheck();
+  assert.equal(first,second);
+  const release=h.AppUpdateService.releaseForNotice(await first);
+  assert.equal(release.tag,'v1.22.0');assert.equal(h.state.requests.length,1);assert.equal(h.state.links.length,0);
+  h.AppUpdateService.setSkippedTag(release.tag);
+  assert.equal(h.state.appStorage.get('appUpdateSkippedTag'),release.tag);
+  const page=h.page();page.aboutToAppear();assert.equal(page.skippedTag,release.tag);
+  h.state.queue.push(response([row(release.tag)]));await page.vm.check();
+  assert.equal(page.releaseSkipped(),true);assert.equal(page.vm.result.release.tag,release.tag);
+ });
+ await test('startup abandons a stalled check after three seconds and frees its request',async()=>{
+  const h=harness(),gate=deferred();h.state.queue.push(gate);
+  const result=h.AppUpdateService.startupCheck();
+  assert.equal(h.state.timer.delay,3000);h.state.timer.callback();
+  assert.equal((await result).status,'cancelled');assert.equal(h.state.requests[0].handle.destroyed,1);
+  gate.resolve(response([row('v99.0')]));await flush();
+  assert.equal(h.state.requests.length,1);assert.equal(h.state.timer,undefined);
  });
  console.log('PASS: native app update policy, transport, lifecycle and trust boundaries');
 })().catch(error=>{console.error(error);process.exitCode=1;});

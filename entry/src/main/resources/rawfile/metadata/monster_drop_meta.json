@@ -1,0 +1,149 @@
+[
+  {
+    "Id": 400022,
+    "Name": "战狂",
+    "Icon": "UI_RelicIcon_10005_4",
+    "RankLevel": 3,
+    "SetId": 10005
+  },
+  {
+    "Id": 400023,
+    "Name": "战狂",
+    "Icon": "UI_RelicIcon_10005_4",
+    "RankLevel": 4,
+    "SetId": 10005
+  },
+  {
+    "Id": 400032,
+    "Name": "教官",
+    "Icon": "UI_RelicIcon_10007_4",
+    "RankLevel": 3,
+    "SetId": 10007
+  },
+  {
+    "Id": 400033,
+    "Name": "教官",
+    "Icon": "UI_RelicIcon_10007_4",
+    "RankLevel": 4,
+    "SetId": 10007
+  },
+  {
+    "Id": 400042,
+    "Name": "流放者",
+    "Icon": "UI_RelicIcon_10009_4",
+    "RankLevel": 3,
+    "SetId": 10009
+  },
+  {
+    "Id": 400043,
+    "Name": "流放者",
+    "Icon": "UI_RelicIcon_10009_4",
+    "RankLevel": 4,
+    "SetId": 10009
+  },
+  {
+    "Id": 400047,
+    "Name": "冒险家",
+    "Icon": "UI_RelicIcon_10010_4",
+    "RankLevel": 3,
+    "SetId": 10010
+  },
+  {
+    "Id": 400052,
+    "Name": "幸运儿",
+    "Icon": "UI_RelicIcon_10011_4",
+    "RankLevel": 3,
+    "SetId": 10011
+  },
+  {
+    "Id": 400062,
+    "Name": "游医",
+    "Icon": "UI_RelicIcon_10013_4",
+    "RankLevel": 3,
+    "SetId": 10013
+  },
+  {
+    "Id": 400088,
+    "Name": "角斗士的终幕礼",
+    "Icon": "UI_RelicIcon_15001_4",
+    "RankLevel": 4,
+    "SetId": 15001
+  },
+  {
+    "Id": 400089,
+    "Name": "角斗士的终幕礼",
+    "Icon": "UI_RelicIcon_15001_4",
+    "RankLevel": 5,
+    "SetId": 15001
+  },
+  {
+    "Id": 400098,
+    "Name": "流浪大地的乐团",
+    "Icon": "UI_RelicIcon_15003_4",
+    "RankLevel": 4,
+    "SetId": 15003
+  },
+  {
+    "Id": 400099,
+    "Name": "流浪大地的乐团",
+    "Icon": "UI_RelicIcon_15003_4",
+    "RankLevel": 5,
+    "SetId": 15003
+  },
+  {
+    "Id": 400127,
+    "Name": "祭火之人",
+    "Icon": "UI_RelicIcon_15009_3",
+    "RankLevel": 3,
+    "SetId": 15009
+  },
+  {
+    "Id": 400128,
+    "Name": "祭火之人",
+    "Icon": "UI_RelicIcon_15009_3",
+    "RankLevel": 4,
+    "SetId": 15009
+  },
+  {
+    "Id": 400132,
+    "Name": "祭水之人",
+    "Icon": "UI_RelicIcon_15010_3",
+    "RankLevel": 3,
+    "SetId": 15010
+  },
+  {
+    "Id": 400133,
+    "Name": "祭水之人",
+    "Icon": "UI_RelicIcon_15010_3",
+    "RankLevel": 4,
+    "SetId": 15010
+  },
+  {
+    "Id": 400137,
+    "Name": "祭雷之人",
+    "Icon": "UI_RelicIcon_15011_3",
+    "RankLevel": 3,
+    "SetId": 15011
+  },
+  {
+    "Id": 400138,
+    "Name": "祭雷之人",
+    "Icon": "UI_RelicIcon_15011_3",
+    "RankLevel": 4,
+    "SetId": 15011
+  },
+  {
+    "Id": 400147,
+    "Name": "祭冰之人",
+    "Icon": "UI_RelicIcon_15013_3",
+    "RankLevel": 3,
+    "SetId": 15013
+  },
+  {
+    "Id": 400148,
+    "Name": "祭冰之人",
+    "Icon": "UI_RelicIcon_15013_3",
+    "RankLevel": 4,
+    "SetId": 15013
+  }
+]

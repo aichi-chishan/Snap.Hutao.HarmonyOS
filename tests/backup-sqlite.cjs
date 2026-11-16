@@ -25,7 +25,7 @@ function harness() {
   db.exec('PRAGMA foreign_keys=ON');
   const state = { writes:0, begins:0, commits:0, rollbacks:0, resultSets:0, closedSets:0, vaultWrites:0, preferenceWrites:0, journalWrites:0,
     failSql:'', failInsert:'', failDelete:'', failVersion:0, failCommit:false,
-    failPrefs:false, failVault:false, journal:'', prefs:{'theme.mode':'dark'}, vault:{}, reloads:0 };
+    failPrefs:false, failVault:false, journal:'', prefs:{'theme.mode':'dark'}, vault:{}, reloads:0, storage:new Map(), tablesWritten:new Set() };
   function resultSet(sql) {
     const stmt = db.prepare(sql), rows = stmt.all(), names = stmt.columns().map(column => column.name);
     let index = -1, closed = false;
@@ -40,6 +40,7 @@ function harness() {
     get version() { return db.prepare('PRAGMA user_version').get().user_version; },
     set version(value) { db.exec('PRAGMA user_version='+Number(value)); if(state.failVersion===value)throw Error('injected version failure'); },
     async executeSql(sql) { if(state.failSql&&sql.includes(state.failSql))throw Error('injected SQL failure'); db.exec(sql); },
+    async close() {},
     beginTransaction() { state.begins++; db.exec('BEGIN'); },
     commit() { if(state.failCommit)throw Error('injected commit failure'); db.exec('COMMIT'); state.commits++; },
     rollBack() { db.exec('ROLLBACK'); state.rollbacks++; },
@@ -47,7 +48,7 @@ function harness() {
     async createTransaction() {
       store.beginTransaction();
       return { querySql:async sql=>resultSet(sql),
-        delete:async pred=>{ state.writes++; if(pred.table===state.failDelete)throw Error('injected delete failure'); return db.prepare('DELETE FROM '+pred.table).run().changes; },
+        delete:async pred=>{ state.writes++; state.tablesWritten.add(pred.table); if(pred.table===state.failDelete)throw Error('injected delete failure'); return db.prepare('DELETE FROM '+pred.table).run().changes; },
         insert:async(table,row)=>{ state.writes++; if(table===state.failInsert)throw Error('injected insert failure');
           const names=Object.keys(row); return Number(db.prepare(`INSERT INTO ${table} (${names}) VALUES (${names.map(()=>'?')})`).run(...Object.values(row)).lastInsertRowid); },
         commit:async()=>store.commit(), rollback:async()=>store.rollBack() };
@@ -59,7 +60,23 @@ function harness() {
     TokenVault:{ loadCookie:async id=>state.vault[id]??'', saveCookie:async(id,cookie)=>{ state.vaultWrites++; if(state.failVault)throw Error('injected vault failure'); state.vault[id]=cookie; }, removeCookie:async id=>{ delete state.vault[id]; } },
     PreferencesStore:{ KEY_CURRENT_USER_ID:'app.current_user_id', KEY_CURRENT_UID:'app.current_uid', exportPortable:()=>clone(state.prefs),
       getBackupJournal:()=>state.journal, saveBackupJournal:async text=>{ state.journalWrites++; state.journal=text; },
-      replacePortable:async value=>{ state.preferenceWrites++; state.prefs=clone(value); if(state.failPrefs){ state.failPrefs=false; throw Error('injected preferences failure'); } }, getRefreshIntervalMinutes:()=>30 },
+      replacePortable:async value=>{ state.preferenceWrites++; state.prefs=clone(value); if(state.failPrefs){ state.failPrefs=false; throw Error('injected preferences failure'); } }, getRefreshIntervalMinutes:()=>30,
+      getReduceMotionEnabled:()=>state.prefs['app.reduce_motion']===true,
+      getBackgroundImageType:()=>state.prefs['app.bg_image_type']??'local',
+      getBackgroundFolderPath:()=>state.prefs['app.bg_folder_path']??'',
+      getHomeActCalendar:()=>state.prefs['home.act_calendar_presented']??true,
+      getHomeActPreview:()=>state.prefs['home.act_preview_enabled']??false },
+    UiSurface:{ publish(){
+      state.storage.set('materialMode',state.prefs['app.material.mode']??0);
+      state.storage.set('materialLevel',state.prefs['app.material.level']??-1);
+    } },
+    Motion:{ setReducedMotion:enabled=>state.storage.set('reduceMotion',enabled) },
+    AppLocaleService:{ applyCurrentPreference(){
+      state.storage.set('appliedLocale',state.prefs['app.help_locale']??'system');
+      state.storage.set('helpLocaleVersion',(state.storage.get('helpLocaleVersion')??0)+1);
+      return true;
+    } },
+    BackgroundMediaService:{ changed(){ state.storage.set('backgroundMediaVersion',(state.storage.get('backgroundMediaVersion')??0)+1); } },
     DailyNoteService:{ getInstance:()=>({ isTimerRunning:()=>true, stopAutoRefresh(){}, startAutoRefresh(){} }) },
     UserService:{ getInstance:()=>({ beginLocalSessionReplacement:async()=>1, cancelLocalSessionReplacement(){}, reloadLocalSession:async()=>{state.reloads++;} }) }
   };
@@ -73,7 +90,9 @@ function harness() {
     const module={exports:{}}; cache.set(filename,module.exports);
     const requireLocal=id=>{ if(mocks[id])return mocks[id]; const key=path.basename(id); if(mocks[key])return {[key]:mocks[key]};
       assert.ok(id.startsWith('.'),'unexpected dependency '+id); return load(path.resolve(path.dirname(filename),id)); };
-    vm.runInNewContext(`(function(require,module,exports){${compiled.outputText}\n})`,{AppStorage:{setOrCreate(){}}})(requireLocal,module,module.exports);
+    vm.runInNewContext(`(function(require,module,exports){${compiled.outputText}\n})`,{
+      AppStorage:{get:key=>state.storage.get(key),setOrCreate:(key,value)=>state.storage.set(key,value)}
+    })(requireLocal,module,module.exports);
     return module.exports;
   }
   const helper=load('data/db/RelationalStoreHelper').RelationalStoreHelper;
@@ -124,10 +143,12 @@ function strictModelTypes() {
 }
 
 (async()=>{
-  await test('fresh production migration creates v8 tables and a real foreign key without orphans',async()=>{
-    const h=harness(); await h.init(); assert.equal(h.store.version,8);
+  await test('fresh production migration creates v9 tables and a real foreign key without orphans',async()=>{
+    const h=harness(); await h.init(); assert.equal(h.store.version,9);
     const input=h.db.prepare('PRAGMA table_info(cultivate_entries)').all().find(column=>column.name==='input_json');
     assert.equal(input.type,'TEXT'); assert.equal(input.notnull,1); assert.equal(input.dflt_value,"''");
+    const offset=h.db.prepare('PRAGMA table_info(cultivate_projects)').all().find(column=>column.name==='server_timezone_offset');
+    assert.equal(offset.type,'INTEGER'); assert.equal(offset.notnull,1); assert.equal(offset.dflt_value,'8');
     assert.equal(h.db.prepare('PRAGMA foreign_key_list(backpack_items)').all()[0].table,'backpack_archives');
     assert.throws(()=>h.db.exec(`INSERT INTO backpack_items VALUES(99,'local:1',1,'material',9,'{}')`),/FOREIGN KEY/);
     assert.equal(h.rows('backpack_items').length,0); h.close();
@@ -145,7 +166,7 @@ function strictModelTypes() {
       assert.equal(h.db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name IN ('backpack_archives','backpack_items')").get().n,0);
       assert.equal(h.rows('challenge_records')[0].raw_json,'keep history');
       h.state.failSql=''; h.state.failVersion=0; h.state.failCommit=false;
-      await h.init(); assert.equal(h.store.version,8); assert.equal(h.helper.isReady(),true); h.close();
+      await h.init(); assert.equal(h.store.version,9); assert.equal(h.helper.isReady(),true); h.close();
     }
   });
   await test('v8 ALTER, version-stamp and commit failures roll back the new column and retry from v7',async()=>{
@@ -163,7 +184,7 @@ function strictModelTypes() {
       assert.equal(h.db.prepare('PRAGMA table_info(cultivate_entries)').all().some(column=>column.name==='input_json'),false);
       assert.deepEqual(h.all(),before,mode);
       h.state.failSql=''; h.state.failVersion=0; h.state.failCommit=false;
-      await h.init(); assert.equal(h.store.version,8); assert.equal(h.helper.isReady(),true);
+      await h.init(); assert.equal(h.store.version,9); assert.equal(h.helper.isReady(),true);
       const after=h.all(); assert.equal(after.cultivate_entries[0].input_json,'');
       delete after.cultivate_entries[0].input_json; assert.deepEqual(after,before,mode); h.close();
     }
@@ -171,38 +192,145 @@ function strictModelTypes() {
   await test('v8 retry tolerates an already existing input column without changing draft bytes',async()=>{
     const h=harness(); await h.init(); h.seed(); const before=h.all();
     h.db.exec('PRAGMA user_version=7'); h.helper.rdbStore=undefined;
-    await h.init(); assert.equal(h.store.version,8); assert.deepEqual(h.all(),before); h.close();
+    await h.init(); assert.equal(h.store.version,9); assert.deepEqual(h.all(),before); h.close();
   });
-  await test('v8 production capture/restore is lossless with reversed table order and foreign keys enabled',async()=>{
+  await test('v9 migration backfills UTC+8 and rolls back cleanly before retry',async()=>{
+    const h=harness(); await h.init(); h.seed();
+    h.db.exec('ALTER TABLE cultivate_projects DROP COLUMN server_timezone_offset; PRAGMA user_version=8');
+    const before=h.all(); h.helper.rdbStore=undefined; h.state.failCommit=true;
+    await assert.rejects(h.helper.init({}),/数据库升级 v8 失败/);
+    assert.equal(h.store.version,8); assert.deepEqual(h.all(),before);
+    h.state.failCommit=false;
+    await h.init(); assert.equal(h.store.version,9);
+    const after=h.all(); assert.equal(after.cultivate_projects[0].server_timezone_offset,8);
+    delete after.cultivate_projects[0].server_timezone_offset; assert.deepEqual(after,before); h.close();
+  });
+  await test('explicit non-sensitive view preferences roundtrip without allowing neighbouring local keys',async()=>{
+    const h=harness(); await h.init(); h.seed();
+    const preferences={
+      'cultivation_resin_world_level':7,
+      'wiki.avatar.grid':false, 'wiki.weapon.grid':true, 'wiki.monster.grid':true,
+      'background.media.type':'official', 'background.media.muted':false, 'background.media.loop':true,
+      'official_web.share_mode':'save-png',
+      'Control.PanelSelector.AvatarPropertyPage.Summary.Avatars':true,
+      'Control.PanelSelector.StatisticsCard.SummaryList301':true,
+      'ai.provider':1,
+      'relic.score.algorithm.10000002':2,
+    };
+    Object.assign(h.state.prefs,preferences);
+    const snapshot=JSON.parse(await h.service.buildBackupJson());
+    for(const [key,value] of Object.entries(preferences)) {
+      assert.equal(snapshot.preferences[key],value);
+      delete h.state.prefs[key];
+    }
+    const restored=await h.service.restoreFromText(JSON.stringify(snapshot));
+    assert.equal(restored.ok,true,restored.message);
+    for(const [key,value] of Object.entries(preferences)) assert.equal(h.state.prefs[key],value);
+    for(const key of ['wiki.avatar.grid.extra','wiki.character_cache','background.media.files','background.media.unlisted',
+      'relic.score.algorithm.default','relic.score.algorithm.10000002.token','ai.provider.endpoint','ai.custom.apiKey','ai.custom.baseUrl',
+      'app.bbs_device_id','gamedata_manifest_url','remote_manifest_url','backup.restore_journal_v1']) {
+      assert.equal(h.validator.portableKey(key),false,key);
+    }
+    h.close();
+  });
+  await test('v9 production capture/restore is lossless with reversed table order and foreign keys enabled',async()=>{
     const h=harness(); await h.init(); h.seed(); const before=h.backpack();
-    const snapshot=JSON.parse(await h.service.buildBackupJson()); assert.equal(snapshot.schemaVersion,8); assert.equal(snapshot.tables.length,20);
+    h.db.exec('UPDATE cultivate_projects SET server_timezone_offset=-5');
+    h.state.prefs['calendar.first_day_of_week']=0;
+    h.state.prefs['app.calendar_server_time_zone_offset']=1;
+    h.state.storage.set('achievementDataVersion',7);
+    const snapshot=JSON.parse(await h.service.buildBackupJson()); assert.equal(snapshot.schemaVersion,9); assert.equal(snapshot.tables.length,20);
+    assert.equal(table(snapshot,'cultivate_projects').rows[0].server_timezone_offset,-5);
+    h.db.exec('UPDATE cultivate_projects SET server_timezone_offset=8');
     snapshot.tables.reverse(); h.db.exec("UPDATE backpack_archives SET name='replace me'; DELETE FROM backpack_items WHERE archive_id=1");
     const result=await h.service.restoreFromText(JSON.stringify(snapshot)); assert.equal(result.ok,true,result.message);
     assert.deepEqual(h.backpack(),before); assert.equal(h.rows('challenge_records')[0].raw_json,'keep history');
     assert.equal(h.rows('cultivate_entries')[0].input_json,cultivationInput);
+    assert.equal(h.rows('cultivate_projects')[0].server_timezone_offset,-5);
+    assert.equal(h.state.prefs['calendar.first_day_of_week'],0);
+    assert.equal(h.state.prefs['app.calendar_server_time_zone_offset'],1);
+    assert.equal(h.state.storage.get('achievementDataVersion'),8);
+    assert.ok(h.state.storage.get('dailyNoteVersion')>0);
     const exported=JSON.parse(await h.service.buildBackupJson());
     assert.equal(table(exported,'cultivate_entries').rows[0].input_json,cultivationInput);
     assert.equal(table(exported,'backpack_archives').rows[0].document_json,document);
     assert.equal(table(exported,'backpack_items').rows.find(row=>row.kind==='weapon').raw_json,weapon);
     assert.equal(h.db.prepare('PRAGMA foreign_key_check').all().length,0); assert.equal(h.state.journal,''); h.close();
   });
-  await test('all schema1–7 snapshots default cultivation input and legacy conversion preserves existing drafts',async()=>{
-    for(let schemaVersion=1;schemaVersion<=7;schemaVersion++) {
+  await test('restore republishes material, motion and locale only after a successful commit',async()=>{
+    for (const fail of [false,true]) {
+      const h=harness(); await h.init(); h.seed();
+      const snapshot=JSON.parse(await h.service.buildBackupJson());
+      Object.assign(snapshot.preferences,{
+        'theme.mode':'light','app.material.mode':1,'app.material.level':2,'app.reduce_motion':true,
+        'app.help_locale':'en','app.bg_image_type':'bing','app.bg_folder_path':'fixture-folder',
+        'home.act_calendar_presented':false,'home.act_preview_enabled':true
+      });
+      h.state.storage.set('materialMode',0); h.state.storage.set('materialLevel',-1);
+      h.state.storage.set('helpLocaleVersion',7); h.state.storage.set('restoredPreferencesVersion',4);
+      const before=[...h.state.storage];
+      if (fail) h.state.failInsert='cultivate_entries';
+      const result=await h.service.restoreFromText(JSON.stringify(snapshot));
+      assert.equal(result.ok,!fail,result.message);
+      if (fail) {
+        assert.deepEqual([...h.state.storage],before,'rollback must not publish staged preferences');
+      } else {
+        assert.equal(h.state.storage.get('materialMode'),1);
+        assert.equal(h.state.storage.get('materialLevel'),2);
+        assert.equal(h.state.storage.get('reduceMotion'),true);
+        assert.equal(h.state.storage.get('appliedLocale'),'en');
+        assert.equal(h.state.storage.get('helpLocaleVersion'),8);
+        assert.equal(h.state.storage.get('bgType'),'bing');
+        assert.equal(h.state.storage.get('bgFolderPath'),'fixture-folder');
+        assert.equal(h.state.storage.get('homeActCalendarShown'),false);
+        assert.equal(h.state.storage.get('homeActPreview'),true);
+        assert.equal(h.state.storage.get('restoredPreferencesVersion'),5);
+        for (const key of ['homeCardsVersion','calendarSettingsVersion','cultivationDataVersion','backgroundMediaVersion']) {
+          assert.equal(h.state.storage.get(key),1,key);
+        }
+        assert.equal(h.state.journal,'');
+      }
+      h.close();
+    }
+  });
+  await test('all schema1–8 snapshots default missing project time zones and legacy conversion preserves existing drafts',async()=>{
+    for(let schemaVersion=1;schemaVersion<=8;schemaVersion++) {
       const h=harness(); await h.init(); h.seed(); const before=h.backpack();
       const old=JSON.parse(await h.service.buildBackupJson()); old.schemaVersion=schemaVersion;
       if(schemaVersion<7)old.tables=old.tables.filter(value=>!value.name.startsWith('backpack_'));
-      for(const row of table(old,'cultivate_entries').rows)delete row.input_json;
+      if(schemaVersion<8)for(const row of table(old,'cultivate_entries').rows)delete row.input_json;
+      for(const row of table(old,'cultivate_projects').rows)delete row.server_timezone_offset;
       const result=await h.service.restoreFromText(JSON.stringify(old)); assert.equal(result.ok,true,result.message);
       assert.deepEqual(h.backpack(),before); assert.equal(h.rows('challenge_records')[0].raw_json,'keep history');
-      assert.equal(h.rows('cultivate_entries')[0].input_json,'',`schema${schemaVersion}`);
+      assert.equal(h.rows('cultivate_entries')[0].input_json,schemaVersion===8?cultivationInput:'',`schema${schemaVersion}`);
+      assert.equal(h.rows('cultivate_projects')[0].server_timezone_offset,8,`schema${schemaVersion}`);
       assert.equal(h.rows('cultivate_items')[0].count,12); assert.equal(h.rows('cultivate_inventory')[0].count,5); h.close();
     }
     const h=harness(); await h.init(); h.seed(); const before=h.backpack();
-    const converted=h.converter.convert(legacy,8); assert.equal(converted.schemaVersion,6);
+    h.db.exec('UPDATE cultivate_projects SET server_timezone_offset=1');
+    h.state.prefs['cultivation.current_project_id']=1;
+    h.state.prefs['calendar.first_day_of_week']=0;
+    h.state.prefs['app.backpack.score_profiles.v1']='preserve-local-score-profiles';
+    const retainedSettings = {
+      cultivation_resin_world_level:8, 'wiki.avatar.grid':false, 'wiki.weapon.grid':true, 'wiki.monster.grid':false,
+      'background.media.type':'local', 'background.media.muted':false, 'background.media.loop':true,
+      'ai.provider':1,
+      'relic.score.algorithm.10000046':1
+    };
+    Object.assign(h.state.prefs,retainedSettings);
+    const converted=h.converter.convert(legacy,9); assert.equal(converted.schemaVersion,6);
     assert.equal(converted.tables.some(value=>value.name.startsWith('backpack_')),false);
     const result=await h.service.restoreFromText(JSON.stringify(legacy)); assert.equal(result.ok,true,result.message);
     assert.deepEqual(h.backpack(),before); assert.equal(h.rows('challenge_records')[0].raw_json,'keep history');
     assert.equal(h.rows('cultivate_projects')[0].name,'keep cultivation');
+    assert.equal(h.rows('cultivate_projects')[0].server_timezone_offset,1);
+    assert.equal(h.state.prefs['cultivation.current_project_id'],1);
+    assert.equal(h.state.prefs['calendar.first_day_of_week'],0);
+    assert.equal(h.state.prefs['app.backpack.score_profiles.v1'],'preserve-local-score-profiles');
+    for (const [key,value] of Object.entries(retainedSettings)) assert.equal(h.state.prefs[key],value,key);
+    for(const name of ['cultivate_projects','cultivate_entries','cultivate_items','cultivate_inventory','challenge_records','backpack_archives','backpack_items']) {
+      assert.equal(h.state.tablesWritten.has(name),false,`legacy restore must not touch ${name}`);
+    }
     assert.equal(h.rows('cultivate_entries')[0].input_json,cultivationInput); h.close();
   });
   await test('v8 input is opaque and roundtrips empty, malformed, future and maximum-size draft strings exactly',async()=>{
@@ -223,6 +351,8 @@ function strictModelTypes() {
     const mutations=[
       s=>delete table(s,'cultivate_entries').rows[0].input_json,
       ...[null, 1, false, {}, [], 'invalid\u0000tail', 'x'.repeat(64*1024+1)].map(value=>s=>table(s,'cultivate_entries').rows[0].input_json=value),
+      s=>delete table(s,'cultivate_projects').rows[0].server_timezone_offset,
+      ...[null, '8', 2, -8].map(value=>s=>table(s,'cultivate_projects').rows[0].server_timezone_offset=value),
       s=>s.schemaVersion=7
     ];
     const before=h.all(), vault=clone(h.state.vault), prefs=clone(h.state.prefs);
@@ -308,5 +438,5 @@ function strictModelTypes() {
     await assert.rejects(h.service.buildBackupJson(),/存档归属/); h.close();
   });
   await test('production backup/UIIF/legacy pure model graph passes strict host types',strictModelTypes);
-  console.log('backup-sqlite: PASS (production v7/v8 migration/SQLite rollback, lossless UIIF/draft roundtrip, schema1–7 + legacy preservation, validation and no orphan snapshots)');
+  console.log('backup-sqlite: PASS (production v7–v9 migration/rollback, lossless UIIF/draft/project time zone roundtrip, schema1–8 and legacy preservation)');
 })().catch(error=>{console.error(error);process.exitCode=1;});

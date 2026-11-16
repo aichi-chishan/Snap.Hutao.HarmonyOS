@@ -33,17 +33,41 @@ export class InventoryRepo {
   }
 
   static async setCount(projectId: number, itemId: number, count: number): Promise<void> {
+    const inventory: Map<number, number> = new Map<number, number>();
+    inventory.set(itemId, count);
+    await InventoryRepo.mergeInventory(projectId, inventory);
+  }
+
+  /** 只更新提供的材料，避免读整表再替换时覆盖同时保存的其他材料。 */
+  static async mergeInventory(projectId: number, inventory: Map<number, number>): Promise<void> {
     InventoryRepo.validateProject(projectId);
-    InventoryRepo.validateCount(itemId, count);
-    const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('cultivate_inventory');
-    pred.equalTo('project_id', projectId).and().equalTo('item_id', itemId);
+    inventory.forEach((count: number, itemId: number) => InventoryRepo.validateCount(itemId, count));
     const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
-    const update: relationalStore.ValuesBucket = { 'count': count };
-    if (store.updateSync(update, pred) > 0) {
-      return;
+    store.beginTransaction();
+    try {
+      InventoryRepo.requireProject(store, projectId);
+      inventory.forEach((count: number, itemId: number) => {
+        const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('cultivate_inventory');
+        pred.equalTo('project_id', projectId).and().equalTo('item_id', itemId);
+        const update: relationalStore.ValuesBucket = { 'count': count };
+        if (store.updateSync(update, pred) === 0) {
+          const values: relationalStore.ValuesBucket = { 'project_id': projectId, 'item_id': itemId, 'count': count };
+          if (store.insertSync('cultivate_inventory', values) <= 0) { throw new Error('库存写入不完整'); }
+        }
+      });
+      store.commit();
+    } catch (e) {
+      store.rollBack();
+      throw new Error(e instanceof Error ? e.message : '库存写入失败，已回滚');
     }
-    const values: relationalStore.ValuesBucket = { 'project_id': projectId, 'item_id': itemId, 'count': count };
-    store.insertSync('cultivate_inventory', values);
+  }
+
+  private static requireProject(store: relationalStore.RdbStore, projectId: number): void {
+    const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('cultivate_projects').equalTo('id', projectId);
+    const rows: relationalStore.ResultSet = store.querySync(pred, ['id']);
+    try {
+      if (!rows.goToFirstRow()) { throw new Error('养成项目已删除，请重新选择项目'); }
+    } finally { rows.close(); }
   }
 
   /** 在任何写入前验证全部值，单事务替换；同步事务内不穿插其他异步业务。 */
@@ -60,6 +84,7 @@ export class InventoryRepo {
     const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
     store.beginTransaction();
     try {
+      InventoryRepo.requireProject(store, projectId);
       store.deleteSync(pred);
       for (let i: number = 0; i < rows.length; i += 500) {
         const chunk: relationalStore.ValuesBucket[] = rows.slice(i, i + 500);

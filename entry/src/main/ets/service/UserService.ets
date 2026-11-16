@@ -8,6 +8,7 @@ import { DailyNoteReminderService } from './DailyNoteReminderService';
 import { UserRepo } from '../data/repo/UserRepo';
 import { ApiClient } from '../data/network/ApiClient';
 import { HoyolabClient } from '../data/network/HoyolabClient';
+import { LoginSession, MobileCaptcha, PassportClient, QrLogin, QrLoginResult } from '../data/network/PassportClient';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { DsSigner } from '../data/network/DsSigner';
 import { DeviceFpApi } from '../data/network/DeviceFpApi';
@@ -19,6 +20,21 @@ import { Logger } from '../common/Logger';
 import { RetCodes } from '../common/Constants';
 
 const TAG: string = 'UserService';
+const COOKIE_REFRESH_INTERVAL_MS: number = 24 * 60 * 60 * 1000;
+
+class SelectedTokenCompletion {
+  readonly owner: User;
+  readonly revision: number;
+  readonly refreshDue: boolean;
+  readonly result: Promise<void>;
+
+  constructor(owner: User, revision: number, refreshDue: boolean, result: Promise<void>) {
+    this.owner = owner;
+    this.revision = revision;
+    this.refreshDue = refreshDue;
+    this.result = result;
+  }
+}
 
 export class UserService {
   private static instance: UserService = new UserService();
@@ -32,13 +48,62 @@ export class UserService {
   private currentUid: string = '';
   private revision: number = 0;
   private transitionPending: boolean = false;
+  private pendingLoginRevision: number = -1;
   private replacementRevision: number = -1;
   private mutationTail: Promise<void> = Promise.resolve();
+  private selectedTokenCompletion: SelectedTokenCompletion | undefined = undefined;
   private invalidationHook: ((reason: string) => Promise<boolean>) | undefined = undefined;
   private revisionListeners: Array<(revision: number) => void> = [];
 
   getCurrentUser(): User | undefined {
     return this.transitionPending ? undefined : this.currentUser;
+  }
+
+  async getSavedUsers(): Promise<User[]> {
+    await this.mutationTail;
+    return this.readSavedUsers();
+  }
+
+  private async readSavedUsers(): Promise<User[]> {
+    const users: User[] = await UserRepo.getAllUsers();
+    const order: number[] = PreferencesStore.getUserOrder();
+    if (order.length === 0) { return users; }
+    return users.sort((left: User, right: User): number => {
+      const leftIndex: number = order.indexOf(left.id);
+      const rightIndex: number = order.indexOf(right.id);
+      return (leftIndex < 0 ? order.length : leftIndex) - (rightIndex < 0 ? order.length : rightIndex);
+    });
+  }
+
+  async moveSavedUser(userId: number, direction: number): Promise<void> {
+    if (direction !== -1 && direction !== 1) { throw new Error('请选择有效的移动方向'); }
+    this.assertAvailable();
+    const revision: number = this.revision;
+    await this.queueMutation(async () => {
+      this.assertRevision(revision);
+      const users: User[] = await this.readSavedUsers();
+      this.assertRevision(revision);
+      const index: number = users.findIndex((user: User): boolean => user.id === userId);
+      if (index < 0) { throw new Error('账号不存在'); }
+      const target: number = index + direction;
+      if (target < 0 || target >= users.length) { return; }
+      const order: number[] = users.map((user: User): number => user.id);
+      order[index] = order[target];
+      order[target] = userId;
+      await PreferencesStore.saveUserOrder(order);
+    });
+  }
+
+  async getSavedAccountCookie(userId: number): Promise<string> {
+    this.assertAvailable();
+    const revision: number = this.revision;
+    await this.mutationTail;
+    this.assertRevision(revision);
+    const user: User | undefined = await UserRepo.getUserById(userId, true);
+    this.assertRevision(revision);
+    if (user === undefined) { throw new Error('账号不存在'); }
+    if (user.isOversea) { throw new Error('仅支持国服米游社账号'); }
+    return user.hasCookie() ? user.fullCookie() : '';
   }
 
   /** Capture before async work. A switch away and back still changes this value. */
@@ -165,6 +230,7 @@ export class UserService {
 
   // ================= 会话恢复 =================
 
+  /** 恢复本地会话；联网更新凭据在页面加载后执行。 */
   async restoreSession(): Promise<boolean> {
     const revision: number = this.beginChange();
     try {
@@ -173,21 +239,14 @@ export class UserService {
       this.assertRevision(revision);
       const loaded: User | undefined = await UserRepo.getCurrentUser();
       this.assertRevision(revision);
-      if (loaded === undefined || !loaded.hasCookie()) {
+      if (loaded === undefined || loaded.isOversea || !loaded.hasCookie()) {
         await this.queueMutation(async () => { await this.selectAndPublish(undefined, '', revision); });
         return false;
       }
       const user: User = this.detached(loaded);
-      try { if (!user.isOversea) { await this.ensureDeviceFingerprint(); } }
-      catch (e) { Logger.warn(TAG, 'ensure fingerprint failed'); }
-      this.assertRevision(revision);
-      if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
-        await this.completeTokenChainInner(user, false, revision);
-      }
-      if (user.displayName.length === 0) { await this.loadUserFullInfo(user, revision); }
       const uid: string = this.resolveDefaultUid(user);
       await this.queueMutation(async () => {
-        await this.commitUser(user, uid, revision, true, true);
+        await this.selectAndPublish(user, uid, revision);
       });
       Logger.info(TAG, 'session restored');
       return true;
@@ -196,6 +255,25 @@ export class UserService {
       Logger.warn(TAG, 'session restore did not complete');
       return false;
     } finally { this.finishChange(revision); }
+  }
+
+  /** 首屏就绪后更新过期凭据和缺失昵称，不改变当前账号或角色选择。 */
+  async refreshSession(): Promise<void> {
+    const user: User | undefined = this.getCurrentUser();
+    if (user === undefined) { return; }
+    const revision: number = this.revision;
+    await this.ensureDeviceFingerprintPublic();
+    this.assertRevision(revision);
+    const refreshDue: boolean = this.cookieExchangeDue(user.id);
+    if (refreshDue || !user.hasCookieToken() || !user.hasLToken()) {
+      await this.completeSelectedTokenChain(user, user, revision, refreshDue);
+    }
+    this.assertRevision(revision);
+    if (user.displayName.length === 0) {
+      await this.fetchUserFullInfo(user);
+      this.assertRevision(revision);
+      if (this.currentUser === user) { this.applySessionState(user, this.currentUid); }
+    }
   }
 
   /** Local-only completion of a successful backup replacement, or standalone reload. */
@@ -210,7 +288,8 @@ export class UserService {
       readStarted = true;
       const loaded: User | undefined = await UserRepo.getCurrentUser();
       this.assertRevision(revision);
-      const user: User | undefined = loaded !== undefined && loaded.hasCookie() ? this.detached(loaded) : undefined;
+      const user: User | undefined = loaded !== undefined && !loaded.isOversea && loaded.hasCookie()
+        ? this.detached(loaded) : undefined;
       const uid: string = user === undefined ? '' : this.resolveDefaultUid(user);
       await this.queueMutation(async () => { await this.selectAndPublish(user, uid, revision); });
     } catch (e) {
@@ -233,16 +312,19 @@ export class UserService {
   }
 
   private resolveDefaultUid(user: User): string {
-    for (const role of user.roles) { if (role.isDefault) { return role.gameUid; } }
     if (user.roles.length === 0) { return ''; }
-    user.roles[0].isDefault = true;
-    user.roles[0].isChosen = true;
-    return user.roles[0].gameUid;
+    const preferred: UserGameRole = user.roles.find((role: UserGameRole): boolean => role.isDefault) ??
+      user.roles.find((role: UserGameRole): boolean => role.isChosen) ?? user.roles[0];
+    for (const role of user.roles) {
+      role.isDefault = role === preferred;
+      role.isChosen = role.isDefault;
+    }
+    return preferred.gameUid;
   }
 
   private async storeUserMetadata(user: User, revision: number): Promise<void> {
     this.assertRevision(revision);
-    const previous: User | undefined = await UserRepo.getUserById(user.id);
+    const previous: User | undefined = await UserRepo.getUserById(user.id, true);
     this.assertRevision(revision);
     if (previous === undefined) { throw new Error('账号不存在'); }
     user.isSelected = this.currentUser !== undefined && this.currentUser.id === user.id;
@@ -275,7 +357,7 @@ export class UserService {
   /** Queue-owned rollback prevents a superseded partial write being adopted by the next intent. */
   private async commitUser(user: User, uid: string, revision: number, details: boolean, select: boolean): Promise<void> {
     this.assertRevision(revision);
-    const previous: User | undefined = user.id > 0 ? await UserRepo.getUserById(user.id) : undefined;
+    const previous: User | undefined = user.id > 0 ? await UserRepo.getUserById(user.id, true) : undefined;
     this.assertRevision(revision);
     let inserted: boolean = false;
     try {
@@ -328,6 +410,33 @@ export class UserService {
 
   // ================= Cookie 解析 / 登录 =================
 
+  createQrLogin(): Promise<QrLogin> {
+    return PassportClient.createQrLogin();
+  }
+
+  queryQrLoginStatus(ticket: string): Promise<QrLoginResult> {
+    return PassportClient.queryQrLoginStatus(ticket);
+  }
+
+  createLoginCaptcha(mobile: string, isActive?: () => boolean): Promise<MobileCaptcha> {
+    return PassportClient.createLoginCaptcha(mobile, isActive);
+  }
+
+  requestMobileLogin(mobile: string, captcha: string, actionType: string, isActive?: () => boolean): Promise<LoginSession> {
+    return PassportClient.loginByMobileCaptcha(mobile, captcha, actionType, isActive);
+  }
+
+  async loginWithQrResult(result: QrLoginResult): Promise<User> {
+    const session: LoginSession = PassportClient.extractQrSession(result);
+    return this.loginWithSession(session.stuid, session.stoken, session.mid, session.accountName);
+  }
+
+  cancelPendingLogin(revision: number): void {
+    if (this.transitionPending && this.revision === revision && this.pendingLoginRevision === revision) {
+      this.finishChange(revision);
+    }
+  }
+
   /** 解析 Cookie 字符串并构造用户（仅解析不落库） */
   parseCookie(raw: string, isOversea: boolean = false): User {
     const u: User = new User();
@@ -336,18 +445,9 @@ export class UserService {
     return u;
   }
 
-  /** 校验 Cookie 基本有效（含 stoken 或 account_id+cookie_token 且存在 stuid/uid） */
+  /** 国服角色绑定需要 SToken 和账号 ID。 */
   static validateCookie(user: User): boolean {
-    if (user.isOversea && user.hasCookie() && (user.cookieToken.length > 0 || user.ltoken.length > 0)) {
-      return true;
-    }
-    if (user.stoken.length > 0 && (user.stuid.length > 0 || user.accountId.length > 0)) {
-      return true;
-    }
-    if (user.accountId.length > 0 && user.cookieToken.length > 0 && user.ltuid.length > 0) {
-      return true;
-    }
-    return false;
+    return !user.isOversea && user.stoken.length > 0 && (user.stuid.length > 0 || user.accountId.length > 0);
   }
 
   /**
@@ -357,12 +457,14 @@ export class UserService {
    * @param avatar 可选头像
    */
   async loginWithCookie(rawCookie: string, displayName: string, avatar: string, isOversea: boolean = false): Promise<User> {
+    if (isOversea) { throw new Error('仅支持国服米游社账号'); }
     const revision: number = this.beginChange();
+    this.pendingLoginRevision = revision;
     try {
       const parsed: User = new User();
       parsed.isOversea = isOversea;
       if (!parsed.applyCookie(rawCookie) || !UserService.validateCookie(parsed)) {
-        throw new Error('Cookie 中未解析到有效 token，请确认已复制完整 Cookie');
+        throw new Error('Cookie 缺少有效的 SToken 或米游社账号 ID，请重新复制完整 Cookie');
       }
       parsed.displayName = displayName;
       parsed.avatar = avatar;
@@ -372,29 +474,74 @@ export class UserService {
       this.assertRevision(revision);
       const existingId: number = await this.findDuplicate(parsed);
       this.assertRevision(revision);
-      const old: User | undefined = existingId > 0 ? await UserRepo.getUserById(existingId) : undefined;
+      const old: User | undefined = existingId > 0 ? await UserRepo.getUserById(existingId, true) : undefined;
       this.assertRevision(revision);
       const saved: User = old === undefined ? parsed : this.detached(old);
       if (old !== undefined) {
         saved.applyCookie(rawCookie);
+        if (parsed.mid.length > 0 && parsed.mid === old.mid) { this.reuseOmittedTokens(saved, old, rawCookie); }
+        if (saved.mid.length === 0) { saved.mid = old.mid; }
         saved.displayName = displayName.length > 0 ? displayName : old.displayName;
         saved.avatar = avatar.length > 0 ? avatar : old.avatar;
       }
-      try { if (!saved.isOversea) { await this.ensureDeviceFingerprint(); } }
+      if (saved.stuid.length === 0) { saved.stuid = saved.accountId; }
+      try { await this.ensureDeviceFingerprint(); }
       catch (e) { Logger.warn(TAG, 'ensure fingerprint failed'); }
       this.assertRevision(revision);
-      await this.completeTokenChainInner(saved, false, revision);
+      const cookieExchanged: boolean = await this.completeTokenChainInner(saved, false, revision, undefined,
+        this.cookieExchangeDue(saved.id));
+      if (!saved.hasCookieToken() || !saved.hasLToken()) {
+        throw new Error('未能取得完整登录凭证，请稍后重试');
+      }
+      if (saved.aid.length === 0) { saved.aid = saved.stuid; }
       saved.roles = await this.fetchRoles(saved, revision);
+      if (saved.roles.length === 0) { throw new Error('该账号没有绑定国服原神角色'); }
       if (saved.displayName.length === 0 || saved.avatar.length === 0) {
         await this.loadUserFullInfo(saved, revision);
       }
       const uid: string = this.resolveDefaultUid(saved);
       await this.queueMutation(async () => {
         await this.commitUser(saved, uid, revision, true, true);
+        if (cookieExchanged) { this.markCookieExchanged(saved.id); }
       });
       Logger.info(TAG, 'login completed');
       return saved;
-    } finally { this.finishChange(revision); }
+    } finally {
+      if (this.pendingLoginRevision === revision) { this.pendingLoginRevision = -1; }
+      this.finishChange(revision);
+    }
+  }
+
+  private reuseOmittedTokens(user: User, previous: User, rawCookie: string): void {
+    const keys: string[] = rawCookie.split(';').map((pair: string): string => pair.substring(0, pair.indexOf('=')).trim());
+    const cookieFields: string[] = ['account_id', 'cookie_token', 'account_id_v2', 'account_mid_v2', 'cookie_token_v2'];
+    const ltokenFields: string[] = ['ltuid', 'ltoken', 'ltuid_v2', 'ltmid_v2', 'ltoken_v2'];
+    if (previous.hasCookieToken() && !keys.some((key: string): boolean => cookieFields.includes(key))) {
+      user.accountId = previous.accountId;
+      user.cookieToken = previous.cookieToken;
+      user.accountIdV2 = previous.accountIdV2;
+      user.accountMidV2 = previous.accountMidV2;
+      user.cookieTokenV2 = previous.cookieTokenV2;
+    }
+    if (previous.hasLToken() && !keys.some((key: string): boolean => ltokenFields.includes(key))) {
+      user.ltuid = previous.ltuid;
+      user.ltoken = previous.ltoken;
+      user.ltuidV2 = previous.ltuidV2;
+      user.ltmidV2 = previous.ltmidV2;
+      user.ltokenV2 = previous.ltokenV2;
+    }
+  }
+
+  private cookieExchangeDue(userId: number): boolean {
+    if (userId <= 0) { return true; }
+    const previous: number = PreferencesStore.getCookieExchangeTime(userId);
+    const now: number = Date.now();
+    return previous <= 0 || previous > now || now - previous >= COOKIE_REFRESH_INTERVAL_MS;
+  }
+
+  private markCookieExchanged(userId: number): void {
+    try { PreferencesStore.setCookieExchangeTime(userId, Date.now()); }
+    catch (e) { Logger.warn(TAG, 'cookie exchange time could not be recorded'); }
   }
 
   /**
@@ -421,19 +568,13 @@ export class UserService {
   /** 查找重复账号 id（同 mid/stuid/account_id），无则 0 */
   private async findDuplicate(candidate: User): Promise<number> {
     const all: User[] = await UserRepo.getAllUsers();
-    for (let i = 0; i < all.length; i++) {
-      const u: User = all[i];
-      if (u.id === 0 || u.isOversea !== candidate.isOversea) {
-        continue;
-      }
-      if (candidate.mid.length > 0 && u.mid === candidate.mid) {
-        return u.id;
-      }
-      if (candidate.stuid.length > 0 && u.stuid === candidate.stuid) {
-        return u.id;
-      }
-      if (candidate.accountId.length > 0 && u.accountId === candidate.accountId) {
-        return u.id;
+    const accountId: string = candidate.stuid || candidate.accountId;
+    for (const user of all) {
+      if (user.id === 0 || user.isOversea !== candidate.isOversea) { continue; }
+      if (candidate.mid.length > 0 && user.mid.length > 0) {
+        if (user.mid === candidate.mid) { return user.id; }
+      } else if (accountId.length > 0 && (user.stuid === accountId || user.accountId === accountId || user.aid === accountId)) {
+        return user.id;
       }
     }
     return 0;
@@ -443,35 +584,57 @@ export class UserService {
    *  说明：这两个接口需要 DS Gen2/PROD 签名 + 完整 passport(XRpc2) 头；
    *  缺 app_id/game_biz/sdk_version 等头会被米哈游拒绝导致拿不到 cookie_token。 */
   /** Refresh detached credentials; publication requires both revision and selected-object ownership. */
-  async refreshCookieTokenForced(user: User): Promise<boolean> {
+  async refreshCookieTokenForced(user: User, isActive?: () => Promise<boolean>): Promise<boolean> {
     this.assertAvailable();
+    if (user.isOversea) { return false; }
     const revision: number = this.revision;
     const owner: User | undefined = this.selectedOwner(user);
     if (user.stoken.length === 0 && user.stokenV2.length === 0) { return false; }
     const snapshot: User = this.detached(user);
-    await this.completeTokenChainInner(snapshot, true, revision);
-    await this.publishTokens(user, snapshot, owner, revision);
-    return snapshot.cookieToken.length > 0;
+    if (!await this.completeTokenChainInner(snapshot, true, revision, isActive)) { return false; }
+    await this.publishTokens(user, snapshot, owner, revision, true, isActive);
+    return true;
   }
 
-  private async publishTokens(user: User, snapshot: User, owner: User | undefined, revision: number): Promise<void> {
+  private async assertTokenRefreshActive(isActive?: () => Promise<boolean>): Promise<void> {
+    if (isActive !== undefined && !await isActive()) { throw new Error('任务已停止'); }
+  }
+
+  private async publishTokens(user: User, snapshot: User, owner: User | undefined, revision: number,
+    cookieExchanged: boolean, isActive?: () => Promise<boolean>): Promise<void> {
     await this.queueMutation(async () => {
       this.assertRevision(revision);
-      const stored: User | undefined = await UserRepo.getUserById(user.id);
+      const stored: User | undefined = await UserRepo.getUserById(user.id, true);
+      await this.assertTokenRefreshActive(isActive);
       this.assertRevision(revision);
       if (stored === undefined || !this.sameIdentity(stored, user)) { throw new Error('账号状态已变化，请重试'); }
-      const metadataChanged: boolean = snapshot.aid !== user.aid;
+      // A native task's ownership check includes the stored account alias.
+      if (isActive !== undefined) { snapshot.aid = stored.aid; }
+      const metadataChanged: boolean = snapshot.aid !== stored.aid;
+      let metadataWritten: boolean = false;
       try {
-        await this.storeCookie(snapshot, revision);
-        if (metadataChanged) { await this.storeUserMetadata(snapshot, revision); }
+        await UserRepo.saveCookieFor(snapshot.id, snapshot.fullCookie());
+        await this.assertTokenRefreshActive(isActive);
+        this.assertRevision(revision);
+        if (metadataChanged) {
+          snapshot.isSelected = this.currentUser?.id === snapshot.id;
+          metadataWritten = true;
+          await UserRepo.updateUser(snapshot);
+        }
         this.assertRevision(revision);
       } catch (e) {
-        await UserRepo.saveCookieFor(stored.id, stored.fullCookie());
-        if (metadataChanged) { await UserRepo.updateUser(stored); }
+        const latest: User | undefined = isActive === undefined ? stored : await UserRepo.getUserById(stored.id, true);
+        if (latest === undefined) {
+          await UserRepo.removeCookieFor(stored.id);
+        } else if (this.sameIdentity(latest, stored)) {
+          await UserRepo.saveCookieFor(stored.id, stored.fullCookie());
+          if (metadataWritten) { await UserRepo.updateUser(stored); }
+        }
         if (e instanceof Error) { throw e; } throw new Error('账号操作失败，请重试');
       }
       user.applyCookie(snapshot.fullCookie());
       user.aid = snapshot.aid;
+      if (cookieExchanged) { this.markCookieExchanged(snapshot.id); }
       if (owner !== undefined && this.currentUser === owner) {
         owner.applyCookie(snapshot.fullCookie());
         owner.aid = snapshot.aid;
@@ -480,14 +643,13 @@ export class UserService {
     });
   }
 
-  private async completeTokenChainInner(user: User, forceRefresh: boolean, revision: number): Promise<void> {
+  private async completeTokenChainInner(user: User, forceRefresh: boolean, revision: number,
+    isActive?: () => Promise<boolean>, refreshDue: boolean = false): Promise<boolean> {
     if (user.stoken.length === 0 && user.stokenV2.length === 0) {
-      return;
+      return false;
     }
-    if (user.isOversea) {
-      await this.completeOverseaTokenChain(user, forceRefresh, revision);
-      return;
-    }
+    await this.assertTokenRefreshActive(isActive);
+    this.assertRevision(revision);
     // 兜底：fp 缺失时先取（passport 交换需 x-rpc-device_fp，缺则被拒 → cookie_token 补不上）
     if (PreferencesStore.getDeviceFp().length === 0) {
       try {
@@ -495,6 +657,7 @@ export class UserService {
       } catch (e) {
         Logger.warn(TAG, 'ensure fp before token chain fail');
       }
+      await this.assertTokenRefreshActive(isActive);
     }
     this.assertRevision(revision);
     const stokenCookie: string = user.stokenCookie();
@@ -502,108 +665,66 @@ export class UserService {
     const fullHeaders: Record<string, string> = HoyolabClient.merge(passportHeaders, {
       'Cookie': stokenCookie,
     });
+    let refreshed: boolean = false;
     // 1) 补 cookie_token（forceRefresh=true 时忽略已有值强制换新）
-    if (forceRefresh || user.cookieToken.length === 0) {
-      try {
-        const dsHeaders: Record<string, string> = await this.buildProdDsHeader();
-        this.assertRevision(revision);
-        fullHeaders['DS'] = dsHeaders['DS'];
-        const resp: ApiResponse = await ApiClient.getInstance().get(
-          'https://passport-api.mihoyo.com/account/auth/api/getCookieAccountInfoBySToken',
-          fullHeaders);
-        this.assertRevision(revision);
-        if (resp.success && resp.data !== undefined) {
-          const data = resp.data as Record<string, Object>;
-          // 参考项目 UidCookieToken：{ uid, cookie_token }。uid 即 account_id
-          const accountId: string = String(data['uid'] ?? data['account_id'] ?? '');
-          const cookieToken: string = String(data['cookie_token'] ?? '');
-          if (accountId.length > 0 && cookieToken.length > 0) {
-            user.accountId = accountId;
-            user.cookieToken = cookieToken;
-            if (user.aid.length === 0) {
-              user.aid = accountId;
-            }
-          } else {
-            Logger.warn(TAG, `getCookieAccountInfo retcode=${resp.retcode} data empty`);
-          }
-        } else {
-          Logger.warn(TAG, `getCookieAccountInfo fail retcode=${resp.retcode} cookieLen=${stokenCookie.length} fpLen=${PreferencesStore.getDeviceFp().length}`);
-        }
-      } catch (e) {
-        this.assertRevision(revision);
-        Logger.warn(TAG, 'complete cookie_token fail');
+    if (forceRefresh || refreshDue || !user.hasCookieToken()) {
+      const resp: ApiResponse = await this.exchangeToken('getCookieAccountInfoBySToken', fullHeaders, revision, isActive);
+      this.assertRevision(revision);
+      const data: Record<string, Object> | undefined = resp.data as Record<string, Object> | undefined;
+      const accountId: string = String(data?.['uid'] ?? data?.['account_id'] ?? '');
+      const cookieToken: string = String(data?.['cookie_token'] ?? '');
+      if (resp.success && accountId.length > 0 && cookieToken.length > 0) {
+        user.accountId = accountId;
+        user.cookieToken = cookieToken;
+        user.accountIdV2 = '';
+        user.accountMidV2 = '';
+        user.cookieTokenV2 = '';
+        refreshed = true;
+        if (user.aid.length === 0) { user.aid = accountId; }
+      } else {
+        Logger.warn(TAG, `getCookieAccountInfo failed retcode=${resp.retcode}`);
       }
     }
     // 2) 补 ltoken（forceRefresh=true 时同步换新）
-    if (forceRefresh || user.ltoken.length === 0) {
-      try {
-        const dsHeaders: Record<string, string> = await this.buildProdDsHeader();
-        this.assertRevision(revision);
-        fullHeaders['DS'] = dsHeaders['DS'];
-        const resp: ApiResponse = await ApiClient.getInstance().get(
-          'https://passport-api.mihoyo.com/account/auth/api/getLTokenBySToken',
-          fullHeaders);
-        this.assertRevision(revision);
-        if (resp.success && resp.data !== undefined) {
-          const data = resp.data as Record<string, Object>;
-          // 参考项目 LTokenWrapper：{ ltoken }。ltuid 复用 stuid（同一账号 ID）
-          const ltoken: string = String(data['ltoken'] ?? '');
-          if (ltoken.length > 0 && ltoken !== 'undefined' && ltoken !== 'null') {
-            user.ltoken = ltoken;
-            if (user.ltuid.length === 0) {
-              user.ltuid = user.stuid.length > 0 ? user.stuid : user.stuidV2;
-            }
-          } else {
-            Logger.warn(TAG, `getLToken retcode=${resp.retcode} data empty`);
-          }
-        } else {
-          Logger.warn(TAG, `getLToken fail retcode=${resp.retcode}`);
-        }
-      } catch (e) {
-        this.assertRevision(revision);
-        Logger.warn(TAG, 'complete ltoken fail');
+    if (forceRefresh || !user.hasLToken()) {
+      const resp: ApiResponse = await this.exchangeToken('getLTokenBySToken', fullHeaders, revision, isActive);
+      this.assertRevision(revision);
+      const data: Record<string, Object> | undefined = resp.data as Record<string, Object> | undefined;
+      const ltoken: string = String(data?.['ltoken'] ?? '');
+      if (resp.success && ltoken.length > 0 && ltoken !== 'undefined' && ltoken !== 'null') {
+        user.ltoken = ltoken;
+        user.ltuid = user.stuidV2 || user.stuid || user.accountId || user.aid;
+        user.ltuidV2 = '';
+        user.ltmidV2 = '';
+        user.ltokenV2 = '';
+      } else {
+        Logger.warn(TAG, `getLToken failed retcode=${resp.retcode}`);
       }
     }
     this.assertRevision(revision);
+    return refreshed;
   }
 
-  /** HoYoLAB token exchange is POST with STokenWrapper (upstream PassportClientOversea). */
-  private async completeOverseaTokenChain(user: User, forceRefresh: boolean, revision: number): Promise<void> {
-    const aid: string = user.aid || user.stuid || user.accountId;
-    const body: Record<string, string> = { 'stoken': user.stokenV2 || user.stoken, 'uid': aid };
-    const headers: Record<string, string> = HoyolabClient.getBaseHeaders('os_asia');
-    headers['Cookie'] = user.stokenCookie();
-    const paths: string[] = ['getCookieAccountInfoBySToken', 'getLTokenBySToken'];
-    for (const path of paths) {
+  private async exchangeToken(path: string, headers: Record<string, string>, revision: number,
+    isActive?: () => Promise<boolean>): Promise<ApiResponse> {
+    let dsHeaders: Record<string, string>;
+    try { dsHeaders = await this.buildProdDsHeader(); }
+    catch (e) {
+      await this.assertTokenRefreshActive(isActive);
       this.assertRevision(revision);
-      if (!forceRefresh && ((path === paths[0] && user.cookieToken.length > 0) ||
-        (path === paths[1] && user.ltoken.length > 0))) {
-        continue;
-      }
-      const response: ApiResponse = await ApiClient.getInstance().postJson(
-        `https://api-account-os.hoyoverse.com/account/auth/api/${path}`, JSON.stringify(body), headers);
-      this.assertRevision(revision);
-      if (!response.success || response.data === undefined) {
-        Logger.warn(TAG, `oversea token exchange failed code=${response.retcode}`);
-        continue;
-      }
-      const data: Record<string, Object> = response.data as Record<string, Object>;
-      if (path === paths[0]) {
-        const token: string = String(data['cookie_token'] ?? '');
-        if (token.length > 0) {
-          user.cookieToken = token;
-          user.accountId = String(data['uid'] ?? aid);
-          user.aid = user.accountId;
-        }
-      } else {
-        const token: string = String(data['ltoken'] ?? '');
-        if (token.length > 0) {
-          user.ltoken = token;
-          user.ltuid = aid;
-        }
-      }
+      return ApiResponse.fail(-1, '登录凭证请求签名失败');
     }
+    await this.assertTokenRefreshActive(isActive);
     this.assertRevision(revision);
+    headers['DS'] = dsHeaders['DS'];
+    let response: ApiResponse;
+    try {
+      response = await ApiClient.getInstance().get(`https://passport-api.mihoyo.com/account/auth/api/${path}`, headers);
+    } catch (e) {
+      response = ApiResponse.fail(-1, '登录凭证请求失败');
+    }
+    await this.assertTokenRefreshActive(isActive);
+    return response;
   }
 
   /** 生成 passport 接口所需 DS Gen2/PROD 头（对齐 Windows PassportClient SignDataAsync(Gen2, PROD, true)：
@@ -631,7 +752,7 @@ export class UserService {
     service.assertAvailable();
     if (!ok) {
       const fail: ApiResponse = ApiResponse.fail(RetCodes.COOKIE_EXPIRED,
-        'SToken 已失效，请到「账号与数据」重新登录');
+        '未能刷新登录凭证，请重试或到「账号与数据」重新登录');
       return fail;
     }
     const response: ApiResponse = await onRetry();
@@ -642,11 +763,45 @@ export class UserService {
   /** 公开封装：补齐当前用户 Token 链（供各 Service 在缺 cookie_token 时调用） */
   async completeTokenChainPublic(user: User): Promise<void> {
     this.assertAvailable();
+    if (user.isOversea) { throw new Error('仅支持国服米游社账号'); }
     const revision: number = this.revision;
     const owner: User | undefined = this.selectedOwner(user);
+    if (owner !== undefined) {
+      await this.completeSelectedTokenChain(user, owner, revision, this.cookieExchangeDue(owner.id));
+      return;
+    }
     const snapshot: User = this.detached(user);
-    await this.completeTokenChainInner(snapshot, false, revision);
-    await this.publishTokens(user, snapshot, owner, revision);
+    const cookieExchanged: boolean = await this.completeTokenChainInner(snapshot, false, revision);
+    await this.publishTokens(user, snapshot, undefined, revision, cookieExchanged);
+  }
+
+  private async completeSelectedTokenChain(user: User, owner: User, revision: number, refreshDue: boolean): Promise<void> {
+    let flight: SelectedTokenCompletion | undefined = this.selectedTokenCompletion;
+    if (flight === undefined || flight.revision !== revision || flight.owner !== owner) {
+      const result: Promise<void> = this.requestSelectedTokens(owner, revision, refreshDue).finally((): void => {
+        if (this.selectedTokenCompletion?.result === result) { this.selectedTokenCompletion = undefined; }
+      });
+      flight = new SelectedTokenCompletion(owner, revision, refreshDue, result);
+      this.selectedTokenCompletion = flight;
+    }
+    await flight.result;
+    this.assertRevision(revision);
+    if (this.currentUser !== owner) { throw new Error('账号状态已变化，请重试'); }
+    // A Cookie may expire while an earlier request is completing another token group.
+    if (refreshDue && !flight.refreshDue && this.cookieExchangeDue(owner.id)) {
+      await this.completeSelectedTokenChain(user, owner, revision, true);
+      return;
+    }
+    if (user !== owner) {
+      user.applyCookie(owner.fullCookie());
+      user.aid = owner.aid;
+    }
+  }
+
+  private async requestSelectedTokens(owner: User, revision: number, refreshDue: boolean): Promise<void> {
+    const snapshot: User = this.detached(owner);
+    const cookieExchanged: boolean = await this.completeTokenChainInner(snapshot, false, revision, undefined, refreshDue);
+    await this.publishTokens(owner, snapshot, owner, revision, cookieExchanged);
   }
 
   private sameIdentity(a: User, b: User): boolean {
@@ -685,6 +840,7 @@ export class UserService {
   /** 拉取账号完整信息（昵称/头像），address 该账号有效 aid；失败仅记录 */
   async fetchUserFullInfo(user: User): Promise<void> {
     this.assertAvailable();
+    if (user.isOversea) { throw new Error('仅支持国服米游社账号'); }
     const revision: number = this.revision;
     const snapshot: User = this.detached(user);
     await this.loadUserFullInfo(snapshot, revision);
@@ -703,12 +859,10 @@ export class UserService {
       return;
     }
     try {
-      const url: string = user.isOversea
-        ? 'https://bbs-api-os.hoyolab.com/community/user/wapi/getUserFullInfo?gid=2'
-        : `https://bbs-api.mihoyo.com/user/wapi/getUserFullInfo?uid=${id}&gids=2`;
+      const url: string = `https://bbs-api.mihoyo.com/user/wapi/getUserFullInfo?uid=${id}&gids=2`;
       const resp: ApiResponse = await ApiClient.getInstance().get(url, {
-        'Cookie': user.isOversea ? user.gameRecordCookie() : user.stokenCookie(),
-        'Referer': user.isOversea ? 'https://www.hoyolab.com/' : 'https://bbs.mihoyo.com/',
+        'Cookie': user.stokenCookie(),
+        'Referer': 'https://bbs.mihoyo.com/',
       });
       this.assertRevision(revision);
       if (resp.success && resp.data !== undefined) {
@@ -718,7 +872,7 @@ export class UserService {
           const nickname: string = String(info['nickname'] ?? '');
           let avatarUrl: string = String(info['avatar_url'] ?? '');
           // 头像 URL 若为相对/数字形式，回退拼默认头像地址（参考项目 AvatarUri 逻辑）
-          if (!user.isOversea && (avatarUrl.length === 0 || !avatarUrl.startsWith('http'))) {
+          if (avatarUrl.length === 0 || !avatarUrl.startsWith('http')) {
             const avatarId: string = String(info['avatar'] ?? '');
             const base: string = avatarUrl.length > 0 ? avatarUrl : avatarId;
             avatarUrl = base.length > 0
@@ -746,6 +900,7 @@ export class UserService {
   /** 通过 SToken → actionTicket → getUserGameRoles 拉取并持久化角色 */
   async fetchAndStoreRoles(user: User): Promise<UserGameRole[]> {
     this.assertAvailable();
+    if (user.isOversea) { throw new Error('仅支持国服米游社账号'); }
     const revision: number = this.revision;
     const snapshot: User = this.detached(user);
     snapshot.roles = await this.fetchRoles(snapshot, revision);
@@ -756,63 +911,48 @@ export class UserService {
   }
 
   private async fetchRoles(user: User, revision: number): Promise<UserGameRole[]> {
-    const rolesResp: ApiResponse = user.isOversea
-      ? await ApiClient.getInstance().get(
-        'https://api-os-takumi.hoyoverse.com/binding/api/getUserGameRolesByCookie?game_biz=hk4e_global',
-        HoyolabClient.merge(HoyolabClient.getBaseHeaders('os_asia'), { 'Cookie': user.gameRecordCookie() }))
-      : await this.fetchChineseRoles(user, revision);
+    const rolesResp: ApiResponse = await this.fetchChineseRoles(user, revision);
     this.assertRevision(revision);
-    if (rolesResp.success && rolesResp.data !== undefined) {
-      const rolesData = rolesResp.data as Record<string, Object>;
-      const list = rolesData['list'] as Array<Object>;
-      const roles: UserGameRole[] = [];
-      let previousDefault: string = '';
-      for (const previous of user.roles) {
-        if (previous.isDefault) { previousDefault = previous.gameUid; break; }
-      }
-      if (list !== undefined && list !== null) {
-        for (let i = 0; i < list.length; i++) {
-          const item = list[i] as Record<string, Object>;
-          const gameUid: string = String(item['game_uid'] ?? '');
-          if (gameUid.length === 0) {
-            continue;
-          }
-          const region: string = String(item['region'] ?? RegionUtil.regionOfUid(gameUid));
-          if (RegionUtil.isOverseaRegion(region) !== user.isOversea) {
-            continue;
-          }
-          const nickname: string = String(item['nickname'] ?? '');
-          const level: number = Number(item['level'] ?? 0);
-          const role: UserGameRole = UserGameRole.of(gameUid, region, nickname, level);
-          role.isDefault = gameUid === previousDefault;
-          role.isChosen = role.isDefault;
-          roles.push(role);
-        }
-      }
-      Logger.info(TAG, `roles fetched count=${roles.length}`);
-      return roles;
+    if (!rolesResp.success) {
+      Logger.warn(TAG, `getUserGameRoles fail retcode=${rolesResp.retcode}`);
+      if (UserService.isCookieAuthError(rolesResp)) { throw new Error('登录态已失效，请重新登录'); }
+      if (rolesResp.retcode === RetCodes.RISK_CONTROL) { throw new Error('获取角色被风控拦截，请稍后重试'); }
+      throw new Error('获取角色列表失败，请稍后重试');
     }
-    Logger.warn(TAG, `getUserGameRoles fail retcode=${rolesResp.retcode}`);
-    if (rolesResp.retcode === RetCodes.RISK_CONTROL) {
-      throw new Error('获取角色被风控拦截，请稍后重试');
+    const rolesData: Record<string, Object> | undefined = rolesResp.data as Record<string, Object> | undefined;
+    const list: Object | undefined = rolesData?.['list'];
+    if (!Array.isArray(list)) { throw new Error('米游社返回的角色列表无效，请稍后重试'); }
+    const previousDefault: string = user.roles.find((role: UserGameRole): boolean => role.isDefault)?.gameUid ?? '';
+    const roles: UserGameRole[] = [];
+    for (const item of list as Object[]) {
+      if (item === null || typeof item !== 'object') { continue; }
+      const data: Record<string, Object> = item as Record<string, Object>;
+      const gameUid: string = String(data['game_uid'] ?? '');
+      const expectedRegion: string = RegionUtil.regionOfUid(gameUid);
+      const region: string = String(data['region'] ?? expectedRegion);
+      if (!RegionUtil.isCnUid(gameUid) || region !== expectedRegion) { continue; }
+      const role: UserGameRole = UserGameRole.of(gameUid, region,
+        String(data['nickname'] ?? ''), Number(data['level'] ?? 0));
+      role.isDefault = gameUid === previousDefault;
+      role.isChosen = data['is_chosen'] === true;
+      roles.push(role);
     }
-    return user.roles;
+    Logger.info(TAG, `roles fetched count=${roles.length}`);
+    return roles;
   }
 
   private async fetchChineseRoles(user: User, revision: number): Promise<ApiResponse> {
     if (user.stoken.length === 0) {
-      Logger.warn(TAG, 'no stoken, skip role fetch');
-      return ApiResponse.fail(-1, '无法获取角色凭证');
+      throw new Error('账号缺少 SToken，请重新登录');
     }
-    const stuid: string = user.stuid.length > 0 ? user.stuid : user.aid;
-    const ticketResp: ApiResponse = await HoyolabClient.getActionTicket(user.stokenCookie(), user.stoken, stuid);
+    const useV2: boolean = user.stokenV2.length > 0 && user.stuidV2.length > 0;
+    const stuid: string = useV2 ? user.stuidV2 : (user.stuid || user.aid);
+    const stoken: string = useV2 ? user.stokenV2 : user.stoken;
+    const ticketResp: ApiResponse = await HoyolabClient.getActionTicket(user.stokenCookie(), stoken, stuid);
     this.assertRevision(revision);
     if (!ticketResp.success || ticketResp.data === undefined) {
       Logger.warn(TAG, `getActionTicket fail retcode=${ticketResp.retcode}`);
-      if (ticketResp.retcode === RetCodes.RISK_CONTROL) {
-        throw new Error('获取角色被风控拦截，请稍后重试');
-      }
-      return ApiResponse.fail(-1, '无法获取角色凭证');
+      return ApiResponse.fail(ticketResp.success ? -1 : ticketResp.retcode, '无法获取角色凭证');
     }
     const ticketData = ticketResp.data as Record<string, Object>;
     const ticket: string = String(ticketData['ticket'] ?? '');
@@ -832,9 +972,11 @@ export class UserService {
       await this.prepareChange('switch', revision);
       await this.mutationTail;
       this.assertRevision(revision);
-      const loaded: User | undefined = await UserRepo.getUserById(userId);
+      const loaded: User | undefined = await UserRepo.getUserById(userId, true);
       this.assertRevision(revision);
       if (loaded === undefined) { throw new Error('账号不存在'); }
+      if (loaded.isOversea) { throw new Error('仅支持国服米游社账号'); }
+      if (!loaded.hasCookie()) { throw new Error('该账号缺少登录凭证，请重新登录'); }
       const user: User = this.detached(loaded);
       const uid: string = this.resolveDefaultUid(user);
       await this.queueMutation(async () => {
@@ -852,15 +994,35 @@ export class UserService {
       this.assertRevision(revision);
       await this.queueMutation(async () => {
         this.assertRevision(revision);
+        const wasSelected: boolean = this.currentUser?.id === userId;
         try {
           await UserRepo.deleteUser(userId);
-        } finally {
-          // A delete may fail after removing its account row. Fail closed for that selected identity.
-          if (this.currentUser === undefined || this.currentUser.id === userId) {
+        } catch (e) {
+          if (wasSelected || this.currentUser === undefined) {
             this.currentUser = undefined;
             this.currentUid = '';
             this.clearSessionState();
+            await this.repairSelection();
           }
+          if (e instanceof Error) { throw e; }
+          throw new Error('删除账号失败，请重试');
+        }
+        if (wasSelected) {
+          this.currentUser = undefined;
+          this.currentUid = '';
+          try {
+            this.assertRevision(revision);
+            const users: User[] = await this.readSavedUsers();
+            this.assertRevision(revision);
+            const next: User | undefined = users.find((user: User): boolean => !user.isOversea && user.hasCookie());
+            if (next !== undefined) {
+              await this.commitUser(next, this.resolveDefaultUid(next), revision, false, true);
+            }
+          } finally {
+            if (this.currentUser === undefined) { this.clearSessionState(); }
+          }
+        } else if (this.currentUser === undefined) {
+          this.clearSessionState();
           await this.repairSelection();
         }
         this.assertRevision(revision);
@@ -884,10 +1046,10 @@ export class UserService {
     } finally { this.finishChange(revision); }
   }
 
-  async refreshRolesOfCurrent(): Promise<void> {
+  async refreshRolesOfCurrent(): Promise<number> {
     this.assertAvailable();
     const selected: User | undefined = this.currentUser;
-    if (selected === undefined) { return; }
+    if (selected === undefined) { throw new Error('请先登录'); }
     const revision: number = this.beginChange();
     try {
       await this.prepareChange('refreshRoles', revision);
@@ -897,6 +1059,7 @@ export class UserService {
       await this.queueMutation(async () => {
         await this.commitUser(user, uid, revision, false, true);
       });
+      return user.roles.length;
     } finally { this.finishChange(revision); }
   }
 
@@ -906,9 +1069,10 @@ export class UserService {
       await this.prepareChange('defaultUid', revision);
       await this.mutationTail;
       this.assertRevision(revision);
-      const loaded: User | undefined = await UserRepo.getUserById(userId);
+      const loaded: User | undefined = await UserRepo.getUserById(userId, true);
       this.assertRevision(revision);
       if (loaded === undefined) { throw new Error('账号不存在'); }
+      if (loaded.isOversea || !RegionUtil.isCnUid(uid)) { throw new Error('请选择国服角色'); }
       const user: User = this.detached(loaded);
       let found: boolean = false;
       for (const role of user.roles) {

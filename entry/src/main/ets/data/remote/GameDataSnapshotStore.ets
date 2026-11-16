@@ -79,9 +79,10 @@ export class GameDataSnapshotStore {
       GameDataManifestPolicy.validateBytes(item, value, this.io.sha256(value)); bytes += value.length;
       if (bytes > GameDataManifestPolicy.MAX_SNAPSHOT_BYTES) { throw new Error('快照容量超限'); }
       result.paths.add(item.path);
-      if (item.type === ItemType.Text) {
-        const decoded: string = this.io.decode(value);
-        result.metadata.set(item.path, decoded.charCodeAt(0) === 0xFEFF ? decoded.substring(1) : decoded);
+      if (GameDataManifestPolicy.isLanguagePath(item.path)) {
+        GameDataManifestPolicy.validateLanguageText(item.path, this.io.decode(value));
+      } else if (item.type === ItemType.Text) {
+        result.metadata.set(item.path, GameDataManifestPolicy.stripBom(this.io.decode(value)));
       }
     }
     GameDataManifestPolicy.validateModels(result.metadata); return result;
@@ -119,7 +120,7 @@ export class GameDataSnapshotStore {
     let units: number = 0;
     if (snapshot !== undefined) {
       for (const item of snapshot.manifest.items) {
-        if (item.type !== ItemType.Text) { continue; }
+        if (item.type !== ItemType.Text || GameDataManifestPolicy.isLanguagePath(item.path)) { continue; }
         const text: string = snapshot.metadata.get(item.path) ?? ''; units += text.length;
         if (units > GameDataSnapshotStore.MAX_TEXT_UNITS) { throw new Error('快照文本超过后台传输限制'); }
         result.push(item.path, text);
@@ -130,7 +131,7 @@ export class GameDataSnapshotStore {
   }
   private decodePrepared(result: string[], mode: string, expectedId: string = ''): GameDataSnapshot | undefined {
     const allowed: string[] = mode === 'selection' ? ['active', 'previous', 'bundled', 'reset', 'corrupt'] : [mode];
-    if (result.length < 6 || result.length > 6 + 2 * GameDataManifestPolicy.METADATA.length ||
+    if (result.length < 6 || result.length > 6 + 2 * GameDataManifestPolicy.MAX_CACHED_METADATA_FILES ||
       result[0] !== '1' || result[1] !== this.root || result[2] !== this.stamp() || !allowed.includes(result[3]) ||
       (expectedId !== '' && result[4] !== expectedId)) { throw new Error('后台校验结果已失效'); }
     if (result[4] === '') {
@@ -148,7 +149,7 @@ export class GameDataSnapshotStore {
     for (const item of snapshot.manifest.items) {
       if (item.size < 1 || item.sha256.length !== 64) { throw new Error('后台快照缺少收据'); }
       snapshot.paths.add(item.path);
-      if (item.type !== ItemType.Text) { continue; }
+      if (item.type !== ItemType.Text || GameDataManifestPolicy.isLanguagePath(item.path)) { continue; }
       if (offset + 1 >= result.length || result[offset] !== item.path || result[offset + 1].length > GameDataManifestPolicy.MAX_FILE_BYTES) {
         throw new Error('后台元数据不完整');
       }

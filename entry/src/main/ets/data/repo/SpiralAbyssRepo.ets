@@ -18,6 +18,7 @@ export class AbyssHistoryEntry {
   endTime: number = 0;
   totalStar: number = 0;
   recordTime: number = 0;
+  rawJson: string = '';
 }
 
 export class SpiralAbyssRepo {
@@ -79,6 +80,7 @@ export class SpiralAbyssRepo {
         e.endTime = rs.getLong(rs.getColumnIndex('end_time'));
         e.totalStar = rs.getLong(rs.getColumnIndex('total_star'));
         e.recordTime = rs.getLong(rs.getColumnIndex('record_time'));
+        e.rawJson = rs.getString(rs.getColumnIndex('raw_json'));
         out.push(e);
       }
     } finally {

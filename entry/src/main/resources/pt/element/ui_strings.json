@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "Cancelar"
+    },
+    {
+      "name": "common_confirm",
+      "value": "Confirmar"
+    },
+    {
+      "name": "common_refresh",
+      "value": "Atualizar"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "Histórico de orações"
+    },
+    {
+      "name": "page_title_home",
+      "value": "Início"
+    },
+    {
+      "name": "page_title_login",
+      "value": "Fazer login"
+    },
+    {
+      "name": "page_title_note",
+      "value": "Lembretes"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "Configurações"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "Histórico de orações"
+    },
+    {
+      "name": "tab_home",
+      "value": "Início"
+    },
+    {
+      "name": "tab_mine",
+      "value": "Perfil"
+    },
+    {
+      "name": "tab_note",
+      "value": "Lembretes"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "Exportar"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "Importar"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "Salvar"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "Generate analysis"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "Account history charts and AI insights"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "Stop generation"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "Test connection"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "Verificar atualizações"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "Dados"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "Agenda"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "Sistema"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "Ferramentas"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "Reabra o aplicativo para seguir o idioma do sistema"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "Padrão do sistema"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "Ordem do Abismo"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "Conquistas"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "Itens do Inventário"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "Confronto Abissal"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "Meus personagens"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "Planejamento"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "Inicializador"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "Diário do Viajante"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Passe de Batalha da Hutao"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "Teatro Imaginarium"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "Wiki de personagens"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "Wiki de monstros"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "Wiki de armas"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "Sobre"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "Conta"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "Aparência"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "Imagem de fundo"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "Fundo de vídeo"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "Cópia e restauração"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "Calendário"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "Início"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "Configurações da área de atividades do jogo na página inicial"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "Cartão do painel"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "Idioma"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "Material de pano de fundo"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "Outros"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "Check-in"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "Armazenamento"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "Esquema de cores"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "CAPTCHA"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "Histórico de orações"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "Migração de dados"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "Tema Escuro"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "Tema Claro"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "A versão %s do Snap Hutao está pronta"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "Notas da versão"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "Ignorar esta versão"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "Atualização do aplicativo"
+    }
+  ]
+}

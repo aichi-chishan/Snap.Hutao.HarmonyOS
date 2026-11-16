@@ -13,11 +13,28 @@
 /.cxx
 /.appanalyzer
 **/.test
+**/.preview/
+**/coverage/
+**/__pycache__/
+*.py[cod]
+*.hap
+*.app
+*.hsp
 /.cache
 
 # ===== 本地签名配置（含密钥，自行在 DevEco 配置）=====
 /build-profile.json5
 /local.properties
+/signing/
+/.signing/
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.p7b
+*.key
+.env
+.env.local
 
 # ===== IDE / 编辑器 =====
 /.idea
@@ -47,6 +64,14 @@ Thumbs.db
 # ===== 隐私/调试产物：截图与布局转储 =====
 /.debug/
 /.local/
+*.ftrace
+*.htrace
+/hutao_backup_*.json
+/uigf_*.json
+/uiaf_*.json
+/uiif_*.json
+*.db-wal
+*.db-shm
 shot_*.jpeg
 shot_*.png
 layout*.json

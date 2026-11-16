@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "ui_startup_failed_title", "value": "Tidak dapat memulai" },
+    { "name": "ui_startup_failed_body", "value": "Aplikasi tidak dapat menyelesaikan proses awal. Silakan coba lagi. Mencoba lagi tidak akan menghapus data Anda yang sudah ada." }
+  ]
+}

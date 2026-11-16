@@ -14,7 +14,7 @@ import { AppBackButton } from './AppBackButton';
 @Component
 export struct PageHeader {
   /** 标题 */
-  @Prop title: string = '';
+  @Prop title: ResourceStr = '';
   /** 宽屏内嵌模式：隐藏返回按钮、去状态栏避让 */
   @Prop embedMode: boolean = false;
   /** 状态栏避让高度（embedMode 时忽略） */

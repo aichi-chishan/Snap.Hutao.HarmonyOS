@@ -58,6 +58,7 @@ export class ActRewardEntry {
 }
 
 export class ActCalendarEntry {
+  id: string = '';
   /** 展示类型（1 活动 2 卡池） */
   type: number = 0;
   typeName: string = '';
@@ -72,6 +73,7 @@ export class ActCalendarEntry {
   endTime: number = 0;
   /** 活动状态 1 未开始 2 进行中 */
   status: number = 0;
+  finished: boolean = false;
   /** 倒计时秒 */
   countdownSeconds: number = 0;
   /** 卡池版本名 */
@@ -111,27 +113,21 @@ export class ActCalendarEntry {
 
   /** 是否进行中 */
   isOngoing(nowMs: number): boolean {
-    return this.startTime <= nowMs && nowMs <= this.endTime;
+    return this.startTime > 0 && this.startTime <= nowMs && nowMs <= this.endTime;
   }
 
   /** 状态文案 */
   statusText(nowMs: number): string {
-    if (this.countdownSeconds > 0) {
-      const span: number = this.countdownSeconds;
-      if (span >= 3600 * 24) {
-        return `${Math.floor(span / 3600 / 24)}天后开始`;
-      }
-      if (span >= 3600) {
-        return `${Math.floor(span / 3600)}小时后开始`;
-      }
-      if (span > 0) {
-        return `${Math.floor(span / 60)}分钟后开始`;
-      }
+    if (this.startTime > nowMs) {
+      return `${ActCalendarEntry.timeSpan(this.startTime - nowMs)}后开始`;
     }
     if (this.isOngoing(nowMs)) {
-      return '进行中';
+      return this.finished ? '已完成' : '进行中';
     }
-    return this.startTime > nowMs ? '未开始' : '已结束';
+    if (this.endTime > 0 && this.endTime < nowMs) { return '已结束'; }
+    if (this.status === ActStatus.Upcoming) { return '未开始'; }
+    if (this.status === ActStatus.Ongoing) { return this.finished ? '已完成' : '进行中'; }
+    return '时间待定';
   }
 
   /**
@@ -180,14 +176,16 @@ export class ActCalendarEntry {
   static fromAct(obj: Object): ActCalendarEntry {
     const item = obj as Record<string, Object>;
     const entry: ActCalendarEntry = new ActCalendarEntry();
-    entry.type = ActCalendarType.ACTIVITY;
+    entry.id = String(item['id'] ?? '');
+    entry.actType = ActCalendarEntry.activityType(item['type']);
+    entry.type = entry.actType === 1 ? ActCalendarType.SIGN_IN : ActCalendarType.ACTIVITY;
     entry.typeName = ActCalendarType.nameOf(entry.type);
-    entry.actType = Number(item['type'] ?? 0);
     entry.name = String(item['name'] ?? '');
     entry.desc = String(item['desc'] ?? '');
     entry.startTime = ActCalendarEntry.toMs(item['start_timestamp']);
     entry.endTime = ActCalendarEntry.toMs(item['end_timestamp']);
     entry.status = Number(item['status'] ?? 0);
+    entry.finished = ActCalendarEntry.toBool(item['is_finished']);
     entry.countdownSeconds = Number(item['countdown_seconds'] ?? 0);
     entry.jumpUrl = String(item['strategy'] ?? '');
     // 奖励列表 + 各类型进度详情（optional 兜底，字段名对齐 Windows ActCalendar 模型）
@@ -228,6 +226,7 @@ export class ActCalendarEntry {
   static fromCardPool(obj: Object): ActCalendarEntry {
     const item = obj as Record<string, Object>;
     const entry: ActCalendarEntry = new ActCalendarEntry();
+    entry.id = String(item['pool_id'] ?? '');
     entry.type = ActCalendarType.CARD_POOL;
     entry.typeName = ActCalendarType.nameOf(entry.type);
     entry.name = String(item['pool_name'] ?? '');
@@ -235,6 +234,7 @@ export class ActCalendarEntry {
     entry.desc = String(item['version_name'] ?? '');
     entry.startTime = ActCalendarEntry.toMs(item['start_timestamp']);
     entry.endTime = ActCalendarEntry.toMs(item['end_timestamp']);
+    entry.status = Number(item['pool_status'] ?? 0);
     entry.countdownSeconds = Number(item['countdown_seconds'] ?? 0);
     entry.jumpUrl = String(item['jump_url'] ?? '');
     const avatars = item['avatars'] as Array<Object>;
@@ -265,8 +265,24 @@ export class ActCalendarEntry {
       return 0;
     }
     const n: number = Number(v);
-    const ts: number = Number.isNaN(n) ? 0 : n;
+    const ts: number = Number.isFinite(n) && n > 0 ? n : 0;
     return ts > 100000000000 ? ts : ts * 1000;
+  }
+
+  private static activityType(raw: Object): number {
+    switch (String(raw)) {
+      case 'ActTypeSignIn': return 1;
+      case 'ActTypeDouble': return 2;
+      case 'ActTypeExplore': return 3;
+      case 'ActTypeLiBen': return 4;
+      case 'ActTypeTower': return 5;
+      case 'ActTypeRoleCombat': return 6;
+      case 'ActTypeHardChallenge': return 10;
+      case 'ActTypeOther': return 100;
+      default:
+        const type: number = Number(raw);
+        return Number.isInteger(type) ? type : 0;
+    }
   }
 
   /** reward_list 数组解析（act_list 项；卡池无此字段） */

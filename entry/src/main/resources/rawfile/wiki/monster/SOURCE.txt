@@ -1,0 +1,6 @@
+metadata/monster_drop_meta.json contains the 21 DisplayItem records referenced by monster drops and absent from Material.json.
+Source: Snap.Metadata, fb3e2692579495c6b181403da01fde1e5b8f9193, Genshin/CHS/DisplayItem.json.
+Names, icons and quality are copied from the source; SetId is the original relic icon's set identity.
+Localized names reuse the existing ReliquarySet.json language overlays. Relic icons are already packaged under icons/RelicIcon.
+Regenerate with scripts/update-compact-metadata.py --source <verified Genshin directory> --revision <full revision> --include-challenges --apply.
+The Snap.Metadata MIT copyright and license are preserved in LICENSE.txt.

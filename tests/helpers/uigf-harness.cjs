@@ -32,6 +32,10 @@ function harness(){
   const db=new DatabaseSync(':memory:');db.exec(`CREATE TABLE gacha_archives(id INTEGER PRIMARY KEY AUTOINCREMENT,uid TEXT UNIQUE,is_selected INTEGER DEFAULT 0);
     CREATE TABLE gacha_items(id INTEGER PRIMARY KEY AUTOINCREMENT,archive_id INTEGER,gacha_type INTEGER,item_id INTEGER,count INTEGER,time TEXT,name TEXT,item_type TEXT,rank_type INTEGER,gacha_id TEXT,schedule_id INTEGER);`);
   const state={parseCalls:0,begins:0,commits:0,rollbacks:0,batches:0,failBatch:0,shortBatch:0,failArchive:0,resultSets:0,closedSets:0,readIds:[],changes:[]};
+  state.logs=[];
+  state.avatarMetadata=[];state.weaponMetadata=[];state.wishEvents=[];state.wishEventReads=0;
+  state.metadataVersion='';state.names=new Map();
+  state.languageReads=[];state.wishReplies=[];state.wishRequests=[];state.wishLanguage='zh-cn';
   const store={
     beginTransaction(){state.begins++;db.exec('BEGIN');},commit(){state.commits++;db.exec('COMMIT');},rollBack(){state.rollbacks++;db.exec('ROLLBACK');},
     querySync(pred){if(pred.table==='gacha_items'&&pred.conditions.includes('archive_id=?'))state.readIds.push(pred.values[0]);return new ResultSet(db.prepare(`SELECT * FROM ${pred.table}${pred.where()}${pred.order}${pred.limit}${pred.offset}`).all(...pred.values),state);},
@@ -52,9 +56,32 @@ function harness(){
       if(id==='@kit.CoreFileKit')return sdk.files;
       if(id==='@kit.ArkData')return {relationalStore:{RdbPredicates:Predicates}};
       if(id.endsWith('/RelationalStoreHelper'))return {RelationalStoreHelper:helper};
-      if(id.endsWith('/Logger'))return {Logger:{info(){},warn(){}}};
-      if(id.endsWith('/Constants'))return {AppConstants:{APP_VERSION:'selective-host'}};
-      if(id.endsWith('/WikiMetaService'))return {WikiMetaService:{getGachaEvents:async()=>[]}};
+      if(id.endsWith('/Logger'))return {Logger:{info(tag,message){state.logs.push([tag,message]);},warn(tag,message){state.logs.push([tag,message]);}}};
+      if(id.endsWith('/PreferencesStore'))return {PreferencesStore:{KEY_GACHA_UNOBTAINED:'gacha.unobtained_visible',
+        getBool:(_key,fallback)=>fallback}};
+      if(id.endsWith('/Constants'))return {AppConstants:{APP_VERSION:'selective-host',GACHA_PAGE_SIZE:20,
+        GACHA_DELAY_MIN:0,GACHA_DELAY_MAX:0,GACHA_AUTH_APPID:'fixture'},RetCodes:{RISK_CONTROL:1034},
+        RegionUtil:{regionOfUid:()=> 'cn_gf01'}};
+      if(id.endsWith('/WikiMetaService'))return {WikiMetaService:{getGachaEvents:async()=>{
+        state.wishEventReads++;return state.wishEvents;
+      },
+        getAvatars:async()=>state.avatarMetadata,getWeapons:async()=>state.weaponMetadata}};
+      if(id.endsWith('/GameDataService'))return {GameDataService:{getInstance:()=>({remoteVersion:()=>state.metadataVersion})}};
+      if(id.endsWith('/LocalizedGameDataService'))return {LocalizedGameDataService:{names:async(table,locale)=>{
+        state.languageReads.push(`${table}:${locale}`);return state.names.get(`${table}:${locale}`)??new Map();
+      }}};
+      if(id.endsWith('/GachaAuthApi')){
+        const authInfo=()=>({authkey:'fixture',authkeyVer:'1',signType:'2',lang:state.wishLanguage,isOversea:false});
+        return {GachaAuthApi:{parseAuthFromUrl:authInfo,parseAuthInfo:authInfo,genAuthKey:async()=>({success:true,data:{}})}};
+      }
+      if(id.endsWith('/ApiClient'))return {ApiClient:{getInstance:()=>({get:async(url)=>{
+        const request=new URL(url);
+        state.wishRequests.push([request.host,request.pathname,request.searchParams.get('gacha_type'),
+          request.searchParams.get('size'),request.searchParams.get('end_id')]);
+        assert.ok(state.wishReplies.length>0,'unexpected wish request');return state.wishReplies.shift();
+      }})}};
+      if(id.endsWith('/UserService'))return {UserService:{getInstance:()=>({getCurrentUser:()=>state.wishUser})}};
+      if(name==='viewmodel/HomeViewModel'&&['/DailyNoteService','/SignInService','/CalendarService','/AnnouncementService'].some(suffix=>id.endsWith(suffix)))return {};
       if(id.endsWith('/GachaLogService'))return {GachaLogService:{getInstance:()=>({cancelRefresh(){}})}};
       assert.ok(id.startsWith('.'),id);return load(path.posix.normalize(path.posix.join(path.posix.dirname(name),id)));
     },module,module.exports);return module.exports;
@@ -66,4 +93,11 @@ function harness(){
   const snapshot=()=>({archives:db.prepare('SELECT * FROM gacha_archives ORDER BY id').all(),items:db.prepare('SELECT * FROM gacha_items ORDER BY id').all()});
   return {db,state,service,repo,Model,Preparation,snapshot,load};
 }
-module.exports={harness,A,B,C,big,row,section,file,plain};
+// Reproduce historical physical duplicates without passing through today's guarded writes.
+function seedItems(db,items){
+  const put=db.prepare('INSERT INTO gacha_items(archive_id,gacha_type,item_id,count,time,name,item_type,rank_type,gacha_id,schedule_id) VALUES (?,?,?,?,?,?,?,?,?,?)');
+  db.exec('BEGIN');
+  try{for(const item of items)put.run(item.archiveId,item.gachaType,item.itemId,item.count,item.time,item.name,item.itemType,item.rankType,item.gachaId,item.scheduleId);db.exec('COMMIT');}
+  catch(error){db.exec('ROLLBACK');throw error;}
+}
+module.exports={harness,A,B,C,big,row,section,file,plain,seedItems};

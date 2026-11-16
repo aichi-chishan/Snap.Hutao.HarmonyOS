@@ -7,18 +7,21 @@
  */
 import { hdsEffect } from '@kit.UIDesignKit';
 import { Motion } from '../common/Motion';
+import { AppButtonModifier } from '../common/UiSurface';
 
 @Component
 export struct QTapButton {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   /** 按钮文字 */
-  @Prop label: string = '';
+  @Prop label: ResourceStr = '';
   /** 可选图标（emoji） */
   @Prop icon: string = '';
   /** 胶囊形态（默认矩形圆角） */
   @Prop capsule: boolean = false;
   /** 禁用态 */
   @Prop @Watch('onEnabledChanged') disabled: boolean = false;
-  /** 主题色按钮（默认主色背景白字） */
+  /** 主题色按钮（默认主色背景） */
   @Prop primary: boolean = true;
   /** 调用方可额外关闭按压缩放与点光源；不能覆盖应用的减少动态效果设置。 */
   @Prop @Watch('onMotionChanged') reduceMotion: boolean = false;
@@ -77,6 +80,11 @@ export struct QTapButton {
     }
   }
 
+  private accessibilityLabel(): string {
+    // 资源标签由组内 Text 自动朗读，保留语言切换响应；空字符串按钮仍朗读图标。
+    return typeof this.label === 'string' ? (this.label.length > 0 ? this.label : this.icon) : '';
+  }
+
   build() {
     Button({ type: ButtonType.Normal, stateEffect: false }) {
       Row({ space: 6 }) {
@@ -89,7 +97,7 @@ export struct QTapButton {
         Text(this.label)
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
-          .fontColor(this.primary ? $r('sys.color.font_on_primary') : $r('app.color.text_primary'))
+          .fontColor(this.primary ? $r('app.color.on_accent') : $r('app.color.text_primary'))
           .textAlign(TextAlign.Center)
           .flexShrink(1)
       }
@@ -97,6 +105,7 @@ export struct QTapButton {
       .alignItems(VerticalAlign.Center)
       .width('100%')
     }
+    .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, this.primary, this.capsule))
     .width('100%')
     .constraintSize({ minHeight: 44 })
     .padding({
@@ -105,12 +114,9 @@ export struct QTapButton {
       top: this.capsule ? 10 : 8,
       bottom: this.capsule ? 10 : 8,
     })
-    .backgroundColor(this.primary ? $r('app.color.app_primary') : $r('app.color.card_surface'))
-    .border({ width: this.primary ? 0 : 1, color: $r('app.color.card_stroke') })
-    .borderRadius(this.capsule ? 22 : 12)
     .enabled(!this.disabled)
     .accessibilityGroup(true)
-    .accessibilityText(this.label.length > 0 ? this.label : this.icon)
+    .accessibilityText(this.accessibilityLabel())
     .opacity(this.disabled ? 0.5 : 1)
     .hoverEffect(this.disabled ? HoverEffect.None : HoverEffect.Highlight)
     .scale({ x: this.disabled || this.reduceMotion || this.appReduceMotion ? 1 : this.pressScale,

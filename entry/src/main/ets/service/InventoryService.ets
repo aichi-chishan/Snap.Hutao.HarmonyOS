@@ -3,6 +3,8 @@ import { InventoryRepo } from '../data/repo/InventoryRepo';
 import { CalBatchResult } from '../model/Calculate';
 
 export class InventoryService {
+  static clear(projectId: number): Promise<void> { return InventoryRepo.clear(projectId); }
+
   private static object(value: Object, label: string): Record<string, Object> {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) {
       throw new Error(`${label} 必须是对象`);
@@ -62,10 +64,8 @@ export class InventoryService {
   /** 默认仅更新文件中出现的材料，未提供的数量仍保持未知或既有值。 */
   static async importInventory(projectId: number, text: string, replace: boolean = false): Promise<number> {
     const incoming: Map<number, number> = InventoryService.parseInventory(text);
-    const inventory: Map<number, number> = replace
-      ? new Map<number, number>() : await InventoryRepo.getInventory(projectId);
-    incoming.forEach((count: number, itemId: number) => inventory.set(itemId, count));
-    await InventoryRepo.replaceInventory(projectId, inventory);
+    if (replace) { await InventoryRepo.replaceInventory(projectId, incoming); }
+    else { await InventoryRepo.mergeInventory(projectId, incoming); }
     return incoming.size;
   }
 
@@ -87,9 +87,7 @@ export class InventoryService {
       }
       incoming.set(item.id, count);
     }
-    const inventory: Map<number, number> = await InventoryRepo.getInventory(projectId);
-    incoming.forEach((count: number, itemId: number) => inventory.set(itemId, count));
-    await InventoryRepo.replaceInventory(projectId, inventory);
+    await InventoryRepo.mergeInventory(projectId, incoming);
     return incoming.size;
   }
 }

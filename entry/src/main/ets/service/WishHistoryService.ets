@@ -81,10 +81,12 @@ export class WishHistoryService {
         const weaponMeta: WikiWeaponMeta | undefined = weapons.get(id);
         if (avatar && avatarMeta !== undefined) {
           item.name = avatarMeta.name.trim().length > 0 ? avatarMeta.name : `#${id}`;
+          item.canonicalName = avatarMeta.canonicalName || item.name;
           item.icon = avatarMeta.icon;
           item.known = true;
         } else if (weapon && weaponMeta !== undefined) {
           item.name = weaponMeta.name.trim().length > 0 ? weaponMeta.name : `#${id}`;
+          item.canonicalName = weaponMeta.canonicalName || item.name;
           item.icon = weaponMeta.icon;
           item.known = true;
         }
@@ -117,7 +119,8 @@ export class WishHistoryService {
   static filter(items: WishHistoryItem[], category: WishHistoryCategory, keyword: string): WishHistoryItem[] {
     const query: string = keyword.trim().toLocaleLowerCase();
     return items.filter((item: WishHistoryItem): boolean => item.category === category
-      && (query.length === 0 || item.name.toLocaleLowerCase().indexOf(query) >= 0 || `#${item.id}`.indexOf(query) >= 0));
+      && (query.length === 0 || item.name.toLocaleLowerCase().includes(query)
+        || item.canonicalName.toLocaleLowerCase().includes(query) || `#${item.id}`.includes(query)));
   }
 
   static ongoing(item: WishHistoryItem, now: number): boolean {

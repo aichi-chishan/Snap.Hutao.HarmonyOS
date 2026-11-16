@@ -26,7 +26,7 @@ export class WishHistoryViewModel {
       const result: WishHistorySnapshot = await WishHistoryService.load(now);
       if (!this.current(sequence)) { return false; }
       this.snapshot = result;
-      this.applyFilter();
+      this.applyFilter(true);
       if (!result.metadataAvailable) {
         this.message = '本地祈愿元数据为空或无法读取，请在设置中检查游戏数据后重启应用';
       }
@@ -56,12 +56,14 @@ export class WishHistoryViewModel {
   }
 
   selected(): WishHistoryItem | undefined {
-    return this.items.find((item: WishHistoryItem): boolean => item.id === this.selectedId);
+    return this.items.find((item: WishHistoryItem): boolean => item.id === this.selectedId) ??
+      this.snapshot.items.find((item: WishHistoryItem): boolean => item.id === this.selectedId);
   }
 
   private current(sequence: number): boolean { return this.attached && this.sequence === sequence; }
-  private applyFilter(): void {
+  private applyFilter(preserveSelection: boolean = false): void {
     this.items = WishHistoryService.filter(this.snapshot.items, this.category, this.keyword);
-    if (!this.items.some((item: WishHistoryItem): boolean => item.id === this.selectedId)) { this.selectedId = 0; }
+    const selectable: WishHistoryItem[] = preserveSelection ? this.snapshot.items : this.items;
+    if (!selectable.some((item: WishHistoryItem): boolean => item.id === this.selectedId)) { this.selectedId = 0; }
   }
 }

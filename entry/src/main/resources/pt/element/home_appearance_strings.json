@@ -1,0 +1,40 @@
+{
+  "string": [
+    {
+      "name": "ui_home_pity_title",
+      "value": "Contagem de Pity"
+    },
+    {
+      "name": "ui_home_pity_five",
+      "value": "5 estrelas"
+    },
+    {
+      "name": "ui_home_pity_four",
+      "value": "4 estrelas"
+    },
+    {
+      "name": "ui_wallpaper_copyright",
+      "value": "Informações de direitos autorais da imagem"
+    },
+    {
+      "name": "ui_wallpaper_none",
+      "value": "Sem papel de parede"
+    },
+    {
+      "name": "ui_wallpaper_local",
+      "value": "Imagem aleatória local"
+    },
+    {
+      "name": "ui_wallpaper_bing",
+      "value": "Imagem do Dia do Bing"
+    },
+    {
+      "name": "ui_wallpaper_daily",
+      "value": "Imagem do Dia do Snap Hutao"
+    },
+    {
+      "name": "ui_wallpaper_launcher",
+      "value": "Papel de parede do lançador oficial de Genshin"
+    }
+  ]
+}

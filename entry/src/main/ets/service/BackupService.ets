@@ -8,6 +8,10 @@ import { LegacyBackup } from '../model/LegacyBackup';
 import { DailyNoteService } from './DailyNoteService';
 import { UserService } from './UserService';
 import { Logger } from '../common/Logger';
+import { Motion } from '../common/Motion';
+import { UiSurface } from '../common/UiSurface';
+import { AppLocaleService } from './AppLocaleService';
+import { BackgroundMediaService } from './BackgroundMediaService';
 
 export class BackupResult {
   ok: boolean = false;
@@ -16,7 +20,28 @@ export class BackupResult {
 
 export class BackupService {
   private static instance: BackupService = new BackupService();
+  private static readonly LEGACY_RESTORE_TABLES: string[] = [
+    'user_accounts', 'user_game_roles', 'daily_notes', 'sign_in_info', 'gacha_archives', 'gacha_items',
+    'achievement_archives', 'achievement_entries',
+  ];
   private busy: boolean = false;
+
+  /** Publish only committed preferences. The setting page applies its native theme/window controls. */
+  private publishRestoredPreferences(): void {
+    UiSurface.publish();
+    Motion.setReducedMotion(PreferencesStore.getReduceMotionEnabled());
+    if (!AppLocaleService.applyCurrentPreference()) {
+      Logger.warn('BackupService', 'restored application language needs restart');
+    }
+    AppStorage.setOrCreate<string>('bgType', PreferencesStore.getBackgroundImageType());
+    AppStorage.setOrCreate<string>('bgFolderPath', PreferencesStore.getBackgroundFolderPath());
+    AppStorage.setOrCreate<boolean>('homeActCalendarShown', PreferencesStore.getHomeActCalendar());
+    AppStorage.setOrCreate<boolean>('homeActPreview', PreferencesStore.getHomeActPreview());
+    BackgroundMediaService.changed();
+    for (const key of ['homeCardsVersion', 'calendarSettingsVersion', 'cultivationDataVersion', 'restoredPreferencesVersion']) {
+      AppStorage.setOrCreate<number>(key, (AppStorage.get<number>(key) ?? 0) + 1);
+    }
+  }
 
   static getInstance(): BackupService { return BackupService.instance; }
 
@@ -122,6 +147,23 @@ export class BackupService {
     }
   }
 
+  /** Keep local preferences for data sections that the old file never represented. */
+  private retainLocalPreferences(snapshot: BackupSnapshot, oldPrefs: Record<string, string | number | boolean>, legacy: boolean): void {
+    const legacyExtraSettings: string[] = [
+      'cultivation_resin_world_level', 'wiki.avatar.grid', 'wiki.weapon.grid', 'wiki.monster.grid',
+      'background.media.type', 'background.media.muted', 'background.media.loop', 'ai.provider',
+    ];
+    for (const key of Object.keys(oldPrefs)) {
+      if (snapshot.preferences[key] !== undefined) { continue; }
+      const legacyPlanOrCalendar: boolean = legacy && (key.startsWith('cultivation.') || key === 'calendar.first_day_of_week'
+        || key === 'app.calendar_server_time_zone_offset' || legacyExtraSettings.includes(key));
+      const localScoreSettings: boolean = snapshot.schemaVersion < 7 &&
+        (key === 'app.backpack.score_profiles.v1' || key.startsWith('app.relic.score.option.') ||
+          /^relic\.score\.algorithm\.[1-9]\d{7}$/.test(key));
+      if (legacyPlanOrCalendar || localScoreSettings) { snapshot.preferences[key] = oldPrefs[key]; }
+    }
+  }
+
   /** Old vault entries stay intact until commit. Never overwrite credentials at an existing ID. */
   private remapUsers(snapshot: BackupSnapshot, nextId: number): void {
     const ids: Map<number, number> = new Map<number, number>();
@@ -143,6 +185,13 @@ export class BackupService {
       if (key.indexOf('dailynote.tracked_') === 0) {
         const id: number | undefined = ids.get(Number(key.substring('dailynote.tracked_'.length)));
         if (id !== undefined) { prefs[`dailynote.tracked_${id}`] = snapshot.preferences[key]; }
+      } else if (key === PreferencesStore.KEY_USER_ORDER) {
+        const order: number[] = [];
+        for (const oldId of PreferencesStore.parseUserOrder(snapshot.preferences[key])) {
+          const id: number | undefined = ids.get(oldId);
+          if (id !== undefined) { order.push(id); }
+        }
+        prefs[key] = JSON.stringify(order);
       } else { prefs[key] = snapshot.preferences[key]; }
     }
     prefs[PreferencesStore.KEY_CURRENT_USER_ID] = selected;
@@ -173,6 +222,7 @@ export class BackupService {
     for (const id of (committed ? journal.oldUsers : journal.newUsers)) { await TokenVault.removeCookie(id); }
     await PreferencesStore.saveBackupJournal('');
     await UserService.getInstance().reloadLocalSession();
+    this.publishRestoredPreferences();
   }
 
   async restoreFromText(text: string): Promise<BackupResult> {
@@ -198,13 +248,6 @@ export class BackupService {
       const legacy: boolean = root['version'] === 1;
       const snapshot: BackupSnapshot = legacy ? LegacyBackup.convert(parsed, store.version) : parsed as BackupSnapshot;
       BackupSnapshotValidator.validate(snapshot);
-      // v1 never had these sections: importing it must not erase newer cultivation/history data.
-      if (legacy) {
-        for (const name of ['cultivate_projects', 'cultivate_entries', 'cultivate_items', 'cultivate_inventory', 'abyss_history',
-          'role_combat_history', 'hard_challenge_history', 'challenge_records', 'act_calendar_entries', 'announcements']) {
-          this.table(snapshot, name).rows = this.readTable(name, await store.querySql(`SELECT * FROM ${name}`)).rows;
-        }
-      }
       await this.validateDatabase(snapshot);
       // Invalid input never changes the session. Once validated, drain all old-owner work
       // before even capturing preferences or opening the account replacement transaction.
@@ -217,6 +260,7 @@ export class BackupService {
       let nextId: number = 0;
       try { if (maxRs.goToFirstRow()) { nextId = maxRs.getLong(0); } } finally { maxRs.close(); }
       this.remapUsers(snapshot, nextId);
+      this.retainLocalPreferences(snapshot, oldPrefs, legacy);
       const journal: BackupRecovery = new BackupRecovery();
       journal.marker = `${Date.now()}-${Math.random()}`;
       journal.oldPreferences = oldPrefs;
@@ -231,7 +275,8 @@ export class BackupService {
       }
       // Child-first deletion and parent-first insertion also work when SQLite foreign keys
       // are enabled. A pre-v7 payload intentionally never touches the Backpack tables.
-      const names: string[] = BackupSnapshotValidator.tablesForSchema(snapshot.schemaVersion);
+      const names: string[] = BackupSnapshotValidator.tablesForSchema(snapshot.schemaVersion)
+        .filter((name: string): boolean => !legacy || BackupService.LEGACY_RESTORE_TABLES.includes(name));
       for (let i: number = names.length - 1; i >= 0; i--) {
         await transaction.delete(new relationalStore.RdbPredicates(names[i]));
       }
@@ -254,7 +299,10 @@ export class BackupService {
       await PreferencesStore.saveBackupJournal('');
       journalSaved = false;
       await UserService.getInstance().reloadLocalSession();
+      this.publishRestoredPreferences();
       AppStorage.setOrCreate<number>('dailyNoteVersion', Date.now());
+      const achievementVersion: number = AppStorage.get<number>('achievementDataVersion') ?? 0;
+      AppStorage.setOrCreate<number>('achievementDataVersion', achievementVersion + 1);
       result.ok = true;
       result.message = legacy ? '旧版备份已还原；已有养成、挑战历史和背包存档保留，请重启应用' :
         (snapshot.schemaVersion < 7 ? '备份已还原；已有背包存档保留，请重启应用' : '全部本地数据已还原，请重启应用');

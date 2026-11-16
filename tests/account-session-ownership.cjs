@@ -9,8 +9,20 @@ const root = path.resolve(__dirname, '../entry/src/main/ets');
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
 const flush = async () => { for (let i=0;i<100;i++) await Promise.resolve(); };
 const accepted = data => ({ success:true, retcode:0, data, message:'' });
+const boundRole = (uid='100000001') => ({ game_uid:uid, region:'cn_gf01', nickname:'fixture-role', level:60 });
+const boundRoles = () => accepted({ list:[boundRole()] });
+function defaultNetwork(url, headers) {
+  if (url.includes('getCookieAccountInfo')) {
+    const aid = /(?:^|;\s*)stuid(?:_v2)?=([^;]+)/.exec(headers.Cookie)?.[1] ?? '11';
+    return accepted({uid:aid,cookie_token:'fixture-rotated'});
+  }
+  if (url.includes('getLToken')) return accepted({ltoken:'fixture-ltoken-rotated'});
+  if (url.includes('getUserFullInfo')) return accepted({user_info:{nickname:'fixture-name',avatar_url:'https://example.invalid/avatar'}});
+  return boundRoles();
+}
 function harness() {
-  const state = { prefsId:0, prefsUid:'', cookie:'', cookieRegion:false, rows:new Map(), requests:[], logs:[], app:new Map(), gates:new Map(), calls:[], activeWrites:0, maxWrites:0, fail:undefined, network:undefined, nextId:10 };
+  const state = { prefsId:0, prefsUid:'', order:[], cookieTimes:new Map(), cookie:'', cookieRegion:false, rows:new Map(), requests:[], ticketRequests:[], logs:[], app:new Map(), gates:new Map(), calls:[], activeWrites:0, maxWrites:0, fail:undefined, network:undefined, nextId:10, passport:{} };
+  state.rolePictures = { cachedIcon:() => '', loadIcon:async () => '' };
   const cache = new Map();
   const gate = async (kind,id) => { const key=kind+':'+id; const pending=state.gates.get(key); if(pending){state.gates.delete(key);await pending.promise;} };
   const read = id => { const user=state.rows.get(id); return user ? copy(user) : undefined; };
@@ -27,6 +39,7 @@ function harness() {
     async updateUser(user){const snapshot=copy(user);await write('update',user.id,()=>{const old=state.rows.get(user.id);if(old){snapshot.roles=old.roles;snapshot.applyCookie(old.fullCookie());state.rows.set(user.id,snapshot);}});},
     async upsertRoles(id,roles){const snapshot=roles.map(copyRole);await write('upsert',id,()=>{const user=state.rows.get(id);if(user)user.roles=snapshot;});},
     async saveCookieFor(id,cookie){await write('cookie',id,()=>{const user=state.rows.get(id);if(user)user.applyCookie(cookie);});},
+    async removeCookieFor(id){await write('remove-cookie',id,()=>{const user=state.rows.get(id);if(user)user.applyCookie('');});},
     async loadCookieFor(id){await gate('vaultRead',id);return state.rows.get(id)?.fullCookie()||'';},
     async selectUser(id){await write('select',id,()=>{for(const user of state.rows.values())user.isSelected=user.id===id;state.prefsId=id;});},
     async deleteUser(id){await write('delete',id,()=>{state.rows.delete(id);if(state.prefsId===id){state.prefsId=0;state.prefsUid='';}});},
@@ -34,10 +47,10 @@ function harness() {
   };
   const client = {
     setCookie(cookie,region=false){state.cookie=cookie;state.cookieRegion=region;},
-    async get(url,headers){state.requests.push({url,headers});if(state.network)return state.network(url,headers);if(url.includes('getCookieAccountInfo'))return accepted({uid:'11',cookie_token:'fixture-rotated'});if(url.includes('getLToken'))return accepted({ltoken:'fixture-ltoken-rotated'});if(url.includes('getUserFullInfo'))return accepted({user_info:{nickname:'fixture-name',avatar_url:'https://example.invalid/avatar'}});return accepted({list:[]});},
+    async get(url,headers){state.requests.push({url,headers});return state.network?state.network(url,headers):defaultNetwork(url,headers);},
     async postJson(url,body,headers){return client.get(url,headers);},
   };
-  const prefs = {getCurrentUserId:()=>state.prefsId,setCurrentUserId:id=>{state.prefsId=id;},getCurrentUid:()=>state.prefsUid,setCurrentUid:uid=>{state.prefsUid=uid;},getDeviceFp:()=> 'fixture-fp',getDeviceFpTime:()=>Date.now(),getDeviceId:()=> 'fixture-device',setDeviceFp(){} };
+  const prefs = {getCurrentUserId:()=>state.prefsId,setCurrentUserId:id=>{state.prefsId=id;},getCurrentUid:()=>state.prefsUid,setCurrentUid:uid=>{state.prefsUid=uid;},getUserOrder:()=>state.order.slice(),saveUserOrder:async ids=>{state.order=Array.from(ids);},getCookieExchangeTime:id=>state.cookieTimes.get(id)||0,setCookieExchangeTime:(id,time)=>{state.cookieTimes.set(id,time);},getDeviceFp:()=> 'fixture-fp',getDeviceFpTime:()=>Date.now(),getDeviceId:()=> 'fixture-device',setDeviceFp(){} };
   function load(name){
     if(cache.has(name))return cache.get(name);
     const source=fs.readFileSync(path.join(root,name+'.ets'),'utf8');
@@ -50,8 +63,10 @@ function harness() {
       if(id.endsWith('/DailyNoteReminderService'))return {DailyNoteReminderService:{cancelUser:async id=>{await gate('reminder',id);}}};
       if(id.endsWith('/Logger'))return {Logger:{warn:(tag,message)=>state.logs.push(message),info:(tag,message)=>state.logs.push(message)}};
       if(id.endsWith('/DeviceFpApi'))return {DeviceFpApi:{fetchFingerprint:async()=> 'fixture-fp'}};
+      if(id.endsWith('/PassportClient'))return {PassportClient:state.passport};
+      if(id.endsWith('/RoleProfilePictureService'))return {RoleProfilePictureService:state.rolePictures};
       if(id.endsWith('/DsSigner'))return {DsSigner:{nowTimestamp:()=>1,randomLowerAlphaNumeric:()=> 'fixture',signGen2:async()=> 'fixture-ds'}};
-      if(id.endsWith('/HoyolabClient'))return {HoyolabClient:{passportHeaders:()=>({}),merge:(a,b)=>({...a,...b}),getBaseHeaders:()=>({}),getActionTicket:async()=>accepted({ticket:'fixture-ticket'}),getUserGameRoles:async()=>client.get('fixture-roles',{})}};
+      if(id.endsWith('/HoyolabClient'))return {HoyolabClient:{passportHeaders:()=>({}),merge:(a,b)=>({...a,...b}),getBaseHeaders:()=>({}),getActionTicket:async(cookie,token,uid)=>{state.ticketRequests.push({cookie,token,uid});return accepted({ticket:'fixture-ticket'});},getUserGameRoles:async()=>client.get('fixture-roles',{})}};
       assert.ok(id.startsWith('.'),id);return load(path.posix.normalize(path.posix.join(path.posix.dirname(name),id)));
     };
     vm.runInNewContext(`(function(require,module,exports){${output.outputText}\n})`,{Error,Date,Observed:value=>value,AppStorage:{setOrCreate:(key,value)=>state.app.set(key,value)}})(req,module,module.exports);
@@ -60,7 +75,7 @@ function harness() {
   const {User}=load('model/User'),{UserGameRole}=load('model/UserGameRole');
   function copyRole(role){return Object.assign(new UserGameRole(),role);}
   function copy(user){const result=user.clone();result.roles=user.roles.map(copyRole);return result;}
-  function user(id,uid='10000000'+id){const value=new User();value.id=id;value.aid='1'+id;value.applyCookie(`account_id=1${id}; cookie_token=fixture-cookie-${id}; ltuid=1${id}; ltoken=fixture-ltoken-${id}; stuid=1${id}; stoken=fixture-stoken-${id}; mid=fixture-mid-${id}`);value.displayName='fixture-'+id;value.avatar='fixture-avatar';value.roles=[UserGameRole.of(uid,'cn_gf01','fixture-role',60)];value.roles[0].isDefault=true;state.rows.set(id,copy(value));return value;}
+  function user(id,uid='10000000'+id){const value=new User();value.id=id;value.aid='1'+id;value.applyCookie(`account_id=1${id}; cookie_token=fixture-cookie-${id}; ltuid=1${id}; ltoken=fixture-ltoken-${id}; stuid=1${id}; stoken=fixture-stoken-${id}; mid=fixture-mid-${id}`);value.displayName='fixture-'+id;value.avatar='fixture-avatar';value.roles=[UserGameRole.of(uid,'cn_gf01','fixture-role',60)];value.roles[0].isDefault=true;state.rows.set(id,copy(value));state.cookieTimes.set(id,Date.now());return value;}
   const service=load('service/UserService').UserService.getInstance();
   const seed=async(id=1)=>{if(!state.rows.has(id))user(id);state.prefsId=id;await service.reloadLocalSession();return service.getCurrentUser();};
   return {state,service,repo,client,user,seed,load,copy,gate:(kind,id)=>{const value=deferred();state.gates.set(kind+':'+id,value);return value;}};
@@ -70,10 +85,12 @@ function strictAccountTypes() {
   for(const name of ['service/UserService','viewmodel/UserViewModel','model/User','model/UserGameRole','model/ApiResponse','common/Constants'])put(name,fs.readFileSync(path.join(root,name+'.ets'),'utf8'));
   put('globals',`declare function Observed<T extends Function>(value:T):T; declare class AppStorage { static setOrCreate<T>(key:string,value:T):void; }`);
   put('service/DailyNoteReminderService',`export class DailyNoteReminderService {static async cancelUser(id:number):Promise<void>{}}`);
-  put('data/repo/UserRepo',`import {User} from '../../model/User';import {UserGameRole} from '../../model/UserGameRole';export class UserRepo {static async getCurrentUser():Promise<User|undefined>{return undefined;}static async getUserById(id:number):Promise<User|undefined>{return undefined;}static async getAllUsers():Promise<User[]>{return [];}static async getRolesByUserId(id:number):Promise<UserGameRole[]>{return [];}static async selectUser(id:number):Promise<void>{}static async insertUser(user:User):Promise<number>{return 0;}static async updateUser(user:User):Promise<void>{}static async deleteUser(id:number):Promise<void>{}static async upsertRoles(id:number,roles:UserGameRole[]):Promise<void>{}static async saveCookieFor(id:number,cookie:string):Promise<void>{}static async loadCookieFor(id:number):Promise<string>{return '';}}`);
+  put('service/RoleProfilePictureService',`export class RoleProfilePictureService {static cachedIcon(uid:string):string{return '';} static async loadIcon(uid:string,force:boolean,isCurrent:()=>boolean):Promise<string>{return '';}}`);
+  put('data/repo/UserRepo',`import {User} from '../../model/User';import {UserGameRole} from '../../model/UserGameRole';export class UserRepo {static async getCurrentUser():Promise<User|undefined>{return undefined;}static async getUserById(id:number,strict:boolean=false):Promise<User|undefined>{return undefined;}static async getAllUsers():Promise<User[]>{return [];}static async getRolesByUserId(id:number):Promise<UserGameRole[]>{return [];}static async selectUser(id:number):Promise<void>{}static async insertUser(user:User):Promise<number>{return 0;}static async updateUser(user:User):Promise<void>{}static async deleteUser(id:number):Promise<void>{}static async upsertRoles(id:number,roles:UserGameRole[]):Promise<void>{}static async saveCookieFor(id:number,cookie:string):Promise<void>{}static async loadCookieFor(id:number):Promise<string>{return '';}static async removeCookieFor(id:number):Promise<void>{}}`);
+  put('data/network/PassportClient',`export class QrLogin {} export class QrLoginResult {} export class MobileCaptcha {} export class LoginSession {stuid='';stoken='';mid='';accountName='';} export class PassportClient {static async createQrLogin():Promise<QrLogin>{return new QrLogin();} static async queryQrLoginStatus(ticket:string):Promise<QrLoginResult>{return new QrLoginResult();} static async createLoginCaptcha(mobile:string,isActive?:()=>boolean):Promise<MobileCaptcha>{return new MobileCaptcha();} static async loginByMobileCaptcha(mobile:string,captcha:string,actionType:string,isActive?:()=>boolean):Promise<LoginSession>{return new LoginSession();} static extractQrSession(result:QrLoginResult):LoginSession{return new LoginSession();}}`);
   put('data/network/ApiClient',`import {ApiResponse} from '../../model/ApiResponse';export class ApiClient {static getInstance():ApiClient{return new ApiClient();}setCookie(cookie:string,oversea:boolean=false):void{}async get(url:string,headers:Record<string,string>):Promise<ApiResponse>{return new ApiResponse();}async postJson(url:string,body:string,headers:Record<string,string>):Promise<ApiResponse>{return new ApiResponse();}}`);
   put('data/network/HoyolabClient',`import {ApiResponse} from '../../model/ApiResponse';export class HoyolabClient {static passportHeaders():Record<string,string>{return {};}static merge(a:Record<string,string>,b:Record<string,string>):Record<string,string>{return {};}static getBaseHeaders(region:string):Record<string,string>{return {};}static async getActionTicket(cookie:string,token:string,uid:string):Promise<ApiResponse>{return new ApiResponse();}static async getUserGameRoles(ticket:string):Promise<ApiResponse>{return new ApiResponse();}}`);
-  put('data/prefs/PreferencesStore',`export class PreferencesStore {static setCurrentUserId(id:number):void{}static setCurrentUid(uid:string):void{}static getDeviceFp():string{return '';}static getDeviceFpTime():number{return 0;}static getDeviceId():string{return '';}static setDeviceFp(fp:string):void{}}`);
+  put('data/prefs/PreferencesStore',`export class PreferencesStore {static setCurrentUserId(id:number):void{}static setCurrentUid(uid:string):void{}static getUserOrder():number[]{return [];}static async saveUserOrder(order:number[]):Promise<void>{}static getCookieExchangeTime(id:number):number{return 0;}static setCookieExchangeTime(id:number,time:number):void{}static getDeviceFp():string{return '';}static getDeviceFpTime():number{return 0;}static getDeviceId():string{return '';}static setDeviceFp(fp:string):void{}}`);
   put('data/network/DsSigner',`export class DsSigner {static nowTimestamp():number{return 0;}static randomLowerAlphaNumeric():string{return '';}static async signGen2(salt:string,time:number,random:string,body:string,query:string):Promise<string>{return '';}}`);
   put('data/network/DeviceFpApi',`export class DeviceFpApi {static async fetchFingerprint(id:string,existing:string):Promise<string>{return '';}}`);
   put('common/Logger',`export class Logger {static info(tag:string,message:string):void{}static warn(tag:string,message:string):void{}}`);
@@ -82,7 +99,9 @@ function strictAccountTypes() {
   const diagnostics=ts.getPreEmitDiagnostics(ts.createProgram([...files.keys()],options,host));assert.equal(diagnostics.length,0,diagnostics.map(value=>ts.flattenDiagnosticMessageText(value.messageText,'\n')).join('\n'));
 }
 const selected = (h,id,uid) => {assert.equal(h.service.getCurrentUser()?.id,id||undefined);assert.equal(h.state.prefsId,id);assert.equal(h.state.app.get('currentUserId'),id);if(uid!==undefined){assert.equal(h.state.prefsUid,uid);assert.equal(h.state.app.get('currentUid'),uid);}assert.equal(h.state.cookie,id?h.service.getCurrentUser().fullCookie():'');};
-(async()=>{
+module.exports = { accepted, boundRole, boundRoles, defaultNetwork, deferred, flush, harness, selected };
+
+if (require.main === module) (async()=>{
  await test('out-of-order switches publish only latest intent and revision changes before awaits',async()=>{
   const h=harness();await h.seed();h.user(2);h.user(3);const oldRevision=h.service.sessionRevision(),gate=h.gate('read',2);const first=h.service.switchUser(2);const rejected=assert.rejects(first,/状态已变化/);assert.ok(h.service.sessionRevision()>oldRevision);assert.equal(h.service.getCurrentUser(),undefined);await flush();await h.service.switchUser(3);gate.resolve();await rejected;selected(h,3,'100000003');
  });
@@ -93,11 +112,11 @@ const selected = (h,id,uid) => {assert.equal(h.service.getCurrentUser()?.id,id||
   for(const mode of ['logout','delete']){const h=harness();h.user(1);h.state.prefsId=1;const gate=h.gate('restore',1),restore=h.service.restoreSession();await flush();if(mode==='logout')await h.service.logout();else await h.service.deleteUser(1);gate.resolve();await restore;selected(h,0,'');assert.equal(h.state.rows.has(1),mode==='logout');}
  });
  await test('two logins finishing out of order cannot select or persist the older identity',async()=>{
-  const h=harness();await h.seed();const gate=deferred();let count=0;h.state.network=async url=>{if(url==='fixture-roles'){if(++count===1)return gate.promise;return accepted({list:[]});}return accepted({});};
-  const first=h.service.loginWithCookie('stuid=77; stoken=fixture-old; mid=fixture-old-mid','old','avatar'),rejected=assert.rejects(first,/状态已变化/);await flush();const latest=await h.service.loginWithCookie('stuid=88; stoken=fixture-new; mid=fixture-new-mid','new','avatar');gate.resolve(accepted({list:[]}));await rejected;selected(h,latest.id,'');assert.equal([...h.state.rows.values()].some(user=>user.mid==='fixture-old-mid'),false);
+  const h=harness();await h.seed();const gate=deferred();let count=0;h.state.network=async (url,headers)=>{if(url==='fixture-roles'&&++count===1)return gate.promise;return defaultNetwork(url,headers);};
+  const first=h.service.loginWithCookie('stuid=77; stoken=fixture-old; mid=fixture-old-mid','old','avatar'),rejected=assert.rejects(first,/状态已变化/);await flush();const latest=await h.service.loginWithCookie('stuid=88; stoken=fixture-new; mid=fixture-new-mid','new','avatar');gate.resolve(boundRoles());await rejected;selected(h,latest.id,'100000001');assert.equal([...h.state.rows.values()].some(user=>user.mid==='fixture-old-mid'),false);
  });
  await test('same-ID login replacement fences token callback without mutating original object',async()=>{
-  const h=harness(),original=await h.seed(),originalCookie=original.fullCookie(),gate=deferred();h.state.network=async url=>url.includes('getCookieAccountInfo')?gate.promise:accepted({list:[]});const first=h.service.refreshCookieTokenForced(original),rejected=assert.rejects(first,/状态已变化/);await flush();const replacement=await h.service.loginWithCookie(original.fullCookie(),'replacement','avatar');assert.equal(replacement.id,original.id);assert.notEqual(replacement,original);gate.resolve(accepted({uid:'11',cookie_token:'fixture-late'}));await rejected;assert.equal(original.fullCookie(),originalCookie);selected(h,1,'');assert.ok(!h.state.cookie.includes('fixture-late'));
+  const h=harness(),original=await h.seed(),originalCookie=original.fullCookie(),gate=deferred();h.state.network=async url=>url.includes('getCookieAccountInfo')?gate.promise:boundRoles();const first=h.service.refreshCookieTokenForced(original),rejected=assert.rejects(first,/状态已变化/);await flush();const replacement=await h.service.loginWithCookie(original.fullCookie(),'replacement','avatar');assert.equal(replacement.id,original.id);assert.notEqual(replacement,original);gate.resolve(accepted({uid:'11',cookie_token:'fixture-late'}));await rejected;assert.equal(original.fullCookie(),originalCookie);selected(h,1,'100000001');assert.ok(!h.state.cookie.includes('fixture-late'));
  });
  await test('token completion after switch-away-and-back rejects even if same User object is restored',async()=>{
   for(const method of ['refreshCookieTokenForced','completeTokenChainPublic']){const h=harness(),original=await h.seed();h.user(2);if(method==='completeTokenChainPublic')original.cookieToken='';const before=original.fullCookie(),gate=deferred();h.state.network=async url=>url.includes('getCookieAccountInfo')?gate.promise:accepted({ltoken:'fixture-new-ltoken'});const pending=h.service[method](original),rejected=assert.rejects(pending,/状态已变化/);await flush();await h.service.switchUser(2);await h.service.switchUser(1);h.service.currentUser=original;gate.resolve(accepted({uid:'11',cookie_token:'fixture-late'}));await rejected;assert.equal(original.fullCookie(),before);assert.ok(!h.state.cookie.includes('fixture-late'));}
@@ -152,14 +171,14 @@ const selected = (h,id,uid) => {assert.equal(h.service.getCurrentUser()?.id,id||
   const h=harness();await h.seed();h.state.network=async()=>accepted({list:[{game_uid:'100000009',region:'cn_gf01',nickname:'new',level:60}]});const gate=h.gate('upsert',1),pending=h.service.refreshRolesOfCurrent(),rejected=assert.rejects(pending,/状态已变化/);await flush();const logout=h.service.logout();gate.resolve();await Promise.all([rejected,logout]);selected(h,0,'');assert.equal(h.state.rows.get(1).roles[0].gameUid,'100000001');
  });
  await test('local reload cannot restore an old object after a newer login or logout',async()=>{
-  for(const action of ['login','logout']){const h=harness();await h.seed();const gate=h.gate('restore',1),pending=h.service.reloadLocalSession(),rejected=assert.rejects(pending,/状态已变化/);await flush();if(action==='logout')await h.service.logout();else await h.service.loginWithCookie('stuid=22; stoken=fixture-new','new','avatar');const expected=h.service.getCurrentUser();gate.resolve();await rejected;assert.equal(h.service.getCurrentUser(),expected);selected(h,expected?.id||0,expected?'':'');}
+  for(const action of ['login','logout']){const h=harness();await h.seed();const gate=h.gate('restore',1),pending=h.service.reloadLocalSession(),rejected=assert.rejects(pending,/状态已变化/);await flush();if(action==='logout')await h.service.logout();else await h.service.loginWithCookie('stuid=22; stoken=fixture-new','new','avatar');const expected=h.service.getCurrentUser();gate.resolve();await rejected;assert.equal(h.service.getCurrentUser(),expected);selected(h,expected?.id||0,expected?'100000001':'');}
  });
  await test('current-account default UID updates all stores while out-of-order intent cannot win',async()=>{
   const h=harness();await h.seed();const row=h.state.rows.get(1);row.roles.push(row.roles[0].constructor.of('100000009','cn_gf01','other',60));const revision=h.service.sessionRevision();await h.service.setDefaultUid(1,'100000009');selected(h,1,'100000009');assert.ok(h.service.sessionRevision()>revision);assert.equal(h.state.rows.get(1).roles.find(role=>role.isDefault).gameUid,'100000009');
   const gate=h.gate('read',1),old=h.service.setDefaultUid(1,'100000001'),rejected=assert.rejects(old,/状态已变化/);await flush();await h.service.setDefaultUid(1,'100000009');gate.resolve();await rejected;selected(h,1,'100000009');
  });
  await test('superseded partial login removes its inserted identity when later login validation fails',async()=>{
-  const h=harness(),owner=await h.seed(),gate=h.gate('cookie',10);const old=h.service.loginWithCookie('stuid=77; stoken=fixture-old','old','avatar'),rejected=assert.rejects(old,/状态已变化/);await flush();await assert.rejects(h.service.loginWithCookie('invalid','bad','avatar'),/有效 token/);gate.resolve();await rejected;assert.equal(h.service.getCurrentUser(),owner);selected(h,1,'100000001');assert.equal(h.state.rows.has(10),false);assert.equal(h.state.maxWrites,1);
+  const h=harness(),owner=await h.seed(),gate=h.gate('cookie',10);const old=h.service.loginWithCookie('stuid=77; stoken=fixture-old','old','avatar'),rejected=assert.rejects(old,/状态已变化/);await flush();await assert.rejects(h.service.loginWithCookie('invalid','bad','avatar'),/SToken/);gate.resolve();await rejected;assert.equal(h.service.getCurrentUser(),owner);selected(h,1,'100000001');assert.equal(h.state.rows.has(10),false);assert.equal(h.state.maxWrites,1);
  });
  await test('logout while a switch select is already dispatched repairs durable selection to empty',async()=>{
   const h=harness();await h.seed();h.user(2);const gate=h.gate('select',2),old=h.service.switchUser(2),rejected=assert.rejects(old,/状态已变化/);await flush();const logout=h.service.logout();gate.resolve();await Promise.all([rejected,logout]);selected(h,0,'');assert.ok([...h.state.rows.values()].every(user=>!user.isSelected));

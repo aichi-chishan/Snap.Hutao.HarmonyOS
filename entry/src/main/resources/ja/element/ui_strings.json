@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "キャンセル"
+    },
+    {
+      "name": "common_confirm",
+      "value": "確定"
+    },
+    {
+      "name": "common_refresh",
+      "value": "更新"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "祈願履歴"
+    },
+    {
+      "name": "page_title_home",
+      "value": "ホーム"
+    },
+    {
+      "name": "page_title_login",
+      "value": "ログイン"
+    },
+    {
+      "name": "page_title_note",
+      "value": "リアルタイムノート"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "設定"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "祈願履歴"
+    },
+    {
+      "name": "tab_home",
+      "value": "ホーム"
+    },
+    {
+      "name": "tab_mine",
+      "value": "マイページ"
+    },
+    {
+      "name": "tab_note",
+      "value": "リアルタイムノート"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "エクスポート"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "インポート"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "保存"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "AI分析を生成"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "アカウント履歴のグラフとAI分析"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "生成を停止"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "API 接続テスト"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "更新を確認"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "データベース"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "周期"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "システム"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "ツールボックス"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "アプリを開き直すとシステム言語に従います"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "システム設定に従う"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "深境螺旋"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "アチーブメント"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "バッグのアイテム"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "幽境の激戦"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "所持キャラ"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "育成計画"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "ゲームを起動するぞ！"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "旅人手記"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "胡桃通行証"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "幻想シアター"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "キャラクター一覧"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "敵と魔物一覧"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "武器一覧"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "アプリ情報"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "アカウント"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "外観"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "背景画像"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "動画背景"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "バックアップと復元"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "カレンダー"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "ホーム"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "ホーム画面のゲームイベントエリア設定"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "ホームカード"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "言語設定"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "テーマ"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "その他"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "ログイン"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "ストレージ"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "カラーテーマ"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "シームレス認証"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "祈願履歴"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "データ移行"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "ダーク"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "ライト"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "胡桃バージョン %s が利用可能です"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "リリースノート"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "このバージョンをスキップ"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "アプリの更新"
+    }
+  ]
+}

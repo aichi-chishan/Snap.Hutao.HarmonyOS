@@ -1,0 +1,1244 @@
+{
+  "string": [
+    {
+      "name": "ui_about_restart",
+      "value": "Establecer idioma"
+    },
+    {
+      "name": "ui_account_insights_copied_json",
+      "value": "De-identified statistics copied to clipboard."
+    },
+    {
+      "name": "ui_account_insights_copy_json",
+      "value": "Copy de-identified statistics (JSON)"
+    },
+    {
+      "name": "ui_account_insights_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_account_insights_loading",
+      "value": "Loading saved records…"
+    },
+    {
+      "name": "ui_account_insights_missing_model",
+      "value": "Enter a model identifier."
+    },
+    {
+      "name": "ui_account_insights_no_account",
+      "value": "Select a game account and UID first."
+    },
+    {
+      "name": "ui_account_insights_no_records",
+      "value": "No saved records available for charting."
+    },
+    {
+      "name": "ui_account_insights_open",
+      "value": "History charts and AI insights"
+    },
+    {
+      "name": "ui_account_insights_unit_wish",
+      "value": "wishes"
+    },
+    {
+      "name": "ui_action_choose",
+      "value": "Elegir"
+    },
+    {
+      "name": "ui_action_clear",
+      "value": "Vaciar"
+    },
+    {
+      "name": "ui_action_clear_cache",
+      "value": "Borrar caché"
+    },
+    {
+      "name": "ui_action_close",
+      "value": "Cerrar"
+    },
+    {
+      "name": "ui_action_continue",
+      "value": "Continuar"
+    },
+    {
+      "name": "ui_action_disable",
+      "value": "Deshabilitar"
+    },
+    {
+      "name": "ui_action_edit",
+      "value": "Editar"
+    },
+    {
+      "name": "ui_action_enable",
+      "value": "Habilitar"
+    },
+    {
+      "name": "ui_action_restore",
+      "value": "Restaurar"
+    },
+    {
+      "name": "ui_agent_page_label_delete_conversation",
+      "value": "Delete conversation"
+    },
+    {
+      "name": "ui_agent_page_label_model_profile",
+      "value": "Model"
+    },
+    {
+      "name": "ui_agent_page_label_model_provider_profile",
+      "value": "Model Provider Profile"
+    },
+    {
+      "name": "ui_agent_page_label_placeholder",
+      "value": "Type a message..."
+    },
+    {
+      "name": "ui_ai_approval",
+      "value": "Tool approval required"
+    },
+    {
+      "name": "ui_ai_continue",
+      "value": "Continuar generando"
+    },
+    {
+      "name": "ui_ai_conversation_actions",
+      "value": "Acciones de conversación"
+    },
+    {
+      "name": "ui_ai_copied_text",
+      "value": "Copiado al portapapeles"
+    },
+    {
+      "name": "ui_ai_copy_error",
+      "value": "Error al abrir el portapapeles"
+    },
+    {
+      "name": "ui_ai_copy_text",
+      "value": "Copy Text"
+    },
+    {
+      "name": "ui_ai_custom_api",
+      "value": "API personalizada"
+    },
+    {
+      "name": "ui_ai_device_generate",
+      "value": "Analizar en el dispositivo"
+    },
+    {
+      "name": "ui_ai_endpoint_placeholder",
+      "value": "URL base (vacía para usar la predeterminada)"
+    },
+    {
+      "name": "ui_ai_initial_request",
+      "value": "Analyze my account performance, wish results and future priorities using the historical statistics in this chat."
+    },
+    {
+      "name": "ui_ai_key_placeholder",
+      "value": "Clave API (vacía para conservar la actual)"
+    },
+    {
+      "name": "ui_ai_mode",
+      "value": "Modo de análisis de IA"
+    },
+    {
+      "name": "ui_ai_on_device",
+      "value": "IA en el dispositivo"
+    },
+    {
+      "name": "ui_ai_privacy_body",
+      "value": "Al enviar un mensaje, el servicio de IA seleccionado recibe la conversación y estadísticas históricas desidentificadas. La aplicación no adjunta UID, cookies, ID de objetos sin procesar ni archivos de base de datos. Las conversaciones se guardan en el dispositivo y el sistema protege las claves de API. Las herramientas requieren tu aprobación."
+    },
+    {
+      "name": "ui_ai_privacy_title",
+      "value": "Before using third-party AI"
+    },
+    {
+      "name": "ui_ai_reasoning_completed",
+      "value": "Thought"
+    },
+    {
+      "name": "ui_ai_reasoning_in_progress",
+      "value": "Thinking"
+    },
+    {
+      "name": "ui_ai_return",
+      "value": "Volver a la conversación"
+    },
+    {
+      "name": "ui_ai_select_conversation",
+      "value": "Seleccionar conversación"
+    },
+    {
+      "name": "ui_ai_workspace",
+      "value": "Espacio de IA"
+    },
+    {
+      "name": "ui_announcement_redeem_code_label",
+      "value": "Código de canje del programa especial"
+    },
+    {
+      "name": "ui_avatar_property_score_algorithm",
+      "value": "Algoritmo de puntuación de artefactos"
+    },
+    {
+      "name": "ui_backpack_category_reliquary",
+      "value": "Artefacto"
+    },
+    {
+      "name": "ui_backpack_category_weapon",
+      "value": "Arma"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_name_header",
+      "value": "Nombre de configuración"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_new_config",
+      "value": "Nueva configuración"
+    },
+    {
+      "name": "ui_backpack_sort_count",
+      "value": "Cantidad"
+    },
+    {
+      "name": "ui_backpack_sort_quality",
+      "value": "Calidad"
+    },
+    {
+      "name": "ui_base_value_slider_level",
+      "value": "Nivel"
+    },
+    {
+      "name": "ui_bg_choose_folder",
+      "value": "Seleccionar carpeta"
+    },
+    {
+      "name": "ui_bg_folder_picker_failed",
+      "value": "No se pudo elegir la carpeta de fondos"
+    },
+    {
+      "name": "ui_bg_folder_saved",
+      "value": "Carpeta de fondos actualizada"
+    },
+    {
+      "name": "ui_bg_folder_temporary",
+      "value": "Solo se puede acceder a la carpeta durante esta sesión"
+    },
+    {
+      "name": "ui_bg_none",
+      "value": "Ninguno"
+    },
+    {
+      "name": "ui_card_calendar_all_materials_hint",
+      "value": "Todos los dominios de materiales pueden ser desafiados"
+    },
+    {
+      "name": "ui_card_sign_in_auto_sign_in",
+      "value": "Registro automático"
+    },
+    {
+      "name": "ui_card_sign_in_claim_re_sign_in_action",
+      "value": "Compensar registro"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_allow",
+      "value": "Allow"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_deny",
+      "value": "Deny"
+    },
+    {
+      "name": "ui_clear_filters",
+      "value": "Quitar filtros"
+    },
+    {
+      "name": "ui_code_copied",
+      "value": "Código de canje copiado con éxito"
+    },
+    {
+      "name": "ui_common_loading",
+      "value": "Cargando…"
+    },
+    {
+      "name": "ui_content_dialog_complete_primary_button_text",
+      "value": "Completado"
+    },
+    {
+      "name": "ui_cultivation_add_project_action",
+      "value": "Crear"
+    },
+    {
+      "name": "ui_cultivation_material_list_world_level_title",
+      "value": "NM"
+    },
+    {
+      "name": "ui_cultivation_navigate_action",
+      "value": "Ir"
+    },
+    {
+      "name": "ui_daily_note_notification_setting",
+      "value": "Configuración de notificaciones"
+    },
+    {
+      "name": "ui_calendar_time_pending",
+      "value": "Fecha por anunciar"
+    },
+    {
+      "name": "ui_daily_note_refresh",
+      "value": "Actualizar ahora"
+    },
+    {
+      "name": "ui_daily_note_setting_auto_refresh",
+      "value": "Actualización automática"
+    },
+    {
+      "name": "ui_desc_abyss",
+      "value": "Período actual y anterior"
+    },
+    {
+      "name": "ui_desc_account",
+      "value": "Gestionar cuentas y personajes vinculados"
+    },
+    {
+      "name": "ui_desc_achievement",
+      "value": "Exportar / Importar / UIAF"
+    },
+    {
+      "name": "ui_desc_announcements",
+      "value": "Actualizaciones y noticias"
+    },
+    {
+      "name": "ui_desc_backpack",
+      "value": "Arma / Artefacto / UIIF"
+    },
+    {
+      "name": "ui_desc_banner_history",
+      "value": "Personajes y armas promocionales"
+    },
+    {
+      "name": "ui_desc_calendar",
+      "value": "Eventos / Deseos / Registros"
+    },
+    {
+      "name": "ui_desc_challenge",
+      "value": "Individual / Cooperativo / Mejores tiempos"
+    },
+    {
+      "name": "ui_desc_character",
+      "value": "Atributos del personaje / Artefacto"
+    },
+    {
+      "name": "ui_desc_cultivation",
+      "value": "Lista de materiales / Estadísticas de materiales"
+    },
+    {
+      "name": "ui_desc_daily_note",
+      "value": "Resina original / Expediciones / Notificación"
+    },
+    {
+      "name": "ui_desc_launch",
+      "value": "Accesos de inicio"
+    },
+    {
+      "name": "ui_desc_ledger",
+      "value": "Registro mensual de Protogemas y Mora"
+    },
+    {
+      "name": "ui_desc_passport",
+      "value": "Información del pase"
+    },
+    {
+      "name": "ui_desc_settings",
+      "value": "Tema de color / Actualizar / Idioma"
+    },
+    {
+      "name": "ui_desc_sign_in",
+      "value": "Recompensas de registro diario"
+    },
+    {
+      "name": "ui_desc_theater",
+      "value": "Medallas de desafío estelar / Personajes suplentes"
+    },
+    {
+      "name": "ui_desc_wiki_avatar",
+      "value": "Elementos y habilidades"
+    },
+    {
+      "name": "ui_desc_wiki_monster",
+      "value": "Elementos y facciones de monstruos"
+    },
+    {
+      "name": "ui_desc_wiki_weapon",
+      "value": "Estadísticas y ataque de armas"
+    },
+    {
+      "name": "ui_desc_wish",
+      "value": "Resumen / Historial"
+    },
+    {
+      "name": "ui_exception_close",
+      "value": "Cerrar"
+    },
+    {
+      "name": "ui_filter",
+      "value": "Filtrar"
+    },
+    {
+      "name": "ui_filter_count",
+      "value": "Filtrar (%d)"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_down",
+      "value": "Segunda mitad"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_up",
+      "value": "Primera mitad"
+    },
+    {
+      "name": "ui_gacha_log_orange_avatar_countdown",
+      "value": "Personajes de cinco estrellas"
+    },
+    {
+      "name": "ui_gacha_log_orange_weapon_countdown",
+      "value": "Armas de cinco estrellas"
+    },
+    {
+      "name": "ui_gacha_log_purple_avatar_countdown",
+      "value": "Personajes de cuatro estrellas"
+    },
+    {
+      "name": "ui_gacha_log_purple_weapon_countdown",
+      "value": "Armas de cuatro estrellas"
+    },
+    {
+      "name": "ui_gacha_log_switch_to_beyond_gacha_mode_header",
+      "value": "Deseo"
+    },
+    {
+      "name": "ui_gacha_pool_avatar_event",
+      "value": "Gachapón de evento de personaje"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_event",
+      "value": "Deseo de evento"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_permanent",
+      "value": "Eco de Aventuras"
+    },
+    {
+      "name": "ui_gacha_pool_chronicled",
+      "value": "Deseo Crónico"
+    },
+    {
+      "name": "ui_gacha_pool_novice",
+      "value": "Gachapón para principiantes"
+    },
+    {
+      "name": "ui_gacha_pool_permanent",
+      "value": "Invocación del Paseo de la Senda"
+    },
+    {
+      "name": "ui_gacha_pool_weapon_event",
+      "value": "Encarnación divina"
+    },
+    {
+      "name": "ui_grid_view",
+      "value": "Vista de cuadrícula"
+    },
+    {
+      "name": "ui_history_charts",
+      "value": "Gráficos históricos"
+    },
+    {
+      "name": "ui_home_greeting",
+      "value": "¡Viajero, bienvenido a Teyvat!"
+    },
+    {
+      "name": "ui_home_greeting_count",
+      "value": "Has iniciado Snap Hutao %s veces"
+    },
+    {
+      "name": "ui_home_greeting_rare",
+      "value": "Tienes razón, pero Snap Hutao es un producto desarrollado de forma independiente por DGP Studio..."
+    },
+    {
+      "name": "ui_home_greeting_text_default",
+      "value": "¡Viajero, bienvenido a Teyvat!"
+    },
+    {
+      "name": "ui_home_no_codes",
+      "value": "No hay códigos disponibles"
+    },
+    {
+      "name": "ui_home_no_events",
+      "value": "No hay eventos programados"
+    },
+    {
+      "name": "ui_home_recent",
+      "value": "Próximos eventos y deseos"
+    },
+    {
+      "name": "ui_hutao_passport_verify_code_action",
+      "value": "Obtener código de verificación"
+    },
+    {
+      "name": "ui_info_bar_panel_contract_content",
+      "value": "Contraer"
+    },
+    {
+      "name": "ui_list_view",
+      "value": "Vista de lista"
+    },
+    {
+      "name": "ui_material_frosted",
+      "value": "Translucidez mate y sombras suaves"
+    },
+    {
+      "name": "ui_material_system_glass",
+      "value": "Vidrio del sistema e iluminación inmersiva"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_elec",
+      "value": "Electro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_fire",
+      "value": "Pyro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_grass",
+      "value": "Dendro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_ice",
+      "value": "Cryo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_rock",
+      "value": "Geo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_water",
+      "value": "Hydro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_wind",
+      "value": "Anemo"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_blue",
+      "value": "Tres estrellas"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_green",
+      "value": "2 estrellas"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_orange",
+      "value": "Cinco estrellas"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_purple",
+      "value": "Cuatro estrellas"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_red",
+      "value": "Event Exclusive"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_white",
+      "value": "1 estrella"
+    },
+    {
+      "name": "ui_model_intrinsic_role_combat_difficulty_level_lunar",
+      "value": "Modo Lunar"
+    },
+    {
+      "name": "ui_model_metadata_material_weapon_ascension_material",
+      "value": "Materiales de ascensión de arma"
+    },
+    {
+      "name": "ui_nav_announcements",
+      "value": "Anuncios del juego"
+    },
+    {
+      "name": "ui_nav_banner_history",
+      "value": "Historial de banners"
+    },
+    {
+      "name": "ui_navigation_collapse",
+      "value": "Contraer navegación"
+    },
+    {
+      "name": "ui_navigation_expand",
+      "value": "Expandir navegación"
+    },
+    {
+      "name": "ui_option_selected",
+      "value": "Seleccionado"
+    },
+    {
+      "name": "ui_option_unselected",
+      "value": "No seleccionado"
+    },
+    {
+      "name": "ui_plugin_setting_back_button",
+      "value": "Volver"
+    },
+    {
+      "name": "ui_role_combat_avatar_trial_hint",
+      "value": "Prueba"
+    },
+    {
+      "name": "ui_role_combat_shortest",
+      "value": "Rendimiento más rápido"
+    },
+    {
+      "name": "ui_role_combat_splendour_buffs_header",
+      "value": "Bendiciones Brillantes"
+    },
+    {
+      "name": "ui_role_combat_support",
+      "value": "Apoyo"
+    },
+    {
+      "name": "ui_setting_apperance_first_day_of_week_header",
+      "value": "Primer día de la semana"
+    },
+    {
+      "name": "ui_setting_background_image_custom_folder_header",
+      "value": "Carpeta personalizada de imágenes de fondo"
+    },
+    {
+      "name": "ui_setting_background_media_local_folder",
+      "value": "Video aleatorio local"
+    },
+    {
+      "name": "ui_setting_background_media_official_launcher_video",
+      "value": "Video de fondo del lanzador oficial"
+    },
+    {
+      "name": "ui_setting_background_video_is_looping_header",
+      "value": "Reproducir en bucle"
+    },
+    {
+      "name": "ui_setting_background_video_is_muted_header",
+      "value": "Reproducir en silencio"
+    },
+    {
+      "name": "ui_setting_control_material_default",
+      "value": "Predeterminado"
+    },
+    {
+      "name": "ui_setting_create_desktop_shortcut_action",
+      "value": "Crear"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_off",
+      "value": "Ocultar"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_on",
+      "value": "Mostrar"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_action",
+      "value": "Configuración"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_header",
+      "value": "Configurar punto de acceso de verificación Geetest"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_description",
+      "value": "Aplicación inmediata. No se mostrará al desactivarlo"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_header",
+      "value": "Activar la visualización del calendario de eventos del juego"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_description",
+      "value": "Desactivado por defecto. Algunos contenidos como fechas de eventos no en curso no se mostrarán correctamente"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_header",
+      "value": "Mostrar eventos de versión del juego que no están en curso"
+    },
+    {
+      "name": "ui_setting_home_card_description",
+      "value": "Administra las tarjetas en el tablero de inicio, arrastra para ordenar"
+    },
+    {
+      "name": "ui_setting_hutao_passport_logout_action",
+      "value": "Cerrar sesión"
+    },
+    {
+      "name": "ui_setting_key_shortcut_virtual_key_code_action",
+      "value": "Ver"
+    },
+    {
+      "name": "ui_settings_auto_sign_info",
+      "value": "Registra el UID actual al iniciar y los personajes locales de CN al cambiar de día con la app abierta."
+    },
+    {
+      "name": "ui_settings_backup_credentials",
+      "value": "La copia contiene credenciales. Guárdala en un lugar privado."
+    },
+    {
+      "name": "ui_settings_cache",
+      "value": "Caché de medios e iconos"
+    },
+    {
+      "name": "ui_settings_cache_size",
+      "value": "Tamaño de caché %s"
+    },
+    {
+      "name": "ui_settings_cancel_update",
+      "value": "Cancelar actualización"
+    },
+    {
+      "name": "ui_settings_cancelling",
+      "value": "Cancelando…"
+    },
+    {
+      "name": "ui_settings_choose_video",
+      "value": "Seleccionar vídeos"
+    },
+    {
+      "name": "ui_settings_configure",
+      "value": "Configuración"
+    },
+    {
+      "name": "ui_settings_data_next_launch",
+      "value": "Los datos seleccionados se usarán al iniciar de nuevo."
+    },
+    {
+      "name": "ui_settings_data_source",
+      "value": "URL de origen de datos"
+    },
+    {
+      "name": "ui_settings_delete_wish",
+      "value": "Eliminar todos los datos de deseos"
+    },
+    {
+      "name": "ui_settings_delete_wish_archive",
+      "value": "Eliminar archivo de deseos"
+    },
+    {
+      "name": "ui_settings_delete_wish_confirm",
+      "value": "¿Eliminar los deseos de todos los UID? Esta acción es irreversible."
+    },
+    {
+      "name": "ui_settings_download_verify",
+      "value": "Descargar y verificar"
+    },
+    {
+      "name": "ui_settings_export_backup",
+      "value": "Exportar copia completa"
+    },
+    {
+      "name": "ui_settings_feedback",
+      "value": "Comentarios y diagnóstico"
+    },
+    {
+      "name": "ui_settings_game_data",
+      "value": "Actualizaciones de datos del juego"
+    },
+    {
+      "name": "ui_settings_geetest_help",
+      "value": "Usa {0} para gt y {1} para challenge. La respuesta GET debe incluir code: 0, challenge y validate. Déjalo vacío para verificación interactiva."
+    },
+    {
+      "name": "ui_settings_help",
+      "value": "Ayuda sin conexión"
+    },
+    {
+      "name": "ui_settings_immersive_material",
+      "value": "Material inmersivo"
+    },
+    {
+      "name": "ui_settings_local_backup_success",
+      "value": "Completado"
+    },
+    {
+      "name": "ui_settings_manifest_help",
+      "value": "Guarda la URL del manifiesto y comprueba si hay actualizaciones."
+    },
+    {
+      "name": "ui_settings_material_level",
+      "value": "Nivel de material inmersivo"
+    },
+    {
+      "name": "ui_settings_material_scope",
+      "value": "Los niveles se aplican al instante. Las superficies de contenido son mate. Los controles compatibles usan el efecto inmersivo del sistema."
+    },
+    {
+      "name": "ui_settings_no_wallpaper",
+      "value": "No se ha elegido un fondo"
+    },
+    {
+      "name": "ui_settings_no_wish_archives",
+      "value": "No hay archivos de deseos. Actualiza o importa para añadir uno."
+    },
+    {
+      "name": "ui_settings_normal_material",
+      "value": "Material estándar"
+    },
+    {
+      "name": "ui_settings_not_logged_in",
+      "value": "Sesión cerrada"
+    },
+    {
+      "name": "ui_settings_page_description_add_model_provider_profile_to_edit",
+      "value": "Add a model provider profile first"
+    },
+    {
+      "name": "ui_settings_page_label_add_profile",
+      "value": "Add"
+    },
+    {
+      "name": "ui_settings_page_label_agent_maximum_iterations_per_request",
+      "value": "Maximum Tool Iterations Per Request"
+    },
+    {
+      "name": "ui_settings_page_label_agent_system_prompt",
+      "value": "System Prompt"
+    },
+    {
+      "name": "ui_settings_page_label_agent_user_name",
+      "value": "User Name"
+    },
+    {
+      "name": "ui_settings_page_label_clear_models",
+      "value": "Clear Models"
+    },
+    {
+      "name": "ui_settings_page_label_copy_profile",
+      "value": "Copy"
+    },
+    {
+      "name": "ui_settings_page_label_delete_model",
+      "value": "Delete Model"
+    },
+    {
+      "name": "ui_settings_page_label_delete_profile",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_settings_page_label_fetch_models",
+      "value": "Fetch"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_context_window_tokens",
+      "value": "Context Window Length"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_input_tokens",
+      "value": "Input Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_output_tokens",
+      "value": "Output Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_name",
+      "value": "Model Name"
+    },
+    {
+      "name": "ui_settings_page_label_model_omit_reasoning_effort_when_thinking_disabled",
+      "value": "Omit reasoning effort when Thinking is off"
+    },
+    {
+      "name": "ui_settings_page_label_model_provider_profiles",
+      "value": "Model Provider Profiles"
+    },
+    {
+      "name": "ui_settings_page_label_model_reasoning_effort",
+      "value": "Reasoning Effort"
+    },
+    {
+      "name": "ui_settings_page_label_model_temperature",
+      "value": "Temperature"
+    },
+    {
+      "name": "ui_settings_page_label_model_thinking_enabled",
+      "value": "Enable Thinking"
+    },
+    {
+      "name": "ui_settings_page_label_model_top_p",
+      "value": "Top P"
+    },
+    {
+      "name": "ui_settings_page_label_profile_model_id",
+      "value": "Model ID"
+    },
+    {
+      "name": "ui_settings_page_label_profile_name",
+      "value": "Profile Name"
+    },
+    {
+      "name": "ui_settings_page_label_profile_provider_type",
+      "value": "Provider Type"
+    },
+    {
+      "name": "ui_settings_page_label_selected_model",
+      "value": "Selected Model"
+    },
+    {
+      "name": "ui_settings_page_option_provider_default",
+      "value": "Provider default"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_extra_high",
+      "value": "Extra high"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_high",
+      "value": "High"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_low",
+      "value": "Low"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_medium",
+      "value": "Medium"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_none",
+      "value": "None"
+    },
+    {
+      "name": "ui_settings_previous_data",
+      "value": "Restaurar datos de juego anteriores"
+    },
+    {
+      "name": "ui_settings_processing",
+      "value": "Procesando…"
+    },
+    {
+      "name": "ui_settings_random_video",
+      "value": "Reproduce un vídeo importado al azar al cargar."
+    },
+    {
+      "name": "ui_settings_reduce_motion",
+      "value": "Reducir movimiento"
+    },
+    {
+      "name": "ui_settings_reduced_motion_info",
+      "value": "Reduce las transiciones y animaciones al pulsar."
+    },
+    {
+      "name": "ui_settings_reset_builtin",
+      "value": "Restaurar datos integrados"
+    },
+    {
+      "name": "ui_settings_restore_backup",
+      "value": "Restaurar desde copia"
+    },
+    {
+      "name": "ui_settings_restore_confirm",
+      "value": "¿Reemplazar los datos actuales con esta copia?"
+    },
+    {
+      "name": "ui_settings_restore_scope",
+      "value": "Restaurar cuentas, registros y preferencias"
+    },
+    {
+      "name": "ui_settings_signed_in",
+      "value": "Sesión iniciada en la cuenta del juego"
+    },
+    {
+      "name": "ui_settings_stop_download",
+      "value": "¿Detener la descarga y esperar a que termine la verificación?"
+    },
+    {
+      "name": "ui_settings_verified_data",
+      "value": "Descarga y verifica todos los datos desde un commit de GitHub de confianza."
+    },
+    {
+      "name": "ui_settings_video_fallback",
+      "value": "Se pausa en segundo plano. Usa el fondo si el vídeo no está disponible."
+    },
+    {
+      "name": "ui_settings_wallpaper_sources",
+      "value": "Las imágenes locales rotan cada cinco minutos. El fondo diario procede de Snap Hutao. Los derechos pertenecen a sus autores."
+    },
+    {
+      "name": "ui_spiral_abyss_hutao_statistics",
+      "value": "Estadísticas de esta fase"
+    },
+    {
+      "name": "ui_spiral_abyss_upload_record_homa_not_login_primary_button_text",
+      "value": "Iniciar sesión ahora"
+    },
+    {
+      "name": "ui_travelers_diary_no_income_source_hint",
+      "value": "No hay registros de ingresos de Protogemas este mes"
+    },
+    {
+      "name": "ui_travelers_diary_today",
+      "value": "Hoy"
+    },
+    {
+      "name": "ui_update_cancel",
+      "value": "Cancelar comprobación"
+    },
+    {
+      "name": "ui_update_cancelled",
+      "value": "Cancelado"
+    },
+    {
+      "name": "ui_update_channel",
+      "value": "Canal de publicación"
+    },
+    {
+      "name": "ui_update_check_failed",
+      "value": "Error al comprobar actualizaciones"
+    },
+    {
+      "name": "ui_update_checking",
+      "value": "Buscando actualizaciones…"
+    },
+    {
+      "name": "ui_update_compare_unknown",
+      "value": "Información de versión insuficiente"
+    },
+    {
+      "name": "ui_update_compatibility_unknown",
+      "value": "Compatibilidad de instalación desconocida"
+    },
+    {
+      "name": "ui_update_conflict",
+      "value": "El nombre y el código de versión no coinciden"
+    },
+    {
+      "name": "ui_update_current",
+      "value": "Ya es la versión más reciente"
+    },
+    {
+      "name": "ui_update_hap_listed",
+      "value": "Paquete de HarmonyOS listado"
+    },
+    {
+      "name": "ui_update_installed",
+      "value": "Versión instalada %s"
+    },
+    {
+      "name": "ui_update_invalid",
+      "value": "Información de versión no válida"
+    },
+    {
+      "name": "ui_update_local_newer",
+      "value": "La versión instalada es más reciente"
+    },
+    {
+      "name": "ui_update_no_hap",
+      "value": "No se indica un paquete de HarmonyOS"
+    },
+    {
+      "name": "ui_update_no_notes",
+      "value": "No hay notas para esta versión"
+    },
+    {
+      "name": "ui_update_no_release",
+      "value": "No hay versiones públicas en este canal"
+    },
+    {
+      "name": "ui_update_notes_error",
+      "value": "No se pudieron abrir las notas de la versión"
+    },
+    {
+      "name": "ui_update_preview",
+      "value": "Incluir versiones preliminares"
+    },
+    {
+      "name": "ui_update_project_releases",
+      "value": "Versiones del proyecto"
+    },
+    {
+      "name": "ui_update_rate_limit",
+      "value": "GitHub ha limitado la solicitud. Inténtalo más tarde."
+    },
+    {
+      "name": "ui_update_recent_only",
+      "value": "Se comprobaron las últimas 300 versiones"
+    },
+    {
+      "name": "ui_update_required_api",
+      "value": "API mínima %d"
+    },
+    {
+      "name": "ui_update_skipped",
+      "value": "Se ha omitido la versión %s; al iniciar ya no se avisará automáticamente de esta versión. Aún puedes buscar actualizaciones manualmente en los ajustes"
+    },
+    {
+      "name": "ui_update_stable",
+      "value": "Versiones estables"
+    },
+    {
+      "name": "ui_update_unavailable",
+      "value": "Repositorio de versiones no disponible"
+    },
+    {
+      "name": "ui_update_unknown",
+      "value": "Desconocido"
+    },
+    {
+      "name": "ui_update_unskip",
+      "value": "Dejar de omitir esta versión"
+    },
+    {
+      "name": "ui_user_copy_cookie_action",
+      "value": "Copiar Cookie"
+    },
+    {
+      "name": "ui_web_daily_note_attendance_reward_status_finished_non_reward",
+      "value": "Finalizado"
+    },
+    {
+      "name": "ui_web_hoyolab_game_record_act_calendar_hard_challenge_locked",
+      "value": "Bloqueado"
+    },
+    {
+      "name": "ui_weekday_friday",
+      "value": "vie"
+    },
+    {
+      "name": "ui_weekday_monday",
+      "value": "lun"
+    },
+    {
+      "name": "ui_weekday_saturday",
+      "value": "sáb"
+    },
+    {
+      "name": "ui_weekday_sunday",
+      "value": "dom"
+    },
+    {
+      "name": "ui_weekday_thursday",
+      "value": "jue"
+    },
+    {
+      "name": "ui_weekday_tuesday",
+      "value": "mar"
+    },
+    {
+      "name": "ui_weekday_wednesday",
+      "value": "mié"
+    },
+    {
+      "name": "ui_wi_ki_avatar_ascension_materials_header",
+      "value": "Materiales de ascensión"
+    },
+    {
+      "name": "ui_wi_ki_avatar_auto_suggest_box_place_holder",
+      "value": "Filtrar personaje"
+    },
+    {
+      "name": "ui_wi_ki_avatar_name_card_header",
+      "value": "Tarjeta de presentación"
+    },
+    {
+      "name": "ui_wi_ki_avatar_special_food_title",
+      "value": "Plato especial"
+    },
+    {
+      "name": "ui_wi_ki_weapon_auto_suggest_box_place_holder",
+      "value": "Filtrar armas"
+    },
+    {
+      "name": "ui_wish_show_empty_history",
+      "value": "Mostrar evento de gachapón sin historial"
+    },
+    {
+      "name": "ui_wish_show_empty_overview",
+      "value": "Resumen de gachapón sin historial"
+    },
+    {
+      "name": "ui_wish_show_unobtained",
+      "value": "Objetos de los deseos no obtenidos"
+    },
+    {
+      "name": "ui_gacha_pivot_overview",
+      "value": "Resumen"
+    },
+    {
+      "name": "ui_gacha_pivot_history",
+      "value": "Historial"
+    },
+    {
+      "name": "ui_gacha_pivot_avatar",
+      "value": "Personaje"
+    },
+    {
+      "name": "ui_gacha_pivot_weapon",
+      "value": "Arma"
+    },
+    {
+      "name": "ui_gacha_pivot_countdown",
+      "value": "Contador"
+    },
+    {
+      "name": "ui_gacha_pivot_statistics",
+      "value": "Estadísticas globales de deseos"
+    },
+    {
+      "name": "ui_gacha_full_refresh",
+      "value": "Actualización completa"
+    },
+    {
+      "name": "ui_gacha_full_refresh_selected",
+      "value": "✓ Actualización completa"
+    },
+    {
+      "name": "ui_gacha_card_statistics",
+      "value": "Estadísticas"
+    },
+    {
+      "name": "ui_gacha_card_ratio",
+      "value": "Proporción"
+    },
+    {
+      "name": "ui_gacha_card_five_average",
+      "value": "Promedio de deseos de cinco estrellas"
+    },
+    {
+      "name": "ui_gacha_card_four_average",
+      "value": "Promedio de deseos de cuatro estrellas"
+    },
+    {
+      "name": "ui_gacha_card_up_average",
+      "value": "Promedio de Deseos UP"
+    },
+    {
+      "name": "ui_gacha_card_to_five",
+      "value": "Última cinco estrellas"
+    },
+    {
+      "name": "ui_gacha_card_to_four",
+      "value": "Última cuatro estrellas"
+    },
+    {
+      "name": "ui_gacha_card_to_three",
+      "value": "Última tres estrellas"
+    },
+    {
+      "name": "ui_travelers_diary_month",
+      "value": "Este mes"
+    },
+    {
+      "name": "ui_travelers_diary_primogems",
+      "value": "Protogema"
+    },
+    {
+      "name": "ui_travelers_diary_mora",
+      "value": "Mora"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "string": [
+    {
+      "name": "ui_home_pity_title",
+      "value": "Compteur de pitié"
+    },
+    {
+      "name": "ui_home_pity_five",
+      "value": "5★"
+    },
+    {
+      "name": "ui_home_pity_four",
+      "value": "4★"
+    },
+    {
+      "name": "ui_wallpaper_copyright",
+      "value": "Informations de copyright de l’image"
+    },
+    {
+      "name": "ui_wallpaper_none",
+      "value": "Pas d'image de fond"
+    },
+    {
+      "name": "ui_wallpaper_local",
+      "value": "Image aléatoire locale"
+    },
+    {
+      "name": "ui_wallpaper_bing",
+      "value": "Image du jour de Bing"
+    },
+    {
+      "name": "ui_wallpaper_daily",
+      "value": "Image du jour de Snap Hutao"
+    },
+    {
+      "name": "ui_wallpaper_launcher",
+      "value": "Fond d'écran du lanceur officiel"
+    }
+  ]
+}

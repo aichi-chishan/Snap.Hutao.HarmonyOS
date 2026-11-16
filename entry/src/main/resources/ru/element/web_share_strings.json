@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "ui_web_share_title",
+      "value": "Режим сохранения при публикации"
+    },
+    {
+      "name": "ui_web_share_description",
+      "value": "Выберите режим сохранения изображения после нажатия кнопки «Поделиться»"
+    },
+    {
+      "name": "ui_web_share_copy",
+      "value": "Скопировано в буфер обмена"
+    },
+    {
+      "name": "ui_web_share_file",
+      "value": "Сохранить как файл"
+    }
+  ]
+}

@@ -7,24 +7,53 @@ import { ApiClient } from '../data/network/ApiClient';
 import { ApiResponse } from '../model/ApiResponse';
 import { HoyolabClient } from '../data/network/HoyolabClient';
 import { DsSigner } from '../data/network/DsSigner';
-import { RiskVerifier, RiskControlError } from '../data/network/RiskVerifier';
+import { RiskVerifier } from '../data/network/RiskVerifier';
 import { CharacterListItem, CharacterDetail, ListWeapon, DetailedWeapon, Reliquary, Constellation, BaseProperty, RelicProperty, RecommendRelic, AvatarSkill } from '../model/CharacterData';
+import { User } from '../model/User';
+import { UserGameRole } from '../model/UserGameRole';
 import { WikiMetaService } from './WikiMetaService';
 import { UserService } from './UserService';
-import { RegionUtil, AppConstants } from '../common/Constants';
+import { RegionUtil } from '../common/Constants';
 import { HoyolabEndpoints } from '../common/HoyolabEndpoints';
 import { Logger } from '../common/Logger';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { PromoteState } from '../model/PromoteState';
 
 const TAG: string = 'CharacterService';
-const LIST_URL: string = 'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api/character/list';
-const DETAIL_URL: string = 'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api/character/detail';
 /** -502 限流退避重试次数 */
 const RETRY_TIMES: number = 3;
+const DETAIL_BATCH_SIZE: number = 20;
+
+class CharacterRequest {
+  readonly uid: string;
+  readonly region: string;
+  readonly user: User;
+  readonly isCurrent: () => boolean;
+
+  constructor(uid: string, region: string, user: User, isCurrent: () => boolean) {
+    this.uid = uid;
+    this.region = region;
+    this.user = user;
+    this.isCurrent = isCurrent;
+  }
+
+  assertCurrent(): void {
+    if (!this.isCurrent()) { throw new Error('账号或角色已切换，请重新刷新'); }
+  }
+}
+
+/** Pending raw entries and IDs already committed by a newer overlapping detail request. */
+class CharacterDetailWrite {
+  readonly uid: string;
+  readonly raw: Map<number, Object> = new Map<number, Object>();
+  readonly superseded: Set<number> = new Set<number>();
+
+  constructor(uid: string) { this.uid = uid; }
+}
 
 export class CharacterService {
   private static instance: CharacterService = new CharacterService();
+  private detailWrites: CharacterDetailWrite[] = [];
 
   static getInstance(): CharacterService {
     return CharacterService.instance;
@@ -87,18 +116,40 @@ export class CharacterService {
     }
   }
 
-  private saveCached(uid: string, raw: Object[], detail: boolean): void {
-    if (!/^\d+$/.test(uid)) {
-      return;
+  private beginRequest(uid: string, caller?: () => boolean): CharacterRequest {
+    const region: string = RegionUtil.regionOfUid(uid);
+    if (!/^\d+$/.test(uid) || region.length === 0) { throw new Error('请选择有效的游戏 UID'); }
+    const service: UserService = UserService.getInstance();
+    const user: User | undefined = service.getCurrentUser();
+    if (user === undefined || !user.hasCookie()) { throw new Error('请先登录'); }
+    if (!user.roles.some((role: UserGameRole): boolean => role.gameUid === uid && role.region === region)) {
+      throw new Error('当前账号未绑定该游戏 UID');
     }
+    const revision: number = service.sessionRevision();
+    const request: CharacterRequest = new CharacterRequest(uid, region, user, (): boolean =>
+      service.sessionRevision() === revision && service.getCurrentUser() === user && (caller?.() ?? true));
+    request.assertCurrent();
+    return request;
+  }
+
+  private beginDetailWrite(uid: string): CharacterDetailWrite {
+    const write: CharacterDetailWrite = new CharacterDetailWrite(uid);
+    this.detailWrites.push(write);
+    return write;
+  }
+
+  private finishDetailWrite(request: CharacterRequest, write: CharacterDetailWrite): void {
+    const index: number = this.detailWrites.indexOf(write);
     try {
-      const key: string = detail ? `character.details.${uid}` : `character.list.${uid}`;
-      if (!detail) {
-        PreferencesStore.setString(key, JSON.stringify(raw));
-        return;
+      if (!request.isCurrent()) { return; }
+      const accepted: Map<number, Object> = new Map<number, Object>();
+      for (const id of write.raw.keys()) {
+        const item: Object | undefined = write.raw.get(id);
+        if (item !== undefined && !write.superseded.has(id)) { accepted.set(id, item); }
       }
+      if (accepted.size === 0) { return; }
       const merged: Map<number, Object> = new Map<number, Object>();
-      for (const item of this.readCached(uid, true)) {
+      for (const item of this.readCached(write.uid, true)) {
         try {
           const id: number = this.parseDetail(item).id;
           if (Number.isSafeInteger(id) && id > 0) {
@@ -109,24 +160,29 @@ export class CharacterService {
           continue;
         }
       }
-      for (const item of raw) {
-        merged.set(this.parseDetail(item).id, item);
+      accepted.forEach((item: Object, id: number): void => { merged.set(id, item); });
+      if (!request.isCurrent()) { return; }
+      PreferencesStore.setString(`character.details.${write.uid}`, JSON.stringify(Array.from(merged.values())));
+      for (let i: number = 0; i < index; i++) {
+        const pending: CharacterDetailWrite = this.detailWrites[i];
+        if (pending.uid !== write.uid) { continue; }
+        for (const id of accepted.keys()) { pending.superseded.add(id); }
       }
-      PreferencesStore.setString(key, JSON.stringify(Array.from(merged.values())));
     } catch (e) {
       // 缓存不可用不影响本次成功的网络结果，也不清除既有快照。
       Logger.warn(TAG, 'character cache write failed');
+    } finally {
+      if (index >= 0) { this.detailWrites.splice(index, 1); }
     }
   }
 
   /** 角色列表
    *  @param challenge 可选：极验通过后的 x-rpc-challenge（重放头） */
-  async fetchList(uid: string, challenge?: string): Promise<CharacterListItem[]> {
-    if (!/^\d+$/.test(uid)) {
-      throw new Error('请选择有效的游戏 UID');
-    }
-    const body: Record<string, Object> = { 'role_id': uid, 'server': RegionUtil.regionOfUid(uid), 'sort_type': 1 };
-    const resp: ApiResponse = await this.postJson(HoyolabEndpoints.gameRecordUrl('character/list', RegionUtil.regionOfUid(uid)), body, challenge);
+  async fetchList(uid: string, challenge?: string, isCurrent?: () => boolean): Promise<CharacterListItem[]> {
+    const request: CharacterRequest = this.beginRequest(uid, isCurrent);
+    const body: Record<string, Object> = { 'role_id': uid, 'server': request.region, 'sort_type': 1 };
+    const resp: ApiResponse = await this.postJson(request, HoyolabEndpoints.gameRecordUrl('character/list', request.region), body, challenge);
+    request.assertCurrent();
     if (!resp.success || resp.data === undefined) {
       throw new Error(resp.userFriendlyMessage());
     }
@@ -146,28 +202,62 @@ export class CharacterService {
       }
     }
     Logger.info(TAG, `characters count=${items.length}`);
-    this.saveCached(uid, list, false);
+    request.assertCurrent();
+    try { PreferencesStore.setString(`character.list.${uid}`, JSON.stringify(list)); }
+    catch (e) { Logger.warn(TAG, 'character cache write failed'); }
     return items;
   }
 
   /** 角色详情（批量 ids）
    *  @param challenge 可选：极验通过后的 x-rpc-challenge（重放头）
    *  注意：character_ids 必须是数字数组（JSON 序列化后 [10000130]）；若发字符串 "[..]" 会被米哈游判为非法 → -502 */
-  async fetchDetail(uid: string, ids: number[], challenge?: string): Promise<CharacterDetail[]> {
-    if (!/^\d+$/.test(uid)) {
-      throw new Error('请选择有效的游戏 UID');
+  async fetchDetail(uid: string, ids: number[], challenge?: string, isCurrent?: () => boolean): Promise<CharacterDetail[]> {
+    if (!/^\d+$/.test(uid)) { throw new Error('请选择有效的游戏 UID'); }
+    if (ids.length === 0) { return []; }
+    const request: CharacterRequest = this.beginRequest(uid, isCurrent);
+    const write: CharacterDetailWrite = this.beginDetailWrite(uid);
+    try {
+      const details: CharacterDetail[] = await this.fetchDetailBatch(request, ids.slice(), write, challenge);
+      request.assertCurrent();
+      return details;
+    } finally {
+      this.finishDetailWrite(request, write);
     }
-    if (ids.length === 0) {
-      return [];
+  }
+
+  /** Publish each successful batch, then merge the completed prefix once at the request boundary. */
+  async fetchDetailBatches(uid: string, ids: number[], onBatch: (details: CharacterDetail[]) => void,
+    isCurrent: () => boolean, challenge?: string): Promise<void> {
+    if (!/^\d+$/.test(uid)) { throw new Error('请选择有效的游戏 UID'); }
+    if (ids.length === 0) { return; }
+    const request: CharacterRequest = this.beginRequest(uid, isCurrent);
+    const write: CharacterDetailWrite = this.beginDetailWrite(uid);
+    const pendingIds: number[] = ids.slice();
+    try {
+      for (let i: number = 0; i < pendingIds.length; i += DETAIL_BATCH_SIZE) {
+        const details: CharacterDetail[] = await this.fetchDetailBatch(request,
+          pendingIds.slice(i, i + DETAIL_BATCH_SIZE), write, challenge);
+        request.assertCurrent();
+        onBatch(details.filter((detail: CharacterDetail): boolean => !write.superseded.has(detail.id)));
+      }
+      request.assertCurrent();
+    } finally {
+      this.finishDetailWrite(request, write);
     }
+  }
+
+  private async fetchDetailBatch(request: CharacterRequest, ids: number[], write: CharacterDetailWrite,
+    challenge?: string): Promise<CharacterDetail[]> {
     const body: Record<string, Object> = {
-      'role_id': uid,
-      'server': RegionUtil.regionOfUid(uid),
+      'role_id': request.uid,
+      'server': request.region,
       'sort_type': 1,
       'character_ids': ids,
     };
+    const url: string = HoyolabEndpoints.gameRecordUrl('character/detail', request.region);
     const resp: ApiResponse = await CharacterService.withBackoff(
-      () => this.postJson(HoyolabEndpoints.gameRecordUrl('character/detail', RegionUtil.regionOfUid(uid)), body, challenge), RETRY_TIMES);
+      () => this.postJson(request, url, body, challenge), RETRY_TIMES, request);
+    request.assertCurrent();
     if (!resp.success || resp.data === undefined) {
       throw new Error(resp.userFriendlyMessage());
     }
@@ -177,26 +267,26 @@ export class CharacterService {
     }
     const list: Object[] = obj['list'] as Object[];
     const details: CharacterDetail[] = [];
-    if (list !== undefined && list !== null) {
-      for (let i = 0; i < list.length; i++) {
-        const detail: CharacterDetail = this.parseDetail(list[i]);
-        if (!Number.isSafeInteger(detail.id) || detail.id <= 0) {
-          throw new Error('角色详情包含无效条目，已保留本地缓存');
-        }
-        details.push(detail);
+    for (const item of list) {
+      const detail: CharacterDetail = this.parseDetail(item);
+      if (!Number.isSafeInteger(detail.id) || detail.id <= 0 || !ids.includes(detail.id)) {
+        throw new Error('角色详情包含无效条目，已保留本地缓存');
       }
+      details.push(detail);
     }
+    for (let i: number = 0; i < details.length; i++) { write.raw.set(details[i].id, list[i]); }
     Logger.info(TAG, `characters detail count=${details.length}`);
-    this.saveCached(uid, list, true);
     return details;
   }
 
   /** -502/-503 退避重试（米哈游对 detail 接口有瞬时限流，等待后可恢复） */
-  private static async withBackoff(task: () => Promise<ApiResponse>, times: number): Promise<ApiResponse> {
+  private static async withBackoff(task: () => Promise<ApiResponse>, times: number, request: CharacterRequest): Promise<ApiResponse> {
     let resp: ApiResponse | undefined = undefined;
-    for (let i = 0; i < times; i++) {
+    for (let i: number = 0; i < times; i++) {
+      request.assertCurrent();
       resp = await task();
-      if (resp.retcode === -502 || resp.retcode === -503 || resp.retcode === -500) {
+      request.assertCurrent();
+      if (i + 1 < times && (resp.retcode === -502 || resp.retcode === -503 || resp.retcode === -500)) {
         Logger.warn(TAG, `detail retry ${i + 1}/${times} retcode=${resp.retcode}`);
         await new Promise<void>((resolve) => {
           setTimeout(() => resolve(), 2000 * (i + 1));
@@ -210,44 +300,46 @@ export class CharacterService {
 
   /** POST JSON + DS Gen2/X4 + Cookie（含 1034 风控极验重放链）。
    *  @param challenge 可选：极验通过后的 x-rpc-challenge（重放头） */
-  private async postJson(url: string, body: Record<string, Object>, challenge?: string): Promise<ApiResponse> {
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined || !user.hasCookie()) {
-      throw new Error('请先登录');
-    }
+  private async postJson(request: CharacterRequest, url: string, body: Record<string, Object>, challenge?: string): Promise<ApiResponse> {
+    request.assertCurrent();
+    const user: User = request.user;
     // 确保设备指纹就绪（passport token 交换需 x-rpc-device_fp；缺 fp 会补不上 cookie_token → 战绩全挂）
     try {
       await UserService.getInstance().ensureDeviceFingerprintPublic();
     } catch (e) {
       Logger.warn(TAG, 'ensure fp fail on postJson');
     }
+    request.assertCurrent();
     if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
       await UserService.getInstance().completeTokenChainPublic(user);
-    }
-    const cookie: string = user.gameRecordCookie();
-    if (cookie.length === 0) {
-      throw new Error('账号缺少 cookie_token，请重新登录');
+      request.assertCurrent();
     }
     const bodyJson: string = JSON.stringify(body);
     const t: number = DsSigner.nowTimestamp();
     const r: string = DsSigner.randomNumber();
-    const ds: string = await DsSigner.signGen2(HoyolabEndpoints.gameRecordSalt(String(body['server'] ?? 'cn_gf01')), t, r, bodyJson, '');
+    const ds: string = await DsSigner.signGen2(HoyolabEndpoints.gameRecordSalt(request.region), t, r, bodyJson, '');
+    request.assertCurrent();
+    const cookie: string = user.gameRecordCookie();
+    if (cookie.length === 0) { throw new Error('账号缺少 cookie_token，请重新登录'); }
     const headers: Record<string, string> = { 'DS': ds, 'Cookie': cookie };
     if (challenge !== undefined && challenge.length > 0) {
       headers['x-rpc-challenge'] = challenge;
     }
     const resp0: ApiResponse = await ApiClient.getInstance().postJson(url, bodyJson,
-      HoyolabClient.merge(HoyolabClient.getBaseHeaders(String(body['server'] ?? 'cn_gf01')), headers));
+      HoyolabClient.merge(HoyolabClient.getBaseHeaders(request.region), headers));
+    request.assertCurrent();
     let resp: ApiResponse = resp0;
     if (resp0.isRiskControl()) {
       // 1034：自动弹统一验证窗，成功后带 challenge 服务内重放一次
       const replayChallenge: string = await RiskVerifier.tryResolveRisk(resp0, cookie, url);
+      request.assertCurrent();
       if (replayChallenge.length === 0) {
         throw new Error('人机验证未完成或被取消，请稍后再试');
       }
       headers['x-rpc-challenge'] = replayChallenge;
       resp = await ApiClient.getInstance().postJson(url, bodyJson,
-        HoyolabClient.merge(HoyolabClient.getBaseHeaders(String(body['server'] ?? 'cn_gf01')), headers));
+        HoyolabClient.merge(HoyolabClient.getBaseHeaders(request.region), headers));
+      request.assertCurrent();
     }
     return resp;
   }
@@ -412,12 +504,15 @@ export class CharacterService {
         d.skills.push(sk);
       }
     }
-    // 推荐圣遗物词条（Windows 评分权重依据）
+    // 推荐主属性用于展示，副词条和能量类型仍用于评分。
     const rec = item['recommend_relic_property'] as Record<string, Object>;
     if (rec !== undefined && rec !== null) {
-      const subProps = rec['recommend_properties'] as Record<string, Object>;
-      if (subProps !== undefined && subProps !== null) {
-        const list = subProps['sub_property_list'] as Array<Object>;
+      const props = rec['recommend_properties'] as Record<string, Object>;
+      if (props !== undefined && props !== null) {
+        d.recommend.sandMainProperties = CharacterService.parseRecommendedMainProperties(props['sand_main_property_list']);
+        d.recommend.gobletMainProperties = CharacterService.parseRecommendedMainProperties(props['goblet_main_property_list']);
+        d.recommend.circletMainProperties = CharacterService.parseRecommendedMainProperties(props['circlet_main_property_list']);
+        const list = props['sub_property_list'] as Array<Object>;
         if (list !== undefined && list !== null) {
           for (let i = 0; i < list.length; i++) {
             d.recommend.subProperties.push(String(list[i]));
@@ -427,6 +522,19 @@ export class CharacterService {
       d.recommend.energyType = String(rec['special_energy_type'] ?? 'NONE');
     }
     return d;
+  }
+
+  private static parseRecommendedMainProperties(raw: Object): string[] {
+    if (!Array.isArray(raw)) { return []; }
+    const properties: string[] = [];
+    for (const value of raw as Object[]) {
+      if (typeof value === 'string' && value.trim().length > 0) {
+        properties.push(value.trim());
+      } else if (typeof value === 'number' && Number.isSafeInteger(value)) {
+        properties.push(String(value));
+      }
+    }
+    return properties;
   }
 
   private parseReliquary(obj: Object): Reliquary {
@@ -440,7 +548,11 @@ export class CharacterService {
     r.level = CharacterService.num(item['level']);
     r.posName = String(item['pos_name'] ?? '');
     const set: Record<string, Object> = item['set'] as Record<string, Object>;
-    r.setName = set !== undefined && set !== null ? String(set['name'] ?? '') : '';
+    if (set !== undefined && set !== null) {
+      const id: number = CharacterService.num(set['id']);
+      r.setId = Number.isSafeInteger(id) && id > 0 ? id : 0;
+      r.setName = String(set['name'] ?? '');
+    }
     const main = item['main_property'] as Record<string, Object>;
     if (main !== undefined && main !== null) {
       r.mainProperty.propertyType = String(main['property_type'] ?? '');

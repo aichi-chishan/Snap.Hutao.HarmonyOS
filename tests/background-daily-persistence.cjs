@@ -6,16 +6,19 @@ const assert = require('node:assert/strict');
 const ts = require(process.env.TYPESCRIPT_PATH || '../ci/node_modules/typescript');
 const file = path.resolve(__dirname, '../entry/src/main/ets/data/repo/DailyNoteRepo.ets');
 let queries = 0, writes = 0, active = true, finishQuery, finishWrite, blockWrite = false, rollbacks = 0;
+let existing = false, updated;
 class Predicates { equalTo() {} }
 const helper = { getStore: () => ({ createTransaction: async () => {
   let staged = 0;
-  return { query: async () => ({ goToFirstRow: () => false, close() {} }),
+  return { query: async () => {
+      queries++;
+      await new Promise(resolve => { finishQuery = resolve; });
+      return { goToFirstRow: () => existing, close() {} };
+    },
     insert: async () => { staged++; if (blockWrite) await new Promise(resolve => { finishWrite = resolve; }); },
-    update: async () => { staged++; }, commit: async () => { writes += staged; }, rollback: async () => { rollbacks++; staged = 0; } };
-} }), async query() { queries++;
-  await new Promise(resolve => { finishQuery = resolve; });
-  return { goToFirstRow: () => false, close() {} };
-}, async insert() { writes++; }, async update() { writes++; } };
+    update: async values => { staged++; updated = values; },
+    commit: async () => { writes += staged; }, rollback: async () => { rollbacks++; staged = 0; } };
+} }) };
 const output = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
 }).outputText;
@@ -27,7 +30,6 @@ vm.runInNewContext(`(function(require,module,exports){${output}\n})`)((name) => 
   return {};
 }, moduleResult, moduleResult.exports);
 const Repo = moduleResult.exports.DailyNoteRepo;
-Repo.get = async () => undefined;
 (async () => {
   const saving = Repo.upsert(1, '100000001', {}, async () => active);
   while (!finishQuery) await new Promise(resolve => setImmediate(resolve));
@@ -36,11 +38,17 @@ Repo.get = async () => undefined;
   active = true; finishQuery = undefined;
   const current = Repo.upsert(1, '100000001', {}, async () => active);
   while (!finishQuery) await new Promise(resolve => setImmediate(resolve)); finishQuery(); await current;
-  assert.equal(writes, 1); assert.equal(queries, 2);
+  assert.equal(writes, 1); assert.equal(queries, 2); assert.equal(rollbacks, 1);
   blockWrite = true; finishQuery = undefined;
   const transactional = Repo.upsert(1, '100000001', {}, async () => active);
   while (!finishQuery) await new Promise(resolve => setImmediate(resolve)); finishQuery();
   while (!finishWrite) await new Promise(resolve => setImmediate(resolve)); active = false; finishWrite(); await transactional;
-  assert.equal(writes, 1, 'cancel after dispatched write rolls back before publication'); assert.equal(rollbacks, 1);
-  console.log('background-daily-persistence: PASS (late cancellation at final repository-write boundary)');
+  assert.equal(writes, 1, 'cancel after dispatched write rolls back before publication'); assert.equal(rollbacks, 2);
+  active = true; existing = true; finishQuery = undefined;
+  const refreshing = Repo.upsert(1, '100000001', { currentResin: 175 }, async () => active);
+  while (!finishQuery) await new Promise(resolve => setImmediate(resolve)); finishQuery(); await refreshing;
+  assert.equal(updated.current_resin, 175);
+  assert.equal(Object.keys(updated).some(key => key.includes('threshold') || key === 'notify_flags'), false,
+    'cache refresh cannot overwrite a threshold or notification toggle saved concurrently');
+  console.log('background-daily-persistence: PASS (cancellation boundaries and threshold preservation)');
 })().catch(error => { console.error(error); process.exitCode = 1; });

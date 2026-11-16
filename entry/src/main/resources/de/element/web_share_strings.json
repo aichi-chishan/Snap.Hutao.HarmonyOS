@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "ui_web_share_title",
+      "value": "Teilen-Speicher-Modus"
+    },
+    {
+      "name": "ui_web_share_description",
+      "value": "Wähle den Modus zum Speichern des Bildes nach dem Klicken auf die Schaltfläche „Teilen“"
+    },
+    {
+      "name": "ui_web_share_copy",
+      "value": "In die Zwischenablage kopieren"
+    },
+    {
+      "name": "ui_web_share_file",
+      "value": "Als Datei speichern"
+    }
+  ]
+}

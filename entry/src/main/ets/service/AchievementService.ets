@@ -8,6 +8,7 @@ import { util } from '@kit.ArkTS';
 import { AppContextProvider } from '../common/AppContext';
 import { AchievementRepo } from '../data/repo/AchievementRepo';
 import { WikiMetaService } from './WikiMetaService';
+import { LocalizedGameDataService } from './LocalizedGameDataService';
 import {
   AchievementArchive,
   AchievementCategory,
@@ -36,10 +37,29 @@ export class UiafImportResult {
   message: string = '';
 }
 
+export class AchievementRecentCompletion {
+  entry: AchievementEntry;
+  /** 与成就页一致：未知时间及 UIAF 哨兵归零，只用于展示和排序。 */
+  timestamp: number;
+
+  constructor(entry: AchievementEntry, timestamp: number) {
+    this.entry = entry;
+    this.timestamp = timestamp > 0 && timestamp < 253402271999 ? timestamp : 0;
+  }
+}
+
+/** 首页每个档案的一次性本地统计快照，翻页时直接读取。 */
+export class AchievementArchiveSummary {
+  archive: AchievementArchive = new AchievementArchive();
+  stats: AchievementStats = new AchievementStats();
+  recent: AchievementRecentCompletion[] = [];
+}
+
 export class AchievementService {
   private static categories: AchievementCategory[] | undefined = undefined;
   private static idIndex: Map<number, AchievementEntry> = new Map();
   private static metadataVersion: string = '';
+  private static loading: Promise<AchievementCategory[]> | undefined = undefined;
 
   /** 分类图标池（rawfile/icons/AchievementIcon 已有文件；paimon 分类按序循环映射） */
   private static readonly CATEGORY_ICONS: string[] = [
@@ -59,30 +79,69 @@ export class AchievementService {
     return AchievementService.CATEGORY_ICONS[catId % AchievementService.CATEGORY_ICONS.length];
   }
 
-  /** 确保存在默认档案（首次进入成就页时创建并选中） */
-  static async ensureDefaultArchive(): Promise<AchievementArchive[]> {
-    let archives: AchievementArchive[] = await AchievementRepo.getAllArchives();
-    if (archives.length === 0) {
-      const created: AchievementArchive = await AchievementRepo.createArchive('默认档案');
-      await AchievementRepo.selectArchive(created.id);
-      created.isSelected = true;
-      archives = [created];
+  static getArchives(): Promise<AchievementArchive[]> {
+    return AchievementRepo.getAllArchives();
+  }
+
+  static async createArchive(name: string): Promise<void> {
+    const archives: AchievementArchive[] = await AchievementRepo.getAllArchives();
+    if (archives.some((archive: AchievementArchive): boolean => archive.name === name)) {
+      throw new Error('已存在同名档案');
     }
-    return archives;
+    const archive: AchievementArchive = await AchievementRepo.createArchive(name);
+    await AchievementService.selectArchive(archive.id);
+  }
+
+  static async selectArchive(id: number): Promise<void> {
+    await AchievementRepo.selectArchive(id);
+    AchievementService.publishDataChange();
+  }
+
+  static async deleteArchive(id: number): Promise<void> {
+    await AchievementRepo.deleteArchive(id);
+    const archives: AchievementArchive[] = await AchievementRepo.getAllArchives();
+    if (archives.length > 0) { await AchievementRepo.selectArchive(archives[0].id); }
+    AchievementService.publishDataChange();
+  }
+
+  static getRecords(archiveId: number): Promise<Map<number, AchievementRecord>> {
+    return AchievementRepo.getRecords(archiveId);
+  }
+
+  private static publishDataChange(): void {
+    const revision: number = AppStorage.get<number>('achievementDataVersion') ?? 0;
+    AppStorage.setOrCreate<number>('achievementDataVersion', revision + 1);
   }
 
   /** 元数据分类列表（官方包优先 → 远端 paimon 遗留 → rawfile paimon 兜底；进程内缓存一次） */
   static async getCategories(): Promise<AchievementCategory[]> {
-    const version: string = GameDataService.getInstance().remoteVersion();
+    while (AchievementService.loading !== undefined) {
+      const pending: Promise<AchievementCategory[]> = AchievementService.loading;
+      await pending;
+    }
+    const locale: string = LocalizedGameDataService.current();
+    const version: string = `${GameDataService.getInstance().remoteVersion()}:${locale}`;
     if (AchievementService.categories !== undefined && AchievementService.metadataVersion === version) {
       return AchievementService.categories;
     }
+    const loading: Promise<AchievementCategory[]> = AchievementService.loadCategories(locale);
+    AchievementService.loading = loading;
+    try {
+      await loading;
+      AchievementService.metadataVersion = version;
+    } finally {
+      AchievementService.loading = undefined;
+    }
+    return locale === LocalizedGameDataService.current()
+      ? AchievementService.categories ?? [] : AchievementService.getCategories();
+  }
+
+  private static async loadCategories(locale: string): Promise<AchievementCategory[]> {
     AchievementService.categories = undefined;
-    AchievementService.metadataVersion = version;
     // 1) 官方元数据（rawfile/metadata，对齐 Snap.Metadata：1844 条 > paimon-moe 社区集 1548 条）
     try {
-      const achText: string = await GameDataService.readMetadataFile('Achievement.json');
-      const goalText: string = await GameDataService.readMetadataFile('AchievementGoal.json');
+      const achText: string = await LocalizedGameDataService.readMetadataFile('Achievement.json', locale);
+      const goalText: string = await LocalizedGameDataService.readMetadataFile('AchievementGoal.json', locale);
       AchievementService.parseOfficialMetadata(achText, goalText);
       if ((AchievementService.idIndex?.size ?? 0) > 0) {
         // 旧官方包省略 IsDailyQuest；仅用社区已有 commissions 标记按 ID 补齐。
@@ -137,6 +196,7 @@ export class AchievementService {
       const cat: AchievementCategory = new AchievementCategory();
       cat.id = Number(g['Id'] ?? 0);
       cat.name = (g['Name'] as string) ?? '';
+      cat.canonicalName = String(g['canonicalName'] ?? cat.name);
       cat.icon = (g['Icon'] as string) ?? '';
       catById.set(cat.id, cat);
     }
@@ -146,6 +206,7 @@ export class AchievementService {
       const entry: AchievementEntry = new AchievementEntry();
       entry.id = Number(a['Id'] ?? 0);
       entry.name = (a['Title'] as string) ?? '';
+      entry.canonicalName = String(a['canonicalName'] ?? entry.name);
       entry.desc = WikiMetaService.cleanText((a['Description'] as string) ?? '');
       const reward: Record<string, Object> | undefined = a['FinishReward'] as Record<string, Object> | undefined;
       entry.reward = reward !== undefined && reward !== null
@@ -213,6 +274,7 @@ export class AchievementService {
       const cat: AchievementCategory = new AchievementCategory();
       cat.id = Number(key);
       cat.name = (catObj['name'] as string) ?? '';
+      cat.canonicalName = cat.name;
       cat.icon = AchievementService.categoryIcon(cat.id);
       const rawEntries: Object[] = (catObj['achievements'] as Object[]) ?? [];
       let groupSeq: number = 0;
@@ -229,6 +291,7 @@ export class AchievementService {
           const entry: AchievementEntry = new AchievementEntry();
           entry.id = Number(st['id'] ?? 0);
           entry.name = (st['name'] as string) ?? '';
+          entry.canonicalName = entry.name;
           entry.desc = (st['desc'] as string) ?? '';
           entry.reward = Number(st['reward'] ?? 0);
           entry.ver = (st['ver'] as string) ?? '';
@@ -283,9 +346,10 @@ export class AchievementService {
   }
 
   /** 完成度统计（总览） */
-  static async getOverallStats(archiveId: number): Promise<AchievementStats> {
-    const cats: AchievementCategory[] = await AchievementService.getCategories();
-    const records: Map<number, AchievementRecord> = await AchievementRepo.getRecords(archiveId);
+  static async getOverallStats(archiveId: number, snapshot?: Map<number, AchievementRecord>,
+    categories?: AchievementCategory[]): Promise<AchievementStats> {
+    const cats: AchievementCategory[] = categories ?? await AchievementService.getCategories();
+    const records: Map<number, AchievementRecord> = snapshot ?? await AchievementRepo.getRecords(archiveId);
     const stats: AchievementStats = new AchievementStats();
     for (const cat of cats) {
       for (const e of cat.entries) {
@@ -300,10 +364,40 @@ export class AchievementService {
     return stats;
   }
 
+  /** 所有档案的完成度和最近两项成就共享每档一次记录读取。 */
+  static async getArchiveSummaries(isCurrent: () => boolean = (): boolean => true): Promise<AchievementArchiveSummary[]> {
+    const archives: AchievementArchive[] = await AchievementService.getArchives();
+    if (archives.length === 0 || !isCurrent()) { return []; }
+    const categories: AchievementCategory[] = await AchievementService.getCategories();
+    const entries: Map<number, AchievementEntry> = new Map<number, AchievementEntry>();
+    for (const category of categories) {
+      for (const entry of category.entries) { entries.set(entry.id, entry); }
+    }
+    const summaries: AchievementArchiveSummary[] = [];
+    for (const archive of archives) {
+      if (!isCurrent()) { return []; }
+      const records: Map<number, AchievementRecord> = await AchievementService.getRecords(archive.id);
+      const summary: AchievementArchiveSummary = new AchievementArchiveSummary();
+      summary.archive = archive;
+      summary.stats = await AchievementService.getOverallStats(archive.id, records, categories);
+      const recent: AchievementRecentCompletion[] = [];
+      for (const record of records.values()) {
+        const entry: AchievementEntry | undefined = entries.get(record.achId);
+        if (entry === undefined || !AchievementRecord.isDone(record)) { continue; }
+        recent.push(new AchievementRecentCompletion(entry, record.timestamp));
+      }
+      recent.sort((left: AchievementRecentCompletion, right: AchievementRecentCompletion): number =>
+        right.timestamp - left.timestamp || left.entry.id - right.entry.id);
+      summary.recent = recent.slice(0, 2);
+      summaries.push(summary);
+    }
+    return summaries;
+  }
+
   /** 分类维度统计 */
-  static async getCategoryStats(archiveId: number): Promise<CategoryStats[]> {
+  static async getCategoryStats(archiveId: number, snapshot?: Map<number, AchievementRecord>): Promise<CategoryStats[]> {
     const cats: AchievementCategory[] = await AchievementService.getCategories();
-    const records: Map<number, AchievementRecord> = await AchievementRepo.getRecords(archiveId);
+    const records: Map<number, AchievementRecord> = snapshot ?? await AchievementRepo.getRecords(archiveId);
     const list: CategoryStats[] = [];
     for (const cat of cats) {
       const cs: CategoryStats = new CategoryStats();
@@ -325,8 +419,13 @@ export class AchievementService {
   static async toggle(archiveId: number, achId: number): Promise<boolean> {
     const records: Map<number, AchievementRecord> = await AchievementRepo.getRecords(archiveId);
     const done: boolean = !AchievementRecord.isDone(records.get(achId));
-    await AchievementRepo.setRecord(archiveId, achId, done, Math.floor(Date.now() / 1000));
+    await AchievementService.setCompleted(archiveId, achId, done);
     return done;
+  }
+
+  static async setCompleted(archiveId: number, achId: number, done: boolean): Promise<void> {
+    await AchievementRepo.setRecord(archiveId, achId, done, Math.floor(Date.now() / 1000));
+    AchievementService.publishDataChange();
   }
 
   /** UIAF v1.1 导出（JSON 字符串） */
@@ -354,6 +453,7 @@ export class AchievementService {
     const existing: Map<number, AchievementRecord> = await AchievementRepo.getRecords(archiveId);
     const records: AchievementRecord[] = UiafCodec.merge(existing, incoming, strategy);
     await AchievementRepo.replaceRecords(archiveId, records);
+    AchievementService.publishDataChange();
     result.ok = true;
     result.fileCount = incoming.length;
     result.mergedTotal = records.length;

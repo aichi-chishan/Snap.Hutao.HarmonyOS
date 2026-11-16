@@ -9,7 +9,7 @@ import { PageBackdrop } from '../components/PageBackdrop';
 import { MetaIcon } from '../components/MetaIcon';
 import { EmptyState } from '../components/EmptyState';
 import { SimpleDataSource } from '../components/SimpleDataSource';
-import { CardSurfaceModifier } from '../common/UiSurface';
+import { AppButtonModifier, CardSurfaceModifier, SelectMaterialModifier, UiSurface } from '../common/UiSurface';
 
 /** 期次横幅图缓存命中（url → 沙盒本地路径） */
 class WishBannerPath {
@@ -20,17 +20,22 @@ class WishBannerPath {
 @Entry
 @Component
 export struct WishHistoryPage {
+  @StorageProp('helpLocaleVersion') @Watch('onLocaleChanged') localeVersion: number = 0;
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   @Prop embedMode: boolean = false;
+  @Prop showHeader: boolean = true;
   @StorageProp('topAvoidVp') topAvoidVp: number = 0;
   @StorageProp('isDarkMode') isDark: boolean = false;
   @State vm: WishHistoryViewModel = new WishHistoryViewModel();
   @State isWide: boolean = false;
   @State selected: WishHistoryItem | undefined = undefined;
   @State bannerPaths: WishBannerPath[] = [];
+  @State appliedLocaleVersion: number = 0;
   private source: SimpleDataSource<WishHistoryItem> = new SimpleDataSource<WishHistoryItem>([]);
   private historySource: SimpleDataSource<WishHistoryOccurrence> = new SimpleDataSource<WishHistoryOccurrence>([]);
   private categoryOptions: SelectOption[] = [
-    { value: '五星角色' }, { value: '四星角色' }, { value: '五星武器' }, { value: '四星武器' }
+    { value: $r('app.string.ui_gacha_log_orange_avatar_countdown') }, { value: $r('app.string.ui_gacha_log_purple_avatar_countdown') }, { value: $r('app.string.ui_gacha_log_orange_weapon_countdown') }, { value: $r('app.string.ui_gacha_log_purple_weapon_countdown') }
   ];
   private attached: boolean = false;
   private pageSequence: number = 0;
@@ -59,18 +64,23 @@ export struct WishHistoryPage {
     if (this.refreshTimer >= 0) { clearInterval(this.refreshTimer); this.refreshTimer = -1; }
   }
 
-  private async reload(): Promise<void> {
+  private onLocaleChanged(): void { this.reload(false); }
+
+  private async reload(preloadBanners: boolean = true): Promise<void> {
     if (!this.attached) { return; }
     const sequence: number = ++this.pageSequence;
     const accepted: boolean = await this.vm.load();
-    if (accepted && this.attached && sequence === this.pageSequence) { this.syncSources(); }
+    if (accepted && this.attached && sequence === this.pageSequence) {
+      this.appliedLocaleVersion = this.localeVersion;
+      this.syncSources(preloadBanners);
+    }
   }
 
-  private syncSources(): void {
+  private syncSources(preloadBanners: boolean = true): void {
     this.selected = this.vm.selected();
     this.source.notifyDataReload(this.vm.items);
     this.historySource.notifyDataReload(this.selected?.histories ?? []);
-    this.preloadBanners(this.selected);
+    if (preloadBanners) { this.preloadBanners(this.selected); }
   }
 
   /**
@@ -145,7 +155,7 @@ export struct WishHistoryPage {
     const params: WishHistoryWikiParams = { itemId: item.id };
     router.pushUrl({ url: item.iconCategory === 'AvatarIcon' ? 'pages/WikiAvatarPage' : 'pages/WikiWeaponPage',
       params: params }).catch(() => {
-      if (this.attached) { this.getUIContext().getPromptAction().showToast({ message: '无法打开图鉴，请稍后重试' }); }
+      if (this.attached) { this.getUIContext().getPromptAction().showToast({ systemMaterial: UiSurface.dialogMaterial(), message: '无法打开图鉴，请稍后重试' }); }
     });
   }
 
@@ -171,21 +181,21 @@ export struct WishHistoryPage {
   @Builder
   controls() {
     Column({ space: 8 }) {
-      Select(this.categoryOptions)
+      Select(this.categoryOptions).attributeModifier(new SelectMaterialModifier(this.surfaceMode, this.surfaceLevel))
         .selected(this.vm.category)
         .value(this.categoryOptions[this.vm.category].value)
         .height(44)
         .width('100%')
         .fontColor($r('app.color.text_primary'))
-        .attributeModifier(new CardSurfaceModifier())
+
         .hoverEffect(HoverEffect.Highlight)
-        .accessibilityText('筛选五星角色、四星角色、五星武器或四星武器')
+        .accessibilityText($r('app.string.ui_filter'))
         .onSelect((index: number) => { this.filter(index, this.vm.keyword); })
       Search({ value: this.vm.keyword, placeholder: '搜索名称或物品 ID' })
         .height(44)
         .maxLength(80)
         .fontColor($r('app.color.text_primary'))
-        .attributeModifier(new CardSurfaceModifier())
+        .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
         .onChange((value: string) => { this.filter(this.vm.category, value); })
       Text(`距上次 UP 结束最久优先 · ${this.vm.items.length} 项`)
         .fontSize(12)
@@ -215,9 +225,9 @@ export struct WishHistoryPage {
     }
     .width('100%')
     .constraintSize({ minHeight: 80 })
-    .borderRadius(12)
     .backgroundColor(this.vm.selectedId === item.id ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
-    .border({ width: 1, color: this.vm.selectedId === item.id ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
+    .border({ width: 1, color: this.vm.selectedId === item.id ? $r('app.color.app_primary') : $r('app.color.card_stroke'), radius: 12 })
+    .borderRadius(12)
     .hoverEffect(HoverEffect.Highlight)
     .accessibilityText(`${item.name}，${WishHistoryService.countdown(item, this.vm.snapshot.asOf)}，查看 ${item.histories.length} 次 UP 历史`)
     .onClick(() => { this.select(item); })
@@ -233,7 +243,7 @@ export struct WishHistoryPage {
         List({ space: 8 }) {
           LazyForEach(this.source, (item: WishHistoryItem) => {
             ListItem() { this.itemRow(item) }
-          }, (item: WishHistoryItem): string => `${item.id}_${this.vm.snapshot.asOf}_${this.vm.selectedId === item.id}`)
+          }, (item: WishHistoryItem): string => `${item.id}_${this.vm.snapshot.asOf}_${this.appliedLocaleVersion}_${this.vm.selectedId === item.id}`)
         }.width('100%').layoutWeight(1).scrollBar(BarState.Auto).cachedCount(5)
       }
     }.width('100%').height('100%')
@@ -274,7 +284,7 @@ export struct WishHistoryPage {
           .fontSize(12).fontColor($r('app.color.text_secondary'))
       }
     }.width('100%').padding(14).alignItems(HorizontalAlign.Start)
-      .borderRadius(12).attributeModifier(new CardSurfaceModifier())
+      .borderRadius(12).attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
       .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
@@ -284,8 +294,9 @@ export struct WishHistoryPage {
       if (this.selected !== undefined) {
         Row({ space: 10 }) {
           if (!this.isWide) {
-            Button('返回列表').height(44).hoverEffect(HoverEffect.Highlight)
-              .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
+            Button('返回列表', { type: ButtonType.Normal })
+              .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+              .height(44)
               .onClick(() => { this.clearSelection(); })
           }
           Text(this.selected.name).fontSize(20).fontWeight(FontWeight.Bold)
@@ -296,9 +307,9 @@ export struct WishHistoryPage {
         Text(`${this.selected.histories.length} 次 UP · 相同物品在相同起止日期的卡池合并计数`)
           .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
         if (this.selected.known) {
-          Button(this.selected.iconCategory === 'AvatarIcon' ? '打开角色图鉴' : '打开武器图鉴')
-            .height(44).width('100%').hoverEffect(HoverEffect.Highlight)
-            .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
+          Button(this.selected.iconCategory === 'AvatarIcon' ? '打开角色图鉴' : '打开武器图鉴', { type: ButtonType.Normal })
+            .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
+            .height(44)
             .onClick(() => { this.openWiki(); })
         } else {
           Text('本地尚无该物品资料，保留原始 ID；更新游戏数据后可查看名称和图鉴')
@@ -307,7 +318,8 @@ export struct WishHistoryPage {
         List({ space: 10 }) {
           LazyForEach(this.historySource, (history: WishHistoryOccurrence) => {
             ListItem() { this.historyRow(history) }
-          }, (history: WishHistoryOccurrence): string => `${this.vm.selectedId}_${history.from}_${history.to}_${this.vm.snapshot.asOf}`)
+          }, (history: WishHistoryOccurrence): string =>
+            `${this.vm.selectedId}_${history.from}_${history.to}_${this.vm.snapshot.asOf}_${this.appliedLocaleVersion}`)
         }.width('100%').layoutWeight(1).scrollBar(BarState.Auto).cachedCount(5)
       } else {
         EmptyState({ text: '选择角色或武器，查看历次 UP 卡池' })
@@ -319,10 +331,13 @@ export struct WishHistoryPage {
     Stack() {
       PageBackdrop({ embedMode: this.embedMode })
       Column({ space: 10 }) {
-        PageHeader({ title: '祈愿 UP 历史', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
-          Button('刷新').height(44).enabled(!this.vm.loading).hoverEffect(HoverEffect.Highlight)
-            .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
-            .onClick(() => { this.reload(); })
+        if (this.showHeader) {
+          PageHeader({ title: '祈愿 UP 历史', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
+            Button($r('app.string.common_refresh'), { type: ButtonType.Normal })
+              .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel))
+              .height(44).enabled(!this.vm.loading)
+              .onClick(() => { this.reload(); })
+          }
         }
         Column({ space: 5 }) {
           Text(this.metadataText()).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
@@ -340,8 +355,9 @@ export struct WishHistoryPage {
         } else if (this.vm.message.length > 0) {
           Column({ space: 12 }) {
             Text(this.vm.message).fontColor($r('app.color.text_secondary')).textAlign(TextAlign.Center)
-            Button('重试').height(44).hoverEffect(HoverEffect.Highlight)
-              .fontColor($r('app.color.app_primary_text')).backgroundColor($r('app.color.app_primary_bg'))
+            Button($r('app.string.common_retry'), { type: ButtonType.Normal })
+              .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
+              .height(44)
               .onClick(() => { this.reload(); })
           }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).padding(24)
         } else if (this.isWide) {

@@ -77,7 +77,7 @@ export struct RiskVerifyDialog {
       // verifyVerification 用 CookieToken 系 cookie（对齐 Windows CardClient）
       const user = UserService.getInstance().getCurrentUser();
       const cookie: string = user !== undefined ? user.gameRecordCookie() : '';
-      const challenge: string = await RiskVerifier.verifyXrpcChallenge(cookie, input);
+      const challenge: string = await RiskVerifier.verifyXrpcChallenge(cookie, input, this.path);
       if (challenge.length === 0) {
         this.statusText = '换 challenge 失败，请重试';
         this.verifying = false;

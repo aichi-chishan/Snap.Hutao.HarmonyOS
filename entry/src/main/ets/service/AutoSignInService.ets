@@ -5,6 +5,8 @@ import { BackgroundTaskRepo } from '../data/repo/BackgroundTaskRepo';
 import { PreferencesStore } from '../data/prefs/PreferencesStore';
 import { AppContextProvider } from '../common/AppContext';
 import { RegionUtil, RetCodes } from '../common/Constants';
+import { Logger } from '../common/Logger';
+import { ServerTime } from '../common/ServerTime';
 import { HoyolabClient } from '../data/network/HoyolabClient';
 import { ApiResponse } from '../model/ApiResponse';
 import { User } from '../model/User';
@@ -17,22 +19,23 @@ class ForegroundSignInGuard implements BackgroundTaskGuard {
   private uid: string;
   private region: string;
   private epoch: number;
-  private revision: number;
+  private active: () => boolean;
   private deadline: number = Date.now() + BackgroundTaskPolicy.BUDGET_MS;
-  constructor(user: User, uid: string, region: string, epoch: number, revision: number) {
+  constructor(user: User, uid: string, region: string, epoch: number, active: () => boolean) {
     this.user = user; this.uid = uid; this.region = region; this.epoch = epoch;
-    this.revision = revision;
+    this.active = active;
+  }
+  private canRun(): boolean {
+    return this.active() && PreferencesStore.getAutoSignInEnabled() &&
+      PreferencesStore.getBackupJournal().length === 0 && Date.now() < this.deadline;
   }
   async isActive(): Promise<boolean> {
-    if (PreferencesStore.getBackupJournal().length > 0 || UserService.getInstance().sessionRevision() !== this.revision ||
-      !PreferencesStore.getAutoSignInEnabled() || Date.now() >= this.deadline ||
-      UserService.getInstance().getCurrentUser() !== this.user || PreferencesStore.getCurrentUid() !== this.uid) { return false; }
+    if (!this.canRun()) { return false; }
     if ((await BackgroundTaskRepo.get(BackgroundTaskKind.SIGN_IN)).epoch !== this.epoch) { return false; }
     const saved: User | undefined = await UserRepo.getUserById(this.user.id);
-    return saved !== undefined && BackgroundTaskPolicy.identity(saved) === BackgroundTaskPolicy.identity(this.user) &&
-      BackgroundTaskPolicy.owns(saved, this.uid, this.region) && UserService.getInstance().getCurrentUser() === this.user &&
-      PreferencesStore.getAutoSignInEnabled() && PreferencesStore.getCurrentUid() === this.uid &&
-      UserService.getInstance().sessionRevision() === this.revision && PreferencesStore.getBackupJournal().length === 0;
+    return this.canRun() && saved !== undefined &&
+      BackgroundTaskPolicy.identity(saved) === BackgroundTaskPolicy.identity(this.user) &&
+      BackgroundTaskPolicy.owns(saved, this.uid, this.region);
   }
 }
 
@@ -40,9 +43,71 @@ export class AutoSignInService {
   private static instance: AutoSignInService = new AutoSignInService();
   static getInstance(): AutoSignInService { return AutoSignInService.instance; }
 
+  private foreground: boolean = false;
+  private foregroundGeneration: number = 0;
+  private dailyTimer: number = -1;
+  private nextDailyRun: number = 0;
+
   async bootstrapAutoSignIn(): Promise<void> {
     if (!PreferencesStore.getAutoSignInEnabled()) { return; }
     await this.runOnce(PreferencesStore.getCurrentUid());
+  }
+
+  setForeground(foreground: boolean): void {
+    if (this.foreground === foreground) { return; }
+    this.foreground = foreground;
+    this.foregroundGeneration++;
+    if (foreground) {
+      this.scheduleDaily();
+    } else if (this.dailyTimer >= 0) {
+      clearTimeout(this.dailyTimer);
+      this.dailyTimer = -1;
+    }
+  }
+
+  private scheduleDaily(): void {
+    const now: number = Date.now();
+    if (this.nextDailyRun === 0) {
+      const dayMs: number = 86400000;
+      const offsetMs: number = ServerTime.offsetHours('cn_gf01') * 3600000;
+      const midnight: number = (Math.floor((now + offsetMs) / dayMs) + 1) * dayMs - offsetMs;
+      this.nextDailyRun = midnight + Math.floor(Math.random() * 60) * 1000;
+    }
+    this.dailyTimer = setTimeout((): void => {
+      this.dailyTimer = -1;
+      if (!this.foreground) { return; }
+      if (Date.now() < this.nextDailyRun) { this.scheduleDaily(); return; }
+      this.nextDailyRun = 0;
+      this.scheduleDaily();
+      this.runForAllUsers().catch(() => { Logger.warn('AutoSignInService', 'daily sign-in scan failed'); });
+    }, Math.max(0, this.nextDailyRun - now));
+  }
+
+  /** The scheduled sweep uses saved roles directly and never changes the selected account. */
+  private async runForAllUsers(): Promise<void> {
+    const service: UserService = UserService.getInstance();
+    const revision: number = service.sessionRevision();
+    const generation: number = this.foregroundGeneration;
+    const active = (): boolean => this.foreground && this.foregroundGeneration === generation &&
+      service.sessionRevision() === revision && !service.isSessionTransitionPending() &&
+      PreferencesStore.getAutoSignInEnabled() && PreferencesStore.getBackupJournal().length === 0;
+    if (!active()) { return; }
+    const epoch: number = (await BackgroundTaskRepo.get(BackgroundTaskKind.SIGN_IN)).epoch;
+    const users: User[] = await UserRepo.getAllUsers();
+    for (const user of users) {
+      if (!user.hasCookie()) { continue; }
+      for (const role of BackgroundTaskPolicy.mainlandRoles(user)) {
+        if (!active()) { return; }
+        const guard: ForegroundSignInGuard = new ForegroundSignInGuard(user, role.gameUid, role.region, epoch, active);
+        await this.runBackground(user, role.gameUid, role.region, guard);
+      }
+    }
+  }
+
+  private currentGuard(user: User, uid: string, region: string, epoch: number, revision: number): ForegroundSignInGuard {
+    const service: UserService = UserService.getInstance();
+    return new ForegroundSignInGuard(user, uid, region, epoch, (): boolean =>
+      service.sessionRevision() === revision && service.getCurrentUser() === user && PreferencesStore.getCurrentUid() === uid);
   }
 
   /** Foreground bootstrap shares the durable per-account/UID lease with native work. */
@@ -55,16 +120,16 @@ export class AutoSignInService {
     try {
       await BackgroundTaskRepo.init(AppContextProvider.getAppContext());
       const epoch: number = (await BackgroundTaskRepo.get(BackgroundTaskKind.SIGN_IN)).epoch;
-      await this.runBackground(user, uid, region, new ForegroundSignInGuard(user, uid, region, epoch, revision));
+      await this.runBackground(user, uid, region, this.currentGuard(user, uid, region, epoch, revision));
     } catch (e) {
-      // No UI, token exchange, permission request, credential or UID logging from automatic work.
+      // Automatic work stays noninteractive and keeps credentials out of logs.
     }
   }
 
   /** Explicit settings action; clears only this owner's current server-day block, never opens auth UI. */
   async retryCurrent(): Promise<BackgroundTaskResult> {
     if (!PreferencesStore.getAutoSignInEnabled()) {
-      return BackgroundTaskResult.of('disabled', '请先开启启动自动签到');
+      return BackgroundTaskResult.of('disabled', '请先开启自动签到');
     }
     const revision: number = UserService.getInstance().sessionRevision();
     const user: User | undefined = UserService.getInstance().getCurrentUser();
@@ -76,7 +141,7 @@ export class AutoSignInService {
     try {
       await BackgroundTaskRepo.init(AppContextProvider.getAppContext());
       const epoch: number = (await BackgroundTaskRepo.get(BackgroundTaskKind.SIGN_IN)).epoch;
-      const guard: ForegroundSignInGuard = new ForegroundSignInGuard(user, uid, region, epoch, revision);
+      const guard: ForegroundSignInGuard = this.currentGuard(user, uid, region, epoch, revision);
       if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '账号或数据状态已变化，请稍后重试'); }
       const state: BackgroundTaskState = new BackgroundTaskState();
       state.kind = BackgroundTaskKind.SIGN_IN; state.userId = user.id; state.uid = uid; state.region = region;
@@ -113,9 +178,26 @@ export class AutoSignInService {
   }
 
   private async signOwned(user: User, uid: string, region: string, guard: BackgroundTaskGuard): Promise<BackgroundTaskResult> {
-    if (!BackgroundTaskPolicy.owns(user, uid, region) || user.cookieToken.length === 0 || user.gameRecordCookie().length === 0) {
+    if (!BackgroundTaskPolicy.owns(user, uid, region)) {
       return BackgroundTaskResult.of('login_required', '请在应用内补齐登录凭据后重新排队');
     }
+    const missingCookie: boolean = user.cookieToken.length === 0 || user.gameRecordCookie().length === 0;
+    if (missingCookie && !await this.renewCookie(user, guard)) {
+      return BackgroundTaskResult.of('login_required', '请在应用内补齐登录凭据后重新排队');
+    }
+    const first: BackgroundTaskResult = await this.signAttempt(user, uid, region, guard);
+    if (!missingCookie && first.status === 'login_required' && await this.renewCookie(user, guard)) {
+      return this.signAttempt(user, uid, region, guard);
+    }
+    return first;
+  }
+
+  private async renewCookie(user: User, guard: BackgroundTaskGuard): Promise<boolean> {
+    if ((user.stoken.length === 0 && user.stokenV2.length === 0) || !await guard.isActive()) { return false; }
+    return UserService.getInstance().refreshCookieTokenForced(user, (): Promise<boolean> => guard.isActive());
+  }
+
+  private async signAttempt(user: User, uid: string, region: string, guard: BackgroundTaskGuard): Promise<BackgroundTaskResult> {
     if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
     const beforeDay: string = BackgroundTaskPolicy.day(region);
     const response: ApiResponse = await HoyolabClient.fetchSignInfo(uid, region, user.gameRecordCookie());

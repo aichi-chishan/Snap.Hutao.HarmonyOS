@@ -51,15 +51,29 @@ export class UserRepo {
   }
 
   static async deleteUser(id: number): Promise<void> {
-    const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('user_accounts');
-    predicates.equalTo('id', id);
-    await RelationalStoreHelper.delete('user_accounts', predicates);
-    // 级联删除角色
-    const rolePred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('user_game_roles');
-    rolePred.equalTo('user_id', id);
-    await RelationalStoreHelper.delete('user_game_roles', rolePred);
-    await TokenVault.removeCookie(id);
-    Logger.info(TAG, `deleted user ${id}`);
+    const previousCookie: string = await TokenVault.loadCookie(id, true);
+    const options: relationalStore.TransactionOptions = { transactionType: relationalStore.TransactionType.IMMEDIATE };
+    const transaction: relationalStore.Transaction = await RelationalStoreHelper.getStore().createTransaction(options);
+    let credentialRemoved: boolean = false;
+    try {
+      for (const table of ['user_game_roles', 'daily_notes', 'sign_in_info']) {
+        const child: relationalStore.RdbPredicates = new relationalStore.RdbPredicates(table);
+        child.equalTo('user_id', id);
+        await transaction.delete(child);
+      }
+      const account: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('user_accounts');
+      account.equalTo('id', id);
+      await transaction.delete(account);
+      await TokenVault.removeCookie(id, true);
+      credentialRemoved = true;
+      await transaction.commit();
+    } catch (e) {
+      await transaction.rollback();
+      if (credentialRemoved && previousCookie.length > 0) { await TokenVault.saveCookie(id, previousCookie); }
+      if (e instanceof Error) { throw e; }
+      throw new Error('删除账号失败，请重试');
+    }
+    Logger.info(TAG, 'deleted user');
     // 若删除的是当前账号，清 prefer
     if (PreferencesStore.getCurrentUserId() === id) {
       PreferencesStore.setCurrentUserId(0);
@@ -83,6 +97,7 @@ export class UserRepo {
   static async getAllUsers(): Promise<User[]> {
     const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('user_accounts');
     predicates.orderByDesc('created_at');
+    predicates.orderByDesc('id');
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(predicates);
     const list: User[] = [];
     try {
@@ -101,7 +116,7 @@ export class UserRepo {
     return list;
   }
 
-  static async getUserById(id: number): Promise<User | undefined> {
+  static async getUserById(id: number, strict: boolean = false): Promise<User | undefined> {
     const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('user_accounts');
     predicates.equalTo('id', id);
     const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(predicates);
@@ -114,7 +129,7 @@ export class UserRepo {
       rs.close();
     }
     if (u !== undefined) {
-      const cookie: string = await TokenVault.loadCookie(u.id);
+      const cookie: string = await TokenVault.loadCookie(u.id, strict);
       u.applyCookie(cookie);
       u.roles = await UserRepo.getRolesByUserId(u.id);
     }
@@ -123,14 +138,8 @@ export class UserRepo {
 
   /** 将某账号设为当前（清除其他账号 is_selected） */
   static async selectUser(id: number): Promise<void> {
-    // 先清除所有标记
-    const clearValues: relationalStore.ValuesBucket = { 'is_selected': 0 };
-    const clearPred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('user_accounts');
-    await RelationalStoreHelper.update('user_accounts', clearValues, clearPred);
-    const values: relationalStore.ValuesBucket = { 'is_selected': 1 };
-    const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('user_accounts');
-    pred.equalTo('id', id);
-    await RelationalStoreHelper.update('user_accounts', values, pred);
+    await RelationalStoreHelper.getStore().executeSql(
+      'UPDATE user_accounts SET is_selected = CASE WHEN id = ? THEN 1 ELSE 0 END', [id]);
     PreferencesStore.setCurrentUserId(id);
   }
 
@@ -156,25 +165,30 @@ export class UserRepo {
   // ================= 角色 CRUD =================
 
   static async upsertRoles(userId: number, roles: UserGameRole[]): Promise<void> {
-    // 清除旧角色
     const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('user_game_roles');
     pred.equalTo('user_id', userId);
-    await RelationalStoreHelper.delete('user_game_roles', pred);
-    // 插入新角色
-    for (let i = 0; i < roles.length; i++) {
-      const role: UserGameRole = roles[i];
-      const values: relationalStore.ValuesBucket = {
-        'user_id': userId,
-        'game_uid': role.gameUid,
-        'region': role.region,
-        'nickname': role.nickname,
-        'level': role.level,
-        'is_default': role.isDefault ? 1 : 0,
-        'is_chosen': role.isChosen ? 1 : 0,
-      };
-      await RelationalStoreHelper.insert('user_game_roles', values);
+    const options: relationalStore.TransactionOptions = { transactionType: relationalStore.TransactionType.IMMEDIATE };
+    const transaction: relationalStore.Transaction = await RelationalStoreHelper.getStore().createTransaction(options);
+    try {
+      await transaction.delete(pred);
+      for (const role of roles) {
+        const values: relationalStore.ValuesBucket = {
+          'user_id': userId,
+          'game_uid': role.gameUid,
+          'region': role.region,
+          'nickname': role.nickname,
+          'level': role.level,
+          'is_default': role.isDefault ? 1 : 0,
+          'is_chosen': role.isChosen ? 1 : 0,
+        };
+        await transaction.insert('user_game_roles', values);
+      }
+      await transaction.commit();
+    } catch (e) {
+      await transaction.rollback();
+      if (e instanceof Error) { throw e; }
+      throw new Error('保存角色列表失败，请重试');
     }
-    Logger.info(TAG, `upsert ${roles.length} roles for user ${userId}`);
   }
 
   static async getRolesByUserId(userId: number): Promise<UserGameRole[]> {
@@ -247,7 +261,7 @@ export class UserRepo {
     if (id <= 0) {
       return undefined;
     }
-    return UserRepo.getUserById(id);
+    return UserRepo.getUserById(id, true);
   }
 
   // ================= Token 密文存储 =================
@@ -257,10 +271,10 @@ export class UserRepo {
   }
 
   static async loadCookieFor(userId: number): Promise<string> {
-    return TokenVault.loadCookie(userId);
+    return TokenVault.loadCookie(userId, true);
   }
 
   static async removeCookieFor(userId: number): Promise<void> {
-    await TokenVault.removeCookie(userId);
+    await TokenVault.removeCookie(userId, true);
   }
 }

@@ -22,10 +22,6 @@ export class DailyNoteRepo {
   /** upsert（存在则更新数据+刷新时间，保留阈值/开关） */
   static async upsert(userId: number, uid: string, note: DailyNote,
     isCurrent?: () => Promise<boolean>): Promise<void> {
-    const existing: DailyNoteRecord | undefined = await DailyNoteRepo.get(userId, uid);
-    const flags: number = existing !== undefined ? existing.notifyFlags : 31;
-    const resinTh: number = existing !== undefined ? existing.resinNotifyThreshold : 120;
-    const homeTh: number = existing !== undefined ? existing.homeCoinNotifyThreshold : 1800;
     const values: relationalStore.ValuesBucket = {
       'user_id': userId,
       'uid': uid,
@@ -46,22 +42,11 @@ export class DailyNoteRepo {
       'transformer_json': JSON.stringify(note.transformer),
       'archon_json': JSON.stringify(note.archonQuests),
       'raw_json': note.rawJson,
-      'resin_notify_threshold': resinTh,
-      'home_coin_notify_threshold': homeTh,
-      'notify_flags': flags,
       'refresh_time': Date.now(),
     };
-    // 查询是否已存在
     const pred: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('daily_notes');
     pred.equalTo('user_id', userId);
     pred.equalTo('uid', uid);
-    const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(pred);
-    let hasRow: boolean = false;
-    try {
-      hasRow = rs.goToFirstRow();
-    } finally {
-      rs.close();
-    }
     if (isCurrent !== undefined) {
       if (!await isCurrent()) { return; }
       // Serialize guarded native writes against account deletion/backup replacement in this DB.
@@ -82,6 +67,13 @@ export class DailyNoteRepo {
         throw new Error('便笺缓存写入未完成');
       }
       return;
+    }
+    const rs: relationalStore.ResultSet = await RelationalStoreHelper.query(pred);
+    let hasRow: boolean = false;
+    try {
+      hasRow = rs.goToFirstRow();
+    } finally {
+      rs.close();
     }
     if (hasRow) {
       const up: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('daily_notes');
@@ -183,6 +175,8 @@ export class DailyNoteRepo {
       }
     }
     note.archonQuests = DailyNote.archonListFromJson(rs.getString(rs.getColumnIndex('archon_json')));
+    // 旧列中的空数组也可能来自缺失字段；完成状态需由原始接口中的显式空列表确认。
+    note.hasArchonQuestProgress = note.archonQuests.length > 0;
     const raw: string = rs.getString(rs.getColumnIndex('raw_json'));
     if (raw.length > 0) {
       try {

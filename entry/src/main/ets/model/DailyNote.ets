@@ -10,6 +10,8 @@ import { DateUtil } from '../common/DateUtil';
 
 /** 魔神任务章节（archon_quest_progress.list 项） */
 export class ArchonQuestChapter {
+  /** 接口章节 ID，与 Snap.Metadata Chapter.Id 对应。旧缓存缺失时保持 0。 */
+  id: number = 0;
   /** Ongoing / Finished / NotOpen（兼容 API 带 Status 前缀的形态） */
   status: string = '';
   /** 第X章 */
@@ -35,6 +37,34 @@ export class ArchonQuestChapter {
       return '尚未开启';
     }
     return '进行中';
+  }
+}
+
+/** 便笺展示需要的 AQ 元数据，顺序与上游 Chapter.json 一致。 */
+export class DailyNoteChapterMetadata {
+  id: number = 0;
+  numberText: string = '';
+  title: string = '';
+
+  static fromJson(value: Object): DailyNoteChapterMetadata[] {
+    if (!Array.isArray(value)) { throw new Error('魔神任务章节元数据格式不正确'); }
+    const chapters: DailyNoteChapterMetadata[] = [];
+    const ids: Set<number> = new Set<number>();
+    for (const item of value as Object[]) {
+      const row: Record<string, Object> = item as Record<string, Object>;
+      if (row['QuestType'] !== 0) { continue; }
+      const id: Object = row['Id'];
+      if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0 || ids.has(id)) {
+        throw new Error('魔神任务章节 ID 无效或重复');
+      }
+      const chapter: DailyNoteChapterMetadata = new DailyNoteChapterMetadata();
+      chapter.id = id;
+      chapter.numberText = typeof row['Number'] === 'string' ? row['Number'] as string : '';
+      chapter.title = typeof row['Title'] === 'string' ? row['Title'] as string : '';
+      ids.add(id);
+      chapters.push(chapter);
+    }
+    return chapters;
   }
 }
 
@@ -218,7 +248,9 @@ export class DailyNote {
 
   transformer: TransformerRecovery = new TransformerRecovery();
   dailyTask: DailyTaskStatus = new DailyTaskStatus();
-  /** 魔神任务进度（archon_quest_progress.list；空列表 = 全部完成，对齐 Windows IsArchonQuestFinished） */
+  /** 区分接口明确返回空列表与未提供任务数据。 */
+  hasArchonQuestProgress: boolean = false;
+  /** 魔神任务进度（接口明确返回空列表 = 全部完成）。 */
   archonQuests: ArchonQuestChapter[] = [];
 
   /** 刷新时间戳（本地） */
@@ -289,10 +321,12 @@ export class DailyNote {
     const aqp = obj['archon_quest_progress'] as Record<string, Object>;
     if (aqp !== undefined && aqp !== null) {
       const list = aqp['list'] as Array<Object>;
-      if (list !== undefined && list !== null) {
+      if (Array.isArray(list)) {
+        note.hasArchonQuestProgress = true;
         for (let i = 0; i < list.length; i++) {
           const q = list[i] as Record<string, Object>;
           const chapter: ArchonQuestChapter = new ArchonQuestChapter();
+          chapter.id = number(q['id'], 0);
           chapter.status = str(q['status']);
           chapter.chapterNum = str(q['chapter_num']);
           chapter.chapterTitle = str(q['chapter_title']);
@@ -303,7 +337,7 @@ export class DailyNote {
     return note;
   }
 
-  /** 从 prefs 持久化 JSON 还原魔神任务列表（DB 表 archon_json 列恒空，由 ViewModel 落 prefs） */
+  /** 从 archon_json / 旧版 prefs 还原章节，缺 ID 的旧记录不按标题猜测身份。 */
   static archonListFromJson(text: string): ArchonQuestChapter[] {
     const list: ArchonQuestChapter[] = [];
     if (text.length === 0) {
@@ -314,6 +348,7 @@ export class DailyNote {
       for (let i = 0; i < arr.length; i++) {
         const q = arr[i] as Record<string, Object>;
         const chapter: ArchonQuestChapter = new ArchonQuestChapter();
+        chapter.id = Number(q['id'] ?? 0);
         chapter.status = String(q['status'] ?? '');
         chapter.chapterNum = String(q['chapterNum'] ?? '');
         chapter.chapterTitle = String(q['chapterTitle'] ?? '');
@@ -327,23 +362,16 @@ export class DailyNote {
 
   // ---- 魔神任务（对齐 Windows DailyNoteArchonQuestView / DailyNote.IsArchonQuestFinished）----
 
-  /** 魔神任务是否全部完成：list 为空即全部完成（对齐 Windows） */
+  /** 只有接口明确返回空列表，才可确认全部完成。 */
   archonQuestFinished(): boolean {
-    return this.archonQuests.length === 0;
-  }
-
-  archonQuestFinishedCount(): number {
-    let n: number = 0;
-    for (const c of this.archonQuests) {
-      if (c.isFinished()) {
-        n++;
-      }
-    }
-    return n;
+    return this.hasArchonQuestProgress && this.archonQuests.length === 0;
   }
 
   /** 主文本：任务状态文案（全部完成/进行中/尚未开启） */
   archonQuestMainText(): string {
+    if (!this.hasArchonQuestProgress) {
+      return '暂无任务进度';
+    }
     if (this.archonQuests.length === 0) {
       return '全部完成';
     }
@@ -352,16 +380,14 @@ export class DailyNote {
 
   /** 副文本：'第X章 章节名' / '所有魔神任务已完成'（对齐 Windows FormattedChapter） */
   archonQuestSubText(): string {
+    if (!this.hasArchonQuestProgress) {
+      return '';
+    }
     if (this.archonQuests.length === 0) {
       return '所有魔神任务已完成';
     }
     const c: ArchonQuestChapter = this.archonQuests[0];
     return `${c.chapterNum} ${c.chapterTitle}`.trim();
-  }
-
-  /** 进度条总数（Max=任务章节数，Value=已完成数） */
-  archonQuestTotal(): number {
-    return Math.max(1, this.archonQuests.length);
   }
 
   // ---- 文本格式化（对齐 Windows DailyNote.cs FormattedX 属性）----

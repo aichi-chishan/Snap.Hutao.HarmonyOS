@@ -1,0 +1,1244 @@
+{
+  "string": [
+    {
+      "name": "ui_about_restart",
+      "value": "Sprache festlegen"
+    },
+    {
+      "name": "ui_account_insights_copied_json",
+      "value": "De-identified statistics copied to clipboard."
+    },
+    {
+      "name": "ui_account_insights_copy_json",
+      "value": "Copy de-identified statistics (JSON)"
+    },
+    {
+      "name": "ui_account_insights_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_account_insights_loading",
+      "value": "Loading saved records…"
+    },
+    {
+      "name": "ui_account_insights_missing_model",
+      "value": "Enter a model identifier."
+    },
+    {
+      "name": "ui_account_insights_no_account",
+      "value": "Select a game account and UID first."
+    },
+    {
+      "name": "ui_account_insights_no_records",
+      "value": "No saved records available for charting."
+    },
+    {
+      "name": "ui_account_insights_open",
+      "value": "History charts and AI insights"
+    },
+    {
+      "name": "ui_account_insights_unit_wish",
+      "value": "wishes"
+    },
+    {
+      "name": "ui_action_choose",
+      "value": "Auswählen"
+    },
+    {
+      "name": "ui_action_clear",
+      "value": "Leeren"
+    },
+    {
+      "name": "ui_action_clear_cache",
+      "value": "Cache leeren"
+    },
+    {
+      "name": "ui_action_close",
+      "value": "Schließen"
+    },
+    {
+      "name": "ui_action_continue",
+      "value": "Fortfahren"
+    },
+    {
+      "name": "ui_action_disable",
+      "value": "Deaktivieren"
+    },
+    {
+      "name": "ui_action_edit",
+      "value": "Bearbeiten"
+    },
+    {
+      "name": "ui_action_enable",
+      "value": "Aktivieren"
+    },
+    {
+      "name": "ui_action_restore",
+      "value": "Wiederherstellen"
+    },
+    {
+      "name": "ui_agent_page_label_delete_conversation",
+      "value": "Delete conversation"
+    },
+    {
+      "name": "ui_agent_page_label_model_profile",
+      "value": "Model"
+    },
+    {
+      "name": "ui_agent_page_label_model_provider_profile",
+      "value": "Model Provider Profile"
+    },
+    {
+      "name": "ui_agent_page_label_placeholder",
+      "value": "Type a message..."
+    },
+    {
+      "name": "ui_ai_approval",
+      "value": "Tool approval required"
+    },
+    {
+      "name": "ui_ai_continue",
+      "value": "Generierung fortsetzen"
+    },
+    {
+      "name": "ui_ai_conversation_actions",
+      "value": "Unterhaltungsaktionen"
+    },
+    {
+      "name": "ui_ai_copied_text",
+      "value": "In die Zwischenablage kopiert"
+    },
+    {
+      "name": "ui_ai_copy_error",
+      "value": "Fehler beim Öffnen der Zwischenablage"
+    },
+    {
+      "name": "ui_ai_copy_text",
+      "value": "Copy Text"
+    },
+    {
+      "name": "ui_ai_custom_api",
+      "value": "Eigene API"
+    },
+    {
+      "name": "ui_ai_device_generate",
+      "value": "Auf dem Gerät analysieren"
+    },
+    {
+      "name": "ui_ai_endpoint_placeholder",
+      "value": "Basis-URL (leer für Standard)"
+    },
+    {
+      "name": "ui_ai_initial_request",
+      "value": "Analyze my account performance, wish results and future priorities using the historical statistics in this chat."
+    },
+    {
+      "name": "ui_ai_key_placeholder",
+      "value": "API-Schlüssel (leer zum Beibehalten)"
+    },
+    {
+      "name": "ui_ai_mode",
+      "value": "KI-Analysemodus"
+    },
+    {
+      "name": "ui_ai_on_device",
+      "value": "KI auf dem Gerät"
+    },
+    {
+      "name": "ui_ai_privacy_body",
+      "value": "Beim Senden erhält der ausgewählte KI-Endpunkt die Unterhaltung und deidentifizierte Verlaufsstatistiken. Die App fügt keine UIDs, Cookies, ursprünglichen Objekt-IDs oder Datenbankdateien an. Unterhaltungen bleiben auf diesem Gerät. Das System speichert API-Schlüssel sicher. Werkzeuge benötigen deine Zustimmung."
+    },
+    {
+      "name": "ui_ai_privacy_title",
+      "value": "Before using third-party AI"
+    },
+    {
+      "name": "ui_ai_reasoning_completed",
+      "value": "Thought"
+    },
+    {
+      "name": "ui_ai_reasoning_in_progress",
+      "value": "Thinking"
+    },
+    {
+      "name": "ui_ai_return",
+      "value": "Zurück zum Gespräch"
+    },
+    {
+      "name": "ui_ai_select_conversation",
+      "value": "Gespräch auswählen"
+    },
+    {
+      "name": "ui_ai_workspace",
+      "value": "KI-Arbeitsbereich"
+    },
+    {
+      "name": "ui_announcement_redeem_code_label",
+      "value": "Vorschau-Live-Stream-Einlösungscode"
+    },
+    {
+      "name": "ui_avatar_property_score_algorithm",
+      "value": "Artefakt-Bewertungsalgorithmus"
+    },
+    {
+      "name": "ui_backpack_category_reliquary",
+      "value": "Artefakte"
+    },
+    {
+      "name": "ui_backpack_category_weapon",
+      "value": "Waffen"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_name_header",
+      "value": "Konfigurationsname"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_new_config",
+      "value": "Neue Konfiguration"
+    },
+    {
+      "name": "ui_backpack_sort_count",
+      "value": "Menge"
+    },
+    {
+      "name": "ui_backpack_sort_quality",
+      "value": "Qualität"
+    },
+    {
+      "name": "ui_base_value_slider_level",
+      "value": "Stufe"
+    },
+    {
+      "name": "ui_bg_choose_folder",
+      "value": "Ordner auswählen"
+    },
+    {
+      "name": "ui_bg_folder_picker_failed",
+      "value": "Hintergrundordner konnte nicht ausgewählt werden"
+    },
+    {
+      "name": "ui_bg_folder_saved",
+      "value": "Hintergrundordner aktualisiert"
+    },
+    {
+      "name": "ui_bg_folder_temporary",
+      "value": "Der Ordner ist nur in dieser Sitzung zugänglich"
+    },
+    {
+      "name": "ui_bg_none",
+      "value": "Keine"
+    },
+    {
+      "name": "ui_card_calendar_all_materials_hint",
+      "value": "Alle Material-Dungeons sind herausforderbar"
+    },
+    {
+      "name": "ui_card_sign_in_auto_sign_in",
+      "value": "Automatisch anmelden"
+    },
+    {
+      "name": "ui_card_sign_in_claim_re_sign_in_action",
+      "value": "Nachholen der Anmeldung"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_allow",
+      "value": "Allow"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_deny",
+      "value": "Deny"
+    },
+    {
+      "name": "ui_clear_filters",
+      "value": "Filter zurücksetzen"
+    },
+    {
+      "name": "ui_code_copied",
+      "value": "Einlösungscode erfolgreich kopiert"
+    },
+    {
+      "name": "ui_common_loading",
+      "value": "Wird geladen…"
+    },
+    {
+      "name": "ui_content_dialog_complete_primary_button_text",
+      "value": "Fertig"
+    },
+    {
+      "name": "ui_cultivation_add_project_action",
+      "value": "Neu"
+    },
+    {
+      "name": "ui_cultivation_material_list_world_level_title",
+      "value": "Weltrang"
+    },
+    {
+      "name": "ui_cultivation_navigate_action",
+      "value": "Gehe zu"
+    },
+    {
+      "name": "ui_daily_note_notification_setting",
+      "value": "Benachrichtigungseinstellungen"
+    },
+    {
+      "name": "ui_calendar_time_pending",
+      "value": "Termin wird noch bekannt gegeben"
+    },
+    {
+      "name": "ui_daily_note_refresh",
+      "value": "Sofort aktualisieren"
+    },
+    {
+      "name": "ui_daily_note_setting_auto_refresh",
+      "value": "Automatische Aktualisierung"
+    },
+    {
+      "name": "ui_desc_abyss",
+      "value": "Aktuelle und vorherige Phase"
+    },
+    {
+      "name": "ui_desc_account",
+      "value": "Konten und verknüpfte Figuren verwalten"
+    },
+    {
+      "name": "ui_desc_achievement",
+      "value": "Exportieren / Importieren / UIAF"
+    },
+    {
+      "name": "ui_desc_announcements",
+      "value": "Updates und Nachrichten"
+    },
+    {
+      "name": "ui_desc_backpack",
+      "value": "Waffen / Artefakte / UIIF"
+    },
+    {
+      "name": "ui_desc_banner_history",
+      "value": "Aktionsfiguren und -waffen"
+    },
+    {
+      "name": "ui_desc_calendar",
+      "value": "Events / Gebete / Check-ins"
+    },
+    {
+      "name": "ui_desc_challenge",
+      "value": "Solo / Koop / Bestzeiten"
+    },
+    {
+      "name": "ui_desc_character",
+      "value": "Charaktereigenschaften / Artefakte"
+    },
+    {
+      "name": "ui_desc_cultivation",
+      "value": "Materialliste / Materialstatistik"
+    },
+    {
+      "name": "ui_desc_daily_note",
+      "value": "Ursprüngliches Harz / Expeditionen / Benachrichtigung"
+    },
+    {
+      "name": "ui_desc_launch",
+      "value": "Startverknüpfungen"
+    },
+    {
+      "name": "ui_desc_ledger",
+      "value": "Monatliche Urgestein- und Mora-Aufzeichnungen"
+    },
+    {
+      "name": "ui_desc_passport",
+      "value": "Pass-Informationen"
+    },
+    {
+      "name": "ui_desc_settings",
+      "value": "Farbschema / Aktualisieren / Sprache"
+    },
+    {
+      "name": "ui_desc_sign_in",
+      "value": "Tägliche Check-in-Belohnungen"
+    },
+    {
+      "name": "ui_desc_theater",
+      "value": "Sternen-Herausforderungsmedaille / Ersatzcharaktere"
+    },
+    {
+      "name": "ui_desc_wiki_avatar",
+      "value": "Elemente und Fähigkeiten"
+    },
+    {
+      "name": "ui_desc_wiki_monster",
+      "value": "Monster-Elemente und -Fraktionen"
+    },
+    {
+      "name": "ui_desc_wiki_weapon",
+      "value": "Waffenwerte und Angriff"
+    },
+    {
+      "name": "ui_desc_wish",
+      "value": "Übersicht / Verlauf"
+    },
+    {
+      "name": "ui_exception_close",
+      "value": "Schließen"
+    },
+    {
+      "name": "ui_filter",
+      "value": "Filter"
+    },
+    {
+      "name": "ui_filter_count",
+      "value": "Filter (%d)"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_down",
+      "value": "Zweite Hälfte"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_up",
+      "value": "Erste Hälfte"
+    },
+    {
+      "name": "ui_gacha_log_orange_avatar_countdown",
+      "value": "Fünf-Sterne-Rollen"
+    },
+    {
+      "name": "ui_gacha_log_orange_weapon_countdown",
+      "value": "Fünf-Sterne-Waffen"
+    },
+    {
+      "name": "ui_gacha_log_purple_avatar_countdown",
+      "value": "Vier-Sterne-Rollen"
+    },
+    {
+      "name": "ui_gacha_log_purple_weapon_countdown",
+      "value": "Vier-Sterne-Waffen"
+    },
+    {
+      "name": "ui_gacha_log_switch_to_beyond_gacha_mode_header",
+      "value": "Gebet"
+    },
+    {
+      "name": "ui_gacha_pool_avatar_event",
+      "value": "Figuren-Aktionsgebet"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_event",
+      "value": "Eventgebet"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_permanent",
+      "value": "Echo der Begegnungen"
+    },
+    {
+      "name": "ui_gacha_pool_chronicled",
+      "value": "Chronik-Gebet"
+    },
+    {
+      "name": "ui_gacha_pool_novice",
+      "value": "Anfängergebet"
+    },
+    {
+      "name": "ui_gacha_pool_permanent",
+      "value": "Verwegen in den Landen"
+    },
+    {
+      "name": "ui_gacha_pool_weapon_event",
+      "value": "Göttliches Werk"
+    },
+    {
+      "name": "ui_grid_view",
+      "value": "Rasteransicht"
+    },
+    {
+      "name": "ui_history_charts",
+      "value": "Verlaufsdiagramme"
+    },
+    {
+      "name": "ui_home_greeting",
+      "value": "Reisender, willkommen in Teyvat!"
+    },
+    {
+      "name": "ui_home_greeting_count",
+      "value": "Du hast Snap Hutao %s Mal gestartet"
+    },
+    {
+      "name": "ui_home_greeting_rare",
+      "value": "Du hast recht, aber Snap Hutao wurde von DGP Studio entwickelt..."
+    },
+    {
+      "name": "ui_home_greeting_text_default",
+      "value": "Reisender, willkommen in Teyvat!"
+    },
+    {
+      "name": "ui_home_no_codes",
+      "value": "Keine Einlösecodes verfügbar"
+    },
+    {
+      "name": "ui_home_no_events",
+      "value": "Keine geplanten Events"
+    },
+    {
+      "name": "ui_home_recent",
+      "value": "Kommende Events und Gebete"
+    },
+    {
+      "name": "ui_hutao_passport_verify_code_action",
+      "value": "Verifizierungscode anfordern"
+    },
+    {
+      "name": "ui_info_bar_panel_contract_content",
+      "value": "Zusammenklappen"
+    },
+    {
+      "name": "ui_list_view",
+      "value": "Listenansicht"
+    },
+    {
+      "name": "ui_material_frosted",
+      "value": "Milchige Transparenz und weiche Schatten"
+    },
+    {
+      "name": "ui_material_system_glass",
+      "value": "Systemglas und immersive Beleuchtung"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_elec",
+      "value": "Elektro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_fire",
+      "value": "Pyro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_grass",
+      "value": "Dendro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_ice",
+      "value": "Cryo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_rock",
+      "value": "Geo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_water",
+      "value": "Hydro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_wind",
+      "value": "Anemo"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_blue",
+      "value": "3 Sterne"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_green",
+      "value": "2 Sterne"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_orange",
+      "value": "5 Sterne"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_purple",
+      "value": "4 Sterne"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_red",
+      "value": "Exklusiv für Event: 5 Sterne"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_white",
+      "value": "1 Stern"
+    },
+    {
+      "name": "ui_model_intrinsic_role_combat_difficulty_level_lunar",
+      "value": "Mondmodus"
+    },
+    {
+      "name": "ui_model_metadata_material_weapon_ascension_material",
+      "value": "Materialien für Waffenaufstieg"
+    },
+    {
+      "name": "ui_nav_announcements",
+      "value": "Spielankündigungen"
+    },
+    {
+      "name": "ui_nav_banner_history",
+      "value": "Bannerverlauf"
+    },
+    {
+      "name": "ui_navigation_collapse",
+      "value": "Navigation einklappen"
+    },
+    {
+      "name": "ui_navigation_expand",
+      "value": "Navigation ausklappen"
+    },
+    {
+      "name": "ui_option_selected",
+      "value": "Ausgewählt"
+    },
+    {
+      "name": "ui_option_unselected",
+      "value": "Nicht ausgewählt"
+    },
+    {
+      "name": "ui_plugin_setting_back_button",
+      "value": "Zurück"
+    },
+    {
+      "name": "ui_role_combat_avatar_trial_hint",
+      "value": "Testversion"
+    },
+    {
+      "name": "ui_role_combat_shortest",
+      "value": "Schnellste Aufführung"
+    },
+    {
+      "name": "ui_role_combat_splendour_buffs_header",
+      "value": "Strahlende Segnungen"
+    },
+    {
+      "name": "ui_role_combat_support",
+      "value": "Unterstützung"
+    },
+    {
+      "name": "ui_setting_apperance_first_day_of_week_header",
+      "value": "Erster Tag der Woche"
+    },
+    {
+      "name": "ui_setting_background_image_custom_folder_header",
+      "value": "Benutzerdefinierter Hintergrundbild-Ordner"
+    },
+    {
+      "name": "ui_setting_background_media_local_folder",
+      "value": "Lokales Zufallsvideo"
+    },
+    {
+      "name": "ui_setting_background_media_official_launcher_video",
+      "value": "Offizieller Launcher-Hintergrund"
+    },
+    {
+      "name": "ui_setting_background_video_is_looping_header",
+      "value": "In Schleife abspielen"
+    },
+    {
+      "name": "ui_setting_background_video_is_muted_header",
+      "value": "Stumm abspielen"
+    },
+    {
+      "name": "ui_setting_control_material_default",
+      "value": "Standard"
+    },
+    {
+      "name": "ui_setting_create_desktop_shortcut_action",
+      "value": "Erstellen"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_off",
+      "value": "Ausblenden"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_on",
+      "value": "Anzeigen"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_action",
+      "value": "Konfiguration"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_header",
+      "value": "Geetest-Verifizierungs-Endpunkt konfigurieren"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_description",
+      "value": "Sofort wirksam; wird nach Deaktivierung nicht mehr angezeigt"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_header",
+      "value": "Spielaktivitätskalender anzeigen"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_description",
+      "value": "Standardmäßig deaktiviert, sodass einige Inhalte wie nicht laufende Ereignisdaten nicht korrekt angezeigt werden"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_header",
+      "value": "Ob nicht laufende In-Game-Versionsaktivitäten angezeigt werden sollen"
+    },
+    {
+      "name": "ui_setting_home_card_description",
+      "value": "Verwalten Sie Karten im Dashboard der Startseite, ziehen Sie sie zur Neuanordnung"
+    },
+    {
+      "name": "ui_setting_hutao_passport_logout_action",
+      "value": "Abmelden"
+    },
+    {
+      "name": "ui_setting_key_shortcut_virtual_key_code_action",
+      "value": "Ansehen"
+    },
+    {
+      "name": "ui_settings_auto_sign_info",
+      "value": "Meldet beim Start die aktuelle UID an und beim Tageswechsel lokale CN-Figuren, solange die App läuft."
+    },
+    {
+      "name": "ui_settings_backup_credentials",
+      "value": "Die Sicherung enthält Anmeldedaten. Bewahren Sie sie sicher auf."
+    },
+    {
+      "name": "ui_settings_cache",
+      "value": "Medien- und Symbolcache"
+    },
+    {
+      "name": "ui_settings_cache_size",
+      "value": "Cache-Größe %s"
+    },
+    {
+      "name": "ui_settings_cancel_update",
+      "value": "Update abbrechen"
+    },
+    {
+      "name": "ui_settings_cancelling",
+      "value": "Wird abgebrochen…"
+    },
+    {
+      "name": "ui_settings_choose_video",
+      "value": "Videos auswählen"
+    },
+    {
+      "name": "ui_settings_configure",
+      "value": "Konfiguration"
+    },
+    {
+      "name": "ui_settings_data_next_launch",
+      "value": "Gewählte Spieldaten gelten beim nächsten Start."
+    },
+    {
+      "name": "ui_settings_data_source",
+      "value": "Datenquellen-URL"
+    },
+    {
+      "name": "ui_settings_delete_wish",
+      "value": "Alle Gebetsdaten löschen"
+    },
+    {
+      "name": "ui_settings_delete_wish_archive",
+      "value": "Gebetsarchiv löschen"
+    },
+    {
+      "name": "ui_settings_delete_wish_confirm",
+      "value": "Gebetsdaten aller UIDs löschen? Dies kann nicht rückgängig gemacht werden."
+    },
+    {
+      "name": "ui_settings_download_verify",
+      "value": "Herunterladen und prüfen"
+    },
+    {
+      "name": "ui_settings_export_backup",
+      "value": "Vollständige Sicherung exportieren"
+    },
+    {
+      "name": "ui_settings_feedback",
+      "value": "Feedback und Diagnose"
+    },
+    {
+      "name": "ui_settings_game_data",
+      "value": "Spieldaten-Updates"
+    },
+    {
+      "name": "ui_settings_geetest_help",
+      "value": "{0} steht für gt, {1} für challenge. Die GET-Antwort muss code: 0, challenge und validate zurückgeben. Für interaktive Prüfung leer lassen."
+    },
+    {
+      "name": "ui_settings_help",
+      "value": "Offline-Hilfe"
+    },
+    {
+      "name": "ui_settings_immersive_material",
+      "value": "Immersives Material"
+    },
+    {
+      "name": "ui_settings_local_backup_success",
+      "value": "Fertig"
+    },
+    {
+      "name": "ui_settings_manifest_help",
+      "value": "Manifest-URL speichern und dann nach Updates suchen."
+    },
+    {
+      "name": "ui_settings_material_level",
+      "value": "Stufe des immersiven Materials"
+    },
+    {
+      "name": "ui_settings_material_scope",
+      "value": "Materialstufen ändern sich sofort. Inhaltsflächen wirken mattiert. Unterstützte Steuerelemente nutzen den immersiven Systemeffekt."
+    },
+    {
+      "name": "ui_settings_no_wallpaper",
+      "value": "Kein Hintergrundbild ausgewählt"
+    },
+    {
+      "name": "ui_settings_no_wish_archives",
+      "value": "Keine Gebetsarchive. Aktualisieren oder importieren, um eines hinzuzufügen."
+    },
+    {
+      "name": "ui_settings_normal_material",
+      "value": "Standardmaterial"
+    },
+    {
+      "name": "ui_settings_not_logged_in",
+      "value": "Nicht angemeldet"
+    },
+    {
+      "name": "ui_settings_page_description_add_model_provider_profile_to_edit",
+      "value": "Add a model provider profile first"
+    },
+    {
+      "name": "ui_settings_page_label_add_profile",
+      "value": "Add"
+    },
+    {
+      "name": "ui_settings_page_label_agent_maximum_iterations_per_request",
+      "value": "Maximum Tool Iterations Per Request"
+    },
+    {
+      "name": "ui_settings_page_label_agent_system_prompt",
+      "value": "System Prompt"
+    },
+    {
+      "name": "ui_settings_page_label_agent_user_name",
+      "value": "User Name"
+    },
+    {
+      "name": "ui_settings_page_label_clear_models",
+      "value": "Clear Models"
+    },
+    {
+      "name": "ui_settings_page_label_copy_profile",
+      "value": "Copy"
+    },
+    {
+      "name": "ui_settings_page_label_delete_model",
+      "value": "Delete Model"
+    },
+    {
+      "name": "ui_settings_page_label_delete_profile",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_settings_page_label_fetch_models",
+      "value": "Fetch"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_context_window_tokens",
+      "value": "Context Window Length"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_input_tokens",
+      "value": "Input Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_output_tokens",
+      "value": "Output Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_name",
+      "value": "Model Name"
+    },
+    {
+      "name": "ui_settings_page_label_model_omit_reasoning_effort_when_thinking_disabled",
+      "value": "Omit reasoning effort when Thinking is off"
+    },
+    {
+      "name": "ui_settings_page_label_model_provider_profiles",
+      "value": "Model Provider Profiles"
+    },
+    {
+      "name": "ui_settings_page_label_model_reasoning_effort",
+      "value": "Reasoning Effort"
+    },
+    {
+      "name": "ui_settings_page_label_model_temperature",
+      "value": "Temperature"
+    },
+    {
+      "name": "ui_settings_page_label_model_thinking_enabled",
+      "value": "Enable Thinking"
+    },
+    {
+      "name": "ui_settings_page_label_model_top_p",
+      "value": "Top P"
+    },
+    {
+      "name": "ui_settings_page_label_profile_model_id",
+      "value": "Model ID"
+    },
+    {
+      "name": "ui_settings_page_label_profile_name",
+      "value": "Profile Name"
+    },
+    {
+      "name": "ui_settings_page_label_profile_provider_type",
+      "value": "Provider Type"
+    },
+    {
+      "name": "ui_settings_page_label_selected_model",
+      "value": "Selected Model"
+    },
+    {
+      "name": "ui_settings_page_option_provider_default",
+      "value": "Provider default"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_extra_high",
+      "value": "Extra high"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_high",
+      "value": "High"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_low",
+      "value": "Low"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_medium",
+      "value": "Medium"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_none",
+      "value": "None"
+    },
+    {
+      "name": "ui_settings_previous_data",
+      "value": "Vorherige Spieldaten wiederherstellen"
+    },
+    {
+      "name": "ui_settings_processing",
+      "value": "Wird verarbeitet…"
+    },
+    {
+      "name": "ui_settings_random_video",
+      "value": "Beim Laden ein zufälliges importiertes Video abspielen."
+    },
+    {
+      "name": "ui_settings_reduce_motion",
+      "value": "Bewegung reduzieren"
+    },
+    {
+      "name": "ui_settings_reduced_motion_info",
+      "value": "Seitenübergänge und Druckanimationen reduzieren."
+    },
+    {
+      "name": "ui_settings_reset_builtin",
+      "value": "Integrierte Spieldaten wiederherstellen"
+    },
+    {
+      "name": "ui_settings_restore_backup",
+      "value": "Aus Sicherung wiederherstellen"
+    },
+    {
+      "name": "ui_settings_restore_confirm",
+      "value": "Aktuelle Daten durch diese Sicherung ersetzen?"
+    },
+    {
+      "name": "ui_settings_restore_scope",
+      "value": "Konten, Spielverlauf und Einstellungen wiederherstellen"
+    },
+    {
+      "name": "ui_settings_signed_in",
+      "value": "Beim Spielkonto angemeldet"
+    },
+    {
+      "name": "ui_settings_stop_download",
+      "value": "Download stoppen und auf Abschluss der Prüfung warten?"
+    },
+    {
+      "name": "ui_settings_verified_data",
+      "value": "Vollständigen Datensatz aus einem vertrauenswürdigen GitHub-Commit herunterladen und prüfen."
+    },
+    {
+      "name": "ui_settings_video_fallback",
+      "value": "Pausiert im Hintergrund. Ohne Video erscheint das Hintergrundbild."
+    },
+    {
+      "name": "ui_settings_wallpaper_sources",
+      "value": "Lokale Bilder wechseln alle fünf Minuten. Das Tagesbild stammt von Snap Hutao. Die Rechte liegen bei den Urhebern."
+    },
+    {
+      "name": "ui_spiral_abyss_hutao_statistics",
+      "value": "Aktuelle Statistik"
+    },
+    {
+      "name": "ui_spiral_abyss_upload_record_homa_not_login_primary_button_text",
+      "value": "Jetzt anmelden"
+    },
+    {
+      "name": "ui_travelers_diary_no_income_source_hint",
+      "value": "Diesen Monat keine Primogem-Einnahmen verzeichnet"
+    },
+    {
+      "name": "ui_travelers_diary_today",
+      "value": "Heute"
+    },
+    {
+      "name": "ui_update_cancel",
+      "value": "Suche abbrechen"
+    },
+    {
+      "name": "ui_update_cancelled",
+      "value": "Abgebrochen"
+    },
+    {
+      "name": "ui_update_channel",
+      "value": "Release-Kanal"
+    },
+    {
+      "name": "ui_update_check_failed",
+      "value": "Fehler beim Überprüfen auf Updates"
+    },
+    {
+      "name": "ui_update_checking",
+      "value": "Suche nach Updates…"
+    },
+    {
+      "name": "ui_update_compare_unknown",
+      "value": "Unzureichende Versionsinformationen"
+    },
+    {
+      "name": "ui_update_compatibility_unknown",
+      "value": "Installationskompatibilität unbekannt"
+    },
+    {
+      "name": "ui_update_conflict",
+      "value": "Versionsname und -code stimmen nicht überein"
+    },
+    {
+      "name": "ui_update_current",
+      "value": "Aktuellste Version"
+    },
+    {
+      "name": "ui_update_hap_listed",
+      "value": "HarmonyOS-Paket aufgeführt"
+    },
+    {
+      "name": "ui_update_installed",
+      "value": "Installierte Version %s"
+    },
+    {
+      "name": "ui_update_invalid",
+      "value": "Ungültige Release-Informationen"
+    },
+    {
+      "name": "ui_update_local_newer",
+      "value": "Installierte Version ist neuer"
+    },
+    {
+      "name": "ui_update_no_hap",
+      "value": "Kein HarmonyOS-Paket aufgeführt"
+    },
+    {
+      "name": "ui_update_no_notes",
+      "value": "Keine Hinweise zu dieser Version"
+    },
+    {
+      "name": "ui_update_no_release",
+      "value": "Keine öffentlichen Releases in diesem Kanal"
+    },
+    {
+      "name": "ui_update_notes_error",
+      "value": "Versionshinweise konnten nicht geöffnet werden"
+    },
+    {
+      "name": "ui_update_preview",
+      "value": "Vorabversionen einbeziehen"
+    },
+    {
+      "name": "ui_update_project_releases",
+      "value": "Projekt-Releases"
+    },
+    {
+      "name": "ui_update_rate_limit",
+      "value": "GitHub-Anfrage begrenzt. Später erneut versuchen."
+    },
+    {
+      "name": "ui_update_recent_only",
+      "value": "Die neuesten 300 Releases geprüft"
+    },
+    {
+      "name": "ui_update_required_api",
+      "value": "Mindest-API %d"
+    },
+    {
+      "name": "ui_update_skipped",
+      "value": "Version %s wurde übersprungen. Beim Start wird diese Version nicht mehr automatisch gemeldet; Sie können in den Einstellungen weiterhin manuell nach Updates suchen"
+    },
+    {
+      "name": "ui_update_stable",
+      "value": "Stabile Releases"
+    },
+    {
+      "name": "ui_update_unavailable",
+      "value": "Release-Repository nicht verfügbar"
+    },
+    {
+      "name": "ui_update_unknown",
+      "value": "Unbekannt"
+    },
+    {
+      "name": "ui_update_unskip",
+      "value": "Version wieder anzeigen"
+    },
+    {
+      "name": "ui_user_copy_cookie_action",
+      "value": "Cookie kopieren"
+    },
+    {
+      "name": "ui_web_daily_note_attendance_reward_status_finished_non_reward",
+      "value": "Abgeschlossen"
+    },
+    {
+      "name": "ui_web_hoyolab_game_record_act_calendar_hard_challenge_locked",
+      "value": "Noch nicht freigeschaltet"
+    },
+    {
+      "name": "ui_weekday_friday",
+      "value": "Fr"
+    },
+    {
+      "name": "ui_weekday_monday",
+      "value": "Mo"
+    },
+    {
+      "name": "ui_weekday_saturday",
+      "value": "Sa"
+    },
+    {
+      "name": "ui_weekday_sunday",
+      "value": "So"
+    },
+    {
+      "name": "ui_weekday_thursday",
+      "value": "Do"
+    },
+    {
+      "name": "ui_weekday_tuesday",
+      "value": "Di"
+    },
+    {
+      "name": "ui_weekday_wednesday",
+      "value": "Mi"
+    },
+    {
+      "name": "ui_wi_ki_avatar_ascension_materials_header",
+      "value": "Aufstiegsmaterialien"
+    },
+    {
+      "name": "ui_wi_ki_avatar_auto_suggest_box_place_holder",
+      "value": "Charakter filtern"
+    },
+    {
+      "name": "ui_wi_ki_avatar_name_card_header",
+      "value": "Namenskarte"
+    },
+    {
+      "name": "ui_wi_ki_avatar_special_food_title",
+      "value": "Spezialgericht"
+    },
+    {
+      "name": "ui_wi_ki_weapon_auto_suggest_box_place_holder",
+      "value": "Waffen filtern"
+    },
+    {
+      "name": "ui_wish_show_empty_history",
+      "value": "Historische Wunschaktionen ohne Aufzeichnungen"
+    },
+    {
+      "name": "ui_wish_show_empty_overview",
+      "value": "Übersicht der Wunschaktionen ohne Aufzeichnungen"
+    },
+    {
+      "name": "ui_wish_show_unobtained",
+      "value": "Nicht gezogene Wunschobjekte"
+    },
+    {
+      "name": "ui_gacha_pivot_overview",
+      "value": "Übersicht"
+    },
+    {
+      "name": "ui_gacha_pivot_history",
+      "value": "Verlauf"
+    },
+    {
+      "name": "ui_gacha_pivot_avatar",
+      "value": "Rolle"
+    },
+    {
+      "name": "ui_gacha_pivot_weapon",
+      "value": "Waffe"
+    },
+    {
+      "name": "ui_gacha_pivot_countdown",
+      "value": "Countdown"
+    },
+    {
+      "name": "ui_gacha_pivot_statistics",
+      "value": "Globale Wunschstatistik"
+    },
+    {
+      "name": "ui_gacha_full_refresh",
+      "value": "Vollständige Aktualisierung"
+    },
+    {
+      "name": "ui_gacha_full_refresh_selected",
+      "value": "✓ Vollständige Aktualisierung"
+    },
+    {
+      "name": "ui_gacha_card_statistics",
+      "value": "Statistik"
+    },
+    {
+      "name": "ui_gacha_card_ratio",
+      "value": "Verhältnis"
+    },
+    {
+      "name": "ui_gacha_card_five_average",
+      "value": "Durchschn. Anzahl an Ziehungen für 5 Sterne"
+    },
+    {
+      "name": "ui_gacha_card_four_average",
+      "value": "Durchschn. Anzahl an Ziehungen für 4 Sterne"
+    },
+    {
+      "name": "ui_gacha_card_up_average",
+      "value": "Durchschn. Anzahl an Ziehungen für UP"
+    },
+    {
+      "name": "ui_gacha_card_to_five",
+      "value": "Bis zum letzten 5-Sterne"
+    },
+    {
+      "name": "ui_gacha_card_to_four",
+      "value": "Bis zum letzten 4-Sterne"
+    },
+    {
+      "name": "ui_gacha_card_to_three",
+      "value": "Bis zum letzten 3-Sterne"
+    },
+    {
+      "name": "ui_travelers_diary_month",
+      "value": "Diesen Monat"
+    },
+    {
+      "name": "ui_travelers_diary_primogems",
+      "value": "Urgestein"
+    },
+    {
+      "name": "ui_travelers_diary_mora",
+      "value": "Mora"
+    }
+  ]
+}

@@ -1,61 +1,36 @@
-# 测试与回归清单
+# 测试与验收
 
-> 自动化：`entry/src/test`（hypium Local Test，纯逻辑）+ GitHub Actions CI（lint 0 错误门禁 + 无签名 HAP 构建）。
-> 本文件供实机验证时逐项打勾使用；发版前按矩阵过一遍。
+## 主机回归
 
-## 自动化测试
+在仓库根目录运行 Node.js 24。测试编译实际的 ArkTS 业务方法、模型和页面事件，并使用 SQLite 或系统 API 替身覆盖导入、计算、切换和取消等分支。
 
-```bash
-# 本地单元测试（无需设备，纯逻辑：圣遗物评分/祈愿类型/富文本清洗/日期工具）
-python .zcode/skills/hmos-local-test/scripts/run_local_test.py --project-path <工程根> --module entry --no-coverage
-# 结果：entry/.test/default/intermediates/test/coverage_data/test_result.txt
+```powershell
+npm ci --prefix ci --ignore-scripts
+$env:TYPESCRIPT_PATH = (Resolve-Path 'ci/node_modules/typescript').Path
+node tests/run.cjs
 ```
 
-CI（`.github/workflows/ci.yml`）：
-- `lint` job：`devecocli check lint`，**Errors ≥ 1 即失败**（warning 不阻断）
-- `build` job：复制 `ci/build-profile.ci.json5`（无签名）→ 构建 unsigned debug HAP → 传 artifact
-- **启用条件**：仓库 Variables 配置 `DEVECO_CLT_URL`（华为 Command Line Tools zip 直链，开发者站登录下载）；
-  未配置时两个 job 自动跳过（CLT 无公开直链，见 ci.yml 顶部注释）
-- `@deveco/deveco-cli` 来自公开 npm（Node ≥ 22），无需 DevEco Studio，仅需 CLT
+Linux 和 macOS 可执行 `TYPESCRIPT_PATH="$PWD/ci/node_modules/typescript" node tests/run.cjs`。已安装依赖后，整套主机回归可离线运行。单独运行某个 `tests/*.cjs` 或 `tests/*.mjs` 可缩短定位时间。例如，`node tests/gacha-logical-records.cjs` 覆盖 64 位 ID、历史重复、命名空间和超过十万条的分页边界。新增套件会由 [run.cjs](../tests/run.cjs) 自动发现。
 
-## 实机回归清单（发版前）
+## 原生验证
 
-### 1. 启动与导航
-- [ ] 冷启动到主页无崩溃；深/浅色跟随系统切换正常
-- [ ] 手机底部页签 / 宽屏侧边栏（≥720）切换；窗口缩放跨 720/840/1200 三断点布局正确
+1. 使用 [API 26 工程模板](../ci/build-profile.ci.json5) 初始化新检出的本地构建配置，执行 `ohpm install --all`。
+2. 运行 `hvigorw assembleHap --mode module -p module=entry@default -p product=default --no-daemon`。Windows 使用 `hvigorw.bat`。本地签名配置控制签名包的生成。
+3. 在无签名构建环境执行 `python ci/check-hap.py entry/build/default/outputs/default/entry-default-unsigned.hap`，校验包完整性、最低/目标 API 与设备类型。
+4. 原生 ArkTS 本地用例见 [entry/src/test](../entry/src/test)，设备侧用例见 [entry/src/ohosTest](../entry/src/ohosTest)。在 DevEco Studio 选择对应测试运行配置。
 
-### 2. 祈愿记录
-- [ ] 刷新全量拉取（常规 5 池 + 颂愿 2 池）；进度头像流正常
-- [ ] 多池卡片：宽屏四列同排等高；折叠某张卡后同行仍等高不裁切；颂愿模式两张卡各占半宽
-- [ ] 历史页签：期次汇总卡（版本/池名/UP 五星四星获取数/时间跨度）与抽卡明细都在
-- [ ] UIGF v4.2 导出再导入，条数不变；v4.0/v3.x 旧文件可导入
+[CI](../.github/workflows/ci.yml) 在推送到 main 或提交 PR 时运行主机测试和仓库检查。配置了 `DEVECO_CLT_URL` 的仓库还会运行原生 lint 和无签名 HAP 构建。工具源及摘要固定在 [install-clt.sh](../ci/install-clt.sh) 与 [verify-clt.py](../ci/verify-clt.py)，lint 验收使用 [run-native-lint.cjs](../ci/run-native-lint.cjs) 的完整扫描报告。
 
-### 3. 成就
-- [ ] 分类与条目为官方 1844 条口径；多阶段组（如"动物园大亨"）聚合展示
-- [ ] 勾选完成、UIAF 导入导出往返一致（id 不变）
+## 交互复测
 
-### 4. 战绩类
-- [ ] 深境螺旋：波次敌人（名称/图标/数量/`Lv.x` 等级）、渊月祝福、历史期切换
-- [ ] 幻想真境剧诗："本期战局"卡出现限定元素/特邀角色/初始可选角色行
-- [ ] 幽境危战：期次名来自接口、双人/单人成绩
+| 场景 | 观察点 |
+| --- | --- |
+| 冷启动、首次进入页面、返回 | 分开观察系统首帧、本地数据首次展示、后台数据补齐。快速切换或退出后，旧回调不能覆盖当前账号和选择 |
+| 壳层及外观 | 手机底部页签、平板侧栏、分栏和菜单在各窗口宽度下可用。系统栏不遮挡工具栏，主题和材质强度切换即时可见 |
+| 祈愿 | 在已有测试档案中分别刷新常规祈愿与颂愿，检查每池结果。导出到新文件后重新预览，总数、池分类与唯一 ID 一致 |
+| 成就、养成与背包 | 切换档案、同类多选/跨类筛选、编辑与取消、既有数据导入及再次导出。对破坏性操作使用专用测试档 |
+| 实时便笺 | 核对所追踪角色、阈值、树脂和派遣数值、刷新时间。开启自动刷新后退后台再回来，只补过期项 |
+| 挑战和图鉴 | 切换期次、层/间、阵容和统计，比较已记录战绩与公告数据。图鉴检查属性等级、突破前后、技能与掉落 |
+| 备份和资源 | 在专用测试账号验证备份恢复及中断重试，比较实际记录和偏好。验证素材更新成功后的下次启动与回滚 |
 
-### 5. 账号与风控
-- [ ] 扫码/验证码登录；多账号切换后数据隔离
-- [ ] 触发 1034/极验：统一浮层出现、验证图完整不裁切、失败可"重新加载"
-- [ ] 配置极验自定义接口（设置→无感验证）后触发验证走自动过验
-
-### 6. 图鉴与展示
-- [ ] 角色资料：立绘卡滑动翻页（首次联网加载 ~0.5s，二进命中缓存）；旅行者显示占位
-- [ ] 名片区块（胶囊横幅 + 大图 + 名称/描述）；攻略外链跳米游社/B站
-- [ ] 武器/怪物/培养材料图标全部离线可用
-
-### 7. 备份与还原
-- [ ] 导出备份 JSON → 卸载重装 → 还原：账号/祈愿/成就/偏好完整；还原后重启生效
-
-### 8. 数据一致性
-- [ ] 旅行者札记月度数据与游戏内一致
-- [ ] 实时便笺刷新 + 桌面卡片数据同步
-
-### 9. 兼容
-- [ ] API 24 真机：沉浸光感回退（backgroundEffect）不闪黄、不透明
-- [ ] 空 UID 未登录：不创建空归档、主页卡片显示未登录态
+性能对照的采样口径和已有结果见[维护者交接](HANDOFF.md)。

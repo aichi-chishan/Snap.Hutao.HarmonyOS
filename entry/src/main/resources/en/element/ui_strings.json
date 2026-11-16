@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "Cancel"
+    },
+    {
+      "name": "common_confirm",
+      "value": "Confirm"
+    },
+    {
+      "name": "common_refresh",
+      "value": "Refresh"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "Wish History"
+    },
+    {
+      "name": "page_title_home",
+      "value": "Home"
+    },
+    {
+      "name": "page_title_login",
+      "value": "Sign in"
+    },
+    {
+      "name": "page_title_note",
+      "value": "Realtime Notes"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "Settings"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "Wish History"
+    },
+    {
+      "name": "tab_home",
+      "value": "Home"
+    },
+    {
+      "name": "tab_mine",
+      "value": "Me"
+    },
+    {
+      "name": "tab_note",
+      "value": "Realtime Notes"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "Export"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "Import"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "Save"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "Generate analysis"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "Account history charts and AI insights"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "Stop generation"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "Test connection"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "Check Update"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "Data"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "Schedule"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "System"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "Tools"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "Reopen the app to follow the system language"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "Follow System"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "Spiral Abyss"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "Achievements"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "Backpack"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "Stygian Onslaught"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "My Characters"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "Dev Plan"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "Game Launcher"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "Traveler's Diary"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Hutao Passport"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "Imaginarium Theater"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "Character WIKI"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "Monster WIKI"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "Weapon WIKI"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "About"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "Account"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "Appearance"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "Wallpaper Image"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "Wallpaper Video"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "Backup and restore"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "Calendar"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "Home"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "Homepage Game Event Area Settings"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "Dashboard card"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "Language"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "Backdrop Material"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "Other"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "Check-in"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "Storage"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "Theme"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "CAPTCHA"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "Wish History"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "Data Migration"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "Dark"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "Light"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "Snap Hutao %s is now available"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "Release notes"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "Skip this version"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "App update"
+    }
+  ]
+}

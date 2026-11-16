@@ -15,20 +15,22 @@ const deferred = () => { let resolve, reject; const promise = new Promise((a,b) 
 const flush = async () => { for(let i=0;i<50;i++)await Promise.resolve(); };
 function harness() {
   const modules=new Map();
-  const state={events:[],avatars:[],weapons:[],reads:[],routes:[],timers:new Map(),cleared:[],nextTimer:0};
+  const state={events:[],avatars:[],weapons:[],reads:[],routes:[],bannerRequests:[],timers:new Map(),cleared:[],nextTimer:0};
   const metadata={
     GachaEventMeta:class {},WikiAvatarMeta:class {},WikiWeaponMeta:class {},
     WikiMetaService:{getGachaEvents:async()=>{state.reads.push('events');return state.events;},
       getAvatars:async()=>{state.reads.push('avatars');return state.avatars;},
       getWeapons:async()=>{state.reads.push('weapons');return state.weapons;}}
   };
-  const globals={Observed:v=>v,Entry:v=>v,Component:v=>v,Prop:()=>{},State:()=>{},StorageProp:()=>()=>{},
+  const globals={Observed:v=>v,Entry:v=>v,Component:v=>v,Prop:()=>{},State:()=>{},StorageProp:()=>()=>{},Watch:()=>()=>{},
+    $r:(name,...args)=>({name,args}),
     setInterval:callback=>{const id=++state.nextTimer;state.timers.set(id,callback);return id;},
     clearInterval:id=>{state.cleared.push(id);state.timers.delete(id);}};
   function load(name) {
     if(modules.has(name))return modules.get(name);
     if(name==='service/WikiMetaService')return metadata;
-    if(name==='service/CachedImageService')return {CachedImageService:{fetchToCache:async()=>''}};
+    if(name==='service/CachedImageService')return {CachedImageService:{fetchToCache:async url=>{state.bannerRequests.push(url);return '';}}};
+    if(name==='common/UiSurface')return {UiSurface:{dialogMaterial:()=>undefined},CardSurfaceModifier:class {},SelectMaterialModifier:class {}};
     if(name==='@kit.ArkUI')return {router:{pushUrl:async args=>{state.routes.push(args);}}};
     if(name==='components/SimpleDataSource')return {SimpleDataSource:class {constructor(items){this.items=items;this.reloads=0;}notifyDataReload(items){this.items=items;this.reloads++;}}};
     if(name.startsWith('components/'))return {};
@@ -51,13 +53,20 @@ function strictTypes() {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hutao-wish-history-'));
   const names=['model/WishHistory','service/WishHistoryService','viewmodel/WishHistoryViewModel'];
   for(const name of names){const file=path.join(dir,name+'.ts');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,fs.readFileSync(path.join(root,name+'.ets'),'utf8'));}
-  fs.writeFileSync(path.join(dir,'service/WikiMetaService.ts'),`export class GachaEventMeta {name='';version='';order=0;type=0;from=0;to=0;banner='';upOrange:number[]=[];upPurple:number[]=[];}\nexport class WikiAvatarMeta {id=0;name='';icon='';}\nexport class WikiWeaponMeta {id=0;name='';icon='';}\nexport class WikiMetaService {static async getGachaEvents():Promise<GachaEventMeta[]>{return [];}static async getAvatars():Promise<WikiAvatarMeta[]>{return [];}static async getWeapons():Promise<WikiWeaponMeta[]>{return [];}}`);
+  fs.writeFileSync(path.join(dir,'service/WikiMetaService.ts'),`export class GachaEventMeta {name='';version='';order=0;type=0;from=0;to=0;banner='';upOrange:number[]=[];upPurple:number[]=[];}\nexport class WikiAvatarMeta {id=0;name='';canonicalName='';icon='';}\nexport class WikiWeaponMeta {id=0;name='';canonicalName='';icon='';}\nexport class WikiMetaService {static async getGachaEvents():Promise<GachaEventMeta[]>{return [];}static async getAvatars():Promise<WikiAvatarMeta[]>{return [];}static async getWeapons():Promise<WikiWeaponMeta[]>{return [];}}`);
   fs.writeFileSync(path.join(dir,'globals.d.ts'),'declare function Observed<T extends new (...args: never[]) => object>(value:T):T;');
   const program=ts.createProgram([...names.map(name=>path.join(dir,name+'.ts')),path.join(dir,'globals.d.ts')],{strict:true,noEmit:true,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true,skipLibCheck:true});
   const errors=ts.getPreEmitDiagnostics(program).filter(d=>d.category===ts.DiagnosticCategory.Error);
   assert.equal(errors.length,0,ts.formatDiagnosticsWithColorAndContext(errors,{getCurrentDirectory:()=>dir,getCanonicalFileName:x=>x,getNewLine:()=> '\n'}));
 }
 (async()=>{
+  await test('featured items can be searched by localized or canonical name',()=>{
+    const {service:S,model}=harness();
+    const avatar={...meta(10000022,'Featured'),canonicalName:'活动角色'};
+    const items=S.build([event()],[avatar],[],NOW).items;
+    assert.equal(S.filter(items,model.WishHistoryCategory.FiveStarAvatar,'featured')[0].id,10000022);
+    assert.equal(S.filter(items,model.WishHistoryCategory.FiveStarAvatar,'活动角色')[0].name,'Featured');
+  });
   await test('pinned Windows exclusions and all four rarity/kind groups',()=>{
     const {service:S}=harness();
     const excludedA=[10000003,10000016,10000041,10000042,10000035,10000069,10000079,10000109,10000006,10000021,10000015,10000062];
@@ -116,7 +125,7 @@ function strictTypes() {
     const raw=JSON.parse(fs.readFileSync(path.join(directory,'GachaEvent.json'),'utf8'));
     state.events=raw.map(x=>event({name:x.Name,version:x.Version,order:x.Order,type:x.Type,from:Date.parse(x.From),to:Date.parse(x.To),upOrange:x.UpOrangeList,upPurple:x.UpPurpleList}));
     state.avatars=JSON.parse(fs.readFileSync(path.join(directory,'avatar_meta.json'),'utf8'));state.weapons=JSON.parse(fs.readFileSync(path.join(directory,'weapon_meta.json'),'utf8'));
-    const result=await S.load(NOW);assert.deepEqual(state.reads,['events','avatars','weapons']);assert.equal(result.sourceEventCount,292);
+    const result=await S.load(NOW);assert.deepEqual(state.reads,['events','avatars','weapons']);assert.equal(result.sourceEventCount,raw.length);
     assert(result.items.length>180);assert(result.items.some(x=>x.name==='温迪'));assert(result.items.some(x=>S.ongoing(x,NOW)));
     for(const item of result.items){
       const expected=new Set(state.events.filter(e=>e.from<=NOW && (e.upOrange.includes(item.id)||e.upPurple.includes(item.id))).map(e=>`${e.from}_${e.to}`));
@@ -160,6 +169,17 @@ function strictTypes() {
     target.select(target.vm.items.find(x=>x.id===10000029));await target.openWiki();assert.equal(state.routes.length,1);
     target.filter(2,'');target.select(target.vm.items[0]);await target.openWiki();assert.equal(state.routes[1].url,'pages/WikiWeaponPage');assert.equal(state.routes[1].params.itemId,11509);
     target.aboutToDisappear();await target.openWiki();assert.equal(state.routes.length,2);
+  });
+  await test('locale reload preserves the selected item and filters without fetching banners',async()=>{
+    const {service:S,state,page}=harness();const target=page();let name='Venti';
+    S.load=async()=>S.build([event()],[{...meta(10000022,name),canonicalName:'温迪'}],[],NOW);
+    target.aboutToAppear();await flush();target.filter(0,'Venti');target.select(target.vm.items[0]);await flush();
+    assert.equal(target.selected.id,10000022);const requests=state.bannerRequests.length;assert.ok(requests>0);
+    name='ウェンティ';target.localeVersion=1;target.onLocaleChanged();await flush();
+    assert.equal(target.vm.keyword,'Venti');assert.equal(target.vm.category,0);assert.equal(target.vm.items.length,0);
+    assert.equal(target.selected.id,10000022);assert.equal(target.selected.name,'ウェンティ');
+    assert.equal(target.appliedLocaleVersion,1);assert.equal(state.bannerRequests.length,requests);
+    target.aboutToDisappear();
   });
   await test('pure production model/service/VM pass strict TypeScript with typed metadata boundary',strictTypes);
   await test('page structure keeps API24-native lazy responsive/offline controls',()=>{

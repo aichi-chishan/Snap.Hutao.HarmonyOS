@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "ui_startup_failed_title", "value": "Impossibile avviare l’app" },
+    { "name": "ui_startup_failed_body", "value": "Non è stato possibile completare l’avvio. Riprova. Un nuovo tentativo non cancellerà i dati esistenti." }
+  ]
+}

@@ -98,15 +98,20 @@ export class HoyolabClient {
   }
 
   /** 活动日历 act_calendar（POST，GameRecord，body=role_id/server）。DS Gen2/X4 */
-  static async fetchActCalendar(uid: string, region: string, cookie: string): Promise<ApiResponse> {
+  static async fetchActCalendar(uid: string, region: string, cookie: string, extraHeaders?: Record<string, string>,
+    isCurrent?: () => boolean): Promise<ApiResponse> {
     const body: Record<string, string> = { 'role_id': uid, 'server': region };
     const bodyJson: string = JSON.stringify(body);
     const t: number = DsSigner.nowTimestamp();
     const r: string = DsSigner.randomNumber();
     const ds: string = await DsSigner.signGen2(HoyolabEndpoints.gameRecordSalt(region), t, r, bodyJson, '');
+    if (isCurrent !== undefined && !isCurrent()) {
+      throw new Error('账号或日历查询已改变，请重试');
+    }
     const url: string = HoyolabEndpoints.gameRecordUrl('act_calendar', region);
     const headers: Record<string, string> = { 'DS': ds, 'Cookie': cookie };
-    return HoyolabClient.client.postJson(url, bodyJson, HoyolabClient.merge(HoyolabClient.baseHeaders(region), headers));
+    return HoyolabClient.client.postJson(url, bodyJson,
+      HoyolabClient.merge(HoyolabClient.baseHeaders(region), HoyolabClient.merge(headers, extraHeaders ?? {})));
   }
 
   /** 每日签到 sign（POST Luna）。DS Gen1/LK2；body 含 act_id/region/uid。
@@ -210,10 +215,11 @@ export class HoyolabClient {
 
   /** getActionTicketBySToken（GET auth/api 端点，DS Gen1/K2 + SToken Cookie）。
    *  stoken/uid 走 query（reference: ApiEndpoints.csv AuthActionTicket）
-   *  参考项目 AuthClient 用 Default 配置（仅 UA + DS + Cookie），不强制带 x-rpc 头。 */
-  static async getActionTicket(stokenCookie: string, stoken: string, uid: string): Promise<ApiResponse> {
+   *  参考 AuthClient 的 Default 配置，已有设备指纹时随 Cookie 一并发送。 */
+  static async getActionTicket(stokenCookie: string, stoken: string, uid: string,
+    actionType: string = 'game_role'): Promise<ApiResponse> {
     const query: Record<string, string> = {
-      'action_type': 'game_role',
+      'action_type': actionType,
       'stoken': encodeURIComponent(stoken),
       'uid': uid,
     };
@@ -227,6 +233,8 @@ export class HoyolabClient {
       'Cookie': stokenCookie,
       'User-Agent': AppConstants.UA_MOBILE,
     };
+    const fp: string = PreferencesStore.getDeviceFp();
+    if (fp.length > 0) { headers['x-rpc-device_fp'] = fp; }
     return HoyolabClient.client.get(url, headers);
   }
 

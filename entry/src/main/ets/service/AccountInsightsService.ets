@@ -12,11 +12,19 @@ import { HardChallengeRepo } from '../data/repo/HardChallengeRepo';
 import { GachaArchive } from '../model/GachaArchive';
 import { GachaItem } from '../model/GachaItem';
 import { GachaType } from '../model/GachaType';
+import { GachaPoolRules } from '../model/GachaPoolRules';
+import { FiveStarDetail, PoolStatistics } from '../model/GachaStatistics';
 import { RoleCombatRoot } from '../model/RoleCombat';
 import { HardChallengeRoot } from '../model/HardChallenge';
 import { RegionUtil } from '../common/Constants';
 import { WishHistoryService } from './WishHistoryService';
-import { InsightBundle, InsightDirection, InsightPoint, InsightSeries } from '../model/AccountInsights';
+import { GachaStatisticsService } from './GachaStatisticsService';
+import { GachaItemIdentityService } from './GachaItemIdentityService';
+import { GachaHistoryService, HistoryWishView } from './GachaHistoryService';
+import { GachaEventMeta, WikiMetaService } from './WikiMetaService';
+import { UigfService } from './UigfService';
+import { InsightBanner, InsightBannerObtain, InsightBundle, InsightDirection, InsightPoint, InsightSeries,
+  InsightWishObtain, InsightWishPool, InsightWishStatistics } from '../model/AccountInsights';
 import { Logger } from '../common/Logger';
 
 const TAG: string = 'AccountInsightsService';
@@ -57,7 +65,7 @@ export class AccountInsightsService {
       if (archive === undefined) {
         return;
       }
-      const items: GachaItem[] = await GachaRepo.getItemsByArchive(archive.id);
+      const items: GachaItem[] = await GachaItemIdentityService.resolveMissing(await GachaRepo.getItemsByArchive(archive.id));
       const normal: GachaItem[] = [];
       const beyond: GachaItem[] = [];
       for (const item of items) {
@@ -79,10 +87,90 @@ export class AccountInsightsService {
         bundle.series.push(new InsightSeries('颂愿', '按池', '抽', this.poolPoints(beyond),
           InsightDirection.Neutral, false));
       }
+      if (items.length > 0) { await this.appendWishStatistics(items, uid, bundle); }
     } catch (e) {
       Logger.warn(TAG, `wish series fail: ${(e as Error).message}`);
       bundle.failedSources.push('祈愿');
     }
+  }
+
+  private async appendWishStatistics(items: GachaItem[], uid: string, bundle: InsightBundle): Promise<void> {
+    const events: GachaEventMeta[] = await WikiMetaService.getGachaEvents();
+    const timezone: number = UigfService.timezoneOfUid(uid);
+    const groups: Map<number, GachaItem[]> = new Map<number, GachaItem[]>();
+    for (const item of items) {
+      const type: number = GachaType.queryTypeOf(item.gachaType);
+      const group: GachaItem[] = groups.get(type) ?? [];
+      group.push(item);
+      groups.set(type, group);
+    }
+    const types: number[] = [301, 302, 500, 200, 100, 1000, 2000];
+    const names: string[] = ['avatar_event', 'weapon_event', 'chronicled', 'standard', 'novice', 'beyond_standard', 'beyond_event'];
+    const computed: InsightWishStatistics = new InsightWishStatistics();
+    for (let index: number = 0; index < types.length; index++) {
+      const pool: PoolStatistics = GachaStatisticsService.buildPool(groups.get(types[index]) ?? [], types[index], events, timezone);
+      computed.pools.push(AccountInsightsService.insightPool(pool, names[index]));
+      if (types[index] === GachaType.AVATAR_EVENT) { bundle.featuredChart = AccountInsightsService.featuredChart(pool); }
+    }
+    bundle.wishStatistics = computed;
+    if (events.length === 0) { return; }
+    try {
+      const banners: HistoryWishView[] = await GachaHistoryService.getInstance().buildFromItems(items, events, timezone);
+      for (const entry of banners.slice(0, 24)) {
+        const banner: InsightBanner = new InsightBanner();
+        banner.from = WishHistoryService.dateText(entry.from);
+        banner.to = WishHistoryService.dateText(entry.to);
+        for (const feature of entry.orangeUps.slice(0, 6)) {
+          const obtain: InsightBannerObtain = new InsightBannerObtain();
+          obtain.name = feature.name;
+          obtain.recorded_obtain_count = feature.count;
+          banner.featured_five_stars.push(obtain);
+        }
+        computed.recent_banner_featured_characters_and_weapons.push(banner);
+      }
+    } catch (e) {
+      Logger.warn(TAG, `wish banner insights fail: ${(e as Error).message}`);
+    }
+  }
+
+  private static insightPool(pool: PoolStatistics, name: string): InsightWishPool {
+    const result: InsightWishPool = new InsightWishPool();
+    result.pool = name;
+    result.total_wishes = pool.totalCount;
+    result.five_star_count = pool.fiveStarCount;
+    result.four_star_count = pool.fourStarCount;
+    result.five_star_rate_in_observed_wishes = pool.totalCount > 0 ? pool.fiveStarCount / pool.totalCount : null;
+    result.average_wishes_per_five_star = pool.fiveStarCount > 0 ? pool.averageOrangePull : null;
+    result.average_wishes_per_featured_five_star = pool.averageUpOrangePull > 0 ? pool.averageUpOrangePull : null;
+    result.minimum_wishes_per_five_star = pool.minOrangePull;
+    result.maximum_wishes_per_five_star = pool.maxOrangePull;
+    result.current_wishes_since_last_five_star = pool.sinceLastFive;
+    result.game_guarantee_threshold = GachaPoolRules.fiveStarThreshold(pool.gachaType);
+    const shown: number = Math.min(35, pool.fiveDetails.length);
+    for (let index: number = 0; index < shown; index++) {
+      const detail: FiveStarDetail = pool.fiveDetails[index];
+      const obtain: InsightWishObtain = new InsightWishObtain();
+      obtain.name = detail.name;
+      obtain.date = detail.time.substring(0, 10);
+      obtain.pulls_for_this_five_star = detail.lastPull;
+      obtain.is_featured = detail.upKnown ? detail.isUp : null;
+      const previous: FiveStarDetail | undefined = pool.fiveDetails[index + 1];
+      if (detail.upKnown && previous?.upKnown === true) { obtain.is_guaranteed = detail.isUp && !previous.isUp; }
+      if (detail.isUp) { obtain.pulls_since_previous_featured = detail.totalCyclePull; }
+      result.recorded_five_star_obtains.push(obtain);
+    }
+    return result;
+  }
+
+  private static featuredChart(pool: PoolStatistics): InsightSeries | undefined {
+    const counts: Map<string, number> = new Map<string, number>();
+    for (const item of pool.fiveDetails) {
+      if (item.isUp && item.name.length > 0) { counts.set(item.name, (counts.get(item.name) ?? 0) + 1); }
+    }
+    if (counts.size === 0) { return undefined; }
+    const points: InsightPoint[] = Array.from(counts.keys()).map((name: string): InsightPoint => new InsightPoint(name, counts.get(name) ?? 0));
+    points.sort((a: InsightPoint, b: InsightPoint): number => b.value - a.value || a.period.localeCompare(b.period));
+    return new InsightSeries('祈愿', '已获得的 UP 五星角色', '抽', points.slice(0, 15), InsightDirection.Neutral, false);
   }
 
   /** 按月计数（period=yyyy-MM，字典序即时间序，取最近 12 个月） */
@@ -220,7 +308,7 @@ export class AccountInsightsService {
    * AI 分析用匿名 JSON（对齐 Windows CreateAnonymousJson：序列 + 摘要，无 UID/无个人标识）。
    * 手工拼 JSON 字符串以符合 ArkTS 禁匿名对象字面量的约束。
    */
-  static anonymousJson(bundle: InsightBundle): string {
+  static anonymousJson(bundle: InsightBundle, includePoints: boolean = true): string {
     const parts: string[] = [];
     for (const series of bundle.series) {
       const pointParts: string[] = [];
@@ -231,7 +319,7 @@ export class AccountInsightsService {
       let timeLatest: number = 0;
       let timePrev: number | null = null;
       for (const point of series.points) {
-        pointParts.push(`{"period":"${point.period}","value":${point.value}}`);
+        if (includePoints) { pointParts.push(`{"period":${JSON.stringify(point.period)},"value":${point.value}}`); }
         sum += point.value;
         if (min === null || point.value < min) { min = point.value; }
         if (max === null || point.value > max) { max = point.value; }
@@ -253,9 +341,11 @@ export class AccountInsightsService {
           ? 'lower_is_better' : 'neutral';
       parts.push(`{${summary},"difficulty":${series.difficulty !== null ? series.difficulty : 'null'},` +
         `"kind":"${series.isTimeSeries ? 'time_series' : 'category_distribution'}",` +
-        `"category":"${series.title}","metric":"${series.metric}","unit":"${series.unit}",` +
-        `"direction":"${direction}","points":[${pointParts.join(',')}]}`);
+        `"category":${JSON.stringify(series.title)},"metric":${JSON.stringify(series.metric)},"unit":${JSON.stringify(series.unit)},` +
+        `"direction":"${direction}"${includePoints ? `,"periods":[${pointParts.join(',')}]` : ''}}`);
     }
-    return `{"series":[${parts.join(',')}]}`;
+    const wish: string = includePoints && bundle.wishStatistics !== undefined
+      ? `,"hu_tao_computed_gacha_statistics":${JSON.stringify(bundle.wishStatistics)}` : '';
+    return `{"schema_version":1,"series":[${parts.join(',')}]${wish}}`;
   }
 }

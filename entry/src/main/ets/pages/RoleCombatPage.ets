@@ -6,10 +6,10 @@
 import { router } from '@kit.ArkUI';
 import { RoleCombatViewModel } from '../viewmodel/RoleCombatViewModel';
 import { RoleCombatDataItem, RoleCombatRoundData, RoleCombatAvatar, RoleCombatBuff, RoleCombatEnemy, RoleCombatAvatarStat } from '../model/RoleCombat';
-import { RoleCombatHistoryEntry } from '../data/repo/RoleCombatRepo';
-import { RiskUiHelper, RiskVerifyParams } from '../common/RiskUiHelper';
-import { AppBackButton } from '../components/AppBackButton';
-import { PageHeader } from '../components/PageHeader';
+import { ChallengePeriod } from '../model/ChallengePeriod';
+import { RiskUiHelper } from '../common/RiskUiHelper';
+import { PageToolbar } from '../components/PageToolbar';
+import { ChallengePeriodActions, ChallengePeriodRail, ChallengePeriodTabs } from '../components/ChallengePeriodRail';
 import { MetaIcon } from '../components/MetaIcon';
 import { PageBackdrop } from '../components/PageBackdrop';
 import { NavIcon } from '../components/NavIcon';
@@ -18,34 +18,58 @@ import { RiskVerifyDialog } from '../components/RiskVerifyDialog';
 import { WikiMetaService, RoleCombatScheduleMeta } from '../service/WikiMetaService';
 import { DateUtil } from '../common/DateUtil';
 import { Logger } from '../common/Logger';
-import { CardSurfaceModifier } from '../common/UiSurface';
+import { AppButtonModifier, CardSurfaceModifier, UiSurface } from '../common/UiSurface';
 
 @Entry
 @Component
 export struct RoleCombatPage {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
+  @StorageProp('helpLocaleVersion') @Watch('loadIcons') localeVersion: number = 0;
   /** 宽屏内嵌模式：隐藏返回按钮、去除状态栏避让（由内容区统一处理） */
   @Prop embedMode: boolean = false;
-  @StorageProp('topAvoidVp') topAvoidVp: number = 0;
-  @StorageLink('currentUid') @Watch('onUidChanged') currentUid: string = '';
-  @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
+  @StorageProp('currentUid') @Watch('onOwnerChanged') currentUid: string = '';
+  @StorageProp('currentUserId') @Watch('onOwnerChanged') ownerId: number = 0;
+  @StorageProp('isLoggedIn') @Watch('onOwnerChanged') isLoggedIn: boolean = false;
   @State vm: RoleCombatViewModel = new RoleCombatViewModel();
   /** 风控验证弹窗开关（needRiskVerify 时自动弹出，对齐 Windows 验证小窗） */
   @State showVerify: boolean = false;
+  @State isWide: boolean = false;
+  @State detailOpen: boolean = false;
+  @State showStatistics: boolean = false;
+  @State pendingPeriodId: number = 0;
+  private readonly detailScroller: Scroller = new Scroller();
   /** 本期期次元数据（限定元素/特邀/初始可选角色，本地 RoleCombatSchedule.json 按 scheduleId 匹配） */
   @State scheduleMeta: RoleCombatScheduleMeta | undefined = undefined;
   /** 月谕统计 Grid 自身宽度（vp，onAreaChange 读取；列数按它推导，不用屏幕宽） */
   @State moonGridW: number = 0;
-  /** 月谕统计网格：最小列宽 / 列间距（对齐 Windows UniformPanel，MinItemWidth 按手机可读性下调） */
-  private static readonly MOON_MIN_ITEM: number = 260;
-  private static readonly MOON_COL_GAP: number = 8;
+  @State iconRevision: number = 0;
+  private attached: boolean = false;
+  private ownerTimer: number = -1;
+  private iconSequence: number = 0;
 
-  onUidChanged(): void {
+  onOwnerChanged(): void {
+    if (!this.attached) { return; }
+    this.vm.invalidate();
     this.vm = new RoleCombatViewModel();
-    this.loadData();
+    this.scheduleMeta = undefined;
+    this.showVerify = false;
+    this.showPeriods();
+    this.pendingPeriodId = 0;
+    clearTimeout(this.ownerTimer);
+    this.ownerTimer = setTimeout((): void => { this.loadData(); }, 0);
   }
 
   aboutToAppear(): void {
+    this.attached = true;
     this.loadData();
+  }
+
+  aboutToDisappear(): void {
+    this.attached = false;
+    clearTimeout(this.ownerTimer);
+    this.iconSequence++;
+    this.vm.invalidate();
   }
 
   /** 页面显示：检测风控 → 自动弹验证窗（保持当前页上下文） */
@@ -55,32 +79,49 @@ export struct RoleCombatPage {
       return;
     }
     if (RiskUiHelper.hasPendingChallenge()) {
-      this.vm.resetRiskAndReload(this.currentUid);
+      this.refreshData(false);
     }
   }
 
   loadData(): void {
-    if (this.isLoggedIn && this.currentUid.length > 0) {
-      // 先装载本地期数历史（实时拉取失败也可回看往期），再拉实时
-      this.vm.loadHistoryList(this.currentUid).then(() => {
-      });
-      this.vm.load(this.currentUid).then(() => {
-        this.syncScheduleMeta();
-      });
-    } else {
-      this.vm.loaded = true;
-      this.vm.message = '请先登录';
-    }
+    this.loadIcons();
+    const vm: RoleCombatViewModel = this.vm;
+    vm.initialize(this.currentUid).then((): void => {
+      if (this.attached && this.vm === vm) { this.syncScheduleMeta(); }
+    });
+  }
+
+  private loadIcons(): void {
+    if (!this.attached) { return; }
+    const vm: RoleCombatViewModel = this.vm;
+    const sequence: number = ++this.iconSequence;
+    WikiMetaService.ensureIconMaps().then((): void => {
+      if (this.attached && this.vm === vm && sequence === this.iconSequence) { this.iconRevision++; }
+    }).catch((): void => { Logger.warn('RoleCombatPage', 'local avatar icons unavailable'); });
+  }
+
+  private refreshData(announce: boolean): void {
+    const vm: RoleCombatViewModel = this.vm;
+    vm.load(this.currentUid).then((): void => {
+      if (!this.attached || this.vm !== vm) { return; }
+      this.syncScheduleMeta();
+      if (vm.needRiskVerify) { this.showVerify = true; }
+      else if (announce) { this.toast(vm.message.length > 0 ? vm.message : '已刷新'); }
+    });
   }
 
   /** 数据到位后按当前期 scheduleId 匹配本地期次元数据（限定元素/特邀/初始可选） */
   private syncScheduleMeta(): void {
-    const current: RoleCombatDataItem | undefined = this.vm.current();
+    const vm: RoleCombatViewModel = this.vm;
+    const current: RoleCombatDataItem | undefined = vm.current();
     if (current === undefined || current.schedule.scheduleId <= 0) {
       this.scheduleMeta = undefined;
       return;
     }
+    const scheduleId: number = current.schedule.scheduleId;
+    if (this.scheduleMeta?.id !== scheduleId) { this.scheduleMeta = undefined; }
     WikiMetaService.getRoleCombatSchedules().then((all: RoleCombatScheduleMeta[]) => {
+      if (!this.attached || this.vm !== vm || this.vm.current()?.schedule.scheduleId !== scheduleId) { return; }
       let hit: RoleCombatScheduleMeta | undefined = undefined;
       for (const m of all) {
         if (m.id === current.schedule.scheduleId) {
@@ -96,34 +137,77 @@ export struct RoleCombatPage {
   }
 
   toast(msg: string): void {
-    this.getUIContext().getPromptAction().showToast({ message: msg, duration: 1800 });
+    this.getUIContext().getPromptAction().showToast({ systemMaterial: UiSurface.dialogMaterial(), message: msg, duration: 1800 });
+  }
+
+  private shownPeriodId(): number {
+    return this.pendingPeriodId > 0 ? this.pendingPeriodId : (this.vm.current()?.schedule.scheduleId ?? 0);
+  }
+
+  private scrollDetailToTop(): void {
+    if (this.isWide || this.detailOpen || this.vm.history.length === 0) {
+      this.detailScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
+    }
+  }
+
+  private selectPeriod(scheduleId: number): void {
+    this.scrollDetailToTop();
+    this.detailOpen = true;
+    if (this.shownPeriodId() === scheduleId) { return; }
+    this.pendingPeriodId = scheduleId;
+    const vm: RoleCombatViewModel = this.vm;
+    vm.loadFromHistory(this.currentUid, scheduleId).then((): void => {
+      if (!this.attached || this.vm !== vm || this.pendingPeriodId !== scheduleId) { return; }
+      this.pendingPeriodId = 0;
+      this.syncScheduleMeta();
+    });
+  }
+
+  private selectTab(statistics: boolean): void {
+    this.scrollDetailToTop();
+    this.showStatistics = statistics;
+    if (statistics) { this.detailOpen = true; }
+  }
+
+  private showPeriods(): void {
+    this.detailOpen = false;
+    this.showStatistics = false;
+  }
+
+  onBackPress(): boolean {
+    if (!this.isWide && this.detailOpen && this.vm.history.length > 0) {
+      this.showPeriods();
+      return true;
+    }
+    return false;
   }
 
   @Builder
-  header() {
-    PageHeader({ title: '幻想真境剧诗', embedMode: this.embedMode, topAvoidVp: this.topAvoidVp }) {
-      Button('洞察')
-        .fontSize(13)
-        .height(32)
-        .backgroundColor($r('app.color.app_primary_bg'))
-        .fontColor($r('app.color.app_primary_text'))
-        .hoverEffect(HoverEffect.Highlight)
-        .accessibilityText('打开账号洞察')
-        .onClick(() => {
-          router.pushUrl({ url: 'pages/AccountInsightsPage' }).catch(() => {
-          });
-        })
-      Button('刷新')
-        .fontSize(13)
-        .height(32)
-        .backgroundColor($r('app.color.app_primary'))
-        .fontColor($r('app.color.on_accent'))
-        .onClick(() => {
-          this.vm.load(this.currentUid).then(() => {
-            this.syncScheduleMeta();
-            this.toast(this.vm.message.length > 0 ? this.vm.message : '已刷新');
-          });
-        })
+  toolbarLeading() {
+    if (!this.isLoggedIn) {
+      Text($r('app.string.ui_nav_theater')).fontSize(16).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary')).maxLines(1)
+    } else if (!this.isWide && this.detailOpen && this.vm.history.length > 0) {
+      Button('‹ 期次', { type: ButtonType.Normal, buttonStyle: ButtonStyleMode.TEXTUAL })
+        .height(44).fontSize(13).fontColor($r('app.color.text_primary')).backgroundColor(Color.Transparent)
+        .padding({ left: 6, right: 6 }).hoverEffect(HoverEffect.Highlight).accessibilityText('返回期次列表')
+        .onClick(() => this.showPeriods())
+      Text(this.showStatistics ? $r('app.string.ui_spiral_abyss_hutao_statistics') : '分期详情')
+        .fontSize(13).fontColor($r('app.color.text_primary')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+    } else {
+      ChallengePeriodTabs({ statistics: this.showStatistics,
+        onSelect: (value: boolean): void => { this.selectTab(value); } })
+    }
+  }
+
+  @Builder
+  toolbarActions() {
+    if (this.isLoggedIn) {
+      ChallengePeriodActions({ split: this.isWide, refreshEnabled: this.currentUid.length > 0 && !this.vm.loading,
+        detailOpen: this.detailOpen && this.vm.history.length > 0, statistics: this.showStatistics,
+        onInsights: (): void => { router.pushUrl({ url: 'pages/AccountInsightsPage' }).catch(() => {}); },
+        onRefresh: (): void => { this.refreshData(true); },
+        onSwitchTab: (): void => { this.selectTab(!this.showStatistics); } })
     }
   }
 
@@ -135,9 +219,8 @@ export struct RoleCombatPage {
         .fontSize(17)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary'))
-      Button('去登录')
-        .backgroundColor($r('app.color.app_primary'))
-        .fontColor($r('app.color.on_accent'))
+      Button('去登录', { type: ButtonType.Normal })
+        .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true)).constraintSize({ minHeight: 44 })
         .onClick(() => {
           router.pushUrl({ url: 'pages/LoginPage' });
         })
@@ -153,7 +236,7 @@ export struct RoleCombatPage {
         .width(36)
         .height(36)
         .color($r('app.color.app_primary'))
-      Text('加载中...')
+      Text($r('app.string.ui_common_loading'))
         .fontSize(13)
         .fontColor($r('app.color.text_secondary'))
     }
@@ -162,13 +245,13 @@ export struct RoleCombatPage {
   }
 
   @Builder
-  statCell(label: string, value: string) {
+  statCell(slot: number) {
     Column({ space: 2 }) {
-      Text(value)
+      Text(this.summaryValue(slot))
         .fontSize(22)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.app_primary_text'))
-      Text(label)
+      Text(this.summaryLabel(slot))
         .fontSize(11)
         .fontColor($r('app.color.text_secondary'))
     }
@@ -179,153 +262,114 @@ export struct RoleCombatPage {
   @Builder
   summaryCard(item: RoleCombatDataItem) {
     Column({ space: 10 }) {
-      Row() {
-        Text('本期战局')
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1)
-        // 历史存档小标签（与实时数据区分）
-        if (this.vm.fromHistory) {
-          Text('历史存档')
-            .fontSize(10)
-            .fontColor($r('app.color.app_primary_text'))
-            .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-            .borderRadius(6)
-            .backgroundColor($r('app.color.app_primary_bg'))
-            .margin({ right: 8 })
+      Text(item.stat.difficultyLabel() || '挑战战绩').fontSize(19).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary')).width('100%')
+      if (item.stat.maxRoundId > 0) {
+        Text(`已抵达第 ${item.stat.maxRoundId} 幕${item.stat.tarotFinishedCount > 0 ? ` · 圣牌 ${item.stat.tarotFinishedCount}` : ''}`)
+          .fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
+      }
+      if (item.detail.fightStatistics.isShowBattleStats ||
+        item.detail.fightStatistics.maxDefeat.value.length > 0 || item.detail.fightStatistics.maxDamage.value.length > 0) {
+        this.moonStatCard(item)
+      } else {
+        GridRow({ columns: this.isWide ? 4 : 2, gutter: 6 }) {
+          GridCol() { this.statCell(0) }
+          GridCol() { this.statCell(1) }
+          GridCol() { this.statCell(2) }
+          GridCol() { this.statCell(3) }
+        }.width('100%')
+      }
+    }
+    .width('100%')
+    .padding(12)
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel, false))
+    .border({ width: 1, radius: 8, color: $r('app.color.card_stroke') })
+  }
+
+  @Builder
+  scheduleCards() {
+    if (this.scheduleMeta !== undefined && this.scheduleMeta.id === this.vm.current()?.schedule.scheduleId) {
+      if (this.scheduleMeta.elements.length > 0) {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.scheduleMeta.elements, (element: number) => {
+            Row({ space: 4 }) {
+              Stack() {
+                MetaIcon({ category: 'IconElement', name: WikiMetaService.elementIconById(element), iconSize: 17 })
+              }.width(25).height(25).borderRadius(12).backgroundColor($r('app.color.element_icon_background'))
+              Text(WikiMetaService.elementNameById(element)).fontSize(12).fontColor($r('app.color.text_primary'))
+            }.margin({ right: 10 })
+          }, (element: number): string => element.toString())
         }
-        Text(RoleCombatPage.formatSpan(item.schedule.startDateTime, item.schedule.endDateTime))
-          .fontSize(11)
-          .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+        .padding(8)
+        .border({ width: 1, radius: 8, color: $r('app.color.card_stroke') })
+        .accessibilityDescription('限定元素')
       }
-      .width('100%')
-
-      Row({ space: 8 }) {
-        this.statCell('奖章数', `${item.stat.medalNumber}`)
-        this.statCell('金币占用', `${item.stat.coinNumber}`)
-        this.statCell('总回合', `${item.stat.maxRoundId}`)
-        this.statCell('获得奖章回合', `${item.stat.getMedalRoundList.length}`)
-      }
-      .width('100%')
-
-      // 期次元数据（限定元素/特邀/初始可选角色，来自 RoleCombatSchedule.json；匹配不到则不显示）
-      if (this.scheduleMeta !== undefined) {
-        Divider()
-          .width('100%')
-          .color($r('app.color.divider'))
-        if (this.scheduleMeta!.elements.length > 0) {
-          Row({ space: 8 }) {
-            Text('限定元素')
-              .fontSize(12)
-              .fontColor($r('app.color.text_secondary'))
-            ForEach(this.scheduleMeta!.elements, (e: number) => {
-              Row({ space: 4 }) {
-                // Canonical element artwork is a white glyph; a themed backplate preserves contrast.
-                Stack() {
-                  MetaIcon({ category: 'IconElement', name: WikiMetaService.elementIconById(e), iconSize: 16 })
-                }.width(24).height(24).borderRadius(12)
-                  .backgroundColor($r('app.color.element_icon_background'))
-                  .accessibilityLevel('no')
-                Text(WikiMetaService.elementNameById(e))
-                  .fontSize(12)
-                  .fontColor($r('app.color.text_primary'))
-              }
-              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-              .borderRadius(8)
-              .backgroundColor($r('app.color.card_inner_tint'))
-            }, (e: number) => `rc_el_${e}`)
-          }
-          .width('100%')
-          .alignItems(VerticalAlign.Center)
+      GridRow({ columns: this.isWide ? 2 : 1, gutter: 8 }) {
+        if (this.scheduleMeta!.initialAvatars.length > 0) {
+          GridCol() { this.metaAvatarRow('开幕角色', this.scheduleMeta!.initialAvatars) }
         }
         if (this.scheduleMeta!.specialAvatars.length > 0) {
-          this.metaAvatarRow('特邀角色', this.scheduleMeta!.specialAvatars)
+          GridCol() { this.metaAvatarRow('特邀角色', this.scheduleMeta!.specialAvatars) }
         }
-        if (this.scheduleMeta!.initialAvatars.length > 0) {
-          this.metaAvatarRow('初始可选', this.scheduleMeta!.initialAvatars)
-        }
-      }
-
-      Divider()
-        .width('100%')
-        .color($r('app.color.divider'))
-
-      Text('历战回合')
-        .fontSize(14)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'))
-        .width('100%')
-
-      // 回合标签行
-      Row({ space: 6 }) {
-        ForEach(item.detail.roundsData, (round: RoleCombatRoundData) => {
-          this.staticRoundTag(round.roundId, round.isGetMedal)
-        }, (round: RoleCombatRoundData) => `rc_round_${round.roundId}`)
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
+      }.width('100%')
     }
-    .width('100%')
-    .padding(14)
-    .borderRadius($r('app.float.card_radius'))
-    .attributeModifier(new CardSurfaceModifier())
-    .border({ width: 1, color: $r('app.color.card_stroke') })
   }
 
-  @Builder
-  staticRoundTag(roundId: number, isMedal: boolean) {
-    Text(`回合 ${roundId}`)
-      .fontSize(11)
-      .fontColor(isMedal ? $r('app.color.on_accent') : $r('app.color.app_primary'))
-      .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-      .borderRadius(10)
-      .backgroundColor(isMedal ? $r('app.color.app_primary') : $r('app.color.app_primary_bg'))
-  }
-
-  /** 期次元数据头像行（特邀/初始可选角色：头像 + 名字，横向滚动） */
   @Builder
   metaAvatarRow(label: string, ids: number[]) {
-    Row({ space: 8 }) {
-      Text(label)
-        .fontSize(12)
-        .fontColor($r('app.color.text_secondary'))
-      Scroll() {
-        Row({ space: 10 }) {
-          ForEach(ids, (id: number) => {
-            Column({ space: 2 }) {
-              MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(id), iconSize: 36 })
-              Text(WikiMetaService.nameOfAvatarId(id))
-                .fontSize(9)
-                .fontColor($r('app.color.text_secondary'))
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-            }
-            .width(44)
-            .alignItems(HorizontalAlign.Center)
-          }, (id: number) => `rc_meta_av_${id}`)
-        }
-      }
-      .scrollable(ScrollDirection.Horizontal)
-      .scrollBar(BarState.Off)
-      .layoutWeight(1)
+    Column({ space: 7 }) {
+      Text(label).fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary')).width('100%')
+      Flex({ wrap: FlexWrap.Wrap }) {
+        ForEach(ids, (id: number) => {
+          MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(id), iconSize: 48 })
+            .borderRadius(5).clip(true).margin({ right: 5, bottom: 4 })
+            .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel, false)).accessibilityText(WikiMetaService.nameOfAvatarId(id))
+        }, (id: number): string => `${id}_${this.iconRevision}`)
+      }.width('100%')
     }
     .width('100%')
-    .alignItems(VerticalAlign.Center)
+    .padding(8)
+    .border({ width: 1, radius: 8, color: $r('app.color.card_stroke') })
+  }
+
+  @Builder
+  combatAvatar(avatar: RoleCombatAvatar) {
+    Column({ space: 3 }) {
+      Stack({ alignContent: Alignment.TopEnd }) {
+        if (WikiMetaService.iconOfAvatar(avatar.avatarId).length > 0) {
+          MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(avatar.avatarId), iconSize: 48 })
+        } else if (avatar.image.length > 0) {
+          MetaIcon({ category: 'AvatarIcon', name: avatar.image, iconSize: 48 })
+        } else if (AssetIcon.elemName(avatar.element).length > 0) {
+          AssetIcon({ name: AssetIcon.elemName(avatar.element), iconSize: 48 })
+        } else {
+          NavIcon({ name: 'AvatarProperty', iconSize: 44 })
+        }
+        if (avatar.avatarType === 2 || avatar.avatarType === 3) {
+          Text(avatar.avatarType === 2 ? $r('app.string.ui_role_combat_avatar_trial_hint') : $r('app.string.ui_role_combat_support'))
+            .fontSize(10).fontColor($r('app.color.on_accent')).padding({ left: 3, right: 3 })
+            .backgroundColor($r('app.color.image_scrim')).borderRadius(4)
+        }
+      }.width(48).height(48).borderRadius(4).clip(true)
+        .backgroundColor(avatar.rarity >= 5 ? $r('app.color.five_star') : $r('app.color.four_star'))
+      Text(`Lv.${avatar.level}`).fontSize(10).fontColor($r('app.color.text_secondary'))
+    }.width(54).margin({ right: 4, bottom: 4 })
+      .accessibilityText(`${WikiMetaService.nameOfAvatarId(avatar.avatarId) || avatar.name}，等级 ${avatar.level}`)
   }
 
   @Builder
   roundCard(round: RoleCombatRoundData) {
     Column({ space: 8 }) {
       Row({ space: 6 }) {
-        Text(`回合 ${round.roundId}`)
+        AssetIcon({ name: RoleCombatPage.medalIcon(round), iconSize: 20 })
+        Text(round.label())
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
         if (round.isGetMedal) {
           Row({ space: 4 }) {
-            NavIcon({ name: 'RoleCombat', iconSize: 14 })
             Text('获得奖章')
               .fontSize(10)
               .fontColor($r('app.color.app_primary_text'))
@@ -350,57 +394,8 @@ export struct RoleCombatPage {
         .width('100%')
       Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
         ForEach(round.avatars, (avatar: RoleCombatAvatar) => {
-          Column({ space: 3 }) {
-            Stack({ alignContent: Alignment.TopEnd }) {
-              if (avatar.image.startsWith('http')) {
-                Image(avatar.image)
-                  .width(36)
-                  .height(36)
-                  .borderRadius(18)
-                  .objectFit(ImageFit.Cover)
-                  .backgroundColor($r('app.color.card_background'))
-              } else if (avatar.image.length > 0) {
-                MetaIcon({ category: 'AvatarIcon', name: avatar.image, iconSize: 36 })
-                  .borderRadius(18)
-                  .clip(true)
-              } else if (WikiMetaService.iconOfAvatar(avatar.avatarId).length > 0) {
-                MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(avatar.avatarId), iconSize: 36 })
-                  .borderRadius(18)
-                  .clip(true)
-              } else if (AssetIcon.elemName(avatar.element).length > 0) {
-                Image(AssetIcon.resolve(AssetIcon.elemName(avatar.element)))
-                  .width(36)
-                  .height(36)
-                  .borderRadius(18)
-                  .objectFit(ImageFit.Cover)
-                  .backgroundColor($r('app.color.app_primary_bg'))
-              } else {
-                Text(avatar.name.length > 0 ? avatar.name.substring(0, 1) : '★')
-                  .fontSize(13)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor($r('app.color.on_accent'))
-                  .width(36)
-                  .height(36)
-                  .textAlign(TextAlign.Center)
-                  .borderRadius(18)
-                  .backgroundColor($r('app.color.app_primary'))
-              }
-              // 试用/声援角标（对齐 Windows RoleCombatAvatarTypeTemplateSelector：2=试用 3=声援）
-              if (avatar.avatarType === 2 || avatar.avatarType === 3) {
-                Text(avatar.avatarType === 2 ? '试用' : '声援')
-                  .fontSize(8)
-                  .fontColor($r('app.color.on_accent'))
-                  .padding({ left: 4, right: 4 })
-                  .borderRadius(6)
-                  .backgroundColor(avatar.avatarType === 2 ? $r('app.color.app_primary') : $r('app.color.four_star'))
-                  .translate({ y: 2 })
-              }
-            }
-            Text(`Lv.${avatar.level}`)
-              .fontSize(10)
-              .fontColor($r('app.color.text_secondary'))
-          }
-        }, (avatar: RoleCombatAvatar) => `rc_av_${avatar.avatarId}_${round.roundId}_${avatar.image}`)
+          this.combatAvatar(avatar)
+        }, (avatar: RoleCombatAvatar): string => `rc_av_${avatar.avatarId}_${round.roundId}_${avatar.avatarType}_${this.iconRevision}`)
       }
       .width('100%')
 
@@ -448,14 +443,17 @@ export struct RoleCombatPage {
         .width('100%')
       }
 
-      // 辉彩祝福（对齐 Windows SplendourSummary + SplendourBuffs：图标带等级角标）
-      if (round.buffs.length > 0) {
-        Text('辉彩祝福')
+      if (round.splendourBuffs.length > 0 || round.splendourSummary.length > 0 || round.buffs.length > 0) {
+        Text(round.splendourBuffs.length > 0 || round.splendourSummary.length > 0 ? $r('app.string.ui_role_combat_splendour_buffs_header') : '回合效果')
           .fontSize(11)
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
+        if (round.splendourSummary.length > 0) {
+          Text(WikiMetaService.cleanText(round.splendourSummary)).fontSize(12)
+            .fontColor($r('app.color.text_secondary')).width('100%')
+        }
         Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
-          ForEach(round.buffs, (buff: RoleCombatBuff) => {
+          ForEach(round.splendourBuffs.length > 0 ? round.splendourBuffs : round.buffs, (buff: RoleCombatBuff) => {
             Row({ space: 4 }) {
               if (buff.icon.startsWith('http')) {
                 Stack({ alignContent: Alignment.BottomEnd }) {
@@ -491,19 +489,17 @@ export struct RoleCombatPage {
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                 if (buff.desc.length > 0) {
-                  Text(buff.desc.length > 14 ? `${buff.desc.substring(0, 14)}…` : buff.desc)
-                    .fontSize(9)
+                  Text(WikiMetaService.cleanText(buff.desc))
+                    .fontSize(11)
                     .fontColor($r('app.color.text_secondary'))
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }
               }
               .alignItems(HorizontalAlign.Start)
-              .constraintSize({ maxWidth: 150 })
+              .layoutWeight(1)
             }
             .width('100%')
             .padding({ top: 3, bottom: 3 })
-          }, (buff: RoleCombatBuff) => `rc_spb_${buff.id}_${round.roundId}`)
+          }, (buff: RoleCombatBuff, index: number) => `rc_spb_${buff.id}_${index}`)
         }
         .width('100%')
       }
@@ -531,27 +527,22 @@ export struct RoleCombatPage {
                 .borderRadius(8)
                 .backgroundColor($r('app.color.app_primary_bg'))
             }
-            Text(buff.name)
-              .fontSize(12)
-              .fontColor($r('app.color.text_primary'))
-              .layoutWeight(1)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-            Text(buff.desc.length > 12 ? `${buff.desc.substring(0, 12)}…` : buff.desc)
-              .fontSize(10)
-              .fontColor($r('app.color.text_secondary'))
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
+            Column({ space: 2 }) {
+              Text(buff.name).fontSize(12).fontColor($r('app.color.text_primary')).width('100%')
+              if (buff.desc.length > 0) {
+                Text(WikiMetaService.cleanText(buff.desc)).fontSize(11).fontColor($r('app.color.text_secondary')).width('100%')
+              }
+            }.layoutWeight(1)
           }
           .width('100%')
           .padding({ top: 4, bottom: 4 })
-        }, (buff: RoleCombatBuff) => `rc_buff_${buff.id}_${round.roundId}`)
+        }, (buff: RoleCombatBuff, index: number) => `rc_buff_${buff.id}_${index}`)
       }
     }
     .width('100%')
     .padding(12)
     .borderRadius(10)
-    .attributeModifier(new CardSurfaceModifier())
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
     .border({ width: 1, color: $r('app.color.card_stroke') })
     .alignItems(HorizontalAlign.Start)
   }
@@ -560,229 +551,189 @@ export struct RoleCombatPage {
   backupSection(item: RoleCombatDataItem) {
     if (item.detail.backupAvatars.length > 0) {
       Column({ space: 8 }) {
-        Text(`候补角色（${item.detail.backupAvatars.length}）`)
+        Text(`待命角色（${item.detail.backupAvatars.length}）`)
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .width('100%')
         Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
           ForEach(item.detail.backupAvatars, (avatar: RoleCombatAvatar) => {
-            Column({ space: 3 }) {
-              if (avatar.image.startsWith('http')) {
-                Image(avatar.image)
-                  .width(38)
-                  .height(38)
-                  .borderRadius(19)
-                  .objectFit(ImageFit.Cover)
-                  .backgroundColor($r('app.color.card_background'))
-              } else if (avatar.image.length > 0) {
-                MetaIcon({ category: 'AvatarIcon', name: avatar.image, iconSize: 38 })
-                  .borderRadius(19)
-                  .clip(true)
-              } else if (WikiMetaService.iconOfAvatar(avatar.avatarId).length > 0) {
-                MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(avatar.avatarId), iconSize: 38 })
-                  .borderRadius(19)
-                  .clip(true)
-              } else if (AssetIcon.elemName(avatar.element).length > 0) {
-                Image(AssetIcon.resolve(AssetIcon.elemName(avatar.element)))
-                  .width(38)
-                  .height(38)
-                  .borderRadius(19)
-                  .objectFit(ImageFit.Cover)
-                  .backgroundColor($r('app.color.app_primary_bg'))
-              } else {
-                Text(avatar.name.length > 0 ? avatar.name.substring(0, 1) : '★')
-                  .fontSize(13)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor($r('app.color.on_accent'))
-                  .width(38)
-                  .height(38)
-                  .textAlign(TextAlign.Center)
-                  .borderRadius(19)
-                  .backgroundColor($r('app.color.app_primary'))
-              }
-              Text(`Lv.${avatar.level}`)
-                .fontSize(10)
-                .fontColor($r('app.color.text_secondary'))
-            }
-          }, (avatar: RoleCombatAvatar) => `rc_bk_${avatar.avatarId}_${avatar.image}`)
+            this.combatAvatar(avatar)
+          }, (avatar: RoleCombatAvatar): string => `rc_bk_${avatar.avatarId}_${avatar.avatarType}_${this.iconRevision}`)
         }
         .width('100%')
       }
       .width('100%')
       .padding(14)
       .borderRadius($r('app.float.card_radius'))
-      .attributeModifier(new CardSurfaceModifier())
+      .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
       .border({ width: 1, color: $r('app.color.card_stroke') })
     }
+  }
+
+  @Builder
+  periodPanels() {
+    Row() {
+      if (this.vm.history.length > 0 && (this.isWide || !this.detailOpen)) {
+        ChallengePeriodRail({ periods: this.vm.history, selectedId: this.shownPeriodId(), split: this.isWide,
+          onSelect: (scheduleId: number): void => { this.selectPeriod(scheduleId); } })
+      }
+      if (this.isWide || this.detailOpen || this.vm.history.length === 0) {
+        Scroll(this.detailScroller) {
+          Column({ space: 10 }) {
+            this.periodDetail()
+          }
+          .width('100%')
+          .padding(12)
+          .alignItems(HorizontalAlign.Start)
+        }
+        .layoutWeight(1)
+        .height('100%')
+        .align(Alignment.TopStart)
+        .scrollBar(BarState.Auto)
+      }
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .alignItems(VerticalAlign.Top)
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
+    .border({ width: 1, radius: 8, color: $r('app.color.card_stroke') })
+    .clip(true)
   }
 
   build() {
     Stack() {
       PageBackdrop({ embedMode: this.embedMode })
-      Column() {
-      this.header()
-      if (!this.isLoggedIn) {
-        this.loginGuide()
-      } else if (this.vm.loading) {
-        this.loadingView()
-      } else if (!this.vm.isUnlock && this.vm.dataItems.length === 0) {
-        Column({ space: 10 }) {
-          NavIcon({ name: 'RoleCombat', iconSize: 60 })
-          Text('本账号暂无幻想真境剧诗数据')
-            .fontSize(14)
-            .fontColor($r('app.color.text_secondary'))
+      Column({ space: 10 }) {
+        PageToolbar({ embedMode: this.embedMode, leading: (): void => this.toolbarLeading(), trailing: (): void => this.toolbarActions() })
+        if (!this.isLoggedIn) {
+          this.loginGuide()
+        } else {
+          this.periodPanels()
         }
-        .width('100%')
-        .padding({ top: 80, bottom: 80 })
+      }
+      .width('100%')
+      .height('100%')
+      .padding({ left: 12, right: 12, top: this.embedMode ? 8 : 0, bottom: 12 })
+      .onAreaChange((_old: Area, area: Area): void => { this.isWide = Number(area.width) >= 840; })
+      .bindSheet(this.showVerify, () => {
+        RiskVerifyDialog({
+          isShow: this.showVerify,
+          gt: this.vm.riskGt,
+          challenge: this.vm.riskChallenge,
+          path: this.vm.riskPath,
+          onDone: (challenge: string): void => {
+            AppStorage.setOrCreate<string>(RiskUiHelper.KEY_PENDING, challenge);
+            this.refreshData(false);
+          },
+        })
+      }, { systemMaterial: UiSurface.dialogMaterial(this.surfaceMode, this.surfaceLevel), height: 420,
+        backgroundColor: $r('app.color.sheet_material_tint'), showClose: false, blurStyle: BlurStyle.Regular })
+    }
+    .width('100%')
+    .height('100%')
+  }
+
+  @Builder
+  periodDetail() {
+    if (this.vm.loading && (this.vm.current() === undefined || this.pendingPeriodId > 0)) {
+      this.loadingView()
+    } else {
+      if (this.vm.message.length > 0) {
+        Text(this.vm.message).fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
+      }
+      if (this.vm.current() !== undefined) {
+        this.currentDataSection(this.vm.current() ?? this.vm.dataItems[0])
       } else {
-        Scroll() {
-          Column({ space: 10 }) {
-            // 期数历史（本地累积存档，对齐 Windows 左侧期数列表；点历史期回看，⟲ 实时回当前）
-            if (this.vm.history.length > 0) {
-              Scroll() {
-                Row({ space: 8 }) {
-                  if (this.vm.fromHistory) {
-                    Text('⟲ 实时')
-                      .fontSize(12)
-                      .fontColor($r('app.color.app_primary_text'))
-                      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                      .borderRadius(14)
-                      .backgroundColor($r('app.color.app_primary_bg'))
-                      .border({ width: 1, color: $r('app.color.app_primary') })
-                      .onClick(() => {
-                        this.vm.backToLive(this.currentUid).then(() => {
-                          this.syncScheduleMeta();
-                        });
-                      })
-                  }
-                  ForEach(this.vm.history, (h: RoleCombatHistoryEntry, hi: number) => {
-                    Text(this.histChipLabel(h))
-                      .fontSize(12)
-                      .fontColor(this.isHistSelected(h)
-                        ? $r('app.color.app_primary') : $r('app.color.text_secondary'))
-                      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                      .borderRadius(14)
-                      .backgroundColor(this.isHistSelected(h)
-                        ? $r('app.color.app_primary_bg') : $r('app.color.card_surface'))
-                      .border({
-                        width: 1,
-                        color: this.isHistSelected(h)
-                          ? $r('app.color.app_primary') : $r('app.color.card_stroke'),
-                      })
-                      .hoverEffect(HoverEffect.Highlight)
-                      .onClick(() => {
-                        this.vm.loadFromHistory(this.currentUid, h.scheduleId).then(() => {
-                          this.syncScheduleMeta();
-                        });
-                      })
-                  }, (h: RoleCombatHistoryEntry, hi: number) => `rch_${h.scheduleId}_${h.recordTime}_${hi}`)
-                }
-              }
-              .scrollable(ScrollDirection.Horizontal)
-              .scrollBar(BarState.Off)
-              .edgeEffect(EdgeEffect.Spring)
-              .width('100%')
-            }
-
-            if (this.vm.dataItems.length === 0) {
-              Text(this.vm.message.length > 0 ? this.vm.message : '暂无数据，点击右上角「刷新」重试')
-                .fontSize(13)
-                .fontColor($r('app.color.text_secondary'))
-                .width('100%')
-                .padding({ top: 30, bottom: 30 })
-                .textAlign(TextAlign.Center)
-            } else {
-              // 档期切换
-              if (this.vm.dataItems.length > 1) {
-                Scroll() {
-                  Row({ space: 8 }) {
-                    ForEach(this.vm.dataItems, (item: RoleCombatDataItem, idx: number) => {
-                      Text(`第 ${idx + 1} 期`)
-                        .fontSize(12)
-                        .fontColor(this.vm.currentIndex === idx ? $r('app.color.on_accent') : $r('app.color.text_primary'))
-                        .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                        .borderRadius(14)
-                        .backgroundColor(this.vm.currentIndex === idx ? $r('app.color.app_primary') : $r('app.color.card_surface'))
-                        .border({ width: 1, color: this.vm.currentIndex === idx ? $r('app.color.app_primary') : $r('app.color.card_stroke') })
-                        .onClick(() => {
-                          this.vm.select(idx);
-                        })
-                    }, (item: RoleCombatDataItem, idx: number) => `rc_sched_${idx}`)
-                  }
-                }
-                .scrollable(ScrollDirection.Horizontal)
-                .scrollBar(BarState.Off)
-                .edgeEffect(EdgeEffect.Spring)
-                .width('100%')
-              }
-
-              if (this.vm.current() !== undefined) {
-                this.currentDataSection(this.vm.current() ?? this.vm.dataItems[0])
-              }
-            }
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16, bottom: 16 })
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .align(Alignment.Top)
+        Text('暂无本地战绩，点击刷新获取').fontSize(13).fontColor($r('app.color.text_secondary'))
+          .width('100%').padding({ top: 16 })
       }
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
-    .bindSheet(this.showVerify, () => {
-      RiskVerifyDialog({
-        isShow: this.showVerify,
-        gt: this.vm.riskGt,
-        challenge: this.vm.riskChallenge,
-        path: this.vm.riskPath,
-        onDone: (challenge: string) => {
-          AppStorage.setOrCreate<string>(RiskUiHelper.KEY_PENDING, challenge);
-          this.vm.resetRiskAndReload(this.currentUid);
-        },
-      })
-    }, { height: 420, backgroundColor: $r('app.color.sheet_material_tint'), showClose: false, blurStyle: BlurStyle.Regular })
-    }
-    .width('100%')
-    .height('100%')
   }
 
   /** 当前档期内容区 */
   @Builder
   currentDataSection(cur: RoleCombatDataItem) {
-    Column({ space: 10 }) {
-      this.summaryCard(cur)
-
-      ForEach(cur.detail.roundsData, (round: RoleCombatRoundData) => {
-        this.roundCard(round)
-      }, (round: RoleCombatRoundData) => `rc_roundcard_${round.roundId}`)
-
-      this.backupSection(cur)
-
-      this.moonStatCard(cur)
-    }
-    .width('100%')
+    Column({ space: 8 }) {
+      if (!this.showStatistics) { this.scheduleCards() }
+      if (cur.hasData) {
+        this.summaryCard(cur)
+        if (!this.showStatistics) {
+          this.backupSection(cur)
+          GridRow({ columns: this.isWide ? 2 : 1, gutter: 8 }) {
+            ForEach(cur.detail.roundsData, (round: RoleCombatRoundData) => {
+              GridCol() { this.roundCard(round) }
+            }, (round: RoleCombatRoundData, index: number): string => `rc_roundcard_${this.vm.recordVersion}_${index}_${this.iconRevision}`)
+          }.width('100%')
+        }
+      } else {
+        Text(this.showStatistics ? '该期暂无本地统计' : '该期暂无本地战绩')
+          .fontSize(13).fontColor($r('app.color.text_secondary')).width('100%').padding({ top: 12 })
+      }
+    }.width('100%')
   }
 
-  /** 统计卡：带角色图标的数值格（label 左 / value 右） */
+  private summaryLabel(slot: number): string {
+    const labels: string[] = ['奖章数', '金币占用', '总回合', '获得奖章回合'];
+    return labels[slot] ?? '';
+  }
+
+  private summaryValue(slot: number): string {
+    const current: RoleCombatDataItem | undefined = this.vm.current();
+    if (current === undefined) { return '--'; }
+    const values: number[] = [current.stat.medalNumber, current.stat.coinNumber,
+      current.stat.maxRoundId, current.stat.getMedalRoundList.length];
+    return String(values[slot] ?? 0);
+  }
+
+  private statLabel(slot: number): string {
+    const labels: string[] = ['最多击破', '最强一击', '最多承伤', '消耗「幻剧之花」', '挑战星章',
+      '演出总时长', '最佳记录', '场外声援', '助演次数'];
+    return labels[slot] ?? '';
+  }
+
+  private statValue(slot: number): string {
+    const current: RoleCombatDataItem | undefined = this.vm.current();
+    if (current === undefined) { return '--'; }
+    switch (slot) {
+      case 0: return current.detail.fightStatistics.maxDefeat.value || '--';
+      case 1: return current.detail.fightStatistics.maxDamage.value || '--';
+      case 2: return current.detail.fightStatistics.maxTakeDamage.value || '--';
+      case 3: return String(current.stat.coinNumber);
+      case 4: return String(current.stat.medalNumber);
+      case 5: return RoleCombatPage.formatMinutes(current.detail.fightStatistics.totalUseTime);
+      case 6: return `第 ${current.stat.maxRoundId} 幕` +
+        (current.stat.tarotFinishedCount > 0 ? ` 圣牌 ${current.stat.tarotFinishedCount}` : '');
+      // Windows XAML：AvatarBonusNumber → 场外声援，RentCount → 助演次数。
+      case 7: return String(current.stat.avatarBonusNumber);
+      case 8: return String(current.stat.rentCount);
+      default: return '';
+    }
+  }
+
+  private statIcon(slot: number): string {
+    const current: RoleCombatDataItem | undefined = this.vm.current();
+    if (current === undefined) { return ''; }
+    const avatars: RoleCombatAvatarStat[] = [current.detail.fightStatistics.maxDefeat,
+      current.detail.fightStatistics.maxDamage, current.detail.fightStatistics.maxTakeDamage];
+    const avatar: RoleCombatAvatarStat | undefined = slot < 3 ? avatars[slot] : undefined;
+    return avatar !== undefined ? RoleCombatPage.statIconOf(avatar) : '';
+  }
+
+  /** 统计参数只传常量槽位，切期后的动态数值与角色图在渲染时读取。 */
   @Builder
-  statValueCell(label: string, value: string, icon: string, avatarId: number) {
+  statValueCell(slot: number) {
     Row({ space: 6 }) {
-      Text(label)
+      Text(this.statLabel(slot))
         .fontSize(12)
         .fontColor($r('app.color.text_secondary'))
         .layoutWeight(1)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
-      if (avatarId > 0 && WikiMetaService.iconOfAvatar(avatarId).length > 0) {
-        MetaIcon({ category: 'AvatarIcon', name: WikiMetaService.iconOfAvatar(avatarId), iconSize: 26, circular: true })
-      } else if (icon.length > 0) {
-        MetaIcon({ category: 'AvatarIcon', name: RoleCombatPage.iconNameOf(icon), iconSize: 26, circular: true })
+      if (this.statIcon(slot).length > 0) {
+        MetaIcon({ category: 'AvatarIcon', name: this.statIcon(slot), iconSize: 32 })
       }
-      Text(value)
+      Text(this.statValue(slot))
         .fontSize(16)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary'))
@@ -792,7 +743,7 @@ export struct RoleCombatPage {
     .width('100%')
     .padding(12)
     .borderRadius(10)
-    .backgroundColor($r('app.color.card_inner_tint'))
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel, false))
     .border({ width: 1, color: $r('app.color.divider') })
   }
 
@@ -803,69 +754,31 @@ export struct RoleCombatPage {
       cur.detail.fightStatistics.maxDefeat.value.length > 0 ||
       cur.detail.fightStatistics.maxDamage.value.length > 0) {
       Column({ space: 10 }) {
-        Row({ space: 8 }) {
-          Text('月谕模式')
-            .fontSize(15)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1)
-          if (cur.stat.maxRoundId > 0) {
-            Text(`已抵达成第 ${cur.stat.maxRoundId} 幕 圣牌 ${cur.stat.heraldry}`)
-              .fontSize(11)
-              .fontColor($r('app.color.app_primary_text'))
-              .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-              .borderRadius(8)
-              .backgroundColor($r('app.color.app_primary_bg'))
-          }
-        }
-        .width('100%')
-
         // 2 列网格：最多击破/最强一击/最多承伤/幻剧之花/星章/总时长/最佳记录/声援/助演/最快
         Grid() {
-          GridItem() {
-            this.statValueCell('最多击破', cur.detail.fightStatistics.maxDefeat.value, cur.detail.fightStatistics.maxDefeat.icon, cur.detail.fightStatistics.maxDefeat.avatarId)
-          }
-          GridItem() {
-            this.statValueCell('最强一击', cur.detail.fightStatistics.maxDamage.value, cur.detail.fightStatistics.maxDamage.icon, cur.detail.fightStatistics.maxDamage.avatarId)
-          }
-          GridItem() {
-            this.statValueCell('最多承伤', cur.detail.fightStatistics.maxTakeDamage.value, cur.detail.fightStatistics.maxTakeDamage.icon, cur.detail.fightStatistics.maxTakeDamage.avatarId)
-          }
-          GridItem() {
-            this.statValueCell('消弭「幻剧之花」', cur.detail.fightStatistics.totalCoinConsumed.value, cur.detail.fightStatistics.totalCoinConsumed.icon, cur.detail.fightStatistics.totalCoinConsumed.avatarId)
-          }
-          GridItem() {
-            this.statValueCell('挑战星章', `${cur.stat.medalNumber}`, '', 0)
-          }
-          GridItem() {
-            this.statValueCell('演出总时长', RoleCombatPage.formatMinutes(cur.detail.fightStatistics.totalUseTime), '', 0)
-          }
-          GridItem() {
-            this.statValueCell('最佳记录', `第 ${cur.stat.maxRoundId} 幕`, '', 0)
-          }
-          GridItem() {
-            this.statValueCell('场外声援', `${cur.stat.rentCount}`, '', 0)
-          }
-          GridItem() {
-            this.statValueCell('助演次数', `${cur.stat.avatarBonusNumber}`, '', 0)
-          }
+          ForEach([0, 1, 2, 3, 4, 5, 6, 7, 8], (slot: number) => {
+            GridItem() {
+              if (slot === 4 && cur.detail.roundsData.length > 0) { this.medalStrip(cur) }
+              else { this.statValueCell(slot) }
+            }
+          }, (slot: number): string => `rc_stat_${this.vm.recordVersion}_${slot}_${this.iconRevision}`)
           if (cur.detail.fightStatistics.shortestAvatarList.length > 0) {
             GridItem() {
               Row({ space: 4 }) {
-                Text('最快演出')
+                Text($r('app.string.ui_role_combat_shortest'))
                   .fontSize(12)
                   .fontColor($r('app.color.text_secondary'))
                   .layoutWeight(1)
                 Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.End }) {
                   ForEach(cur.detail.fightStatistics.shortestAvatarList, (st: RoleCombatAvatarStat) => {
-                    MetaIcon({ category: 'AvatarIcon', name: RoleCombatPage.statIconOf(st), iconSize: 24, circular: true })
-                  }, (st: RoleCombatAvatarStat, idx: number) => `rc_short_${idx}_${st.icon}`)
+                    MetaIcon({ category: 'AvatarIcon', name: RoleCombatPage.statIconOf(st), iconSize: 32 })
+                  }, (st: RoleCombatAvatarStat, idx: number) => `rc_short_${idx}_${st.avatarId}_${st.icon}_${this.iconRevision}`)
                 }
               }
               .width('100%')
               .padding(12)
               .borderRadius(10)
-              .backgroundColor($r('app.color.card_inner_tint'))
+              .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel, false))
               .border({ width: 1, color: $r('app.color.divider') })
             }
           }
@@ -879,24 +792,29 @@ export struct RoleCombatPage {
         })
       }
       .width('100%')
-      .padding(14)
-      .borderRadius($r('app.float.card_radius'))
-      .attributeModifier(new CardSurfaceModifier())
-      .border({ width: 1, color: $r('app.color.card_stroke') })
     }
   }
 
-  /** 月谕统计列数（对齐 Windows UniformPanel.MeasureOverride：floor((W+gap)/(minItem+gap))）。
-   *  W 取 Grid 自身宽度（onAreaChange），不读屏幕宽；首帧未测量前退回 2 列（原视觉）。
-   *  下限 2 保持手机窄屏观感（原为固定 2 列），上限 4 防止超宽屏格子过窄；
-   *  列模板用 '1fr'，任何列数都按可用宽均分，不会横向溢出。 */
   moonCols(): number {
-    if (this.moonGridW <= 0) {
-      return 2;
+    return this.moonGridW > 0 ? (this.moonGridW >= 500 ? 2 : 1) : (this.isWide ? 2 : 1);
+  }
+
+  @Builder
+  medalStrip(cur: RoleCombatDataItem) {
+    Row({ space: 6 }) {
+      Text('挑战星章').fontSize(12).fontColor($r('app.color.text_secondary'))
+      Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.End }) {
+        ForEach(cur.detail.roundsData, (round: RoleCombatRoundData, index: number) => {
+          AssetIcon({ name: RoleCombatPage.medalIcon(round), iconSize: 20 })
+            .margin({ left: 3 })
+            .accessibilityText(round.label())
+        }, (round: RoleCombatRoundData, index: number): string => `${index}_${round.isGetMedal}_${round.isTarot}`)
+      }.layoutWeight(1)
     }
-    const computed: number = Math.floor((this.moonGridW + RoleCombatPage.MOON_COL_GAP)
-      / (RoleCombatPage.MOON_MIN_ITEM + RoleCombatPage.MOON_COL_GAP));
-    return Math.max(2, Math.min(4, computed));
+    .width('100%')
+    .padding(12)
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel, false))
+    .border({ width: 1, radius: 8, color: $r('app.color.divider') })
   }
 
   /** avatar_icon 全名（如 UI_AvatarIcon_Ayaka）→ MetaIcon name（UI_AvatarIcon_Ayaka）直接可用 */
@@ -905,7 +823,7 @@ export struct RoleCombatPage {
       return '';
     }
     // 可能带 .png 后缀
-    if (icon.endsWith('.png')) {
+    if (!icon.startsWith('http') && !icon.startsWith('file://') && icon.endsWith('.png')) {
       return icon.substring(0, icon.length - 4);
     }
     return icon;
@@ -914,12 +832,16 @@ export struct RoleCombatPage {
   /** 统计格角色图：优先 avatar_id→本地元数据图标，次选 avatar_icon 名 */
   private static statIconOf(st: RoleCombatAvatarStat): string {
     if (st.avatarId > 0) {
-      const local: string = WikiMetaService.iconOfAvatar(st.avatarId);
+      const local: string = WikiMetaService.sideIconOfAvatar(st.avatarId) || WikiMetaService.iconOfAvatar(st.avatarId);
       if (local.length > 0) {
         return local;
       }
     }
     return RoleCombatPage.iconNameOf(st.icon);
+  }
+
+  private static medalIcon(round: RoleCombatRoundData): string {
+    return round.isTarot ? (round.isGetMedal ? 'tarot4' : 'tarot5') : (round.isGetMedal ? 'towerStar1' : 'towerStar2');
   }
 
   private static formatSpan(start: string, end: string): string {
@@ -931,40 +853,21 @@ export struct RoleCombatPage {
     return `${s} ~ ${e}`;
   }
 
-  /** 期数历史 chip 是否为当前查看期（实时/存档均按 scheduleId 匹配） */
-  private isHistSelected(h: RoleCombatHistoryEntry): boolean {
-    const cur: RoleCombatDataItem | undefined = this.vm.current();
-    return cur !== undefined && cur.schedule.scheduleId === h.scheduleId;
-  }
-
-  /** 期数历史 chip 文案：第 X 期(MM/DD~MM/DD) */
-  private histChipLabel(h: RoleCombatHistoryEntry): string {
-    return `第 ${h.scheduleId} 期(${RoleCombatPage.md(h.startTime)}~${RoleCombatPage.md(h.endTime)})`;
-  }
-
-  /** 毫秒时间戳 → 'MM/DD' */
-  private static md(ms: number): string {
-    if (ms <= 0) {
-      return '--';
-    }
-    const d: Date = new Date(ms);
-    return `${DateUtil.pad2(d.getMonth() + 1)}/${DateUtil.pad2(d.getDate())}`;
-  }
-
   private static formatMinutes(sec: number): string {
     if (sec <= 0) {
       return '--';
     }
-    const m: number = Math.floor(sec / 60);
+    const h: number = Math.floor(sec / 3600);
+    const m: number = Math.floor(sec / 60) % 60;
     const s: number = sec % 60;
-    return `${m} 分 ${s} 秒`;
+    return `${DateUtil.pad2(h)}:${DateUtil.pad2(m)}:${DateUtil.pad2(s)}`;
   }
 
   /** 回合完成时间（秒级时间戳 → yyyy.MM.dd HH:mm:ss，对齐 Windows RoundView.FinishTimeString） */
   private static formatRoundTime(sec: number): string {
-    const d: Date = new Date(sec * 1000);
+    const d: Date = ChallengePeriod.serverDate(sec * 1000);
     const p = (n: number): string => `${n}`.padStart(2, '0');
-    return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} `
-      + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    return `${d.getUTCFullYear()}.${p(d.getUTCMonth() + 1)}.${p(d.getUTCDate())} `
+      + `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
   }
 }

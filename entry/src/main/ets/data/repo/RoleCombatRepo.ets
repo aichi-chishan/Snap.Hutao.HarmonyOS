@@ -17,6 +17,7 @@ export class RoleCombatHistoryEntry {
   startTime: number = 0;
   endTime: number = 0;
   recordTime: number = 0;
+  rawJson: string = '';
 }
 
 export class RoleCombatRepo {
@@ -76,6 +77,7 @@ export class RoleCombatRepo {
         e.startTime = rs.getLong(rs.getColumnIndex('start_time'));
         e.endTime = rs.getLong(rs.getColumnIndex('end_time'));
         e.recordTime = rs.getLong(rs.getColumnIndex('record_time'));
+        e.rawJson = rs.getString(rs.getColumnIndex('raw_json'));
         out.push(e);
       }
     } finally {

@@ -63,15 +63,53 @@ export class NotifyFlags {
 
 /** AppStorage 键：便笺数据版本戳（服务层每次成功刷新后自增；便笺页/主页订阅后重读本地缓存） */
 export const KEY_NOTE_VERSION: string = 'dailyNoteVersion';
-/** AppStorage 键：最近一次后台刷新失败原因（供页面提示；成功刷新后清空） */
+/** AppStorage 键：最近一次自动刷新失败原因（供页面提示；成功刷新后清空） */
 export const KEY_NOTE_ERROR: string = 'dailyNoteLastError';
+
+export class DailyNoteTrackedEntry {
+  userId: number = 0;
+  uid: string = '';
+  nickname: string = '';
+  region: string = '';
+  level: number = 0;
+  record: DailyNoteRecord | undefined = undefined;
+}
+
+export class DailyNoteRefreshSummary {
+  total: number = 0;
+  succeeded: number = 0;
+  firstError: string = '';
+}
+
+class TrackedNoteOwnerGuard implements BackgroundTaskGuard {
+  private user: User;
+  private uid: string;
+  private region: string;
+  private active?: () => boolean;
+  constructor(user: User, uid: string, active?: () => boolean) {
+    this.user = user; this.uid = uid; this.region = RegionUtil.regionOfUid(uid); this.active = active;
+  }
+
+  async isActive(): Promise<boolean> {
+    if (this.active?.() === false || PreferencesStore.getBackupJournal().length > 0) { return false; }
+    const saved: User | undefined = await UserRepo.getUserById(this.user.id);
+    return this.active?.() !== false && saved !== undefined &&
+      BackgroundTaskPolicy.identity(saved) === BackgroundTaskPolicy.identity(this.user) &&
+      BackgroundTaskPolicy.owns(saved, this.uid, this.region) && PreferencesStore.getBackupJournal().length === 0 &&
+      PreferencesStore.getTrackedUids(saved.id).includes(this.uid);
+  }
+}
 
 class ForegroundNotePresentationGuard implements BackgroundTaskGuard {
   private user: User;
   private uid: string;
   private revision: number;
-  constructor(user: User, uid: string, revision: number) { this.user = user; this.uid = uid; this.revision = revision; }
+  private owner?: BackgroundTaskGuard;
+  constructor(user: User, uid: string, revision: number, owner?: BackgroundTaskGuard) {
+    this.user = user; this.uid = uid; this.revision = revision; this.owner = owner;
+  }
   async isActive(): Promise<boolean> {
+    if (this.owner !== undefined && !await this.owner.isActive()) { return false; }
     return UserService.getInstance().sessionRevision() === this.revision &&
       !UserService.getInstance().isSessionTransitionPending() && UserService.getInstance().getCurrentUser() === this.user &&
       PreferencesStore.getCurrentUid() === this.uid && PreferencesStore.getBackupJournal().length === 0;
@@ -84,8 +122,13 @@ export class DailyNoteService {
   private timerRunning: boolean = false;
   /** 当前定时器间隔（分钟）：同间隔重复 start 不重启计时 */
   private intervalMin: number = 0;
-  /** 在途刷新标记（重入保护：手动/自动/卡片刷新共用） */
-  private refreshing: boolean = false;
+  /** 手动/自动/卡片刷新共用的结算信号；失败也会结算，便于回前台等待旧请求退出。 */
+  private refreshInFlight: Promise<void> | undefined = undefined;
+  private foreground: boolean = false;
+  private autoRevision: number = 0;
+  private bootstrapRevision: number = -1;
+  private autoRunRevision: number = -1;
+  private autoRun: Promise<void> | undefined = undefined;
 
   static getInstance(): DailyNoteService {
     return DailyNoteService.instance;
@@ -109,19 +152,26 @@ export class DailyNoteService {
    * @param challenge 可选：极验通过后从 verifyVerification 换得的 challenge（重放头）
    */
   async refresh(uid: string, challenge?: string, interactive: boolean = true): Promise<DailyNote> {
-    if (this.refreshing) {
+    if (this.refreshInFlight !== undefined) {
       throw new Error('正在刷新中，请稍候');
     }
-    this.refreshing = true;
+    return this.runRefresh<DailyNote>((): Promise<DailyNote> => this.doRefresh(uid, challenge, interactive));
+  }
+
+  private async runRefresh<T>(work: () => Promise<T>): Promise<T> {
+    const operation: Promise<T> = Promise.resolve().then<T>(work);
+    const settled: Promise<void> = operation.then<void, void>((): void => {}, (): void => {});
+    this.refreshInFlight = settled;
     try {
-      return await this.doRefresh(uid, challenge, interactive);
+      return await operation;
     } finally {
-      this.refreshing = false;
+      if (this.refreshInFlight === settled) { this.refreshInFlight = undefined; }
     }
   }
 
-  /** Native deferred work: explicit owner, one request, no token exchange, verification, permission or webhook path. */
-  async refreshBackground(user: User, uid: string, region: string, guard: BackgroundTaskGuard): Promise<BackgroundTaskResult> {
+  /** Refresh an explicit owner from saved credentials. Scheduled tracked refresh can run its configured side effects. */
+  async refreshBackground(user: User, uid: string, region: string, guard: BackgroundTaskGuard,
+    trackedEffects: boolean = false): Promise<BackgroundTaskResult> {
     if (!BackgroundTaskPolicy.owns(user, uid, region) || user.cookieToken.length === 0 || user.gameRecordCookie().length === 0) {
       return BackgroundTaskResult.of('login_required', '请在应用内补齐登录凭据后重新排队');
     }
@@ -134,57 +184,107 @@ export class DailyNoteService {
     if (response.data === undefined) { return BackgroundTaskResult.of('retry', '便笺响应为空，等待下次调度'); }
     const note: DailyNote = DailyNote.fromJson(response.data);
     note.refreshTime = Date.now();
+    const prev: DailyNoteRecord | undefined = trackedEffects ? await DailyNoteRepo.get(user.id, uid) : undefined;
     if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
     await DailyNoteRepo.upsert(user.id, uid, note, (): Promise<boolean> => guard.isActive());
     if (!await guard.isActive()) { return BackgroundTaskResult.of('cancelled', '任务已停止'); }
     DailyNoteService.bumpVersion();
-    // Native work refreshes the current binding's form snapshot. Notifications/reminders are
-    // deliberately left to their already-authorized foreground flow; no permission UI can run here.
-    await this.updateCardSnapshot(note, user.displayName, user.id, uid, guard, true);
+    if (await UserRepo.getSelectedUserId() === user.id && (await UserRepo.getDefaultRole(user.id))?.gameUid === uid) {
+      await this.updateCardSnapshot(note, user.displayName, user.id, uid, guard, true);
+    }
+    if (trackedEffects) {
+      await this.evalAndNotify(user.id, uid, note, prev, guard);
+      await this.forwardWebhook(uid, note, guard);
+    }
     return BackgroundTaskResult.of('success', '后台便笺已刷新', BackgroundTaskPolicy.day(region));
   }
 
-  /**
-   * 追踪列表刷新（对齐 Windows 多 UID 追踪）：顺序刷新当前账号下全部被追踪 UID
-   * （不含当前 UID——它已由常规刷新覆盖），单个失败不影响其余。
-   */
-  async refreshTrackedList(): Promise<number> {
-    if (this.refreshing) {
-      return 0;
+  /** Local tracking records across saved accounts, including roles with no cached snapshot yet. */
+  async trackedEntries(): Promise<DailyNoteTrackedEntry[]> {
+    const entries: DailyNoteTrackedEntry[] = [];
+    for (const user of await UserRepo.getAllUsers()) {
+      const tracked: string[] = PreferencesStore.getTrackedUids(user.id);
+      for (const role of BackgroundTaskPolicy.mainlandRoles(user)) {
+        if (!tracked.includes(role.gameUid)) { continue; }
+        const entry: DailyNoteTrackedEntry = new DailyNoteTrackedEntry();
+        entry.userId = user.id;
+        entry.uid = role.gameUid;
+        entry.nickname = role.nickname;
+        entry.region = role.region;
+        entry.level = role.level;
+        entry.record = await DailyNoteRepo.get(user.id, role.gameUid);
+        entries.push(entry);
+      }
     }
-    this.refreshing = true;
-    let ok: number = 0;
-    try {
+    return entries;
+  }
+
+  async refreshTrackedEntry(userId: number, uid: string): Promise<DailyNote> {
+    if (this.refreshInFlight !== undefined) { throw new Error('正在刷新中，请稍候'); }
+    return this.runRefresh<DailyNote>(async (): Promise<DailyNote> => {
+      const user: User | undefined = await UserRepo.getUserById(userId);
+      if (user === undefined) { throw new Error('该账号已移除'); }
+      return await this.refreshOwnedEntry(user, uid, true);
+    });
+  }
+
+  /** 手动强刷全部追踪；自动调用传入过期时间与本批有效性检查。 */
+  async refreshTrackedList(interactive: boolean = true, staleAfterMs: number = 0,
+    active?: () => boolean): Promise<DailyNoteRefreshSummary> {
+    const summary: DailyNoteRefreshSummary = new DailyNoteRefreshSummary();
+    if (this.refreshInFlight !== undefined) { summary.firstError = '正在刷新中，请稍候'; return summary; }
+    return this.runRefresh<DailyNoteRefreshSummary>(async (): Promise<DailyNoteRefreshSummary> => {
       const users: User[] = await UserRepo.getAllUsers();
-      const current = UserService.getInstance().getCurrentUser();
-      const currentUid: string = PreferencesStore.getCurrentUid();
       for (const user of users) {
-        if (!user.hasCookie()) { continue; }
-        const uids: string[] = PreferencesStore.getTrackedUids(user.id);
-        for (const uid of uids) {
-          if (current !== undefined && user.id === current.id && uid === currentUid) { continue; }
+        for (const role of BackgroundTaskPolicy.mainlandRoles(user)) {
+          if (active?.() === false) { return summary; }
+          const uid: string = role.gameUid;
+          if (!PreferencesStore.getTrackedUids(user.id).includes(uid)) { continue; }
           try {
-            // 后台不切换全局账号，不弹出另一个账号的验证窗口。
-            await this.doRefresh(uid, undefined, false, user);
-            ok++;
+            if (staleAfterMs > 0) {
+              const cached: DailyNoteRecord | undefined = await DailyNoteRepo.get(user.id, uid);
+              if (active?.() === false) { return summary; }
+              if (cached !== undefined && cached.note.refreshTime > 0 &&
+                Date.now() - cached.note.refreshTime < staleAfterMs) { continue; }
+            }
+            summary.total++;
+            await this.refreshOwnedEntry(user, uid, interactive, active);
+            summary.succeeded++;
           } catch (e) {
-            Logger.warn(TAG, `tracked refresh failed uid=${uid}: ${(e as Error).message}`);
+            if (active?.() === false) { return summary; }
+            if (summary.firstError.length === 0) { summary.firstError = (e as Error).message; }
           }
         }
       }
-    } finally {
-      this.refreshing = false;
+      return summary;
+    });
+  }
+
+  private async refreshOwnedEntry(user: User, uid: string, allowInteractive: boolean,
+    active?: () => boolean): Promise<DailyNote> {
+    const guard: TrackedNoteOwnerGuard = new TrackedNoteOwnerGuard(user, uid, active);
+    await this.assertTrackedActive(guard);
+    const selected: User | undefined = UserService.getInstance().getCurrentUser();
+    if (selected !== undefined && selected.id === user.id &&
+      BackgroundTaskPolicy.identity(selected) === BackgroundTaskPolicy.identity(user) && PreferencesStore.getCurrentUid() === uid) {
+      return this.doRefresh(uid, undefined, allowInteractive, selected, guard);
     }
-    return ok;
+    return this.doRefresh(uid, undefined, false, user, guard);
+  }
+
+  private async assertTrackedActive(guard?: BackgroundTaskGuard): Promise<void> {
+    if (guard !== undefined && !await guard.isActive()) { throw new Error('该角色已停止追踪或账号已变化'); }
   }
 
   /** 实际刷新流程：网络拉取 → 落库 → 广播版本戳 → 卡片快照 → 阈值通知 */
-  private async doRefresh(uid: string, challenge?: string, interactive: boolean = true, account?: User): Promise<DailyNote> {
+  private async doRefresh(uid: string, challenge?: string, interactive: boolean = true, account?: User,
+    guard?: BackgroundTaskGuard): Promise<DailyNote> {
     const revision: number = UserService.getInstance().sessionRevision();
     const user: User | undefined = account ?? UserService.getInstance().getCurrentUser();
     if (user === undefined || !user.hasCookie()) {
       throw new Error('请先登录');
     }
+    const presentation: ForegroundNotePresentationGuard = new ForegroundNotePresentationGuard(user, uid, revision, guard);
     // 若缺 cookie_token/ltoken（旧账号），先用 SToken 补齐再拉取
     if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
       if (!interactive) { throw new Error('请打开应用补齐登录凭据'); }
@@ -198,6 +298,7 @@ export class DailyNoteService {
 
     // 降低风控概率：请求前随机 600~1200ms 抖动
     await DailyNoteService.delay(600 + Math.floor(Math.random() * 600));
+    await this.assertTrackedActive(guard);
 
     // 重放头（风控验证后）
     const extra: Record<string, string> = {};
@@ -208,7 +309,7 @@ export class DailyNoteService {
     // 拉取
     let resp: ApiResponse = await HoyolabClient.fetchDailyNote(uid, region, cookie, extra);
     if (resp.isRiskControl()) {
-      if (!interactive || HoyolabEndpoints.isOverseaRegion(region)) {
+      if (!interactive || HoyolabEndpoints.isOverseaRegion(region) || (guard !== undefined && !await presentation.isActive())) {
         throw new Error('请打开应用完成人机验证');
       }
       // 1034：自动弹统一验证窗，成功后带 challenge 服务内重放一次
@@ -216,13 +317,16 @@ export class DailyNoteService {
       if (replayChallenge.length === 0) {
         throw new Error('人机验证未完成或被取消，请稍后再试');
       }
+      await this.assertTrackedActive(guard);
       extra['x-rpc-challenge'] = replayChallenge;
+      if (guard !== undefined && !await presentation.isActive()) { throw new Error('当前角色已切换'); }
       resp = await HoyolabClient.fetchDailyNote(uid, region, cookie, extra);
     }
     // Cookie 鉴权失效（-100/10001）：强制换新凭证后重试一次（对齐 Windows CookieToken 刷新）
     if (!resp.success && UserService.isCookieAuthError(resp)) {
-      if (!interactive) { throw new Error('请打开应用重新登录'); }
-      resp = await UserService.retryWithRefreshedCookie(user, (): Promise<ApiResponse> => {
+      if (!interactive || (guard !== undefined && !await presentation.isActive())) { throw new Error('请打开应用重新登录'); }
+      resp = await UserService.retryWithRefreshedCookie(user, async (): Promise<ApiResponse> => {
+        await this.assertTrackedActive(guard);
         const retryExtra: Record<string, string> = {};
         for (const k of Object.keys(extra)) {
           retryExtra[k] = extra[k];
@@ -240,7 +344,9 @@ export class DailyNoteService {
     const note: DailyNote = DailyNote.fromJson(resp.data);
     note.refreshTime = Date.now();
     const prev: DailyNoteRecord | undefined = await DailyNoteRepo.get(user.id, uid);
-    await DailyNoteRepo.upsert(user.id, uid, note);
+    await this.assertTrackedActive(guard);
+    await DailyNoteRepo.upsert(user.id, uid, note, guard === undefined ? undefined : (): Promise<boolean> => guard.isActive());
+    await this.assertTrackedActive(guard);
 
     // 广播：本地缓存已更新（服务层自动刷新 / 桌面卡片刷新 / 页面手动刷新都会走到这里），
     // 便笺页与主页便笺卡订阅该版本戳后重读本地缓存，避免界面数值停滞。
@@ -257,25 +363,20 @@ export class DailyNoteService {
     const currentUser = UserService.getInstance().getCurrentUser();
     if (currentUser !== undefined && user.id === currentUser.id && uid === PreferencesStore.getCurrentUid()) {
       await this.updateCardSnapshot(note, user.displayName, user.id, uid,
-        new ForegroundNotePresentationGuard(user, uid, revision));
+        presentation);
     }
 
-    await this.evalAndNotify(user.id, uid, note, prev);
+    await this.evalAndNotify(user.id, uid, note, prev, guard);
+    await this.assertTrackedActive(guard);
     try {
       await DailyNoteReminderService.sync(user.id, uid, note, prev);
     } catch (e) {
-      AppStorage.setOrCreate<string>(DailyNoteReminderService.ERROR_KEY, (e as Error).message);
-      Logger.warn(TAG, `agent reminder failed: ${(e as Error).message}`);
-    }
-    const webhook: string = DailyNoteService.webhookUrl();
-    if (webhook.length > 0 && note.rawJson.length > 0) {
-      try {
-        await DailyNoteWebhookClient.send(webhook, uid, note.rawJson);
-      } catch (e) {
-        // 网络转发失败不能抹掉已成功更新的本地便笺。
-        Logger.warn(TAG, `webhook failed: ${(e as Error).message}`);
+      if (guard === undefined || await guard.isActive()) {
+        AppStorage.setOrCreate<string>(DailyNoteReminderService.ERROR_KEY, (e as Error).message);
+        Logger.warn(TAG, `agent reminder failed: ${(e as Error).message}`);
       }
     }
+    await this.forwardWebhook(uid, note, guard);
     Logger.info(TAG, `refresh ok uid=${uid} resin=${note.currentResin}/${note.maxResin}`);
     // 派遣头像排查：接口可能返回哈希文件名（本地/CND 无对应图标，UI 改走接口 URL）
     for (const expedition of note.expeditions) {
@@ -284,6 +385,13 @@ export class DailyNoteService {
       }
     }
     return note;
+  }
+
+  private async forwardWebhook(uid: string, note: DailyNote, guard?: BackgroundTaskGuard): Promise<void> {
+    const webhook: string = DailyNoteService.webhookUrl();
+    if (webhook.length === 0 || note.rawJson.length === 0 || (guard !== undefined && !await guard.isActive())) { return; }
+    try { await DailyNoteWebhookClient.send(webhook, uid, note.rawJson); }
+    catch (e) { Logger.warn(TAG, 'webhook delivery failed'); }
   }
 
   /** 刷新成功后更新桌面卡片快照并主动推送 formProvider */
@@ -373,10 +481,14 @@ export class DailyNoteService {
   }
 
   /** 阈值判定 → 本地通知（边沿触发：仅当本次达标且上次未达标） */
-  async evalAndNotify(userId: number, uid: string, note: DailyNote, prev: DailyNoteRecord | undefined): Promise<void> {
+  async evalAndNotify(userId: number, uid: string, note: DailyNote, prev: DailyNoteRecord | undefined,
+    guard?: BackgroundTaskGuard): Promise<void> {
     if (!NotificationHelper.isEnabled()) {
       return;
     }
+    const publish = async (title: string, text: string, id: number): Promise<void> => {
+      if (guard === undefined || await guard.isActive()) { await NotificationHelper.publish(title, text, id); }
+    };
     const flags: number = prev !== undefined ? prev.notifyFlags : NotifyFlags.ALL;
     const resinTh: number = prev !== undefined ? prev.resinNotifyThreshold : 120;
     const homeTh: number = prev !== undefined ? prev.homeCoinNotifyThreshold : 1800;
@@ -388,7 +500,7 @@ export class DailyNoteService {
     if ((flags & NotifyFlags.RESIN) !== 0 && note.resinReached(resinTh)) {
       const wasMet: boolean = hasRec && prevNote.resinReached(resinTh);
       if (!wasMet) {
-        await NotificationHelper.publish(`UID ${uid} · 树脂已达标`,
+        await publish(`UID ${uid} · 树脂已达标`,
           `当前树脂 ${note.currentResin}/${note.maxResin}，已达阈值 ${resinTh}`, DailyNoteService.notificationId(uid, NotifyIds.RESIN));
       }
     }
@@ -398,7 +510,7 @@ export class DailyNoteService {
       if (allDone) {
         const wasDone: boolean = hasRec && prevNote.allExpeditionsFinished();
         if (!wasDone) {
-          await NotificationHelper.publish(`UID ${uid} · 派遣已完成`, '所有派遣任务已完成', DailyNoteService.notificationId(uid, NotifyIds.EXPEDITION));
+          await publish(`UID ${uid} · 派遣已完成`, '所有派遣任务已完成', DailyNoteService.notificationId(uid, NotifyIds.EXPEDITION));
         }
       }
     }
@@ -411,7 +523,7 @@ export class DailyNoteService {
           ServerTime.date(region, prevNote.refreshTime) === ServerTime.date(region, note.refreshTime);
         const wasPending: boolean = hasRec && sameDay && !prevNote.isExtraTaskRewardReceived;
         if (!wasPending) {
-          await NotificationHelper.publish(`UID ${uid} · 每日委托奖励未领取`, note.extraTaskRewardDescription(),
+          await publish(`UID ${uid} · 每日委托奖励未领取`, note.extraTaskRewardDescription(),
             DailyNoteService.notificationId(uid, NotifyIds.DAILY_TASK));
         }
       }
@@ -420,14 +532,14 @@ export class DailyNoteService {
     if ((flags & NotifyFlags.TRANSFORMER) !== 0 && note.transformer.isReady()) {
       const wasReady: boolean = hasRec && prevNote.transformer.isReady();
       if (!wasReady) {
-        await NotificationHelper.publish(`UID ${uid} · 参变仪就绪`, '参量质变仪已可使用', DailyNoteService.notificationId(uid, NotifyIds.TRANSFORMER));
+        await publish(`UID ${uid} · 参变仪就绪`, '参量质变仪已可使用', DailyNoteService.notificationId(uid, NotifyIds.TRANSFORMER));
       }
     }
     // 洞天宝钱
     if ((flags & NotifyFlags.HOME_COIN) !== 0 && note.homeCoinReached(homeTh)) {
       const wasMet: boolean = hasRec && prevNote.homeCoinReached(homeTh);
       if (!wasMet) {
-        await NotificationHelper.publish(`UID ${uid} · 洞天宝钱已达标`,
+        await publish(`UID ${uid} · 洞天宝钱已达标`,
           `当前宝钱 ${note.currentHomeCoin}/${note.maxHomeCoin}，已达阈值 ${homeTh}`, DailyNoteService.notificationId(uid, NotifyIds.HOME_COIN));
       }
     }
@@ -441,9 +553,16 @@ export class DailyNoteService {
     return hash * 10 + (kind - NotifyIds.RESIN);
   }
 
-  /** 启动自动刷新（intervalMin 分钟）。已在运行且间隔未变时不重启，避免每次进页把计时清零 */
+  /** Ability 生命周期只控制前台轮询；OS 显式后台任务使用独立的 refreshBackground。 */
+  setForeground(foreground: boolean): void {
+    if (this.foreground === foreground) { return; }
+    this.foreground = foreground;
+    if (!foreground) { this.stopAutoRefresh(); }
+  }
+
+  /** 同间隔重复 start 不重置计时；用户选项和前台状态同时允许时才开表。 */
   startAutoRefresh(intervalMin: number): void {
-    if (intervalMin <= 0) {
+    if (!this.foreground || !PreferencesStore.isReady() || !PreferencesStore.getAutoRefreshEnabled() || intervalMin <= 0) {
       this.stopAutoRefresh();
       return;
     }
@@ -452,14 +571,16 @@ export class DailyNoteService {
     }
     this.stopAutoRefresh();
     this.intervalMin = intervalMin;
-    this.timer = setInterval(() => {
-      this.tickAutoRefresh();
+    const revision: number = this.autoRevision;
+    this.timer = setInterval((): void => {
+      this.tickAutoRefresh(revision);
     }, intervalMin * 60 * 1000);
     this.timerRunning = true;
     Logger.info(TAG, `auto refresh started every ${intervalMin}min`);
   }
 
   stopAutoRefresh(): void {
+    this.autoRevision++;
     if (this.timer >= 0) {
       clearInterval(this.timer);
       this.timer = -1;
@@ -471,67 +592,71 @@ export class DailyNoteService {
     return this.timerRunning;
   }
 
-  /** 应用启动/回前台：按偏好同步定时器，并在缓存过期时后台补一次（对齐 Windows 启动即刷新便笺） */
+  /** 本次进入前台补扫一次；初始化和 onForeground 重复调用时合并同一批工作。 */
   async bootstrapAutoRefresh(): Promise<void> {
     if (!PreferencesStore.isReady()) {
       return;
     }
-    if (!PreferencesStore.getAutoRefreshEnabled()) {
+    if (!this.foreground || !PreferencesStore.getAutoRefreshEnabled()) {
       this.stopAutoRefresh();
       return;
     }
     const intervalMin: number = PreferencesStore.getRefreshIntervalMinutes();
     this.startAutoRefresh(intervalMin);
-    await this.refreshIfStale(intervalMin);
+    if (this.bootstrapRevision !== this.autoRevision || this.autoRun !== undefined) {
+      await this.tickAutoRefresh(this.autoRevision);
+    }
   }
 
-  /** 缓存超过 intervalMin 分钟（或从未刷新）时后台补一次；失败只记录不抛出 */
-  private async refreshIfStale(intervalMin: number): Promise<void> {
-    if (this.refreshing) {
+  private canAutoRefresh(revision: number): boolean {
+    return revision === this.autoRevision && this.foreground && this.timerRunning && PreferencesStore.isReady() &&
+      PreferencesStore.getAutoRefreshEnabled() && PreferencesStore.getBackupJournal().length === 0 &&
+      !UserService.getInstance().isSessionTransitionPending();
+  }
+
+  private async tickAutoRefresh(revision: number): Promise<void> {
+    if (!this.canAutoRefresh(revision)) { return; }
+    if (this.autoRun !== undefined) {
+      const sameRun: boolean = this.autoRunRevision === revision;
+      const pendingRun: Promise<void> = this.autoRun;
+      await pendingRun;
+      // 回前台的新批次等待旧请求退出；同一批的重复触发只等待，不重新请求失败项。
+      if (!sameRun) { await this.tickAutoRefresh(revision); }
       return;
     }
-    const uid: string = AppStorage.get<string>('currentUid') ?? '';
-    if (uid.length === 0) {
-      return;
-    }
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined || !user.hasCookie()) {
-      return;
-    }
+    this.autoRunRevision = revision;
+    const running: Promise<void> = this.refreshStaleTracked(revision, this.intervalMin * 60 * 1000);
+    this.autoRun = running;
     try {
-      const rec: DailyNoteRecord | undefined = await DailyNoteRepo.get(user.id, uid);
-      const ageMs: number = rec !== undefined && rec.note.refreshTime > 0
-        ? Date.now() - rec.note.refreshTime : Number.MAX_SAFE_INTEGER;
-      if (ageMs < intervalMin * 60 * 1000) {
-        return;
+      await running;
+    } finally {
+      if (this.autoRun === running) { this.autoRun = undefined; }
+    }
+  }
+
+  private async refreshStaleTracked(revision: number, staleAfterMs: number): Promise<void> {
+    while (this.refreshInFlight !== undefined) {
+      const pendingRefresh: Promise<void> = this.refreshInFlight;
+      await pendingRefresh;
+      if (!this.canAutoRefresh(revision)) { return; }
+    }
+    if (!this.canAutoRefresh(revision)) { return; }
+    // 开表不等于已补扫：账号/备份门控解除后的 bootstrap 仍可补上本次前台工作。
+    this.bootstrapRevision = revision;
+    const sessionRevision: number = UserService.getInstance().sessionRevision();
+    const active: () => boolean = (): boolean => this.canAutoRefresh(revision) &&
+      UserService.getInstance().sessionRevision() === sessionRevision;
+    try {
+      const summary: DailyNoteRefreshSummary = await this.refreshTrackedList(false, staleAfterMs, active);
+      if (!active()) { return; }
+      if (summary.firstError.length > 0) { DailyNoteService.publishError(summary.firstError); }
+      else if (summary.succeeded > 0) { DailyNoteService.clearError(); }
+    } catch (e) {
+      if (active()) {
+        DailyNoteService.publishError((e as Error).message);
+        Logger.warn(TAG, `auto refresh fail ${(e as Error).message}`);
       }
-      await this.refresh(uid);
-      Logger.info(TAG, 'stale refresh done');
-    } catch (e) {
-      DailyNoteService.publishError((e as Error).message);
-      Logger.warn(TAG, `stale refresh fail ${(e as Error).message}`);
     }
-  }
-
-  private async tickAutoRefresh(): Promise<void> {
-    const isLoggedIn: boolean = AppStorage.get<boolean>('isLoggedIn') ?? false;
-    if (!isLoggedIn) {
-      return;
-    }
-    const uid: string = AppStorage.get<string>('currentUid') ?? '';
-    if (uid.length === 0) {
-      return;
-    }
-    try {
-      await this.refresh(uid);
-      Logger.info(TAG, 'auto refresh done');
-    } catch (e) {
-      // 失败原因写入 AppStorage，便笺页顶部提示（此前只进日志，用户无感知）
-      DailyNoteService.publishError((e as Error).message);
-      Logger.warn(TAG, `auto refresh fail ${(e as Error).message}`);
-    }
-    // 追踪列表随自动刷新一起轮询（单个失败静默）
-    await this.refreshTrackedList();
   }
 
   /** 自增数据版本戳：AppStorage 全局广播（页面/主页订阅后重读本地缓存） */

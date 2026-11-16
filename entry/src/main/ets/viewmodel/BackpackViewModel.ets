@@ -4,6 +4,7 @@ import { BackpackService } from '../service/BackpackService';
 import { CultivateProject } from '../data/repo/CultivationRepo';
 import { BackpackScoreEdit, BackpackScoreProfile, BackpackScoreSettings, BackpackScoring } from '../model/BackpackScore';
 import { BackpackScoreService } from '../service/BackpackScoreService';
+import { WikiAvatarMeta } from '../service/WikiMetaService';
 
 @Observed
 export class BackpackViewModel {
@@ -17,6 +18,7 @@ export class BackpackViewModel {
   filter: BackpackFilter = new BackpackFilter();
   scoreSettings: BackpackScoreSettings = new BackpackScoreSettings();
   private generation: number = 0;
+  private displayRequest: number = 0;
   private active: boolean = true;
 
   activate(): void { this.active = true; }
@@ -45,6 +47,21 @@ export class BackpackViewModel {
     } finally { if (generation === this.generation) { this.loading = false; } }
   }
 
+  /** Reload labels and keep the current archive, filter and active editor generations. */
+  async refreshDisplay(): Promise<boolean> {
+    const request: number = ++this.displayRequest;
+    const generation: number = this.generation;
+    const id: number = this.currentId;
+    if (!this.active || id <= 0) { return false; }
+    try {
+      const items: BackpackItem[] = await BackpackService.getItems(id);
+      if (request !== this.displayRequest || generation !== this.generation || id !== this.currentId) { return false; }
+      this.allItems = items;
+      this.recalculateScores();
+      return true;
+    } catch (e) { return false; }
+  }
+
   beginScoreEdit(): BackpackScoreEdit {
     if (!this.active || this.loading || this.currentId <= 0) { throw new Error('请先选择背包档案'); }
     this.scoreSettings = BackpackScoreService.load();
@@ -56,15 +73,9 @@ export class BackpackViewModel {
     return edit;
   }
 
-  saveScore(edit: BackpackScoreEdit, profile: BackpackScoreProfile): void {
+  saveScore(edit: BackpackScoreEdit, profile: BackpackScoreProfile, deletedIds: string[] = []): void {
     this.verifyScoreOwner(edit);
-    this.scoreSettings = BackpackScoreService.save(profile, edit.settingsRevision);
-    this.recalculateScores();
-  }
-
-  deleteScore(edit: BackpackScoreEdit, id: string): void {
-    this.verifyScoreOwner(edit);
-    this.scoreSettings = BackpackScoreService.remove(id, edit.settingsRevision);
+    this.scoreSettings = BackpackScoreService.save(profile, edit.settingsRevision, deletedIds);
     this.recalculateScores();
   }
 
@@ -87,6 +98,23 @@ export class BackpackViewModel {
     return this.archives.find((archive: BackpackArchive): boolean => archive.id === this.currentId);
   }
 
+  equippedAvatarLabel(avatarId: number | undefined): string {
+    if (avatarId === undefined) { return '装备状态未知'; }
+    if (avatarId === 0) { return '未装备'; }
+    const name: string = BackpackService.equippedAvatar(avatarId)?.name ?? '';
+    return `已装备 · ${name || `角色 ID ${avatarId}`}`;
+  }
+
+  equippedAvatarIcon(avatarId: number | undefined): string {
+    if (avatarId === undefined || avatarId === 0) { return ''; }
+    const avatar: WikiAvatarMeta | undefined = BackpackService.equippedAvatar(avatarId);
+    return avatar?.sideIcon || avatar?.icon || '';
+  }
+
+  purchasedStatNames(ids: number[]): string[] {
+    return BackpackService.purchasedStatNames(ids);
+  }
+
   applyFilter(): void { this.items = BackpackCatalog.filter(this.allItems, this.filter); }
   async select(id: number): Promise<void> { await BackpackService.selectArchive(id); await this.load(id); }
   async create(name: string, uid: string): Promise<void> { await this.load(await BackpackService.createArchive(name, uid)); }
@@ -101,6 +129,7 @@ export class BackpackViewModel {
     }
     prepared.targetArchiveId = archive.id;
     prepared.targetUid = archive.uid;
+    prepared.targetCreatedAt = archive.createdAt;
     prepared.targetUpdatedAt = archive.updatedAt;
     return prepared;
   }
@@ -117,19 +146,25 @@ export class BackpackViewModel {
   syncMaterials(id: number, projectId: number, replace: boolean): Promise<number> {
     return BackpackService.syncMaterials(id, projectId, replace);
   }
-  async categorize(instanceId: string, category: number): Promise<void> {
-    const id: number = this.currentId;
-    await BackpackService.categorize(id, instanceId, category);
+  private requireItemArchive(item: BackpackItem): number {
+    if (!this.active || this.loading || item.archiveId !== this.currentId) {
+      throw new Error('背包档案已改变，请重新选择物品');
+    }
+    return item.archiveId;
+  }
+  async categorize(item: BackpackItem, category: number): Promise<void> {
+    const id: number = this.requireItemArchive(item);
+    await BackpackService.categorize(id, item.instanceId, category, item.rawJson);
     await this.load(id);
   }
-  async updateCount(instanceId: string, count: string): Promise<void> {
-    const id: number = this.currentId;
-    await BackpackService.updateCount(id, instanceId, count);
+  async updateCount(item: BackpackItem, count: string): Promise<void> {
+    const id: number = this.requireItemArchive(item);
+    await BackpackService.updateCount(id, item.instanceId, count, item.rawJson);
     await this.load(id);
   }
-  async removeItem(instanceId: string): Promise<void> {
-    const id: number = this.currentId;
-    await BackpackService.removeItem(id, instanceId);
+  async removeItem(item: BackpackItem): Promise<void> {
+    const id: number = this.requireItemArchive(item);
+    await BackpackService.removeItem(id, item.instanceId, item.rawJson);
     await this.load(id);
   }
 }

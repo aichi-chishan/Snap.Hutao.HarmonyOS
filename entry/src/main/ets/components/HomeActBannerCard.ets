@@ -21,8 +21,13 @@ export struct HomeActBannerCard {
     return this.entry.isOngoing(Date.now());
   }
 
+  private hasDates(): boolean {
+    return this.entry.startTime > 0 && this.entry.endTime > 0;
+  }
+
   /** 剩余时间（进行中=距结束；否则距开始） */
-  remainText(): string {
+  remainText(): ResourceStr {
+    if (!this.hasDates()) { return $r('app.string.ui_calendar_time_pending'); }
     const now: number = Date.now();
     if (!this.isOngoing()) {
       if (this.entry.startTime > now) {
@@ -39,16 +44,14 @@ export struct HomeActBannerCard {
         this.bannerBody()
       }
       .width('100%')
-      // 固定行高：与左列池行等高（面板两列恒等高）
       .height(this.rowHeight > 0 ? this.rowHeight : undefined)
       .justifyContent(FlexAlign.Center)
-      .padding({ top: 10, bottom: 10 })
+      .padding({ top: 8, bottom: 8 })
     } else {
       PressCard({
         onTap: () => {
           this.onTap()
         },
-        cardBg: $r('app.color.card_background'),
         radius: 12,
       }) {
         Column() {
@@ -67,9 +70,9 @@ export struct HomeActBannerCard {
         Stack({ alignContent: Alignment.Center }) {
           NavIcon({ name: this.entry.type === ActCalendarType.CARD_POOL ? 'GachaLog' : 'Database', iconSize: 24 })
         }
-        .width(52)
-        .height(52)
-        .borderRadius(12)
+        .width(40)
+        .height(40)
+        .borderRadius(8)
         .backgroundColor(this.isOngoing() ? $r('app.color.app_primary_bg') : $r('app.color.card_inner_tint'))
 
         Column({ space: 5 }) {
@@ -81,10 +84,12 @@ export struct HomeActBannerCard {
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .layoutWeight(1)
-            Text(this.entry.statusText(Date.now()))
-              .fontSize(12)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(this.isOngoing() ? $r('app.color.success') : $r('app.color.notice_on'))
+            if (this.hasDates()) {
+              Text(this.entry.statusText(Date.now()))
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(this.isOngoing() ? $r('app.color.success') : $r('app.color.notice_on'))
+            }
           }
           .width('100%')
 
@@ -95,12 +100,14 @@ export struct HomeActBannerCard {
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .width('100%')
 
-          Text(`${HomeActBannerCard.timestamp(this.entry.startTime)} 至 ${HomeActBannerCard.timestamp(this.entry.endTime)}`)
-            .fontSize(9)
-            .fontColor($r('app.color.text_secondary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .width('100%')
+          if (this.hasDates()) {
+            Text(`${HomeActBannerCard.timestamp(this.entry.startTime)} 至 ${HomeActBannerCard.timestamp(this.entry.endTime)}`)
+              .fontSize(9)
+              .fontColor($r('app.color.text_secondary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
+          }
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)

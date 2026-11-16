@@ -15,6 +15,7 @@ export class PreferencesStore {
   // ---- keys ----
   static readonly KEY_CURRENT_USER_ID: string = 'app.current_user_id';
   static readonly KEY_CURRENT_UID: string = 'app.current_uid';
+  static readonly KEY_USER_ORDER: string = 'app.user_order';
   static readonly KEY_REFRESH_INTERVAL: string = 'dailynote.refresh_interval_minutes';
   static readonly KEY_AUTO_REFRESH: string = 'dailynote.auto_refresh_enabled';
   static readonly KEY_THEME_MODE: string = 'theme.mode';
@@ -36,6 +37,10 @@ export class PreferencesStore {
   static readonly KEY_HOME_ACT_PREVIEW: string = 'home.act_preview_enabled';
   /** 应用启动次数（主页欢迎语文案用，对齐 Windows LaunchTimes） */
   static readonly KEY_LAUNCH_TIMES: string = 'app.launch_times';
+  /** Windows AppOptions：三个祈愿显示开关均默认关闭。 */
+  static readonly KEY_GACHA_EMPTY_OVERVIEW: string = 'gacha.empty_overview_visible';
+  static readonly KEY_GACHA_EMPTY_HISTORY: string = 'gacha.empty_history_visible';
+  static readonly KEY_GACHA_UNOBTAINED: string = 'gacha.unobtained_visible';
 
   /** 主页仪表板卡片键（数组顺序即默认顺序，对齐 Windows HomeCards 七卡） */
   static readonly HOME_CARD_KEYS: string[] =
@@ -46,7 +51,8 @@ export class PreferencesStore {
 
   // ---- defaults ----
   static readonly DEFAULT_REFRESH_INTERVAL: number = 30;
-  static readonly DEFAULT_AUTO_REFRESH: boolean = true;
+  static readonly DAILY_NOTE_REFRESH_INTERVALS: number[] = [4, 8, 30, 40, 60];
+  static readonly DEFAULT_AUTO_REFRESH: boolean = false;
   static readonly DEFAULT_THEME_MODE: string = 'system';
   static readonly DEFAULT_REDUCE_MOTION: boolean = false;
   /** 沉浸光感强度 0~1（0=关闭），默认 0.25 */
@@ -182,12 +188,58 @@ export class PreferencesStore {
     PreferencesStore.setString(PreferencesStore.KEY_CURRENT_UID, uid);
   }
 
+  static parseUserOrder(value: string | number | boolean): number[] {
+    if (typeof value !== 'string') { return []; }
+    try {
+      const parsed: Object = JSON.parse(value) as Object;
+      if (!Array.isArray(parsed)) { return []; }
+      const order: number[] = [];
+      for (const id of parsed as Object[]) {
+        if (typeof id === 'number' && Number.isSafeInteger(id) && id > 0 && !order.includes(id)) {
+          order.push(id);
+        }
+      }
+      return order;
+    } catch (e) { return []; }
+  }
+
+  static getUserOrder(): number[] {
+    return PreferencesStore.parseUserOrder(PreferencesStore.getString(PreferencesStore.KEY_USER_ORDER, '[]'));
+  }
+
+  static async saveUserOrder(order: number[]): Promise<void> {
+    const store: preferences.Preferences = PreferencesStore.getStore();
+    const key: string = PreferencesStore.KEY_USER_ORDER;
+    const previous: string = PreferencesStore.getString(key, '[]');
+    store.putSync(key, JSON.stringify(order));
+    try {
+      await store.flush();
+    } catch (e) {
+      store.putSync(key, previous);
+      await store.flush().catch((): void => { Logger.warn(TAG, 'user order rollback failed'); });
+      throw new Error('账号顺序保存失败，请稍后重试');
+    }
+  }
+
+  static getCookieExchangeTime(userId: number): number {
+    return PreferencesStore.getNumber(`session.cookie_refresh_${userId}`, 0);
+  }
+
+  static setCookieExchangeTime(userId: number, time: number): void {
+    PreferencesStore.setNumber(`session.cookie_refresh_${userId}`, time);
+  }
+
   static getRefreshIntervalMinutes(): number {
-    return PreferencesStore.getNumber(PreferencesStore.KEY_REFRESH_INTERVAL, PreferencesStore.DEFAULT_REFRESH_INTERVAL);
+    const minutes: number = PreferencesStore.getNumber(PreferencesStore.KEY_REFRESH_INTERVAL, PreferencesStore.DEFAULT_REFRESH_INTERVAL);
+    // Honor earlier versions' persisted 5/10/15-minute choices until the user chooses a new interval.
+    return PreferencesStore.DAILY_NOTE_REFRESH_INTERVALS.includes(minutes) || minutes === 5 || minutes === 10 || minutes === 15
+      ? minutes : PreferencesStore.DEFAULT_REFRESH_INTERVAL;
   }
 
   static setRefreshIntervalMinutes(min: number): void {
-    PreferencesStore.setNumber(PreferencesStore.KEY_REFRESH_INTERVAL, min);
+    if (PreferencesStore.DAILY_NOTE_REFRESH_INTERVALS.includes(min)) {
+      PreferencesStore.setNumber(PreferencesStore.KEY_REFRESH_INTERVAL, min);
+    }
   }
 
   static getAutoRefreshEnabled(): boolean {

@@ -38,7 +38,16 @@ export class User {
 
   /** 是否已具备有效 Cookie 态 */
   hasCookie(): boolean {
-    return this.accountId.length > 0 || this.accountMidV2.length > 0 || this.stuid.length > 0 || this.ltuid.length > 0;
+    return (this.accountId.length > 0 || this.accountMidV2.length > 0 || this.stuid.length > 0 || this.ltuid.length > 0) &&
+      (this.stoken.length > 0 || this.cookieToken.length > 0 || this.ltoken.length > 0);
+  }
+
+  hasCookieToken(): boolean {
+    return this.accountId.length > 0 && this.cookieToken.length > 0;
+  }
+
+  hasLToken(): boolean {
+    return this.ltuid.length > 0 && this.ltoken.length > 0;
   }
 
   /** 战绩类接口所需 Cookie：对齐 Windows CookieType.Cookie = CookieToken | LToken = account_id+cookie_token+ltuid+ltoken。
@@ -136,17 +145,25 @@ export class User {
       const v: string = map[k];
       return v === undefined ? '' : v;
     };
-    // 优先 v2，其次 v1
-    this.accountId = get('account_id').length > 0 ? get('account_id') : get('account_id_v2');
     this.accountMidV2 = get('account_mid_v2');
     this.accountIdV2 = get('account_id_v2');
     this.cookieTokenV2 = get('cookie_token_v2');
     this.ltuidV2 = get('ltuid_v2');
     this.ltmidV2 = get('ltmid_v2');
     this.ltokenV2 = get('ltoken_v2');
-    this.cookieToken = get('cookie_token').length > 0 ? get('cookie_token') : get('cookie_token_v2');
-    this.ltuid = get('ltuid').length > 0 ? get('ltuid') : get('ltuid_v2');
-    this.ltoken = get('ltoken').length > 0 ? get('ltoken') : get('ltoken_v2');
+    // Choose each token and ID from the same version, retaining the original v2 keys for export.
+    const accountId: string = get('account_id');
+    const cookieToken: string = get('cookie_token');
+    const ltuid: string = get('ltuid');
+    const ltoken: string = get('ltoken');
+    const useCookieV2: boolean = (accountId.length === 0 && cookieToken.length === 0) ||
+      ((accountId.length === 0 || cookieToken.length === 0) && this.accountIdV2.length > 0 && this.cookieTokenV2.length > 0);
+    const useLTokenV2: boolean = (ltuid.length === 0 && ltoken.length === 0) ||
+      ((ltuid.length === 0 || ltoken.length === 0) && this.ltuidV2.length > 0 && this.ltokenV2.length > 0);
+    this.accountId = useCookieV2 ? this.accountIdV2 : accountId;
+    this.cookieToken = useCookieV2 ? this.cookieTokenV2 : cookieToken;
+    this.ltuid = useLTokenV2 ? this.ltuidV2 : ltuid;
+    this.ltoken = useLTokenV2 ? this.ltokenV2 : ltoken;
     this.stuid = get('stuid').length > 0 ? get('stuid') : get('stuid_v2');
     this.stoken = get('stoken').length > 0 ? get('stoken') : get('stoken_v2');
     // v2 原始键值单独保存（交换接口/某些域可能需要原键名）
@@ -158,9 +175,7 @@ export class User {
     if (this.stuid.length === 0 && stuidRaw.length > 0) {
       this.stuid = stuidRaw;
     }
-    const has: boolean = this.hasCookie() &&
-      (this.stoken.length > 0 || this.cookieToken.length > 0 || this.ltoken.length > 0);
-    return has;
+    return this.hasCookie();
   }
 
   private appendV2Cookies(pairs: string[]): void {

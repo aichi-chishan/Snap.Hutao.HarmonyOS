@@ -1,286 +1,233 @@
-/**
- * HomeDailyNoteCard.ets
- * 主页实时便笺卡（对齐 Windows HomeCardDailyNoteCard）：
- * 头部（图标+UID+刷新时间）、主体三分块：树脂/宝钱+委托/折扣+参变仪，带阈值红点提示。
- * 整卡可点击 → 便笺页。
- *
- * ⚠ ArkUI @Builder 传参规则（官方文档）：「@Builder 按引用传递且仅传入一个参数时才会触发动态渲染」，
- * 传入两个及以上参数时 @Builder 内部 UI 不会随状态刷新。因此本组件所有会变的文案/红点
- * 一律在渲染期通过私有方法读取组件状态（this.note / 阈值），@Builder 参数只传常量槽位。
- * 历史 bug：便笺自动刷新后卡面数值不更新（刷新时间变了、树脂数值没变）。
- */
 import { DailyNote, Expedition } from '../model/DailyNote';
-import { PressCard } from './PressCard';
-import { NavIcon } from './NavIcon';
-import { MetaIcon } from './MetaIcon';
+import { HomeNoteEntry } from '../viewmodel/HomeViewModel';
+import { CardSurfaceModifier } from '../common/UiSurface';
 import { DateUtil } from '../common/DateUtil';
+import { MetaIcon } from './MetaIcon';
+import { NavIcon } from './NavIcon';
 
 @Component
 export struct HomeDailyNoteCard {
-  @Prop uid: string = '';
-  @Prop note: DailyNote | undefined = undefined;
-  /** 便笺快照时间（epoch ms；渲染期算相对时间与过期标注，估算性质对齐 UX11） */
-  @Prop refreshTs: number = 0;
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
+  @StorageProp('reduceMotion') reduceMotion: boolean = false;
+  @Prop @Watch('onEntriesChanged') entries: HomeNoteEntry[] = [];
   @Prop loaded: boolean = false;
-  /** 树脂阈值提示（默认 120） */
-  @Prop resinThreshold: number = 120;
-  /** 洞天宝钱阈值提示（默认 1800） */
-  @Prop homeCoinThreshold: number = 1800;
-  onTap: () => void = () => {
-  };
+  @Prop refreshing: boolean = false;
+  @Prop fillHeight: boolean = false;
+  onTap: () => void = () => {};
+  onRefresh: () => void = () => {};
 
-  /** 分块槽位常量（@Builder 参数必须恒定，动态内容走组件状态） */
-  private static readonly SLOT_RESIN: number = 0;
-  private static readonly SLOT_HOME_COIN: number = 1;
-  private static readonly SLOT_TASK: number = 2;
-  private static readonly SLOT_DISCOUNT: number = 3;
-  private static readonly SLOT_TRANSFORMER: number = 4;
+  @State pageIndex: number = 0;
+  @State cardWidth: number = 0;
+  private displayedKey: string = '';
 
-  /** note 为空时的占位对象（避免 builder 内做 undefined 分支） */
-  private placeholder: DailyNote = new DailyNote();
+  private static readonly LABELS: string[] = ['树脂', '洞天宝钱', '每日委托', '周本折扣', '参变仪'];
+  private static readonly ICONS: string[] = ['UI_ItemIcon_106', 'UI_ItemIcon_204',
+    'UI_MarkQuest_Events_Proce', 'UI_MarkTower', 'UI_ItemIcon_220021'];
 
-  /** 当前便笺（渲染期读取组件状态 → 参与依赖收集） */
-  private cur(): DailyNote {
-    return this.note !== undefined ? this.note : this.placeholder;
+  aboutToAppear(): void {
+    this.onEntriesChanged();
   }
 
-  private blockCategory(slot: number): string {
-    if (slot === HomeDailyNoteCard.SLOT_HOME_COIN || slot === HomeDailyNoteCard.SLOT_TRANSFORMER) {
-      return 'ItemIcon';
+  onEntriesChanged(): void {
+    if (this.entries.length === 0) {
+      this.pageIndex = 0;
+      return;
     }
-    return slot === HomeDailyNoteCard.SLOT_RESIN ? 'ItemIcon' : 'Mark';
+    const displayedKey: string = this.displayedKey;
+    const index: number = this.entries.findIndex((entry: HomeNoteEntry): boolean =>
+      HomeDailyNoteCard.ownerKey(entry) === displayedKey);
+    this.selectPage(Math.max(0, index));
   }
 
-  private blockIcon(slot: number): string {
-    if (slot === HomeDailyNoteCard.SLOT_RESIN) {
-      return 'UI_ItemIcon_106';
-    }
-    if (slot === HomeDailyNoteCard.SLOT_HOME_COIN) {
-      return 'UI_ItemIcon_204';
-    }
-    if (slot === HomeDailyNoteCard.SLOT_TASK) {
-      return 'UI_MarkQuest_Events_Proce';
-    }
-    if (slot === HomeDailyNoteCard.SLOT_DISCOUNT) {
-      return 'UI_MarkTower';
-    }
-    return 'UI_ItemIcon_220021';
+  private selectPage(index: number): void {
+    const entry: HomeNoteEntry | undefined = this.entries[index];
+    if (entry === undefined) { return; }
+    this.pageIndex = index;
+    this.displayedKey = HomeDailyNoteCard.ownerKey(entry);
   }
 
-  private blockText(slot: number): string {
-    const n: DailyNote = this.cur();
-    if (slot === HomeDailyNoteCard.SLOT_RESIN) {
-      return `${n.currentResin}/${n.maxResin}`;
-    }
-    if (slot === HomeDailyNoteCard.SLOT_HOME_COIN) {
-      return `${n.currentHomeCoin}/${n.maxHomeCoin}`;
-    }
-    if (slot === HomeDailyNoteCard.SLOT_TASK) {
-      return `${n.finishedTaskNum}/${n.totalTaskNum}`;
-    }
-    if (slot === HomeDailyNoteCard.SLOT_DISCOUNT) {
-      return `${n.resinDiscountUsedNum()}/${n.resinDiscountNumLimit}`;
-    }
-    return n.transformer.text();
+  private static ownerKey(entry: HomeNoteEntry): string {
+    return `${entry.userId}:${entry.uid}`;
   }
 
-  private blockSub(slot: number): string {
-    const n: DailyNote = this.cur();
-    if (slot === HomeDailyNoteCard.SLOT_RESIN) {
-      return `树脂${n.resinReached(this.resinThreshold) ? '·已达标' : ''}`;
+  private static value(entry: HomeNoteEntry, slot: number): string {
+    const note: DailyNote | undefined = entry.note;
+    if (note === undefined) { return ''; }
+    switch (slot) {
+      case 0: return `${note.currentResin}/${note.maxResin}`;
+      case 1: return note.formattedHomeCoin();
+      case 2: return note.formattedTask();
+      case 3: return note.formattedResinDiscount();
+      default: return note.transformerMainText();
     }
-    if (slot === HomeDailyNoteCard.SLOT_HOME_COIN) {
-      return '洞天宝钱';
-    }
-    if (slot === HomeDailyNoteCard.SLOT_TASK) {
-      return n.totalTaskNum > 0 && n.finishedTaskNum >= n.totalTaskNum ? '每日任务已完成' : '每日委托';
-    }
-    if (slot === HomeDailyNoteCard.SLOT_DISCOUNT) {
-      return '周本折扣';
-    }
-    return n.transformer.isReady() ? '参变仪已就绪' : '参变仪恢复中';
   }
 
-  private blockDot(slot: number): boolean {
-    const n: DailyNote = this.cur();
-    if (slot === HomeDailyNoteCard.SLOT_RESIN) {
-      return n.resinReached(this.resinThreshold);
+  private static hasDot(entry: HomeNoteEntry, slot: number): boolean {
+    const note: DailyNote | undefined = entry.note;
+    if (note === undefined) { return false; }
+    switch (slot) {
+      case 0: return note.resinReached(entry.resinThreshold);
+      case 1: return note.homeCoinReached(entry.homeCoinThreshold);
+      case 2: return note.dailyTask.isAllFinished();
+      case 4: return note.transformer.isReady();
+      default: return false;
     }
-    if (slot === HomeDailyNoteCard.SLOT_HOME_COIN) {
-      return n.homeCoinReached(this.homeCoinThreshold);
-    }
-    if (slot === HomeDailyNoteCard.SLOT_TASK) {
-      return n.dailyTask.isAllFinished();
-    }
-    if (slot === HomeDailyNoteCard.SLOT_DISCOUNT) {
-      return n.remainResinDiscountNum > 0;
-    }
-    return n.transformer.isReady();
   }
 
-  @Builder
-  loadingView() {
-    Column({ space: 8 }) {
-      LoadingProgress()
-        .width(24)
-        .height(24)
-        .color($r('app.color.app_primary'))
-      Text('便笺加载中...')
-        .fontSize(12)
-        .fontColor($r('app.color.text_secondary'))
-    }
-    .width('100%')
-    // fillHeight（宽屏 204 单元格）时占满头部之外的剩余空间并垂直居中，避免底部空洞；
-    // 手机自适应高度时保持原 120 视觉。
-    .height(this.fillHeight ? undefined : 120)
-    .layoutWeight(this.fillHeight ? 1 : 0)
-    .justifyContent(FlexAlign.Center)
+  private static expeditionSummary(note: DailyNote): string {
+    const finished: number = note.expeditions.filter((entry: Expedition): boolean => entry.isFinished()).length;
+    return `派遣 ${note.currentExpeditionNum}/${note.maxExpeditionNum} · 已完成 ${finished}`;
+  }
+
+  private static entryKey(entry: HomeNoteEntry): string {
+    const note: DailyNote | undefined = entry.note;
+    if (note === undefined) { return HomeDailyNoteCard.ownerKey(entry); }
+    const blocks: string[] = HomeDailyNoteCard.LABELS.map((_label: string, slot: number): string =>
+      `${HomeDailyNoteCard.value(entry, slot)}:${HomeDailyNoteCard.hasDot(entry, slot)}`);
+    return `${HomeDailyNoteCard.ownerKey(entry)}_${note.refreshTime}_${blocks.join('|')}_${HomeDailyNoteCard.expeditionSummary(note)}`;
+  }
+
+  private currentEntry(): HomeNoteEntry | undefined {
+    return this.entries[this.pageIndex] ?? this.entries[0];
+  }
+
+  private heading(): ResourceStr {
+    return this.currentEntry()?.uid ?? $r('app.string.card_daily_note_title');
+  }
+
+  private refreshTimeText(): string {
+    const refreshTime: number = this.currentEntry()?.note?.refreshTime ?? 0;
+    return refreshTime > 0 ? `刷新于 ${DateUtil.formatTimestamp(refreshTime).substring(5).replace('-', '.')}` : '尚未刷新';
+  }
+
+  private static blockDescription(entry: HomeNoteEntry, slot: number): string {
+    if (slot === 0) { return entry.note?.resinRecoveryTargetText() ?? ''; }
+    if (slot === 4) { return entry.note?.transformerSubText() ?? ''; }
+    return '';
   }
 
   @Builder
-  emptyView() {
-    Column({ space: 8 }) {
-      NavIcon({ name: 'DailyNote', iconSize: 28 })
-      Text('暂无便笺数据')
-        .fontSize(13)
-        .fontColor($r('app.color.text_secondary'))
-      Text('登录后自动拉取树脂/派遣/宝钱')
-        .fontSize(12)
-        .fontColor($r('app.color.text_secondary'))
-    }
-    .width('100%')
-    .height(this.fillHeight ? undefined : 140)
-    .layoutWeight(this.fillHeight ? 1 : 0)
-    .justifyContent(FlexAlign.Center)
-  }
-
-  /** 游戏素材图标块（对齐 Windows DailyNoteCard：UI_ItemIcon_106/UI_MarkQuest_* 等）。
-   *  slot 为常量槽位；文案/红点在渲染期读组件状态，保证便笺刷新后同步。 */
-  @Builder
-  block(slot: number, wide: boolean) {
-    Column({ space: 3 }) {
-      if (wide) {
-        MetaIcon({ category: this.blockCategory(slot), name: this.blockIcon(slot), iconSize: 26, remoteFallback: true })
+  noteBlock(entry: HomeNoteEntry, slot: number) {
+    Stack({ alignContent: Alignment.TopEnd }) {
+      Column({ space: slot === 0 ? 5 : 2 }) {
+        MetaIcon({ category: slot === 2 || slot === 3 ? 'Mark' : 'ItemIcon',
+          name: HomeDailyNoteCard.ICONS[slot], iconSize: slot === 0 ? 64 : 24, remoteFallback: true })
+        Text(HomeDailyNoteCard.value(entry, slot))
+          .fontSize(slot === 0 ? 15 : 12).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+          .minFontSize(10).maxFontSize(slot === 0 ? 15 : 12)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(TextAlign.Center)
+          .width('100%')
+      }.width('100%').height('100%').justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+      if (HomeDailyNoteCard.hasDot(entry, slot)) {
+        Row().width(6).height(6).borderRadius(3).backgroundColor($r('app.color.app_primary')).margin(5)
       }
-      Text(this.blockText(slot))
-        .fontSize(wide ? 17 : 13)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary'))
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .width('100%')
-      Row({ space: 3 }) {
-        Text(this.blockSub(slot))
-          .fontSize(12)
-          .fontColor($r('app.color.text_secondary'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .layoutWeight(1)
-        Row()
-          .width(6)
-          .height(6)
-          .borderRadius(4)
-          .backgroundColor($r('app.color.app_primary'))
-          .opacity(this.blockDot(slot) ? 1 : 0)
-      }
-      .width('100%')
     }
-    .width('100%')
-    .height(wide ? 104 : 50)
-    .padding({ left: 6, right: 6, top: 4, bottom: 4 })
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Start)
-    .borderRadius(8)
+    .width('100%').height(slot === 0 ? '100%' : undefined).layoutWeight(slot === 0 ? 0 : 1)
+    .padding({ left: 4, right: 4, top: 3, bottom: 3 })
     .backgroundColor($r('app.color.card_inner_tint'))
+    .border({ width: 1, radius: 6, color: $r('app.color.card_stroke') })
+    .accessibilityGroup(true)
+    .accessibilityText(`${HomeDailyNoteCard.LABELS[slot]} ${HomeDailyNoteCard.value(entry, slot)}`)
+    .accessibilityDescription(HomeDailyNoteCard.blockDescription(entry, slot))
   }
 
-  private expeditionSummary(): string {
-    const n: DailyNote = this.cur();
-    const finished: number = n.expeditions.filter((exp: Expedition) => exp.isFinished()).length;
-    return `派遣 ${n.currentExpeditionNum}/${n.maxExpeditionNum} · 已完成 ${finished}`;
+  @Builder
+  notePage(entry: HomeNoteEntry) {
+    Column({ space: 6 }) {
+      if (entry.note !== undefined) {
+        Row({ space: 6 }) {
+          Column() { this.noteBlock(entry, 0) }.layoutWeight(1).height('100%')
+          Column({ space: 6 }) {
+            this.noteBlock(entry, 1)
+            this.noteBlock(entry, 2)
+          }.layoutWeight(1).height('100%')
+          Column({ space: 6 }) {
+            this.noteBlock(entry, 3)
+            this.noteBlock(entry, 4)
+          }.layoutWeight(1).height('100%')
+        }.width('100%').layoutWeight(1).alignItems(VerticalAlign.Top)
+        if (!this.fillHeight) {
+          Text(HomeDailyNoteCard.expeditionSummary(entry.note!)).fontSize(11)
+            .fontColor($r('app.color.text_secondary')).width('100%')
+        }
+      } else {
+        Text('尚未刷新便笺').fontSize(12).fontColor($r('app.color.text_secondary'))
+          .width('100%').layoutWeight(1).textAlign(TextAlign.Center)
+      }
+    }.width('100%').height('100%').padding({ bottom: this.entries.length > 1 ? 16 : 0 })
+      .focusable(true).hoverEffect(HoverEffect.Highlight).onClick(() => this.onTap())
   }
 
-    /** 是否撑满 Grid 单元格高度（行内等高） */
-    @Prop fillHeight: boolean = false;
+  @Builder
+  header() {
+    Row({ space: 4 }) {
+      Row({ space: 6 }) {
+        NavIcon({ name: 'DailyNote', iconSize: 22 })
+        if (this.cardWidth >= 320) {
+          Text(this.heading()).fontSize(13).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(this.refreshTimeText()).fontSize(10).fontColor($r('app.color.text_secondary'))
+            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1).textAlign(TextAlign.End)
+        } else {
+          Column({ space: 1 }) {
+            Text(this.heading()).fontSize(13).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+              .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+            Text(this.refreshTimeText()).fontSize(10).fontColor($r('app.color.text_secondary'))
+              .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        }
+      }
+      .layoutWeight(1).height(44).padding({ left: 8, right: 2 })
+      .focusable(true).hoverEffect(HoverEffect.Highlight).accessibilityGroup(true)
+      .accessibilityDescription('打开实时便笺').onClick(() => this.onTap())
+      Button({ type: ButtonType.Normal, buttonStyle: ButtonStyleMode.TEXTUAL }) {
+        if (this.refreshing) {
+          LoadingProgress().width(18).height(18).color($r('app.color.app_primary'))
+        } else {
+          SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(18).fontColor([$r('app.color.text_primary')])
+        }
+      }
+      .width(44).height(44).padding(0).borderRadius(6).backgroundColor(Color.Transparent)
+      .hoverEffect(HoverEffect.Highlight).enabled(this.entries.length > 0 && !this.refreshing)
+      .accessibilityText(this.refreshing ? '便笺刷新中' : '刷新全部追踪便笺').onClick(() => this.onRefresh())
+    }
+    .width('100%').height(44).flexShrink(0)
+    .backgroundColor($r('app.color.card_inner_tint'))
+    .border({ width: 1, radius: 6, color: $r('app.color.card_stroke') })
+  }
 
   build() {
-    PressCard({
-      fillHeight: this.fillHeight,
-      onTap: () => {
-        this.onTap()
-      },
-      cardBg: $r('app.color.card_background'),
-      radius: 12,
-    }) {
-      Column({ space: 10 }) {
-        Row({ space: 8 }) {
-          NavIcon({ name: 'DailyNote', iconSize: 20 })
-          Text('实时便笺')
-            .fontSize(15)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1)
-          if (this.refreshTs > 0) {
-            Text(DateUtil.isNoteStale(this.refreshTs)
-              ? `已过期 · ${DateUtil.timeAgo(this.refreshTs)}更新`
-              : `更新于 ${DateUtil.timeAgo(this.refreshTs)} · 估算`)
-              .fontSize(12)
-              .fontColor(DateUtil.isNoteStale(this.refreshTs) ? $r('app.color.danger') : $r('app.color.text_secondary'))
-          }
+    Column({ space: 6 }) {
+      this.header()
+
+      if (!this.loaded) {
+        Column({ space: 8 }) {
+          LoadingProgress().width(24).height(24).color($r('app.color.app_primary'))
+          Text('便笺加载中').fontSize(12).fontColor($r('app.color.text_secondary'))
+        }.width('100%').height(this.fillHeight ? undefined : 120)
+          .layoutWeight(this.fillHeight ? 1 : 0).justifyContent(FlexAlign.Center)
+      } else if (this.entries.length === 0) {
+        Text('在实时便笺页添加追踪角色').fontSize(12).fontColor($r('app.color.text_secondary'))
+          .width('100%').height(this.fillHeight ? undefined : 120)
+          .layoutWeight(this.fillHeight ? 1 : 0).textAlign(TextAlign.Center)
+      } else {
+        Swiper() {
+          ForEach(this.entries, (entry: HomeNoteEntry) => {
+            this.notePage(entry)
+          }, (entry: HomeNoteEntry): string => HomeDailyNoteCard.entryKey(entry))
         }
-        .width('100%')
-        .height(24)
-        .flexShrink(0)
-
-        if (!this.loaded) {
-          this.loadingView()
-        } else if (this.note === undefined) {
-          this.emptyView()
-        } else {
-          Row({ space: 6 }) {
-            // 三列：树脂跨两块高度，其余两列各两个双行块。
-            Column() {
-              this.block(HomeDailyNoteCard.SLOT_RESIN, true)
-            }
-            .layoutWeight(1)
-            // 列2：宝钱 / 委托
-            Column({ space: 4 }) {
-              this.block(HomeDailyNoteCard.SLOT_HOME_COIN, false)
-              this.block(HomeDailyNoteCard.SLOT_TASK, false)
-            }
-            .layoutWeight(1)
-            .padding(0)
-
-            // 列3：周本折扣 / 参变仪
-            Column({ space: 4 }) {
-              this.block(HomeDailyNoteCard.SLOT_DISCOUNT, false)
-              this.block(HomeDailyNoteCard.SLOT_TRANSFORMER, false)
-            }
-            .layoutWeight(1)
-            .padding(0)
-          }
-          .width('100%')
-
-          Row({ space: 6 }) {
-            Text(this.expeditionSummary())
-              .fontSize(12)
-              .fontColor($r('app.color.text_secondary'))
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .layoutWeight(1)
-            Text('查看详情 ›')
-              .fontSize(12)
-              .fontColor($r('app.color.app_primary_text'))
-              .hoverEffect(HoverEffect.Highlight)
-              .onClick(() => this.onTap())
-          }
-          .width('100%')
-          .height(24)
-        }
+        .index(this.pageIndex).loop(false).indicator(this.entries.length > 1)
+        .displayArrow(this.entries.length > 1, true).disableSwipe(this.entries.length < 2)
+        .duration(this.reduceMotion ? 0 : 240)
+        .effectMode(this.reduceMotion ? EdgeEffect.None : EdgeEffect.Spring)
+        .onChange((index: number) => {
+          this.selectPage(index);
+        })
+        .width('100%').height(this.fillHeight ? undefined : 162).layoutWeight(this.fillHeight ? 1 : 0)
       }
-      .width('100%')
-      .height(this.fillHeight ? '100%' : undefined)
-      .padding(12)
-    }
+    }.width('100%').height(this.fillHeight ? '100%' : undefined).padding(12).borderRadius(12)
+      .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
+      .onAreaChange((_old: Area, area: Area): void => { this.cardWidth = Number(area.width); })
   }
 }

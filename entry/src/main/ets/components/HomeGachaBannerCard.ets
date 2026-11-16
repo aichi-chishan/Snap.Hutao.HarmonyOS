@@ -7,7 +7,7 @@
  * 整卡可点击 → 祈愿页。
  */
 import { ActCalendarEntry } from '../model/ActCalendarEntry';
-import { HomePoolSummary } from '../viewmodel/HomeViewModel';
+import { HomePoolSummary } from '../service/GachaHomeStatService';
 import { PressCard } from './PressCard';
 import { MetaIcon } from './MetaIcon';
 
@@ -52,9 +52,9 @@ export struct HomeGachaBannerCard {
     return '';
   }
 
-  /** UP 待显示图标池（武器池 weaponIcons 优先，角色池用 avatarIcons） */
+  /** 同一卡池先显示角色，再显示武器。 */
   private upIcons(): string[] {
-    return this.pool.weaponIcons.length > 0 ? this.pool.weaponIcons : this.pool.avatarIcons;
+    return this.pool.avatarIcons.concat(this.pool.weaponIcons);
   }
 
   build() {
@@ -63,16 +63,14 @@ export struct HomeGachaBannerCard {
         this.bannerBody()
       }
       .width('100%')
-      // 固定行高（对齐 Windows 池行 104 契约的等比放大：容纳 44vp UP 图标行）
       .height(this.rowHeight > 0 ? this.rowHeight : undefined)
       .justifyContent(FlexAlign.Center)
-      .padding({ top: 10, bottom: 10 })
+      .padding({ top: 8, bottom: 8 })
     } else {
       PressCard({
         onTap: () => {
           this.onTap()
         },
-        cardBg: $r('app.color.card_background'),
         radius: 12,
       }) {
         Column() {
@@ -86,7 +84,7 @@ export struct HomeGachaBannerCard {
 
   @Builder
   bannerBody() {
-    Column({ space: 8 }) {
+    Column({ space: 6 }) {
       // 头部：池名 + 剩余时间
       Row({ space: 6 }) {
           Text(this.title())
@@ -107,29 +105,33 @@ export struct HomeGachaBannerCard {
         }
         .width('100%')
 
-        // 内容：网络卡池→UP 头像行（武器池 weaponIcons；角色池 avatarIcons）；本地统计→抽数+星级
+        // 网络卡池显示全部 UP 图标，本地统计显示抽数与星级。
         if (this.upIcons().length > 0) {
-          Row({ space: 6 }) {
-            ForEach(this.upCells(), (cell: UpIconCell, idx: number) => {
-              if (cell.name.startsWith('UI_')) {
-                MetaIcon({
-                  category: HomeGachaBannerCard.upIconCategory(cell.name),
-                  name: cell.name,
-                  iconSize: 44,
-                  remoteFallback: true,
-                })
-              } else {
-                Image(cell.url)
-                  .width(44)
-                  .height(44)
-                  .borderRadius(22)
-                  .objectFit(ImageFit.Cover)
-                  .backgroundColor($r('app.color.app_primary_bg'))
-              }
-            }, (cell: UpIconCell, idx: number) => `gb_${idx}_${cell.name.length}`)
-            Blank()
+          Scroll() {
+            Row({ space: 6 }) {
+              ForEach(this.upCells(), (cell: UpIconCell) => {
+                if (cell.name.startsWith('UI_')) {
+                  MetaIcon({
+                    category: HomeGachaBannerCard.upIconCategory(cell.name),
+                    name: cell.name,
+                    iconSize: 40,
+                    remoteFallback: true,
+                  })
+                } else {
+                  Image(cell.url)
+                    .width(40)
+                    .height(40)
+                    .borderRadius(4)
+                    .objectFit(ImageFit.Cover)
+                    .backgroundColor($r('app.color.app_primary_bg'))
+                }
+              }, (cell: UpIconCell, index: number): string => `${cell.url}_${index}`)
+            }
           }
           .width('100%')
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
+          .align(Alignment.Start)
         } else if (this.summary !== undefined) {
           Row({ space: 10 }) {
             Column({ space: 0 }) {
@@ -137,7 +139,7 @@ export struct HomeGachaBannerCard {
                 .fontSize(14)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.five_star'))
-              Text('五星')
+              Text($r('app.string.ui_model_intrinsic_item_quality_orange'))
                 .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))
             }
@@ -147,7 +149,7 @@ export struct HomeGachaBannerCard {
                 .fontSize(14)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.four_star'))
-              Text('四星')
+              Text($r('app.string.ui_model_intrinsic_item_quality_purple'))
                 .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))
             }
@@ -198,8 +200,8 @@ export struct HomeGachaBannerCard {
     if (url.length === 0) {
       return '';
     }
-    const seg: string[] = url.split('/');
-    const name: string = seg[seg.length - 1].replace(/\.png$/, '');
+    const path: string = url.split(/[?#]/, 1)[0];
+    const name: string = path.substring(path.lastIndexOf('/') + 1).replace(/\.png$/i, '');
     return name;
   }
 

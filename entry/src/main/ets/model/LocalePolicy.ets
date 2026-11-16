@@ -1,7 +1,9 @@
-/** Help and integrated app-owned common messages only; other UI and game text retain their source language. */
+/** Language choices shared by native resources and the offline help catalog. */
 export class LocalePolicy {
   private static readonly LOCALES: string[] = ['zh-Hans', 'zh-Hant', 'en', 'de', 'es', 'fr', 'id', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'tr', 'vi'];
   private static readonly NAMES: string[] = ['简体中文', '繁體中文', 'English', 'Deutsch', 'Español', 'Français', 'Bahasa Indonesia', 'Italiano', '日本語', '한국어', 'Português', 'Русский', 'ไทย', 'Türkçe', 'Tiếng Việt'];
+  private static readonly API_LANGUAGE_CODES: string[] = ['zh-cn', 'zh-tw', 'en-us', 'de-de', 'es-es', 'fr-fr', 'id-id',
+    'it-it', 'ja-jp', 'ko-kr', 'pt-pt', 'ru-ru', 'th-th', 'tr-tr', 'vi-vn'];
   static locales(): string[] { return LocalePolicy.LOCALES.slice(); }
   static preference(value: string): string {
     return value === 'system' || LocalePolicy.LOCALES.includes(value) ? value : 'system';
@@ -26,4 +28,10 @@ export class LocalePolicy {
   static supported(value: string): boolean { return LocalePolicy.resolve(value).length > 0; }
   static index(value: string): number { return LocalePolicy.LOCALES.indexOf(LocalePolicy.resourceLocale(value)); }
   static nativeName(value: string): string { return LocalePolicy.NAMES[LocalePolicy.index(value)]; }
+
+  /** Windows LocaleNames.LanguageCode 的区服无关语言参数，未知语言回退简中。 */
+  static apiLanguageCode(value: string): string {
+    const index: number = LocalePolicy.LOCALES.indexOf(LocalePolicy.resolve(value));
+    return LocalePolicy.API_LANGUAGE_CODES[index] ?? 'zh-cn';
+  }
 }

@@ -10,9 +10,9 @@ import { DsSigner } from '../data/network/DsSigner';
 import { RiskVerifier } from '../data/network/RiskVerifier';
 import { SpiralAbyssData } from '../model/SpiralAbyss';
 import { UserService } from './UserService';
-import { RegionUtil, AppConstants } from '../common/Constants';
 import { HoyolabEndpoints } from '../common/HoyolabEndpoints';
 import { Logger } from '../common/Logger';
+import { ChallengeSession, ChallengeVerificationCancelled } from './ChallengeSession';
 
 const TAG: string = 'SpiralAbyssService';
 const API_PATH: string = 'spiralAbyss';
@@ -27,18 +27,9 @@ export class SpiralAbyssService {
   /** 拉取深渊数据（scheduleType：1=当期，2=上期）
    *  @param challenge 可选：极验通过后的 x-rpc-challenge（重放头） */
   async fetch(uid: string, scheduleType: number, challenge?: string): Promise<SpiralAbyssData> {
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined || !user.hasCookie()) {
-      throw new Error('请先登录');
-    }
-    if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
-      await UserService.getInstance().completeTokenChainPublic(user);
-    }
-    const region: string = RegionUtil.regionOfUid(uid);
-    const cookie: string = user.gameRecordCookie();
-    if (cookie.length === 0) {
-      throw new Error('账号缺少 cookie_token，请重新登录');
-    }
+    const session: ChallengeSession = ChallengeSession.require(uid);
+    const region: string = session.region;
+    const cookie: string = await session.gameRecordCookie();
     const query: Record<string, string> = {
       'schedule_type': `${scheduleType}`,
       'role_id': uid,
@@ -53,34 +44,40 @@ export class SpiralAbyssService {
     if (challenge !== undefined && challenge.length > 0) {
       headers['x-rpc-challenge'] = challenge;
     }
+    session.assertCurrent();
     const resp0: ApiResponse = await ApiClient.getInstance().get(url,
       HoyolabClient.merge(HoyolabClient.getBaseHeaders(region), headers));
+    session.assertCurrent();
     let resp: ApiResponse = resp0;
     if (resp0.isRiskControl()) {
-      if (HoyolabEndpoints.isOverseaRegion(region)) {
-        throw new Error('HoYoLAB 需要完成验证，请在官方应用验证后重试');
-      }
       // 1034：自动弹统一验证窗，成功后带 challenge 服务内重放一次
       const replayChallenge: string = await RiskVerifier.tryResolveRisk(resp0, cookie, url);
       if (replayChallenge.length === 0) {
-        throw new Error('人机验证未完成或被取消，请稍后再试');
+        throw new ChallengeVerificationCancelled();
       }
       headers['x-rpc-challenge'] = replayChallenge;
+      session.assertCurrent();
       resp = await ApiClient.getInstance().get(url,
         HoyolabClient.merge(HoyolabClient.getBaseHeaders(region), headers));
+      session.assertCurrent();
     }
     // Cookie 鉴权失效（-100/10001）：强制换新凭证后重试一次（对齐 Windows CookieToken 刷新）
     if (!resp.success && UserService.isCookieAuthError(resp)) {
-      resp = await UserService.retryWithRefreshedCookie(user, (): Promise<ApiResponse> => {
-        const retryHeaders: Record<string, string> = { 'Cookie': user.gameRecordCookie() };
+      resp = await UserService.retryWithRefreshedCookie(session.user, async (): Promise<ApiResponse> => {
+        const retryHeaders: Record<string, string> = {
+          'Cookie': session.user.gameRecordCookie(),
+          'DS': await DsSigner.signGen2(HoyolabEndpoints.gameRecordSalt(region),
+            DsSigner.nowTimestamp(), DsSigner.randomNumber(), '', sorted),
+        };
         if (headers['x-rpc-challenge'] !== undefined) {
           retryHeaders['x-rpc-challenge'] = headers['x-rpc-challenge'];
         }
-        retryHeaders['DS'] = headers['DS'];
+        session.assertCurrent();
         return ApiClient.getInstance().get(url,
           HoyolabClient.merge(HoyolabClient.getBaseHeaders(region), retryHeaders));
       });
     }
+    session.assertCurrent();
     if (!resp.success || resp.data === undefined) {
       throw new Error(resp.userFriendlyMessage());
     }

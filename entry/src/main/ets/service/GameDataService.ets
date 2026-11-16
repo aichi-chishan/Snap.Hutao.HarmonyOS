@@ -127,11 +127,29 @@ export class GameDataService {
   /** 发布清单的 path 保留 metadata/ 前缀；与下载器 itemPath 的落盘规则一致。 */
   static async readMetadataFile(name: string): Promise<string> {
     await GameDataService.initializeSnapshot();
-    GameDataManifestPolicy.validatePath(`metadata/${name}`, ItemType.Text);
-    const remote: string = GameDataUpdater.readMetadata(`metadata/${name}`);
+    const path: string = `metadata/${name}`;
+    GameDataManifestPolicy.validatePath(path, ItemType.Text);
+    const languageFile: boolean = GameDataManifestPolicy.isLanguagePath(path);
+    const remote: string = languageFile ? await GameDataUpdater.readLanguageMetadata(path) : GameDataUpdater.readMetadata(path);
     if (remote.length > 0) { return remote; } // Entire selected cohort was verified together at startup.
-    const raw: Uint8Array = await AppContextProvider.getResourceManager().getRawFileContent(`metadata/${name}`);
-    return util.TextDecoder.create('utf-8').decodeToString(raw);
+    const raw: Uint8Array = await AppContextProvider.getResourceManager().getRawFileContent(path);
+    const text: string = util.TextDecoder.create('utf-8').decodeToString(raw);
+    return languageFile ? GameDataManifestPolicy.stripBom(text) : text;
+  }
+
+  /** Display layers: a sparse verified language update keeps the bundled translations it omits. */
+  static async readLanguageFiles(name: string): Promise<string[]> {
+    await GameDataService.initializeSnapshot();
+    const path: string = `metadata/${name}`;
+    if (!GameDataManifestPolicy.isLanguagePath(path)) { throw new Error('未知游戏语言文件'); }
+    const layers: string[] = [];
+    try {
+      const raw: Uint8Array = await AppContextProvider.getResourceManager().getRawFileContent(path);
+      layers.push(GameDataManifestPolicy.stripBom(util.TextDecoder.create('utf-8').decodeToString(raw)));
+    } catch (_) { Logger.warn(TAG, `bundled language ${name} unavailable`); }
+    const remote: string = await GameDataUpdater.readLanguageMetadata(path);
+    if (remote.length > 0) { layers.push(remote); }
+    return layers;
   }
 
   /** 当前远端版本号（无则 ''） */

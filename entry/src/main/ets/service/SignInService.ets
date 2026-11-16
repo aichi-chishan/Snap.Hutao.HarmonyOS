@@ -4,7 +4,8 @@
  * 补签：luna/resign_info（配额/米游币）+ luna/resign（对齐 Windows SignInClient.ReSignAsync）。返回码 -5003 已签等映射。
  */
 import { UserService } from './UserService';
-import { RiskVerifyService } from './RiskVerifyService';
+import { RiskVerifyService, GeetestSolveResult } from './RiskVerifyService';
+import { ChallengeSession } from './ChallengeSession';
 import { HoyolabClient } from '../data/network/HoyolabClient';
 import { RiskVerifier } from '../data/network/RiskVerifier';
 import { ApiResponse } from '../model/ApiResponse';
@@ -21,6 +22,8 @@ export class SignInResult {
   alreadySigned: boolean = false;
   /** 签到/补签成功后本次获得的奖励文案（如「获得 原石 ×60」，对齐 Windows InfoBar 奖励展示） */
   rewardText: string = '';
+
+  shouldOpenOfficialPage(): boolean { return !this.ok && !this.alreadySigned; }
 }
 
 /** 补签信息（对齐 Windows SignInRewardReSignInfo） */
@@ -94,18 +97,20 @@ export class SignInService {
 
   /** 执行签到（含风控极验自动重放，对齐 Windows SignInClient.SignAsync） */
   async sign(uid: string): Promise<SignInResult> {
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined || !user.hasCookie()) {
+    const owner: ChallengeSession | undefined = ChallengeSession.capture(uid);
+    if (owner === undefined || !owner.user.hasCookie()) {
       const r: SignInResult = new SignInResult();
       r.ok = false;
       r.message = '请先登录';
       return r;
     }
-    const region: string = RegionUtil.regionOfUid(uid);
+    const user = owner.user;
+    const region: string = owner.region;
     // 缺 cookie_token/ltoken 时先补齐
     if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
       await UserService.getInstance().completeTokenChainPublic(user);
     }
+    owner.assertCurrent();
     const cookie: string = user.gameRecordCookie();
     let resp: ApiResponse = await HoyolabClient.signIn(uid, region, cookie);
     if (!resp.success && UserService.isCookieAuthError(resp)) {
@@ -113,7 +118,7 @@ export class SignInService {
         return HoyolabClient.signIn(uid, region, user.gameRecordCookie());
       });
     }
-    resp = await SignInService.resolveSignRisk(uid, region, user.gameRecordCookie(), resp,
+    resp = await SignInService.resolveSignRisk(owner, user.gameRecordCookie(), resp, 'event/luna/sign',
       (u: string, reg: string, ck: string, extra?: Record<string, string>): Promise<ApiResponse> => {
         return HoyolabClient.signIn(u, reg, ck, extra);
       });
@@ -172,17 +177,19 @@ export class SignInService {
 
   /** 执行补签（服务端自动补最近漏签日；风控/返回码处理对齐 Windows ClaimResignInRewardAsync） */
   async resign(uid: string): Promise<SignInResult> {
-    const user = UserService.getInstance().getCurrentUser();
-    if (user === undefined || !user.hasCookie()) {
+    const owner: ChallengeSession | undefined = ChallengeSession.capture(uid);
+    if (owner === undefined || !owner.user.hasCookie()) {
       const r: SignInResult = new SignInResult();
       r.ok = false;
       r.message = '请先登录';
       return r;
     }
-    const region: string = RegionUtil.regionOfUid(uid);
+    const user = owner.user;
+    const region: string = owner.region;
     if (user.cookieToken.length === 0 || user.ltoken.length === 0) {
       await UserService.getInstance().completeTokenChainPublic(user);
     }
+    owner.assertCurrent();
     const cookie: string = user.gameRecordCookie();
     let resp: ApiResponse = await HoyolabClient.resignSign(uid, region, cookie);
     if (!resp.success && UserService.isCookieAuthError(resp)) {
@@ -190,7 +197,7 @@ export class SignInService {
         return HoyolabClient.resignSign(uid, region, user.gameRecordCookie());
       });
     }
-    resp = await SignInService.resolveSignRisk(uid, region, user.gameRecordCookie(), resp,
+    resp = await SignInService.resolveSignRisk(owner, user.gameRecordCookie(), resp, 'event/luna/resign',
       (u: string, reg: string, ck: string, extra?: Record<string, string>): Promise<ApiResponse> => {
         return HoyolabClient.resignSign(u, reg, ck, extra);
       });
@@ -269,9 +276,10 @@ export class SignInService {
    *      （对齐 Windows SignInClient：SignAsync 体内 GeetestWebResponse 路径）；
    *   b) retcode 1034 → createVerification 统一链路 → challenge 重放。
    */
-  private static async resolveSignRisk(uid: string, region: string, cookie: string, resp: ApiResponse,
+  private static async resolveSignRisk(owner: ChallengeSession, cookie: string, resp: ApiResponse, path: string,
     replayFn: (u: string, reg: string, ck: string, extra?: Record<string, string>) => Promise<ApiResponse>):
     Promise<ApiResponse> {
+    owner.assertCurrent();
     // a) 体内极验：成功 HTTP 但 data 携带 gt/challenge
     if (resp.success && resp.data !== undefined) {
       const data = resp.data as Record<string, Object>;
@@ -280,10 +288,11 @@ export class SignInService {
       const challenge: string = String(data['challenge'] ?? '');
       if (inBodySuccess && gt.length > 0 && challenge.length > 0) {
         Logger.info(TAG, 'sign hit in-body geetest, launching verify');
-        const validate: string = await RiskVerifyService.getInstance().verifyGt(gt, challenge);
-        if (validate.length > 0) {
-          const replay: Record<string, string> = RiskUiHelper.riskReplayHeaders(challenge, validate);
-          return replayFn(uid, region, cookie, replay);
+        const solved: GeetestSolveResult = await RiskVerifyService.getInstance().verifyGtFull(gt, challenge);
+        owner.assertCurrent();
+        if (solved.challenge.length > 0 && solved.validate.length > 0) {
+          const replay: Record<string, string> = RiskUiHelper.riskReplayHeaders(solved.challenge, solved.validate);
+          return replayFn(owner.uid, owner.region, cookie, replay);
         }
         const cancelled: ApiResponse = ApiResponse.fail(RetCodes.RISK_CONTROL, '人机验证未完成，签到已取消');
         return cancelled;
@@ -292,10 +301,11 @@ export class SignInService {
     }
     // b) retcode 1034：走 createVerification 统一链路
     if (resp.isRiskControl()) {
-      const challenge: string = await RiskVerifier.resolveGtChallenge(cookie, 'event/luna/sign');
+      const challenge: string = await RiskVerifier.resolveGtChallenge(cookie, path);
+      owner.assertCurrent();
       if (challenge.length > 0) {
         Logger.info(TAG, 'sign 1034 verified, replaying');
-        return replayFn(uid, region, cookie, RiskUiHelper.riskReplayHeaders(challenge));
+        return replayFn(owner.uid, owner.region, cookie, RiskUiHelper.riskReplayHeaders(challenge));
       }
     }
     return resp;

@@ -201,6 +201,19 @@ export class UIIFCodec {
       }
       item.isLocked = item.isLocked ?? equipLock;
       item.isMarked = item.isMarked ?? equipMark;
+      // Optional producer extensions. Older archives may have preserved unrecognized values under these keys.
+      const equipped: string | undefined = detail.get('equippedAvatarId') ?? fields.get('equippedAvatarId');
+      if (equipped !== undefined && equipped !== 'null') {
+        try { item.equippedAvatarId = UIIFCodec.uint(equipped, '已装备角色 ID'); } catch (e) {}
+      }
+      const purchased: string | undefined = equip.get('purchasedAppendPropIdList') ?? detail.get('purchasedAppendPropIdList')
+        ?? fields.get('purchasedAppendPropIdList');
+      if (!hasWeapon && purchased !== undefined && purchased !== 'null') {
+        try {
+          item.purchasedAppendPropIds = BackpackJson.elements(purchased)
+            .map((value: string): number => UIIFCodec.uint(value, '定向词条 ID', 1));
+        } catch (e) {}
+      }
     }
     return item;
   }

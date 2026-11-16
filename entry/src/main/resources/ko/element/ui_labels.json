@@ -1,0 +1,1244 @@
+{
+  "string": [
+    {
+      "name": "ui_about_restart",
+      "value": "언어 설정"
+    },
+    {
+      "name": "ui_account_insights_copied_json",
+      "value": "De-identified statistics copied to clipboard."
+    },
+    {
+      "name": "ui_account_insights_copy_json",
+      "value": "Copy de-identified statistics (JSON)"
+    },
+    {
+      "name": "ui_account_insights_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_account_insights_loading",
+      "value": "Loading saved records…"
+    },
+    {
+      "name": "ui_account_insights_missing_model",
+      "value": "Enter a model identifier."
+    },
+    {
+      "name": "ui_account_insights_no_account",
+      "value": "Select a game account and UID first."
+    },
+    {
+      "name": "ui_account_insights_no_records",
+      "value": "No saved records available for charting."
+    },
+    {
+      "name": "ui_account_insights_open",
+      "value": "History charts and AI insights"
+    },
+    {
+      "name": "ui_account_insights_unit_wish",
+      "value": "wishes"
+    },
+    {
+      "name": "ui_action_choose",
+      "value": "선택"
+    },
+    {
+      "name": "ui_action_clear",
+      "value": "비우기"
+    },
+    {
+      "name": "ui_action_clear_cache",
+      "value": "캐시 지우기"
+    },
+    {
+      "name": "ui_action_close",
+      "value": "닫기"
+    },
+    {
+      "name": "ui_action_continue",
+      "value": "계속"
+    },
+    {
+      "name": "ui_action_disable",
+      "value": "비활성화"
+    },
+    {
+      "name": "ui_action_edit",
+      "value": "수정"
+    },
+    {
+      "name": "ui_action_enable",
+      "value": "활성화"
+    },
+    {
+      "name": "ui_action_restore",
+      "value": "복원"
+    },
+    {
+      "name": "ui_agent_page_label_delete_conversation",
+      "value": "Delete conversation"
+    },
+    {
+      "name": "ui_agent_page_label_model_profile",
+      "value": "Model"
+    },
+    {
+      "name": "ui_agent_page_label_model_provider_profile",
+      "value": "Model Provider Profile"
+    },
+    {
+      "name": "ui_agent_page_label_placeholder",
+      "value": "Type a message..."
+    },
+    {
+      "name": "ui_ai_approval",
+      "value": "Tool approval required"
+    },
+    {
+      "name": "ui_ai_continue",
+      "value": "생성 계속"
+    },
+    {
+      "name": "ui_ai_conversation_actions",
+      "value": "대화 작업"
+    },
+    {
+      "name": "ui_ai_copied_text",
+      "value": "클립보드로 복사됨"
+    },
+    {
+      "name": "ui_ai_copy_error",
+      "value": "클립보드를 열지 못했습니다"
+    },
+    {
+      "name": "ui_ai_copy_text",
+      "value": "Copy Text"
+    },
+    {
+      "name": "ui_ai_custom_api",
+      "value": "사용자 지정 API"
+    },
+    {
+      "name": "ui_ai_device_generate",
+      "value": "기기에서 분석"
+    },
+    {
+      "name": "ui_ai_endpoint_placeholder",
+      "value": "기본 URL (비워 두면 기본값)"
+    },
+    {
+      "name": "ui_ai_initial_request",
+      "value": "Analyze my account performance, wish results and future priorities using the historical statistics in this chat."
+    },
+    {
+      "name": "ui_ai_key_placeholder",
+      "value": "API 키 (비워 두면 기존 키 유지)"
+    },
+    {
+      "name": "ui_ai_mode",
+      "value": "AI 분석 모드"
+    },
+    {
+      "name": "ui_ai_on_device",
+      "value": "기기 내 AI"
+    },
+    {
+      "name": "ui_ai_privacy_body",
+      "value": "메시지를 보내면 선택한 AI 서비스에 대화와 비식별화된 기록 통계가 전송됩니다. 앱은 UID, 쿠키, 원본 아이템 ID 또는 데이터베이스 파일을 첨부하지 않습니다. 대화는 기기에 저장되며 API 키는 시스템에 안전하게 저장됩니다. 도구를 실행하려면 승인이 필요합니다."
+    },
+    {
+      "name": "ui_ai_privacy_title",
+      "value": "Before using third-party AI"
+    },
+    {
+      "name": "ui_ai_reasoning_completed",
+      "value": "Thought"
+    },
+    {
+      "name": "ui_ai_reasoning_in_progress",
+      "value": "Thinking"
+    },
+    {
+      "name": "ui_ai_return",
+      "value": "대화로 돌아가기"
+    },
+    {
+      "name": "ui_ai_select_conversation",
+      "value": "대화 선택"
+    },
+    {
+      "name": "ui_ai_workspace",
+      "value": "AI 작업 공간"
+    },
+    {
+      "name": "ui_announcement_redeem_code_label",
+      "value": "특별 프로그램 교환 코드"
+    },
+    {
+      "name": "ui_avatar_property_score_algorithm",
+      "value": "성유물 점수 알고리즘"
+    },
+    {
+      "name": "ui_backpack_category_reliquary",
+      "value": "성유물"
+    },
+    {
+      "name": "ui_backpack_category_weapon",
+      "value": "무기"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_name_header",
+      "value": "설정 이름"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_new_config",
+      "value": "새 설정"
+    },
+    {
+      "name": "ui_backpack_sort_count",
+      "value": "수량"
+    },
+    {
+      "name": "ui_backpack_sort_quality",
+      "value": "품질"
+    },
+    {
+      "name": "ui_base_value_slider_level",
+      "value": "레벨"
+    },
+    {
+      "name": "ui_bg_choose_folder",
+      "value": "폴더 선택"
+    },
+    {
+      "name": "ui_bg_folder_picker_failed",
+      "value": "배경 폴더를 선택할 수 없습니다"
+    },
+    {
+      "name": "ui_bg_folder_saved",
+      "value": "배경 폴더를 업데이트했습니다"
+    },
+    {
+      "name": "ui_bg_folder_temporary",
+      "value": "이 폴더는 현재 세션에서만 사용할 수 있습니다"
+    },
+    {
+      "name": "ui_bg_none",
+      "value": "없음"
+    },
+    {
+      "name": "ui_card_calendar_all_materials_hint",
+      "value": "모든 재료 비경을 도전할 수 있습니다"
+    },
+    {
+      "name": "ui_card_sign_in_auto_sign_in",
+      "value": "자동 출석체크"
+    },
+    {
+      "name": "ui_card_sign_in_claim_re_sign_in_action",
+      "value": "보충 출석"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_allow",
+      "value": "Allow"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_deny",
+      "value": "Deny"
+    },
+    {
+      "name": "ui_clear_filters",
+      "value": "필터 초기화"
+    },
+    {
+      "name": "ui_code_copied",
+      "value": "교환 코드 복사 성공"
+    },
+    {
+      "name": "ui_common_loading",
+      "value": "불러오는 중…"
+    },
+    {
+      "name": "ui_content_dialog_complete_primary_button_text",
+      "value": "완료"
+    },
+    {
+      "name": "ui_cultivation_add_project_action",
+      "value": "신규"
+    },
+    {
+      "name": "ui_cultivation_material_list_world_level_title",
+      "value": "세계 레벨"
+    },
+    {
+      "name": "ui_cultivation_navigate_action",
+      "value": "이동"
+    },
+    {
+      "name": "ui_daily_note_notification_setting",
+      "value": "알림 설정"
+    },
+    {
+      "name": "ui_calendar_time_pending",
+      "value": "일정 미정"
+    },
+    {
+      "name": "ui_daily_note_refresh",
+      "value": "지금 동기화"
+    },
+    {
+      "name": "ui_daily_note_setting_auto_refresh",
+      "value": "자동 새로 고침"
+    },
+    {
+      "name": "ui_desc_abyss",
+      "value": "현재 및 이전 기간"
+    },
+    {
+      "name": "ui_desc_account",
+      "value": "계정 및 연결 캐릭터 관리"
+    },
+    {
+      "name": "ui_desc_achievement",
+      "value": "내보내기 / 가져오기 / UIAF"
+    },
+    {
+      "name": "ui_desc_announcements",
+      "value": "업데이트와 소식"
+    },
+    {
+      "name": "ui_desc_backpack",
+      "value": "무기 / 성유물 / UIIF"
+    },
+    {
+      "name": "ui_desc_banner_history",
+      "value": "픽업 캐릭터 및 무기"
+    },
+    {
+      "name": "ui_desc_calendar",
+      "value": "이벤트 / 기원 / 출석"
+    },
+    {
+      "name": "ui_desc_challenge",
+      "value": "솔로 / 협동 / 최고 기록"
+    },
+    {
+      "name": "ui_desc_character",
+      "value": "캐릭터 속성 / 성유물"
+    },
+    {
+      "name": "ui_desc_cultivation",
+      "value": "재료 목록 / 재료 통계"
+    },
+    {
+      "name": "ui_desc_daily_note",
+      "value": "퓨어 레진 / 탐색 파견 / 알림"
+    },
+    {
+      "name": "ui_desc_launch",
+      "value": "실행 바로가기"
+    },
+    {
+      "name": "ui_desc_ledger",
+      "value": "원석 및 모라 월간 기록"
+    },
+    {
+      "name": "ui_desc_passport",
+      "value": "통행증 안내"
+    },
+    {
+      "name": "ui_desc_settings",
+      "value": "색상 테마 / 동기화 / 언어"
+    },
+    {
+      "name": "ui_desc_sign_in",
+      "value": "일일 출석 보상"
+    },
+    {
+      "name": "ui_desc_theater",
+      "value": "도전 별장 / 대기 캐릭터"
+    },
+    {
+      "name": "ui_desc_wiki_avatar",
+      "value": "캐릭터 원소 및 스킬"
+    },
+    {
+      "name": "ui_desc_wiki_monster",
+      "value": "몬스터 원소 및 소속"
+    },
+    {
+      "name": "ui_desc_wiki_weapon",
+      "value": "무기 능력치 및 공격력"
+    },
+    {
+      "name": "ui_desc_wish",
+      "value": "개요 / 기록"
+    },
+    {
+      "name": "ui_exception_close",
+      "value": "닫기"
+    },
+    {
+      "name": "ui_filter",
+      "value": "필터"
+    },
+    {
+      "name": "ui_filter_count",
+      "value": "필터 (%d)"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_down",
+      "value": "후반"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_up",
+      "value": "전반"
+    },
+    {
+      "name": "ui_gacha_log_orange_avatar_countdown",
+      "value": "5성 캐릭터"
+    },
+    {
+      "name": "ui_gacha_log_orange_weapon_countdown",
+      "value": "오성 무기"
+    },
+    {
+      "name": "ui_gacha_log_purple_avatar_countdown",
+      "value": "사성 캐릭터"
+    },
+    {
+      "name": "ui_gacha_log_purple_weapon_countdown",
+      "value": "사성 무기"
+    },
+    {
+      "name": "ui_gacha_log_switch_to_beyond_gacha_mode_header",
+      "value": "기도"
+    },
+    {
+      "name": "ui_gacha_pool_avatar_event",
+      "value": "캐릭터 이벤트"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_event",
+      "value": "이벤트 기도"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_permanent",
+      "value": "기연 메아리"
+    },
+    {
+      "name": "ui_gacha_pool_chronicled",
+      "value": "집록 기원"
+    },
+    {
+      "name": "ui_gacha_pool_novice",
+      "value": "초심자 기원"
+    },
+    {
+      "name": "ui_gacha_pool_permanent",
+      "value": "영구 기원"
+    },
+    {
+      "name": "ui_gacha_pool_weapon_event",
+      "value": "신의 주조"
+    },
+    {
+      "name": "ui_grid_view",
+      "value": "격자 보기"
+    },
+    {
+      "name": "ui_history_charts",
+      "value": "기록 차트"
+    },
+    {
+      "name": "ui_home_greeting",
+      "value": "여행자, 티바트 대륙에 오신 것을 환영합니다!"
+    },
+    {
+      "name": "ui_home_greeting_count",
+      "value": "Snap Hutao를 %s번 실행했습니다."
+    },
+    {
+      "name": "ui_home_greeting_rare",
+      "value": "네 말이 맞아. 하지만 Snap Hutao는 DGP Studio에서 자체 개발한..."
+    },
+    {
+      "name": "ui_home_greeting_text_default",
+      "value": "여행자, 티바트 대륙에 오신 것을 환영합니다!"
+    },
+    {
+      "name": "ui_home_no_codes",
+      "value": "사용 가능한 교환 코드가 없습니다"
+    },
+    {
+      "name": "ui_home_no_events",
+      "value": "예정된 이벤트가 없습니다"
+    },
+    {
+      "name": "ui_home_recent",
+      "value": "예정 이벤트 및 기원"
+    },
+    {
+      "name": "ui_hutao_passport_verify_code_action",
+      "value": "인증 코드 전송"
+    },
+    {
+      "name": "ui_info_bar_panel_contract_content",
+      "value": "접기"
+    },
+    {
+      "name": "ui_list_view",
+      "value": "목록 보기"
+    },
+    {
+      "name": "ui_material_frosted",
+      "value": "반투명 유리와 부드러운 그림자"
+    },
+    {
+      "name": "ui_material_system_glass",
+      "value": "시스템 유리와 몰입형 조명"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_elec",
+      "value": "번개"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_fire",
+      "value": "불"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_grass",
+      "value": "풀"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_ice",
+      "value": "얼음"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_rock",
+      "value": "바위"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_water",
+      "value": "물"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_wind",
+      "value": "바람"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_blue",
+      "value": "3성"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_green",
+      "value": "2성"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_orange",
+      "value": "5성"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_purple",
+      "value": "4성"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_red",
+      "value": "한정 5성"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_white",
+      "value": "1성"
+    },
+    {
+      "name": "ui_model_intrinsic_role_combat_difficulty_level_lunar",
+      "value": "월유 모드"
+    },
+    {
+      "name": "ui_model_metadata_material_weapon_ascension_material",
+      "value": "무기 돌파 소재"
+    },
+    {
+      "name": "ui_nav_announcements",
+      "value": "게임 공지"
+    },
+    {
+      "name": "ui_nav_banner_history",
+      "value": "기원 이력"
+    },
+    {
+      "name": "ui_navigation_collapse",
+      "value": "탐색 메뉴 접기"
+    },
+    {
+      "name": "ui_navigation_expand",
+      "value": "탐색 메뉴 펼치기"
+    },
+    {
+      "name": "ui_option_selected",
+      "value": "선택됨"
+    },
+    {
+      "name": "ui_option_unselected",
+      "value": "선택되지 않음"
+    },
+    {
+      "name": "ui_plugin_setting_back_button",
+      "value": "뒤로"
+    },
+    {
+      "name": "ui_role_combat_avatar_trial_hint",
+      "value": "체험"
+    },
+    {
+      "name": "ui_role_combat_shortest",
+      "value": "최고 속도 공연"
+    },
+    {
+      "name": "ui_role_combat_splendour_buffs_header",
+      "value": "휘채 축복"
+    },
+    {
+      "name": "ui_role_combat_support",
+      "value": "지원"
+    },
+    {
+      "name": "ui_setting_apperance_first_day_of_week_header",
+      "value": "한 주의 첫날"
+    },
+    {
+      "name": "ui_setting_background_image_custom_folder_header",
+      "value": "사용자 지정 배경 이미지 폴더"
+    },
+    {
+      "name": "ui_setting_background_media_local_folder",
+      "value": "로컬 무작위 동영상"
+    },
+    {
+      "name": "ui_setting_background_media_official_launcher_video",
+      "value": "공식 런처 배경"
+    },
+    {
+      "name": "ui_setting_background_video_is_looping_header",
+      "value": "반복 재생 여부"
+    },
+    {
+      "name": "ui_setting_background_video_is_muted_header",
+      "value": "음소거 여부"
+    },
+    {
+      "name": "ui_setting_control_material_default",
+      "value": "기본"
+    },
+    {
+      "name": "ui_setting_create_desktop_shortcut_action",
+      "value": "생성"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_off",
+      "value": "숨김"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_on",
+      "value": "표시"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_action",
+      "value": "구성"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_header",
+      "value": "Geetest 인증 서비스 구성"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_description",
+      "value": "즉시 적용되며, 끄면 더 이상 표시되지 않습니다"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_header",
+      "value": "게임 활동 캘린더 표시 여부"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_description",
+      "value": "기본값은 꺼짐이며, 진행 중이 아닌 이벤트 날짜 등 일부 내용이 올바르게 표시되지 않습니다"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_header",
+      "value": "현재 진행 중이 아닌 게임 내 버전 활동 이벤트 표시 여부"
+    },
+    {
+      "name": "ui_setting_home_card_description",
+      "value": "홈 대시보드의 카드를 관리하고 드래그하여 정렬합니다"
+    },
+    {
+      "name": "ui_setting_hutao_passport_logout_action",
+      "value": "로그아웃"
+    },
+    {
+      "name": "ui_setting_key_shortcut_virtual_key_code_action",
+      "value": "보기"
+    },
+    {
+      "name": "ui_settings_auto_sign_info",
+      "value": "시작 시 현재 UID, 앱 실행 중 날짜가 바뀌면 로컬 중국 서버 캐릭터로 출석합니다."
+    },
+    {
+      "name": "ui_settings_backup_credentials",
+      "value": "백업에는 로그인 정보가 포함됩니다. 안전하게 보관하세요."
+    },
+    {
+      "name": "ui_settings_cache",
+      "value": "미디어 및 아이콘 캐시"
+    },
+    {
+      "name": "ui_settings_cache_size",
+      "value": "캐시 사용량 %s"
+    },
+    {
+      "name": "ui_settings_cancel_update",
+      "value": "업데이트 취소"
+    },
+    {
+      "name": "ui_settings_cancelling",
+      "value": "취소 중…"
+    },
+    {
+      "name": "ui_settings_choose_video",
+      "value": "동영상 선택"
+    },
+    {
+      "name": "ui_settings_configure",
+      "value": "구성"
+    },
+    {
+      "name": "ui_settings_data_next_launch",
+      "value": "선택한 게임 데이터는 다음 실행 시 적용됩니다."
+    },
+    {
+      "name": "ui_settings_data_source",
+      "value": "데이터 원본 URL"
+    },
+    {
+      "name": "ui_settings_delete_wish",
+      "value": "모든 기원 데이터 삭제"
+    },
+    {
+      "name": "ui_settings_delete_wish_archive",
+      "value": "기원 보관 기록 삭제"
+    },
+    {
+      "name": "ui_settings_delete_wish_confirm",
+      "value": "모든 UID의 기원 기록을 삭제할까요? 되돌릴 수 없습니다."
+    },
+    {
+      "name": "ui_settings_download_verify",
+      "value": "다운로드 및 검증"
+    },
+    {
+      "name": "ui_settings_export_backup",
+      "value": "전체 백업 내보내기"
+    },
+    {
+      "name": "ui_settings_feedback",
+      "value": "피드백 및 진단"
+    },
+    {
+      "name": "ui_settings_game_data",
+      "value": "게임 데이터 업데이트"
+    },
+    {
+      "name": "ui_settings_geetest_help",
+      "value": "{0}은 gt, {1}은 challenge입니다. GET 응답에 code: 0, challenge 및 validate가 필요합니다. 대화형 인증은 비워 두세요."
+    },
+    {
+      "name": "ui_settings_help",
+      "value": "오프라인 도움말"
+    },
+    {
+      "name": "ui_settings_immersive_material",
+      "value": "몰입형 재질"
+    },
+    {
+      "name": "ui_settings_local_backup_success",
+      "value": "완료"
+    },
+    {
+      "name": "ui_settings_manifest_help",
+      "value": "매니페스트 URL을 저장한 다음 업데이트를 확인하세요."
+    },
+    {
+      "name": "ui_settings_material_level",
+      "value": "몰입형 재질 수준"
+    },
+    {
+      "name": "ui_settings_material_scope",
+      "value": "재질 수준은 즉시 적용됩니다. 콘텐츠 표면에는 반투명 효과를, 지원되는 컨트롤에는 시스템 몰입 효과를 사용합니다."
+    },
+    {
+      "name": "ui_settings_no_wallpaper",
+      "value": "선택한 배경 이미지가 없습니다"
+    },
+    {
+      "name": "ui_settings_no_wish_archives",
+      "value": "기원 보관 기록이 없습니다. 새로 고치거나 가져오세요."
+    },
+    {
+      "name": "ui_settings_normal_material",
+      "value": "기본 재질"
+    },
+    {
+      "name": "ui_settings_not_logged_in",
+      "value": "로그아웃 상태"
+    },
+    {
+      "name": "ui_settings_page_description_add_model_provider_profile_to_edit",
+      "value": "Add a model provider profile first"
+    },
+    {
+      "name": "ui_settings_page_label_add_profile",
+      "value": "Add"
+    },
+    {
+      "name": "ui_settings_page_label_agent_maximum_iterations_per_request",
+      "value": "Maximum Tool Iterations Per Request"
+    },
+    {
+      "name": "ui_settings_page_label_agent_system_prompt",
+      "value": "System Prompt"
+    },
+    {
+      "name": "ui_settings_page_label_agent_user_name",
+      "value": "User Name"
+    },
+    {
+      "name": "ui_settings_page_label_clear_models",
+      "value": "Clear Models"
+    },
+    {
+      "name": "ui_settings_page_label_copy_profile",
+      "value": "Copy"
+    },
+    {
+      "name": "ui_settings_page_label_delete_model",
+      "value": "Delete Model"
+    },
+    {
+      "name": "ui_settings_page_label_delete_profile",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_settings_page_label_fetch_models",
+      "value": "Fetch"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_context_window_tokens",
+      "value": "Context Window Length"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_input_tokens",
+      "value": "Input Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_output_tokens",
+      "value": "Output Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_name",
+      "value": "Model Name"
+    },
+    {
+      "name": "ui_settings_page_label_model_omit_reasoning_effort_when_thinking_disabled",
+      "value": "Omit reasoning effort when Thinking is off"
+    },
+    {
+      "name": "ui_settings_page_label_model_provider_profiles",
+      "value": "Model Provider Profiles"
+    },
+    {
+      "name": "ui_settings_page_label_model_reasoning_effort",
+      "value": "Reasoning Effort"
+    },
+    {
+      "name": "ui_settings_page_label_model_temperature",
+      "value": "Temperature"
+    },
+    {
+      "name": "ui_settings_page_label_model_thinking_enabled",
+      "value": "Enable Thinking"
+    },
+    {
+      "name": "ui_settings_page_label_model_top_p",
+      "value": "Top P"
+    },
+    {
+      "name": "ui_settings_page_label_profile_model_id",
+      "value": "Model ID"
+    },
+    {
+      "name": "ui_settings_page_label_profile_name",
+      "value": "Profile Name"
+    },
+    {
+      "name": "ui_settings_page_label_profile_provider_type",
+      "value": "Provider Type"
+    },
+    {
+      "name": "ui_settings_page_label_selected_model",
+      "value": "Selected Model"
+    },
+    {
+      "name": "ui_settings_page_option_provider_default",
+      "value": "Provider default"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_extra_high",
+      "value": "Extra high"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_high",
+      "value": "High"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_low",
+      "value": "Low"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_medium",
+      "value": "Medium"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_none",
+      "value": "None"
+    },
+    {
+      "name": "ui_settings_previous_data",
+      "value": "이전 게임 데이터 복원"
+    },
+    {
+      "name": "ui_settings_processing",
+      "value": "처리 중…"
+    },
+    {
+      "name": "ui_settings_random_video",
+      "value": "불러올 때 가져온 동영상을 무작위로 재생합니다."
+    },
+    {
+      "name": "ui_settings_reduce_motion",
+      "value": "동작 줄이기"
+    },
+    {
+      "name": "ui_settings_reduced_motion_info",
+      "value": "화면 전환 및 누르기 애니메이션을 줄입니다."
+    },
+    {
+      "name": "ui_settings_reset_builtin",
+      "value": "내장 게임 데이터 복원"
+    },
+    {
+      "name": "ui_settings_restore_backup",
+      "value": "백업에서 복원"
+    },
+    {
+      "name": "ui_settings_restore_confirm",
+      "value": "현재 데이터를 이 백업으로 덮어쓸까요?"
+    },
+    {
+      "name": "ui_settings_restore_scope",
+      "value": "계정, 게임 기록 및 환경 설정 복원"
+    },
+    {
+      "name": "ui_settings_signed_in",
+      "value": "게임 계정에 로그인됨"
+    },
+    {
+      "name": "ui_settings_stop_download",
+      "value": "다운로드를 중지하고 검증이 끝날 때까지 기다릴까요?"
+    },
+    {
+      "name": "ui_settings_verified_data",
+      "value": "신뢰할 수 있는 GitHub 커밋에서 전체 데이터를 다운로드하고 검증합니다."
+    },
+    {
+      "name": "ui_settings_video_fallback",
+      "value": "백그라운드에서 일시 정지합니다. 동영상이 없으면 배경 이미지를 표시합니다."
+    },
+    {
+      "name": "ui_settings_wallpaper_sources",
+      "value": "로컬 이미지는 5분마다 바뀝니다. 오늘의 배경은 Snap Hutao에서 가져오며 이미지 권리는 제작자에게 있습니다."
+    },
+    {
+      "name": "ui_spiral_abyss_hutao_statistics",
+      "value": "이번 통계"
+    },
+    {
+      "name": "ui_spiral_abyss_upload_record_homa_not_login_primary_button_text",
+      "value": "로그인하러 가기"
+    },
+    {
+      "name": "ui_travelers_diary_no_income_source_hint",
+      "value": "이번 달 원석 수입 기록이 없습니다"
+    },
+    {
+      "name": "ui_travelers_diary_today",
+      "value": "오늘"
+    },
+    {
+      "name": "ui_update_cancel",
+      "value": "확인 취소"
+    },
+    {
+      "name": "ui_update_cancelled",
+      "value": "취소됨"
+    },
+    {
+      "name": "ui_update_channel",
+      "value": "릴리스 채널"
+    },
+    {
+      "name": "ui_update_check_failed",
+      "value": "업데이트 확인 중 오류 발생"
+    },
+    {
+      "name": "ui_update_checking",
+      "value": "업데이트 확인 중…"
+    },
+    {
+      "name": "ui_update_compare_unknown",
+      "value": "버전 정보가 부족합니다"
+    },
+    {
+      "name": "ui_update_compatibility_unknown",
+      "value": "설치 호환성 정보 없음"
+    },
+    {
+      "name": "ui_update_conflict",
+      "value": "버전 이름과 코드가 일치하지 않습니다"
+    },
+    {
+      "name": "ui_update_current",
+      "value": "현재 최신 버전입니다"
+    },
+    {
+      "name": "ui_update_hap_listed",
+      "value": "HarmonyOS 패키지 목록에 있음"
+    },
+    {
+      "name": "ui_update_installed",
+      "value": "설치된 버전 %s"
+    },
+    {
+      "name": "ui_update_invalid",
+      "value": "릴리스 정보가 유효하지 않습니다"
+    },
+    {
+      "name": "ui_update_local_newer",
+      "value": "설치된 버전이 더 최신입니다"
+    },
+    {
+      "name": "ui_update_no_hap",
+      "value": "HarmonyOS 패키지 목록에 없음"
+    },
+    {
+      "name": "ui_update_no_notes",
+      "value": "이 버전의 릴리스 노트가 없습니다"
+    },
+    {
+      "name": "ui_update_no_release",
+      "value": "이 채널에 공개 릴리스가 없습니다"
+    },
+    {
+      "name": "ui_update_notes_error",
+      "value": "릴리스 노트를 열 수 없습니다"
+    },
+    {
+      "name": "ui_update_preview",
+      "value": "시험판 포함"
+    },
+    {
+      "name": "ui_update_project_releases",
+      "value": "프로젝트 릴리스"
+    },
+    {
+      "name": "ui_update_rate_limit",
+      "value": "GitHub 요청이 제한되었습니다. 나중에 다시 시도하세요."
+    },
+    {
+      "name": "ui_update_recent_only",
+      "value": "최근 릴리스 300개 확인"
+    },
+    {
+      "name": "ui_update_required_api",
+      "value": "최소 API %d"
+    },
+    {
+      "name": "ui_update_skipped",
+      "value": "버전 %s 건너뛰기가 완료되었습니다. 시작 시 해당 버전을 더 이상 자동으로 알리지 않으며, 설정에서 수동으로 업데이트를 확인할 수 있습니다"
+    },
+    {
+      "name": "ui_update_stable",
+      "value": "안정 릴리스"
+    },
+    {
+      "name": "ui_update_unavailable",
+      "value": "릴리스 저장소를 사용할 수 없습니다"
+    },
+    {
+      "name": "ui_update_unknown",
+      "value": "알 수 없음"
+    },
+    {
+      "name": "ui_update_unskip",
+      "value": "이 버전 건너뛰기 취소"
+    },
+    {
+      "name": "ui_user_copy_cookie_action",
+      "value": "Cookie 복사"
+    },
+    {
+      "name": "ui_web_daily_note_attendance_reward_status_finished_non_reward",
+      "value": "완료됨"
+    },
+    {
+      "name": "ui_web_hoyolab_game_record_act_calendar_hard_challenge_locked",
+      "value": "아직 해제되지 않음"
+    },
+    {
+      "name": "ui_weekday_friday",
+      "value": "금"
+    },
+    {
+      "name": "ui_weekday_monday",
+      "value": "월"
+    },
+    {
+      "name": "ui_weekday_saturday",
+      "value": "토"
+    },
+    {
+      "name": "ui_weekday_sunday",
+      "value": "일"
+    },
+    {
+      "name": "ui_weekday_thursday",
+      "value": "목"
+    },
+    {
+      "name": "ui_weekday_tuesday",
+      "value": "화"
+    },
+    {
+      "name": "ui_weekday_wednesday",
+      "value": "수"
+    },
+    {
+      "name": "ui_wi_ki_avatar_ascension_materials_header",
+      "value": "육성 재료"
+    },
+    {
+      "name": "ui_wi_ki_avatar_auto_suggest_box_place_holder",
+      "value": "캐릭터 필터"
+    },
+    {
+      "name": "ui_wi_ki_avatar_name_card_header",
+      "value": "명함"
+    },
+    {
+      "name": "ui_wi_ki_avatar_special_food_title",
+      "value": "특수 요리"
+    },
+    {
+      "name": "ui_wi_ki_weapon_auto_suggest_box_place_holder",
+      "value": "무기 필터"
+    },
+    {
+      "name": "ui_wish_show_empty_history",
+      "value": "기록되지 않은 오래된 기원 이벤트"
+    },
+    {
+      "name": "ui_wish_show_empty_overview",
+      "value": "기록 없는 기원 개요"
+    },
+    {
+      "name": "ui_wish_show_unobtained",
+      "value": "획득하지 못한 기원 아이템"
+    },
+    {
+      "name": "ui_gacha_pivot_overview",
+      "value": "개요"
+    },
+    {
+      "name": "ui_gacha_pivot_history",
+      "value": "기록"
+    },
+    {
+      "name": "ui_gacha_pivot_avatar",
+      "value": "캐릭터"
+    },
+    {
+      "name": "ui_gacha_pivot_weapon",
+      "value": "무기"
+    },
+    {
+      "name": "ui_gacha_pivot_countdown",
+      "value": "카운트다운"
+    },
+    {
+      "name": "ui_gacha_pivot_statistics",
+      "value": "统计"
+    },
+    {
+      "name": "ui_gacha_full_refresh",
+      "value": "전체 동기화"
+    },
+    {
+      "name": "ui_gacha_full_refresh_selected",
+      "value": "✓ 전체 동기화"
+    },
+    {
+      "name": "ui_gacha_card_statistics",
+      "value": "통계"
+    },
+    {
+      "name": "ui_gacha_card_ratio",
+      "value": "비율"
+    },
+    {
+      "name": "ui_gacha_card_five_average",
+      "value": "5성 평균 뽑기 횟수"
+    },
+    {
+      "name": "ui_gacha_card_four_average",
+      "value": "4성 평균 획득 뽑기 횟수"
+    },
+    {
+      "name": "ui_gacha_card_up_average",
+      "value": "UP 평균 뽑기 횟수"
+    },
+    {
+      "name": "ui_gacha_card_to_five",
+      "value": "마지막 5성까지"
+    },
+    {
+      "name": "ui_gacha_card_to_four",
+      "value": "마지막 4성까지"
+    },
+    {
+      "name": "ui_gacha_card_to_three",
+      "value": "최근 4성 획득까지"
+    },
+    {
+      "name": "ui_travelers_diary_month",
+      "value": "이번 달"
+    },
+    {
+      "name": "ui_travelers_diary_primogems",
+      "value": "원석"
+    },
+    {
+      "name": "ui_travelers_diary_mora",
+      "value": "모라"
+    }
+  ]
+}

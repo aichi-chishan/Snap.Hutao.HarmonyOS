@@ -9,6 +9,11 @@ export class UigfCodec {
   static readonly VERSIONS: string[] = ['v2.2', 'v2.3', 'v2.4', 'v3.0', 'v4.0', 'v4.1', 'v4.2'];
   private checkpoint: (() => void) | undefined = undefined;
   private rowCount: number = 0;
+
+  static supportsImportVersion(version: string): boolean {
+    return version === 'v2.0' || version === 'v2.1' || UigfCodec.VERSIONS.includes(version);
+  }
+
   /** Parse once for preview. Validation covers every UID before any selection or database write. */
   prepareImport(text: string, checkpoint?: () => void): UigfImportPreparation {
     if (text.length === 0 || text.length > UigfImportPreparation.MAX_TEXT_CODE_UNITS) {
@@ -27,7 +32,7 @@ export class UigfCodec {
     const rawVersion: Object | undefined = info['version'] ?? info['uigf_version'];
     if (typeof rawVersion !== 'string') { throw new UigfError('UIGF 版本必须为字符串'); }
     const version: string = rawVersion;
-    if (UigfCodec.VERSIONS.indexOf(version) < 0) {
+    if (!UigfCodec.supportsImportVersion(version)) {
       throw new UigfError(`不支持的 UIGF 版本：${version}`);
     }
     if (info['version'] !== undefined && info['uigf_version'] !== undefined && info['version'] !== info['uigf_version']) {
@@ -48,6 +53,9 @@ export class UigfCodec {
         'list': root['list']
       };
       this.parseSections([section], false, pending, indexes);
+    }
+    for (const uid of pending.keys()) {
+      pending.set(uid, Array.from((indexes.get(uid) ?? new Map<string, GachaItem>()).values()));
     }
     return new UigfImportPreparation(version, pending);
   }
@@ -78,7 +86,7 @@ export class UigfCodec {
         throw new UigfError(`UID ${uid} 的 list 必须是数组`);
       }
       if (!pending.has(uid) && pending.size >= UigfBounds.MAX_ARCHIVES) { throw new UigfError('UIGF 最多预览 1024 个归档，请拆分文件'); }
-      const items: GachaItem[] = pending.get(uid) ?? [];
+      if (!pending.has(uid)) { pending.set(uid, []); }
       const known: Map<string, GachaItem> = indexes.get(uid) ?? new Map<string, GachaItem>();
       indexes.set(uid, known);
       for (const rawItem of sec['list'] as Object[]) {
@@ -95,14 +103,14 @@ export class UigfCodec {
         }
         const item: GachaItem = new GachaItem();
         item.uid = uid;
-        item.gachaId = cursor;
+        item.gachaId = GachaItem.decimalId(cursor);
         item.gachaType = UigfCodec.number(isUgc ? it['op_gacha_type'] : (it['gacha_type'] ?? it['uigf_gacha_type']), '卡池类型');
         if (isUgc ? !GachaType.isBeyond(item.gachaType)
           : !(GachaType.isStandard(item.gachaType) || item.gachaType === 400)) {
           throw new UigfError(`记录 ${cursor} 的卡池类型无效`);
         }
         if (it['uid'] !== undefined && UigfCodec.decimal(it['uid'], '记录 UID') !== uid) { throw new UigfError(`记录 ${cursor} 的 UID 与归档不一致`); }
-        if (!isUgc && it['uigf_gacha_type'] !== undefined && UigfCodec.number(it['uigf_gacha_type'], 'UIGF 卡池') !== (item.gachaType === 400 ? 301 : item.gachaType)) {
+        if (!isUgc && it['uigf_gacha_type'] !== undefined && UigfCodec.number(it['uigf_gacha_type'], 'UIGF 卡池') !== GachaType.queryTypeOf(item.gachaType)) {
           throw new UigfError(`记录 ${cursor} 的原始卡池与 UIGF 卡池不一致`);
         }
         item.itemId = UigfCodec.number(it['item_id'] ?? 0, 'item_id');
@@ -111,10 +119,6 @@ export class UigfCodec {
         }
         item.count = UigfCodec.number(it['count'] ?? 1, '数量');
         item.rankType = UigfCodec.number(it['rank_type'] ?? 0, '星级');
-        if (!Number.isSafeInteger(item.count) || item.count <= 0 || !Number.isInteger(item.rankType)
-          || item.rankType < 3 || item.rankType > 5) {
-          throw new UigfError(`记录 ${cursor} 的数量或星级无效`);
-        }
         if (typeof it['time'] !== 'string') { throw new UigfError('祈愿时间必须为字符串'); }
         item.time = UigfCodec.normalizeTime(it['time'] as string, timezone,
           UigfCodec.timezoneOfUid(uid));
@@ -129,16 +133,15 @@ export class UigfCodec {
           throw new UigfError(`记录 ${cursor} 的卡池期次无效`);
         }
         UigfCodec.validateItem(item);
-        const key: string = UigfCodec.itemKey(item);
+        const key: string = GachaItem.recordKey(item);
         const previous: GachaItem | undefined = known.get(key);
         if (previous !== undefined) {
-          if (JSON.stringify(previous) !== JSON.stringify(item)) { throw new UigfError(`UID ${uid} 中记录 ${cursor} 的重复数据存在冲突`); }
+          try { known.set(key, GachaItem.mergeRecord(previous, item, `UID ${uid}`)); }
+          catch (e) { throw new UigfError((e as Error).message); }
           continue;
         }
         known.set(key, item);
-        items.push(item);
       }
-      pending.set(uid, items);
     }
   }
 
@@ -158,14 +161,17 @@ export class UigfCodec {
 
   static validateItem(item: GachaItem): void {
     if (!/^[0-9]+$/.test(item.gachaId) || !(GachaType.isValid(item.gachaType) || item.gachaType === 400)) { throw new UigfError('祈愿记录包含无效卡池或 ID'); }
-    if (!Number.isSafeInteger(item.itemId) || item.itemId <= 0 || !Number.isSafeInteger(item.count) || item.count <= 0 ||
-      !Number.isInteger(item.rankType) || item.rankType < 3 || item.rankType > 5 || !Number.isSafeInteger(item.scheduleId) || item.scheduleId < 0) {
-      throw new UigfError(`记录 ${item.gachaId} 的物品、数量、星级或期次无效`);
+    const minRank: number = GachaType.isBeyond(item.gachaType) ? 1 : 3;
+    const invalid: string[] = [];
+    if (!Number.isSafeInteger(item.itemId) || item.itemId <= 0) { invalid.push(`物品 ID（item_id=${item.itemId}）`); }
+    if (!Number.isSafeInteger(item.count) || item.count <= 0) { invalid.push(`数量（count=${item.count}）`); }
+    if (!Number.isInteger(item.rankType) || item.rankType < minRank || item.rankType > 5) {
+      invalid.push(`星级（rank_type=${item.rankType}）`);
     }
-  }
-
-  private static itemKey(item: GachaItem): string {
-    return `${GachaType.isBeyond(item.gachaType) ? 'b' : 's'}:${item.gachaId}`;
+    if (!Number.isSafeInteger(item.scheduleId) || item.scheduleId < 0) { invalid.push(`期次（schedule_id=${item.scheduleId}）`); }
+    if (invalid.length > 0) {
+      throw new UigfError(`记录 ${item.gachaId}（${item.name}，${item.itemType}）的${invalid.join('、')}无效`);
+    }
   }
 
   /** Windows InferRegionTimeZone：美服UTC-5、欧服UTC+1，其余UTC+8。 */

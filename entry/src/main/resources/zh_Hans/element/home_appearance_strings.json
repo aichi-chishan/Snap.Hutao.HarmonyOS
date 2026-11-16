@@ -1,0 +1,40 @@
+{
+  "string": [
+    {
+      "name": "ui_home_pity_title",
+      "value": "保底计数"
+    },
+    {
+      "name": "ui_home_pity_five",
+      "value": "五星"
+    },
+    {
+      "name": "ui_home_pity_four",
+      "value": "四星"
+    },
+    {
+      "name": "ui_wallpaper_copyright",
+      "value": "图片版权信息"
+    },
+    {
+      "name": "ui_wallpaper_none",
+      "value": "无背景图片"
+    },
+    {
+      "name": "ui_wallpaper_local",
+      "value": "本地随机图片"
+    },
+    {
+      "name": "ui_wallpaper_bing",
+      "value": "必应每日一图"
+    },
+    {
+      "name": "ui_wallpaper_daily",
+      "value": "胡桃每日一图"
+    },
+    {
+      "name": "ui_wallpaper_launcher",
+      "value": "官方启动器壁纸"
+    }
+  ]
+}

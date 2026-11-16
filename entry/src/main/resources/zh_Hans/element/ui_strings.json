@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "common_confirm",
+      "value": "确认"
+    },
+    {
+      "name": "common_refresh",
+      "value": "刷新"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "祈愿记录"
+    },
+    {
+      "name": "page_title_home",
+      "value": "主页"
+    },
+    {
+      "name": "page_title_login",
+      "value": "登录"
+    },
+    {
+      "name": "page_title_note",
+      "value": "实时便笺"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "设置"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "祈愿记录"
+    },
+    {
+      "name": "tab_home",
+      "value": "主页"
+    },
+    {
+      "name": "tab_mine",
+      "value": "我的"
+    },
+    {
+      "name": "tab_note",
+      "value": "实时便笺"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "导出"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "导入"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "保存"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "添加模型"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "复制对话"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "生成分析评价"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "账号历史图表与 AI 分析"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "新对话"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "重新生成"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "发送"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "停止生成"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "测试 API 连接"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "检查更新"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "数据"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "周期"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "系统"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "工具"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "关闭后重新打开应用以跟随系统语言"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "跟随系统"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "深境螺旋"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "成就管理"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "背包物品"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "幽境危战"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "我的角色"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "养成计划"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "启动游戏"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "旅行者札记"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "胡桃通行证"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "幻想真境剧诗"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "角色资料"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "怪物资料"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "武器资料"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "关于"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "账号"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "模型设置"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "外观"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "背景图片"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "视频背景"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "备份与还原"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "日历"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "主页"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "主页游戏活动区域设置"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "主页卡片"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "语言"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "背景材质"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "其它"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "签到"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "存储空间"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "颜色主题"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "无感验证"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "祈愿记录"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "数据迁移"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "深色"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "浅色"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "胡桃 %s 版本现已可用"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "查看发布说明"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "跳过此版本"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "应用更新"
+    }
+  ]
+}

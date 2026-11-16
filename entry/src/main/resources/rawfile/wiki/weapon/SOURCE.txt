@@ -1,0 +1,6 @@
+UI_GachaShowPanel_Bg_Weapon.png is copied unchanged from:
+SnapHutaoRemasteringProject/Snap.Hutao.Remastered, main 3b7475ed3eca4aedf9cb81d94741bfbe6fa189f5
+src/Snap.Hutao.Remastered/Snap.Hutao.Remastered/Resource/Icon/UI_GachaShowPanel_Bg_Weapon.png
+SHA-256: 14b9702e415ab7c52d76a8f622dd7bfa14bcde31f446cc6cb7ffceb41f8e0e80
+The repository's MIT copyright and license are preserved in LICENSE.txt.
+Weapon artwork is requested from the same public static CDN as the Windows GachaEquipIconConverter.

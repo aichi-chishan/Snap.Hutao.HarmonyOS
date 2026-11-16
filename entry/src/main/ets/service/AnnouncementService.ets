@@ -87,7 +87,7 @@ export class AnnouncementService {
         group.items.push(item);
       }
       group.items.sort((a: Announcement, b: Announcement): number => b.startTime - a.startTime);
-      if (group.items.length > 0) { groups.push(group); }
+      groups.push(group);
     }
     const cached: AnnouncementCache = this.entry(context.key());
     cached.groups = groups; cached.groupsAt = Date.now();

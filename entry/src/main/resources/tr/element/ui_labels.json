@@ -1,0 +1,1244 @@
+{
+  "string": [
+    {
+      "name": "ui_about_restart",
+      "value": "Sunulan dili ayarla"
+    },
+    {
+      "name": "ui_account_insights_copied_json",
+      "value": "De-identified statistics copied to clipboard."
+    },
+    {
+      "name": "ui_account_insights_copy_json",
+      "value": "Copy de-identified statistics (JSON)"
+    },
+    {
+      "name": "ui_account_insights_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_account_insights_loading",
+      "value": "Loading saved records…"
+    },
+    {
+      "name": "ui_account_insights_missing_model",
+      "value": "Enter a model identifier."
+    },
+    {
+      "name": "ui_account_insights_no_account",
+      "value": "Select a game account and UID first."
+    },
+    {
+      "name": "ui_account_insights_no_records",
+      "value": "No saved records available for charting."
+    },
+    {
+      "name": "ui_account_insights_open",
+      "value": "History charts and AI insights"
+    },
+    {
+      "name": "ui_account_insights_unit_wish",
+      "value": "wishes"
+    },
+    {
+      "name": "ui_action_choose",
+      "value": "Seç"
+    },
+    {
+      "name": "ui_action_clear",
+      "value": "Temizle"
+    },
+    {
+      "name": "ui_action_clear_cache",
+      "value": "Önbelleği temizle"
+    },
+    {
+      "name": "ui_action_close",
+      "value": "Kapat"
+    },
+    {
+      "name": "ui_action_continue",
+      "value": "Devam et"
+    },
+    {
+      "name": "ui_action_disable",
+      "value": "Devre Dışı Bırak"
+    },
+    {
+      "name": "ui_action_edit",
+      "value": "Düzenle"
+    },
+    {
+      "name": "ui_action_enable",
+      "value": "Etkinleştir"
+    },
+    {
+      "name": "ui_action_restore",
+      "value": "Geri yükle"
+    },
+    {
+      "name": "ui_agent_page_label_delete_conversation",
+      "value": "Delete conversation"
+    },
+    {
+      "name": "ui_agent_page_label_model_profile",
+      "value": "Model"
+    },
+    {
+      "name": "ui_agent_page_label_model_provider_profile",
+      "value": "Model Provider Profile"
+    },
+    {
+      "name": "ui_agent_page_label_placeholder",
+      "value": "Type a message..."
+    },
+    {
+      "name": "ui_ai_approval",
+      "value": "Tool approval required"
+    },
+    {
+      "name": "ui_ai_continue",
+      "value": "Üretmeye devam et"
+    },
+    {
+      "name": "ui_ai_conversation_actions",
+      "value": "Sohbet işlemleri"
+    },
+    {
+      "name": "ui_ai_copied_text",
+      "value": "Panoya kopyalandı"
+    },
+    {
+      "name": "ui_ai_copy_error",
+      "value": "Pano açma başarısız oldu"
+    },
+    {
+      "name": "ui_ai_copy_text",
+      "value": "Copy Text"
+    },
+    {
+      "name": "ui_ai_custom_api",
+      "value": "Özel API"
+    },
+    {
+      "name": "ui_ai_device_generate",
+      "value": "Cihazda analiz et"
+    },
+    {
+      "name": "ui_ai_endpoint_placeholder",
+      "value": "Temel URL (varsayılan için boş bırakın)"
+    },
+    {
+      "name": "ui_ai_initial_request",
+      "value": "Analyze my account performance, wish results and future priorities using the historical statistics in this chat."
+    },
+    {
+      "name": "ui_ai_key_placeholder",
+      "value": "API anahtarı (mevcudu korumak için boş)"
+    },
+    {
+      "name": "ui_ai_mode",
+      "value": "Yapay zekâ analiz modu"
+    },
+    {
+      "name": "ui_ai_on_device",
+      "value": "Cihazda yapay zekâ"
+    },
+    {
+      "name": "ui_ai_privacy_body",
+      "value": "Mesaj gönderdiğinizde seçilen yapay zekâ hizmeti sohbeti ve kimlikten arındırılmış geçmiş istatistiklerini alır. Uygulama UID, çerez, ham öğe kimliği veya veri tabanı dosyası eklemez. Sohbetler cihazda kalır ve API anahtarları sistem tarafından güvenli biçimde saklanır. Araçlar onayınızı gerektirir."
+    },
+    {
+      "name": "ui_ai_privacy_title",
+      "value": "Before using third-party AI"
+    },
+    {
+      "name": "ui_ai_reasoning_completed",
+      "value": "Thought"
+    },
+    {
+      "name": "ui_ai_reasoning_in_progress",
+      "value": "Thinking"
+    },
+    {
+      "name": "ui_ai_return",
+      "value": "Sohbete dön"
+    },
+    {
+      "name": "ui_ai_select_conversation",
+      "value": "Sohbet seç"
+    },
+    {
+      "name": "ui_ai_workspace",
+      "value": "Yapay zekâ çalışma alanı"
+    },
+    {
+      "name": "ui_announcement_redeem_code_label",
+      "value": "Özel yayın kupon kodu"
+    },
+    {
+      "name": "ui_avatar_property_score_algorithm",
+      "value": "Yadigâr puanlama algoritması"
+    },
+    {
+      "name": "ui_backpack_category_reliquary",
+      "value": "Eserler"
+    },
+    {
+      "name": "ui_backpack_category_weapon",
+      "value": "Silah"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_name_header",
+      "value": "Yapılandırma Adı"
+    },
+    {
+      "name": "ui_backpack_reliquary_score_config_new_config",
+      "value": "Yeni Yapılandırma Oluştur"
+    },
+    {
+      "name": "ui_backpack_sort_count",
+      "value": "Miktar"
+    },
+    {
+      "name": "ui_backpack_sort_quality",
+      "value": "Kalite"
+    },
+    {
+      "name": "ui_base_value_slider_level",
+      "value": "Seviye"
+    },
+    {
+      "name": "ui_bg_choose_folder",
+      "value": "Klasör seç"
+    },
+    {
+      "name": "ui_bg_folder_picker_failed",
+      "value": "Arka plan klasörü seçilemedi"
+    },
+    {
+      "name": "ui_bg_folder_saved",
+      "value": "Arka plan klasörü güncellendi"
+    },
+    {
+      "name": "ui_bg_folder_temporary",
+      "value": "Klasöre yalnızca bu oturumda erişilebilir"
+    },
+    {
+      "name": "ui_bg_none",
+      "value": "Yok"
+    },
+    {
+      "name": "ui_card_calendar_all_materials_hint",
+      "value": "Tüm materyal zindanlarına meydan okunabilir"
+    },
+    {
+      "name": "ui_card_sign_in_auto_sign_in",
+      "value": "Otomatik günlük giriş"
+    },
+    {
+      "name": "ui_card_sign_in_claim_re_sign_in_action",
+      "value": "Telafi Girişi"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_allow",
+      "value": "Allow"
+    },
+    {
+      "name": "ui_chat_tool_approval_request_segment_view_label_deny",
+      "value": "Deny"
+    },
+    {
+      "name": "ui_clear_filters",
+      "value": "Filtreleri temizle"
+    },
+    {
+      "name": "ui_code_copied",
+      "value": "Kupon kodu kopyalandı"
+    },
+    {
+      "name": "ui_common_loading",
+      "value": "Yükleniyor…"
+    },
+    {
+      "name": "ui_content_dialog_complete_primary_button_text",
+      "value": "Tamamlandı"
+    },
+    {
+      "name": "ui_cultivation_add_project_action",
+      "value": "Oluştur"
+    },
+    {
+      "name": "ui_cultivation_material_list_world_level_title",
+      "value": "Dünya Seviyesi"
+    },
+    {
+      "name": "ui_cultivation_navigate_action",
+      "value": "Git"
+    },
+    {
+      "name": "ui_daily_note_notification_setting",
+      "value": "Bildirim Ayarları"
+    },
+    {
+      "name": "ui_calendar_time_pending",
+      "value": "Zaman henüz belli değil"
+    },
+    {
+      "name": "ui_daily_note_refresh",
+      "value": "Hemen Yenile"
+    },
+    {
+      "name": "ui_daily_note_setting_auto_refresh",
+      "value": "Otomatik Yenile"
+    },
+    {
+      "name": "ui_desc_abyss",
+      "value": "Güncel ve önceki dönemler"
+    },
+    {
+      "name": "ui_desc_account",
+      "value": "Hesapları ve bağlı karakterleri yönet"
+    },
+    {
+      "name": "ui_desc_achievement",
+      "value": "Dışa Aktar / İçe Aktar / UIAF"
+    },
+    {
+      "name": "ui_desc_announcements",
+      "value": "Güncellemeler ve haberler"
+    },
+    {
+      "name": "ui_desc_backpack",
+      "value": "Silah / Eserler / UIIF"
+    },
+    {
+      "name": "ui_desc_banner_history",
+      "value": "Öne çıkan karakterler ve silahlar"
+    },
+    {
+      "name": "ui_desc_calendar",
+      "value": "Etkinlikler / Dilekler / Girişler"
+    },
+    {
+      "name": "ui_desc_challenge",
+      "value": "Tekli / Eşli / En iyi süreler"
+    },
+    {
+      "name": "ui_desc_character",
+      "value": "Karakter Özellikleri / Eserler"
+    },
+    {
+      "name": "ui_desc_cultivation",
+      "value": "Materyal Kontrol Listesi / Materyal İstatistikleri"
+    },
+    {
+      "name": "ui_desc_daily_note",
+      "value": "Orijinal Reçine / Keşif Seferleri / Bildirim"
+    },
+    {
+      "name": "ui_desc_launch",
+      "value": "Başlatma kısayolları"
+    },
+    {
+      "name": "ui_desc_ledger",
+      "value": "Aylık İlk Taş ve Mora kayıtları"
+    },
+    {
+      "name": "ui_desc_passport",
+      "value": "Pasaport bilgileri"
+    },
+    {
+      "name": "ui_desc_settings",
+      "value": "Tema / Yenile / Dil"
+    },
+    {
+      "name": "ui_desc_sign_in",
+      "value": "Günlük giriş ödülleri"
+    },
+    {
+      "name": "ui_desc_theater",
+      "value": "Yıldız Meydan Okuma Nişanları / Yedek Oyuncular"
+    },
+    {
+      "name": "ui_desc_wiki_avatar",
+      "value": "Karakter elementleri ve becerileri"
+    },
+    {
+      "name": "ui_desc_wiki_monster",
+      "value": "Canavar elementleri ve grupları"
+    },
+    {
+      "name": "ui_desc_wiki_weapon",
+      "value": "Silah özellikleri ve saldırı"
+    },
+    {
+      "name": "ui_desc_wish",
+      "value": "Genel Bakış / Geçmiş"
+    },
+    {
+      "name": "ui_exception_close",
+      "value": "Kapat"
+    },
+    {
+      "name": "ui_filter",
+      "value": "Filtrele"
+    },
+    {
+      "name": "ui_filter_count",
+      "value": "Filtrele (%d)"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_down",
+      "value": "Alt Kısım"
+    },
+    {
+      "name": "ui_gacha_log_countdown_order_up",
+      "value": "Üst Kısım"
+    },
+    {
+      "name": "ui_gacha_log_orange_avatar_countdown",
+      "value": "Beş Yıldızlı Karakterler"
+    },
+    {
+      "name": "ui_gacha_log_orange_weapon_countdown",
+      "value": "Beş Yıldızlı Silahlar"
+    },
+    {
+      "name": "ui_gacha_log_purple_avatar_countdown",
+      "value": "Dört Yıldızlı Karakterler"
+    },
+    {
+      "name": "ui_gacha_log_purple_weapon_countdown",
+      "value": "Dört Yıldızlı Silahlar"
+    },
+    {
+      "name": "ui_gacha_log_switch_to_beyond_gacha_mode_header",
+      "value": "Ötesi"
+    },
+    {
+      "name": "ui_gacha_pool_avatar_event",
+      "value": "Karakter Etkinliği Dileği"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_event",
+      "value": "Etkinlik Ötesi"
+    },
+    {
+      "name": "ui_gacha_pool_beyond_permanent",
+      "value": "Sıradışı Yankı"
+    },
+    {
+      "name": "ui_gacha_pool_chronicled",
+      "value": "Kaydedilen Dilek"
+    },
+    {
+      "name": "ui_gacha_pool_novice",
+      "value": "Acemi Dileği"
+    },
+    {
+      "name": "ui_gacha_pool_permanent",
+      "value": "Dolaşım Çağrısı"
+    },
+    {
+      "name": "ui_gacha_pool_weapon_event",
+      "value": "Eşsiz İsteği"
+    },
+    {
+      "name": "ui_grid_view",
+      "value": "Izgara görünümü"
+    },
+    {
+      "name": "ui_history_charts",
+      "value": "Geçmiş grafikleri"
+    },
+    {
+      "name": "ui_home_greeting",
+      "value": "Gezgin, Teyvat kıtasına hoş geldin!"
+    },
+    {
+      "name": "ui_home_greeting_count",
+      "value": "Snap Hutao'yu %s kez başlattın"
+    },
+    {
+      "name": "ui_home_greeting_rare",
+      "value": "Haklısın, ama Snap Hutao, DGP Studio tarafından bağımsız olarak geliştirilmiş bir..."
+    },
+    {
+      "name": "ui_home_greeting_text_default",
+      "value": "Gezgin, Teyvat kıtasına hoş geldin!"
+    },
+    {
+      "name": "ui_home_no_codes",
+      "value": "Kullanılabilir kod yok"
+    },
+    {
+      "name": "ui_home_no_events",
+      "value": "Planlanmış etkinlik yok"
+    },
+    {
+      "name": "ui_home_recent",
+      "value": "Yaklaşan etkinlikler ve dilekler"
+    },
+    {
+      "name": "ui_hutao_passport_verify_code_action",
+      "value": "Doğrulama Kodu Al"
+    },
+    {
+      "name": "ui_info_bar_panel_contract_content",
+      "value": "Daralt"
+    },
+    {
+      "name": "ui_list_view",
+      "value": "Liste görünümü"
+    },
+    {
+      "name": "ui_material_frosted",
+      "value": "Buzlu saydamlık ve yumuşak gölgeler"
+    },
+    {
+      "name": "ui_material_system_glass",
+      "value": "Sistem camı ve sürükleyici aydınlatma"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_elec",
+      "value": "Elektro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_fire",
+      "value": "Pyro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_grass",
+      "value": "Dendro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_ice",
+      "value": "Cryo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_rock",
+      "value": "Geo"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_water",
+      "value": "Hydro"
+    },
+    {
+      "name": "ui_model_intrinsic_element_name_wind",
+      "value": "Anemo"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_blue",
+      "value": "Üç Yıldız"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_green",
+      "value": "İki Yıldız"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_orange",
+      "value": "Beş Yıldız"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_purple",
+      "value": "Dört Yıldız"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_red",
+      "value": "Etkinlik Özel"
+    },
+    {
+      "name": "ui_model_intrinsic_item_quality_white",
+      "value": "Bir Yıldız"
+    },
+    {
+      "name": "ui_model_intrinsic_role_combat_difficulty_level_lunar",
+      "value": "Ay Modu"
+    },
+    {
+      "name": "ui_model_metadata_material_weapon_ascension_material",
+      "value": "Silah Yükseltme Materyalleri"
+    },
+    {
+      "name": "ui_nav_announcements",
+      "value": "Oyun duyuruları"
+    },
+    {
+      "name": "ui_nav_banner_history",
+      "value": "Afiş geçmişi"
+    },
+    {
+      "name": "ui_navigation_collapse",
+      "value": "Gezinmeyi daralt"
+    },
+    {
+      "name": "ui_navigation_expand",
+      "value": "Gezinmeyi genişlet"
+    },
+    {
+      "name": "ui_option_selected",
+      "value": "Seçili"
+    },
+    {
+      "name": "ui_option_unselected",
+      "value": "Seçili değil"
+    },
+    {
+      "name": "ui_plugin_setting_back_button",
+      "value": "Geri"
+    },
+    {
+      "name": "ui_role_combat_avatar_trial_hint",
+      "value": "Deneme"
+    },
+    {
+      "name": "ui_role_combat_shortest",
+      "value": "En hızlı performans"
+    },
+    {
+      "name": "ui_role_combat_splendour_buffs_header",
+      "value": "Görkemli Kutsamalar"
+    },
+    {
+      "name": "ui_role_combat_support",
+      "value": "Destek"
+    },
+    {
+      "name": "ui_setting_apperance_first_day_of_week_header",
+      "value": "Haftanın İlk Günü"
+    },
+    {
+      "name": "ui_setting_background_image_custom_folder_header",
+      "value": "Özel arka plan resim klasörü"
+    },
+    {
+      "name": "ui_setting_background_media_local_folder",
+      "value": "Yerel Rastgele Video"
+    },
+    {
+      "name": "ui_setting_background_media_official_launcher_video",
+      "value": "Resmi Başlatıcı Arka Planı"
+    },
+    {
+      "name": "ui_setting_background_video_is_looping_header",
+      "value": "Döngüsel Oynatma"
+    },
+    {
+      "name": "ui_setting_background_video_is_muted_header",
+      "value": "Sessiz Oynatma"
+    },
+    {
+      "name": "ui_setting_control_material_default",
+      "value": "Varsayılan"
+    },
+    {
+      "name": "ui_setting_create_desktop_shortcut_action",
+      "value": "Oluştur"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_off",
+      "value": "Gizle"
+    },
+    {
+      "name": "ui_setting_empty_history_visible_on",
+      "value": "Göster"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_action",
+      "value": "Yapılandırma"
+    },
+    {
+      "name": "ui_setting_geetest_custom_url_header",
+      "value": "Doğrulama İstek Arayüzünü Yapılandır"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_description",
+      "value": "Hemen etkili olur, kapatıldıktan sonra artık görüntülenmez"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_is_enable_header",
+      "value": "Oyun etkinlik takvimi görüntülemesini etkinleştir"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_description",
+      "value": "Varsayılan olarak kapalı, devam etmeyen etkinliklerin tarihleri gibi bazı içerikler doğru görüntülenmez"
+    },
+    {
+      "name": "ui_setting_home_announcement_act_preview_header",
+      "value": "Devam etmeyen oyun içi sürüm etkinliklerinin gösterilip gösterilmeyeceği"
+    },
+    {
+      "name": "ui_setting_home_card_description",
+      "value": "Ana sayfa kontrol panelindeki kartları yönetin, sıralamak için sürükleyin"
+    },
+    {
+      "name": "ui_setting_hutao_passport_logout_action",
+      "value": "Çıkış Yap"
+    },
+    {
+      "name": "ui_setting_key_shortcut_virtual_key_code_action",
+      "value": "Görüntüle"
+    },
+    {
+      "name": "ui_settings_auto_sign_info",
+      "value": "Açılışta mevcut UID, uygulama çalışırken gün değişiminde yerel CN karakterleri için giriş ödülünü alır."
+    },
+    {
+      "name": "ui_settings_backup_credentials",
+      "value": "Yedek giriş bilgileri içerir. Güvenli bir yerde saklayın."
+    },
+    {
+      "name": "ui_settings_cache",
+      "value": "Medya ve simge önbelleği"
+    },
+    {
+      "name": "ui_settings_cache_size",
+      "value": "Önbellek boyutu %s"
+    },
+    {
+      "name": "ui_settings_cancel_update",
+      "value": "Güncellemeyi iptal et"
+    },
+    {
+      "name": "ui_settings_cancelling",
+      "value": "İptal ediliyor…"
+    },
+    {
+      "name": "ui_settings_choose_video",
+      "value": "Videoları seç"
+    },
+    {
+      "name": "ui_settings_configure",
+      "value": "Yapılandırma"
+    },
+    {
+      "name": "ui_settings_data_next_launch",
+      "value": "Seçilen oyun verileri bir sonraki açılışta kullanılır."
+    },
+    {
+      "name": "ui_settings_data_source",
+      "value": "Veri kaynağı URL'si"
+    },
+    {
+      "name": "ui_settings_delete_wish",
+      "value": "Tüm dilek verilerini sil"
+    },
+    {
+      "name": "ui_settings_delete_wish_archive",
+      "value": "Dilek arşivini sil"
+    },
+    {
+      "name": "ui_settings_delete_wish_confirm",
+      "value": "Tüm UID'lerin dilek kayıtları silinsin mi? Bu işlem geri alınamaz."
+    },
+    {
+      "name": "ui_settings_download_verify",
+      "value": "İndir ve doğrula"
+    },
+    {
+      "name": "ui_settings_export_backup",
+      "value": "Tam yedeklemeyi dışa aktar"
+    },
+    {
+      "name": "ui_settings_feedback",
+      "value": "Geri bildirim ve tanılama"
+    },
+    {
+      "name": "ui_settings_game_data",
+      "value": "Oyun verisi güncellemeleri"
+    },
+    {
+      "name": "ui_settings_geetest_help",
+      "value": "{0} gt, {1} challenge içindir. GET yanıtı code: 0, challenge ve validate içermelidir. Etkileşimli doğrulama için boş bırakın."
+    },
+    {
+      "name": "ui_settings_help",
+      "value": "Çevrimdışı yardım"
+    },
+    {
+      "name": "ui_settings_immersive_material",
+      "value": "Sürükleyici malzeme"
+    },
+    {
+      "name": "ui_settings_local_backup_success",
+      "value": "Tamamlandı"
+    },
+    {
+      "name": "ui_settings_manifest_help",
+      "value": "Manifest URL'sini kaydedip güncellemeleri denetleyin."
+    },
+    {
+      "name": "ui_settings_material_level",
+      "value": "Sürükleyici malzeme seviyesi"
+    },
+    {
+      "name": "ui_settings_material_scope",
+      "value": "Malzeme düzeyi hemen değişir. İçerik yüzeyleri buzlu efekt kullanır. Desteklenen denetimler sistemin sürükleyici efektini kullanır."
+    },
+    {
+      "name": "ui_settings_no_wallpaper",
+      "value": "Duvar kâğıdı seçilmedi"
+    },
+    {
+      "name": "ui_settings_no_wish_archives",
+      "value": "Dilek arşivi yok. Eklemek için yenileyin veya içe aktarın."
+    },
+    {
+      "name": "ui_settings_normal_material",
+      "value": "Standart malzeme"
+    },
+    {
+      "name": "ui_settings_not_logged_in",
+      "value": "Oturum açılmadı"
+    },
+    {
+      "name": "ui_settings_page_description_add_model_provider_profile_to_edit",
+      "value": "Add a model provider profile first"
+    },
+    {
+      "name": "ui_settings_page_label_add_profile",
+      "value": "Add"
+    },
+    {
+      "name": "ui_settings_page_label_agent_maximum_iterations_per_request",
+      "value": "Maximum Tool Iterations Per Request"
+    },
+    {
+      "name": "ui_settings_page_label_agent_system_prompt",
+      "value": "System Prompt"
+    },
+    {
+      "name": "ui_settings_page_label_agent_user_name",
+      "value": "User Name"
+    },
+    {
+      "name": "ui_settings_page_label_clear_models",
+      "value": "Clear Models"
+    },
+    {
+      "name": "ui_settings_page_label_copy_profile",
+      "value": "Copy"
+    },
+    {
+      "name": "ui_settings_page_label_delete_model",
+      "value": "Delete Model"
+    },
+    {
+      "name": "ui_settings_page_label_delete_profile",
+      "value": "Delete"
+    },
+    {
+      "name": "ui_settings_page_label_fetch_models",
+      "value": "Fetch"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_context_window_tokens",
+      "value": "Context Window Length"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_input_tokens",
+      "value": "Input Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_max_output_tokens",
+      "value": "Output Token Limit"
+    },
+    {
+      "name": "ui_settings_page_label_model_name",
+      "value": "Model Name"
+    },
+    {
+      "name": "ui_settings_page_label_model_omit_reasoning_effort_when_thinking_disabled",
+      "value": "Omit reasoning effort when Thinking is off"
+    },
+    {
+      "name": "ui_settings_page_label_model_provider_profiles",
+      "value": "Model Provider Profiles"
+    },
+    {
+      "name": "ui_settings_page_label_model_reasoning_effort",
+      "value": "Reasoning Effort"
+    },
+    {
+      "name": "ui_settings_page_label_model_temperature",
+      "value": "Temperature"
+    },
+    {
+      "name": "ui_settings_page_label_model_thinking_enabled",
+      "value": "Enable Thinking"
+    },
+    {
+      "name": "ui_settings_page_label_model_top_p",
+      "value": "Top P"
+    },
+    {
+      "name": "ui_settings_page_label_profile_model_id",
+      "value": "Model ID"
+    },
+    {
+      "name": "ui_settings_page_label_profile_name",
+      "value": "Profile Name"
+    },
+    {
+      "name": "ui_settings_page_label_profile_provider_type",
+      "value": "Provider Type"
+    },
+    {
+      "name": "ui_settings_page_label_selected_model",
+      "value": "Selected Model"
+    },
+    {
+      "name": "ui_settings_page_option_provider_default",
+      "value": "Provider default"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_extra_high",
+      "value": "Extra high"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_high",
+      "value": "High"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_low",
+      "value": "Low"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_medium",
+      "value": "Medium"
+    },
+    {
+      "name": "ui_settings_page_option_reasoning_effort_none",
+      "value": "None"
+    },
+    {
+      "name": "ui_settings_previous_data",
+      "value": "Önceki oyun verilerini geri yükle"
+    },
+    {
+      "name": "ui_settings_processing",
+      "value": "İşleniyor…"
+    },
+    {
+      "name": "ui_settings_random_video",
+      "value": "Yüklemede içe aktarılan rastgele bir video oynatılır."
+    },
+    {
+      "name": "ui_settings_reduce_motion",
+      "value": "Hareketi azalt"
+    },
+    {
+      "name": "ui_settings_reduced_motion_info",
+      "value": "Sayfa geçişlerini ve basma animasyonlarını azaltır."
+    },
+    {
+      "name": "ui_settings_reset_builtin",
+      "value": "Yerleşik oyun verilerini geri yükle"
+    },
+    {
+      "name": "ui_settings_restore_backup",
+      "value": "Yedekten geri yükle"
+    },
+    {
+      "name": "ui_settings_restore_confirm",
+      "value": "Mevcut veriler bu yedekle değiştirilsin mi?"
+    },
+    {
+      "name": "ui_settings_restore_scope",
+      "value": "Hesapları, oyun kayıtlarını ve tercihleri geri yükle"
+    },
+    {
+      "name": "ui_settings_signed_in",
+      "value": "Oyun hesabında oturum açık"
+    },
+    {
+      "name": "ui_settings_stop_download",
+      "value": "İndirme durdurulup doğrulamanın bitmesi beklensin mi?"
+    },
+    {
+      "name": "ui_settings_verified_data",
+      "value": "Güvenilir bir GitHub commit'inden tüm veri indirilir ve doğrulanır."
+    },
+    {
+      "name": "ui_settings_video_fallback",
+      "value": "Arka planda duraklar. Video yoksa duvar kâğıdı görünür."
+    },
+    {
+      "name": "ui_settings_wallpaper_sources",
+      "value": "Yerel resimler beş dakikada bir değişir. Günlük duvar kâğıdı Snap Hutao'dan gelir. Haklar eserin sahibine aittir."
+    },
+    {
+      "name": "ui_spiral_abyss_hutao_statistics",
+      "value": "Bu Dönem İstatistikleri"
+    },
+    {
+      "name": "ui_spiral_abyss_upload_record_homa_not_login_primary_button_text",
+      "value": "Şimdi Giriş Yap"
+    },
+    {
+      "name": "ui_travelers_diary_no_income_source_hint",
+      "value": "Bu ay için Primogem geliri kaydı yok"
+    },
+    {
+      "name": "ui_travelers_diary_today",
+      "value": "Bugün"
+    },
+    {
+      "name": "ui_update_cancel",
+      "value": "Denetimi iptal et"
+    },
+    {
+      "name": "ui_update_cancelled",
+      "value": "İptal Edildi"
+    },
+    {
+      "name": "ui_update_channel",
+      "value": "Sürüm kanalı"
+    },
+    {
+      "name": "ui_update_check_failed",
+      "value": "Güncellemeler kontrol edilirken bir hata oluştu"
+    },
+    {
+      "name": "ui_update_checking",
+      "value": "Güncellemeler denetleniyor…"
+    },
+    {
+      "name": "ui_update_compare_unknown",
+      "value": "Sürüm bilgisi yetersiz"
+    },
+    {
+      "name": "ui_update_compatibility_unknown",
+      "value": "Kurulum uyumluluğu bilinmiyor"
+    },
+    {
+      "name": "ui_update_conflict",
+      "value": "Sürüm adı ve kodu uyuşmuyor"
+    },
+    {
+      "name": "ui_update_current",
+      "value": "Şu an en güncel sürüm"
+    },
+    {
+      "name": "ui_update_hap_listed",
+      "value": "HarmonyOS paketi listeleniyor"
+    },
+    {
+      "name": "ui_update_installed",
+      "value": "Yüklü sürüm %s"
+    },
+    {
+      "name": "ui_update_invalid",
+      "value": "Sürüm bilgisi geçersiz"
+    },
+    {
+      "name": "ui_update_local_newer",
+      "value": "Yüklü sürüm daha yeni"
+    },
+    {
+      "name": "ui_update_no_hap",
+      "value": "HarmonyOS paketi listelenmiyor"
+    },
+    {
+      "name": "ui_update_no_notes",
+      "value": "Bu sürüm için sürüm notu yok"
+    },
+    {
+      "name": "ui_update_no_release",
+      "value": "Bu kanalda açık sürüm yok"
+    },
+    {
+      "name": "ui_update_notes_error",
+      "value": "Sürüm notları açılamadı"
+    },
+    {
+      "name": "ui_update_preview",
+      "value": "Ön sürümleri dahil et"
+    },
+    {
+      "name": "ui_update_project_releases",
+      "value": "Proje sürümleri"
+    },
+    {
+      "name": "ui_update_rate_limit",
+      "value": "GitHub isteği sınırlandı. Daha sonra tekrar deneyin."
+    },
+    {
+      "name": "ui_update_recent_only",
+      "value": "En son 300 sürüm denetlendi"
+    },
+    {
+      "name": "ui_update_required_api",
+      "value": "En düşük API %d"
+    },
+    {
+      "name": "ui_update_skipped",
+      "value": "%s sürümü atlandı; başlangıçta bu sürüm için otomatik olarak hatırlatılmayacak, güncellemeleri ayarlardan el ile yine kontrol edebilirsiniz"
+    },
+    {
+      "name": "ui_update_stable",
+      "value": "Kararlı sürümler"
+    },
+    {
+      "name": "ui_update_unavailable",
+      "value": "Sürüm deposu kullanılamıyor"
+    },
+    {
+      "name": "ui_update_unknown",
+      "value": "Bilinmiyor"
+    },
+    {
+      "name": "ui_update_unskip",
+      "value": "Bu sürümü artık atlama"
+    },
+    {
+      "name": "ui_user_copy_cookie_action",
+      "value": "Çerezi Kopyala"
+    },
+    {
+      "name": "ui_web_daily_note_attendance_reward_status_finished_non_reward",
+      "value": "Tamamlandı"
+    },
+    {
+      "name": "ui_web_hoyolab_game_record_act_calendar_hard_challenge_locked",
+      "value": "Henüz Açılmadı"
+    },
+    {
+      "name": "ui_weekday_friday",
+      "value": "Cum"
+    },
+    {
+      "name": "ui_weekday_monday",
+      "value": "Pzt"
+    },
+    {
+      "name": "ui_weekday_saturday",
+      "value": "Cmt"
+    },
+    {
+      "name": "ui_weekday_sunday",
+      "value": "Paz"
+    },
+    {
+      "name": "ui_weekday_thursday",
+      "value": "Per"
+    },
+    {
+      "name": "ui_weekday_tuesday",
+      "value": "Sal"
+    },
+    {
+      "name": "ui_weekday_wednesday",
+      "value": "Çar"
+    },
+    {
+      "name": "ui_wi_ki_avatar_ascension_materials_header",
+      "value": "Yükseltme Malzemeleri"
+    },
+    {
+      "name": "ui_wi_ki_avatar_auto_suggest_box_place_holder",
+      "value": "Karakter Filtrele"
+    },
+    {
+      "name": "ui_wi_ki_avatar_name_card_header",
+      "value": "İsim Kartı"
+    },
+    {
+      "name": "ui_wi_ki_avatar_special_food_title",
+      "value": "Özel Yemek"
+    },
+    {
+      "name": "ui_wi_ki_weapon_auto_suggest_box_place_holder",
+      "value": "Silahları Filtrele"
+    },
+    {
+      "name": "ui_wish_show_empty_history",
+      "value": "Kayıt Bulunmayan Geçmiş Dilek Etkinliklerini Göster"
+    },
+    {
+      "name": "ui_wish_show_empty_overview",
+      "value": "Kayıtsız Dilek Genel Bakışları"
+    },
+    {
+      "name": "ui_wish_show_unobtained",
+      "value": "Çekilmemiş Dilek Öğeleri"
+    },
+    {
+      "name": "ui_gacha_pivot_overview",
+      "value": "Genel Bakış"
+    },
+    {
+      "name": "ui_gacha_pivot_history",
+      "value": "Geçmiş"
+    },
+    {
+      "name": "ui_gacha_pivot_avatar",
+      "value": "Karakter"
+    },
+    {
+      "name": "ui_gacha_pivot_weapon",
+      "value": "Silah"
+    },
+    {
+      "name": "ui_gacha_pivot_countdown",
+      "value": "Geri Sayım"
+    },
+    {
+      "name": "ui_gacha_pivot_statistics",
+      "value": "Küresel Dilek İstatistikleri"
+    },
+    {
+      "name": "ui_gacha_full_refresh",
+      "value": "Tam Yenileme"
+    },
+    {
+      "name": "ui_gacha_full_refresh_selected",
+      "value": "✓ Tam Yenileme"
+    },
+    {
+      "name": "ui_gacha_card_statistics",
+      "value": "İstatistikler"
+    },
+    {
+      "name": "ui_gacha_card_ratio",
+      "value": "Oran"
+    },
+    {
+      "name": "ui_gacha_card_five_average",
+      "value": "Ort. Beş Yıldız Çekilişi #"
+    },
+    {
+      "name": "ui_gacha_card_four_average",
+      "value": "Ort. Dört Yıldız Çekilişi"
+    },
+    {
+      "name": "ui_gacha_card_up_average",
+      "value": "Ort. UP Çekilişi"
+    },
+    {
+      "name": "ui_gacha_card_to_five",
+      "value": "Son Beş Yıldızdan Beri"
+    },
+    {
+      "name": "ui_gacha_card_to_four",
+      "value": "Son Dört Yıldızdan Beri"
+    },
+    {
+      "name": "ui_gacha_card_to_three",
+      "value": "Son Beş Yıldız"
+    },
+    {
+      "name": "ui_travelers_diary_month",
+      "value": "Bu Ay"
+    },
+    {
+      "name": "ui_travelers_diary_primogems",
+      "value": "Köken Taşı"
+    },
+    {
+      "name": "ui_travelers_diary_mora",
+      "value": "Mora"
+    }
+  ]
+}

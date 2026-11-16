@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "ยกเลิก"
+    },
+    {
+      "name": "common_confirm",
+      "value": "ยืนยัน"
+    },
+    {
+      "name": "common_refresh",
+      "value": "รีเฟรช"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "ประวัติการอธิษฐาน"
+    },
+    {
+      "name": "page_title_home",
+      "value": "หน้าแรก"
+    },
+    {
+      "name": "page_title_login",
+      "value": "ลงชื่อเข้าใช้"
+    },
+    {
+      "name": "page_title_note",
+      "value": "บันทึกประจำวัน"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "การตั้งค่า"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "ประวัติการอธิษฐาน"
+    },
+    {
+      "name": "tab_home",
+      "value": "หน้าแรก"
+    },
+    {
+      "name": "tab_mine",
+      "value": "โปรไฟล์"
+    },
+    {
+      "name": "tab_note",
+      "value": "บันทึกประจำวัน"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "ส่งออก"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "นำเข้า"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "บันทึก"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "Generate analysis"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "Account history charts and AI insights"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "Stop generation"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "Test connection"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "ตรวจสอบการอัพเดต"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "ข้อมูล"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "ตาราง"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "ระบบ"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "เครื่องมือ"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "เปิดแอปอีกครั้งเพื่อใช้ภาษาของระบบ"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "ตามระบบ"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "หอคอยเกลียว"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "การจัดการความสำเร็จ"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "ไอเทมในกระเป๋า"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "ศึกเดือดแดนเร้นลับ"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "ตัวละครของฉัน"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "แผนการพัฒนา"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "เปิดเกม"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "บันทึกนักเดินทาง"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Hutao Passport"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "โรงละครมายา"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "ข้อมูลตัวละคร"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "ข้อมูลมอนสเตอร์"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "ข้อมูลอาวุธ"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "เกี่ยวกับ"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "บัญชี"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "ลักษณะภายนอก"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "ภาพพื้นหลัง"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "视频背景"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "สำรองและกู้คืน"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "ปฏิทิน"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "หน้าแรก"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "主页游戏活动区域设置"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "การ์ดหน้าแรก"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "ภาษา"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "วัสดุพื้นหลัง"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "อื่น ๆ"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "ลงชื่อเข้าใช้"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "พื้นที่จัดเก็บ"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "ชุดสี"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "การตรวจสอบแบบไร้สัมผัส"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "บันทึกการอธิษฐาน"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "การย้ายข้อมูล"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "มืด"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "สว่าง"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "เวอร์ชัน %s ของฮูโตะพร้อมใช้งานแล้ว"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "บันทึกประจำรุ่น"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "ข้ามเวอร์ชันนี้"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "อัปเดตแอป"
+    }
+  ]
+}

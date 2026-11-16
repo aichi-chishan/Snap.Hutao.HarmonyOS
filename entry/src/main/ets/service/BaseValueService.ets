@@ -28,19 +28,24 @@ export class BaseValueService {
   static fightPropName(t: number): string {
     switch (t) {
       case 1: return '生命值';
+      case 3: return '生命值';
       case 4: return '攻击力';
+      case 6: return '攻击力';
       case 7: return '防御力';
+      case 9: return '防御力';
       case 20: return '暴击率';
       case 22: return '暴击伤害';
-      case 26: return '元素充能效率';
-      case 28: return '治疗加成';
+      case 23: return '元素充能效率';
+      case 26: return '治疗加成';
+      case 27: return '受治疗加成';
+      case 28: return '元素精通';
       case 30: return '物理伤害加成';
-      case 40: return '风元素伤害加成';
-      case 41: return '岩元素伤害加成';
-      case 42: return '雷元素伤害加成';
+      case 40: return '火元素伤害加成';
+      case 41: return '雷元素伤害加成';
+      case 42: return '水元素伤害加成';
       case 43: return '草元素伤害加成';
-      case 44: return '水元素伤害加成';
-      case 45: return '火元素伤害加成';
+      case 44: return '风元素伤害加成';
+      case 45: return '岩元素伤害加成';
       case 46: return '冰元素伤害加成';
       default: return '';
     }
@@ -48,8 +53,7 @@ export class BaseValueService {
 
   /** 百分比型战斗属性集合（值按 ×100 显示） */
   private static isPercentProp(t: number): boolean {
-    return t === 20 || t === 22 || t === 26 || t === 28 || t === 30
-      || (t >= 40 && t <= 46);
+    return [3, 6, 9, 20, 22, 23, 26, 27, 30].includes(t) || (t >= 40 && t <= 46);
   }
 
   /** 格式化属性值（百分比型 → "+4.8%"；平面型 → 四舍五入整数） */
@@ -194,13 +198,14 @@ export class BaseValueService {
     return map;
   }
 
-  /** 品质 → 最大等级（>=4星90，否则70；对齐 Windows GetMaxLevelByQuality） */
+  /** 三星及以上武器最高 90 级，其余最高 70 级。 */
   static weaponMaxLevel(rankLevel: number): number {
-    return rankLevel >= 4 ? 90 : 70;
+    return rankLevel >= 3 ? 90 : 70;
   }
 
   /** 突破等级（对齐 Windows GetPromoteLevel） */
   static promoteLevel(level: number, maxLevel: number, promoted: boolean): number {
+    if (maxLevel <= 70 && level === 70) { return 4; }
     if (promoted) {
       if (level >= 80) { return 6; }
       if (level >= 70) { return 5; }
@@ -219,50 +224,24 @@ export class BaseValueService {
     return 0;
   }
 
-  /** 武器某等级攻击力（value = InitValue × curve[level][growCurveType] + promote[promoteLevel][FIGHT_PROP_BASE_ATTACK]） */
-  static async weaponAttack(id: number, level: number, promoted: boolean): Promise<number> {
-    const weapon = await BaseValueService.weaponOf(id);
-    if (weapon === undefined) {
-      return 0;
-    }
+  /** 计算已载入的武器攻击力与副属性。 */
+  static async weaponBaseValues(growCurves: Curve3[], promoteId: number, maxLevel: number,
+    level: number, promoted: boolean): Promise<WeaponBaseValues> {
     const curves: Curves = await BaseValueService.getWeaponCurves();
     const promotes: Promotes = await BaseValueService.getWeaponPromotes();
-    const maxLv: number = BaseValueService.weaponMaxLevel(weapon.rankLevel);
-    const pLevel: number = BaseValueService.promoteLevel(level, maxLv, promoted);
-    let base: number = 0;
-    let added: number = 0;
-    for (const g of weapon.growCurves) {
-      // t: 4=FIGHT_PROP_BASE_ATTACK（攻击）；只算攻击
-      if (g.t === 4) {
-        const curveLevel: Map<number, number> | undefined = curves.get(level);
-        base = g.i * ((curveLevel !== undefined ? curveLevel.get(g.v) : undefined) ?? 0);
+    const pLevel: number = BaseValueService.promoteLevel(level, maxLevel, promoted);
+    const curveLevel: Map<number, number> | undefined = curves.get(level);
+    const added: Map<number, number> | undefined = promotes.get(promoteId)?.get(pLevel);
+    const result: WeaponBaseValues = new WeaponBaseValues();
+    for (const curve of growCurves) {
+      const value: number = curve.i * (curveLevel?.get(curve.v) ?? 0) + (added?.get(curve.t) ?? 0);
+      if (curve.t === 4) {
+        result.attack = Math.round(value);
+      } else {
+        result.secondary = `${BaseValueService.fightPropName(curve.t)} ${BaseValueService.fightPropText(curve.t, value)}`;
       }
     }
-    const pMap: Map<number, Map<number, number>> | undefined = promotes.get(weapon.promoteId);
-    const pLevelMap: Map<number, number> | undefined = pMap !== undefined ? pMap.get(pLevel) : undefined;
-    added = (pLevelMap !== undefined ? pLevelMap.get(4) : undefined) ?? 0;
-    return Math.round(base + added);
-  }
-
-  private static async weaponOf(id: number): Promise<GrowCurveItem | undefined> {
-    const meta = JSON.parse(await GameDataService.readMetadataFile('weapon_meta.json')) as Object[];
-    for (const raw of meta) {
-      const o = raw as Record<string, Object>;
-      if (Number(o['id']) === id) {
-        const w: GrowCurveItem = { rankLevel: Number(o['rankLevel'] ?? 0), promoteId: Number(o['promoteId'] ?? 0), growCurves: [] };
-        const arr = (o['growCurves'] as Object[]) ?? [];
-        for (const g of arr) {
-          const go = g as Record<string, Object>;
-          const c: Curve3 = new Curve3();
-          c.i = Number(go['i'] ?? 0);
-          c.t = Number(go['t'] ?? 0);
-          c.v = Number(go['v'] ?? 0);
-          w.growCurves.push(c);
-        }
-        return w;
-      }
-    }
-    return undefined;
+    return result;
   }
 
   private static async getWeaponCurves(): Promise<Curves> {
@@ -317,10 +296,9 @@ export class BaseValueService {
 }
 
 /** 武器曲线项（供等级滑条计算） */
-export class GrowCurveItem {
-  rankLevel: number = 0;
-  promoteId: number = 0;
-  growCurves: Curve3[] = [];
+export class WeaponBaseValues {
+  attack: number = 0;
+  secondary: string = '';
 }
 
 /** 角色成长信息（WikiAvatarMeta 传入，避免服务层反向解析 3MB 元数据） */

@@ -42,7 +42,7 @@ const curves = {
 };
 const logger = { info() {}, warn() {}, error() {} };
 const mocks = {
-  Logger: { Logger: logger },
+  Logger: { Logger: { ...logger, flush: async () => {} } },
   '@kit.ArkData': { preferences: { getPreferences: async () => {
     if (failInit) throw Error('preference init failure');
     live = new Map(disk);
@@ -68,10 +68,12 @@ const mocks = {
   GameDataService: { GameDataService: { initializeSnapshot: async () => {} } },
   BackgroundTaskService: { BackgroundTaskService: { init: async () => {}, reconcile: async () => {}, reset: async () => {}, stopAndInvalidate: async () => true } },
   NotificationHelper: { NotificationHelper: { init: async () => {} } },
-  UserService: { UserService: { getInstance: () => ({ setSessionInvalidationHook() {}, restoreSession: async () => true }) } },
-  AutoSignInService: { AutoSignInService: { getInstance: () => ({ bootstrapAutoSignIn: async () => {} }) } },
-  DailyNoteService: { DailyNoteService: { getInstance: () => ({ bootstrapAutoRefresh: async () => {}, clearCardSnapshot: async () => {} }) } },
+  AppLocaleService: { AppLocaleService: { initialize() {}, onConfigurationUpdate() {} } },
+  UserService: { UserService: { getInstance: () => ({ setSessionInvalidationHook() {}, addSessionRevisionListener() {}, restoreSession: async () => true, refreshSession: async () => {} }) } },
+  AutoSignInService: { AutoSignInService: { getInstance: () => ({ bootstrapAutoSignIn: async () => {}, setForeground() {} }) } },
+  DailyNoteService: { DailyNoteService: { getInstance: () => ({ setForeground() {}, bootstrapAutoRefresh: async () => {}, clearCardSnapshot: async () => {} }) } },
   RiskVerifyModal: {},
+  RiskVerifyService: { RiskVerifyService: { getInstance: () => ({ cancel() {} }) } },
 };
 function compile(text, name, resolve) {
   const compiled = ts.transpileModule(text, { compilerOptions: {
@@ -116,33 +118,45 @@ function load(name) {
 
   // Run the real startup method, including restore ordering, before observing loadContent.
   const startupValues = [];
-  const ability = { context: { config: { colorMode: 1 },
-    getApplicationContext: () => ({ setColorMode() {} }) } };
-  const stage = { loadContent: route => {
-    assert.equal(route, 'pages/Index');
-    startupValues.push(Motion.isReducedMotion());
+  const context = { config: { colorMode: 1 },
+    getApplicationContext: () => ({ setColorMode() {} }), eventHub: { on() {}, off() {} } };
+  const stage = { loadContent: async route => {
+    startupValues.push({ route, reduced: Motion.isReducedMotion() });
   } };
+  async function bootstrapActiveWindow() {
+    const initialLoads = startupValues.length;
+    // Model a cold process with a live stage, as onWindowStageCreate establishes it.
+    EntryAbility.runtimeInitialization = undefined;
+    EntryAbility.runtimeReady = false;
+    const ability = new EntryAbility();
+    ability.context = context;
+    ability.configureImmersive = () => {};
+    ability.mountRiskVerifyOverlay = () => {};
+    ability.windowStage = stage;
+    await EntryAbility.bootstrap(ability, stage);
+    assert.equal(startupValues.length, initialLoads + 1, 'the active window actually loads its first page');
+  }
   prefs.prefs = undefined;
   appValues.clear();
-  EntryAbility.runtimeInitialization = undefined; // A new process, not another window in the same runtime.
-  await EntryAbility.bootstrap(ability, stage);
-  assert.equal(startupValues.at(-1), true, 'persisted preference is restored before the first page loads');
+  await bootstrapActiveWindow();
+  assert.deepEqual(startupValues.at(-1), { route: 'pages/Index', reduced: true }, 'persisted preference is restored before the first page loads');
   recoveryValue = false;
-  EntryAbility.runtimeInitialization = undefined; // A new process, not another window in the same runtime.
-  await EntryAbility.bootstrap(ability, stage);
-  assert.equal(startupValues.at(-1), false, 'interrupted backup recovery wins over the earlier preference');
+  await bootstrapActiveWindow();
+  assert.deepEqual(startupValues.at(-1), { route: 'pages/Index', reduced: false }, 'interrupted backup recovery wins over the earlier preference');
   recoveryValue = undefined;
   live.set('app.reduce_motion', true);
   failDatabase = true;
-  EntryAbility.runtimeInitialization = undefined; // A new process, not another window in the same runtime.
-  await EntryAbility.bootstrap(ability, stage);
-  assert.equal(startupValues.at(-1), true, 'an unrelated database failure does not lose the preference');
+  await bootstrapActiveWindow();
+  assert.deepEqual(startupValues.at(-1), { route: 'pages/StartupErrorPage', reduced: true },
+    'database failure keeps the preference but cannot mount the normal page');
+  assert.equal(EntryAbility.runtimeReady, false);
   failDatabase = false;
   failInit = true;
   prefs.prefs = undefined;
-  EntryAbility.runtimeInitialization = undefined; // A new process, not another window in the same runtime.
-  await EntryAbility.bootstrap(ability, stage);
-  assert.equal(startupValues.at(-1), false, 'a missing preference store has a safe deterministic fallback');
+  await bootstrapActiveWindow();
+  assert.deepEqual(startupValues.at(-1), { route: 'pages/StartupErrorPage', reduced: false },
+    'a missing preference store displays the startup error with deterministic appearance');
+  assert.equal(EntryAbility.runtimeReady, false);
   failInit = false;
   await prefs.init({});
   live.set('app.reduce_motion', 'false');
@@ -193,7 +207,7 @@ function load(name) {
   apiThrows = true; assert.equal(Motion.detectImmersive(), false, 'API 26 availability remains runtime guarded');
   assert.match(settings, /@StorageProp\('reduceMotion'\) reduceMotion: boolean/);
   assert.match(settings, /Toggle\(\{ type: ToggleType.Switch, isOn: this.reduceMotion \}\)/);
-  assert.match(settings, /\.accessibilityText\('减少动态效果'\)/);
+  assert.match(settings, /\.accessibilityText\(\$r\('app\.string\.ui_settings_reduce_motion'\)\)/);
   assert.match(settings, /\.constraintSize\(\{ minWidth: 44, minHeight: 44 \}\)/);
   const container = read('components/PageContainer');
   assert.match(container, /@StorageProp\('reduceMotion'\)/);

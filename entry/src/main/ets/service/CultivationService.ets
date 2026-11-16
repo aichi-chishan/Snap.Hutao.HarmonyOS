@@ -1,12 +1,23 @@
 import { AvatarSkillReference } from '../model/AvatarSkillReference';
-import { CultivationDraft, CultivationSkillDraft } from '../model/CultivationDraft';
-import { CalAvatarDelta, CalSkillDelta, CalWeaponDelta, CalculateService } from './CalculateService';
-import { CharacterListItem } from '../model/CharacterData';
+import { CultivationBatchField, CultivationBatchTargets, CultivationDraft, CultivationSkillDraft } from '../model/CultivationDraft';
+import { CalAvatarDelta, CalSkillDelta, CalWeaponDelta, CalculateInventoryCatalog, CalculateService } from './CalculateService';
+import { CharacterDetail, CharacterListItem } from '../model/CharacterData';
+import { CharacterService } from './CharacterService';
 import { OfflineCultivationService } from './OfflineCultivationService';
-import { SkillLevelService } from './SkillLevelService';
+import { ResolvedAvatarSkill, SkillLevelService } from './SkillLevelService';
 import { WikiMetaService, WikiAvatarMeta, WikiWeaponMeta } from './WikiMetaService';
-import { CultivationPreparedEntry, CultivationRepo, CultivationSaveReport } from '../data/repo/CultivationRepo';
+import { CultivateEntry, CultivationPreparedEntry, CultivationRepo, CultivationSaveReport } from '../data/repo/CultivationRepo';
 import { CalBatchResult } from '../model/Calculate';
+
+export class CultivationProgressUpdate {
+  entries: CultivationPreparedEntry[] = [];
+  skipped: number = 0;
+}
+
+export class CultivationEquipmentDrafts {
+  drafts: CultivationDraft[] = [];
+  skippedNames: string[] = [];
+}
 
 /** Shared by character, wiki and saved-plan editors. No network operation mutates saved plans. */
 export class CultivationService {
@@ -95,6 +106,101 @@ export class CultivationService {
     return draft;
   }
 
+  /** One verified avatar and its current weapon per role. Batch callers can skip incomplete pairs. */
+  static async fromEquippedCharacters(uid: string, characters: CharacterListItem[], skipIncomplete: boolean,
+    isCurrent: () => boolean): Promise<CultivationEquipmentDrafts> {
+    if (!/^\d{9,10}$/.test(uid) || characters.length === 0) { throw new Error('请先选择角色与 UID'); }
+    const byId: Map<number, CharacterListItem> = new Map<number, CharacterListItem>();
+    for (const character of characters) { byId.set(character.id, character); }
+    const details: Map<number, CharacterDetail> = await CultivationService.fetchProgressDetails(uid, Array.from(byId.keys()), isCurrent);
+    const avatars: WikiAvatarMeta[] = await WikiMetaService.getAvatars();
+    const weapons: WikiWeaponMeta[] = await WikiMetaService.getWeapons();
+    let promotes: Map<number, number> = new Map<number, number>();
+    if (Array.from(details.values()).some((detail: CharacterDetail): boolean => detail.promoteLevel < 0)) {
+      if (!isCurrent()) { throw new Error('账号已切换，请重新选择角色'); }
+      promotes = await CalculateService.getInstance().fetchPromoteLevels(uid);
+    }
+
+    const result: CultivationEquipmentDrafts = new CultivationEquipmentDrafts();
+    for (const character of byId.values()) {
+      try {
+        const detail: CharacterDetail | undefined = details.get(character.id);
+        const avatar: WikiAvatarMeta | undefined = avatars.find((item: WikiAvatarMeta): boolean => item.id === character.id);
+        if (detail === undefined || avatar === undefined || avatar.cultivationItems.length < 6) {
+          throw new Error('角色进度或养成元数据不完整');
+        }
+        if (detail.weapon.equipmentState !== 'equipped' || detail.weapon.id <= 0 ||
+          (character.weapon.id > 0 && detail.weapon.id !== character.weapon.id)) {
+          throw new Error('当前装备武器未同步或已变化');
+        }
+        const weapon: WikiWeaponMeta | undefined = weapons.find((item: WikiWeaponMeta): boolean => item.id === detail.weapon.id);
+        if (weapon === undefined || weapon.rankLevel < 1) { throw new Error('武器养成元数据不可用'); }
+        const promote: number = detail.promoteLevel >= 0 ? detail.promoteLevel : (promotes.get(detail.id) ?? -1);
+        const pair: CultivationDraft[] = CultivationService.equipmentDrafts(uid, detail, avatar, weapon, promote);
+        for (const draft of pair) { result.drafts.push(draft); }
+      } catch (e) {
+        if (!skipIncomplete) { throw new Error(`${character.name}：${(e as Error).message}`); }
+        result.skippedNames.push(character.name || String(character.id));
+      }
+    }
+    return result;
+  }
+
+  private static equipmentDrafts(uid: string, detail: CharacterDetail, avatar: WikiAvatarMeta, weapon: WikiWeaponMeta,
+    avatarPromote: number): CultivationDraft[] {
+    const role: CultivationDraft = new CultivationDraft();
+    role.avatarId = detail.id; role.itemId = detail.id; role.name = avatar.name; role.icon = avatar.icon;
+    role.sourceUid = uid; role.sourceAt = Date.now();
+    role.current = detail.level; role.promote = avatarPromote; role.target = Math.max(90, role.current);
+    role.targetPromote = CultivationDraft.promoteFor(role.target, role.maxLevel);
+    role.elementAttrId = CultivationService.elementId(detail.element);
+    const skills: ResolvedAvatarSkill[] = SkillLevelService.resolve(detail);
+    const kinds: string[] = ['A', 'E', 'Q'];
+    const labels: string[] = ['普通攻击', '元素战技', '元素爆发'];
+    for (let i: number = 0; i < kinds.length; i++) {
+      const resolved: ResolvedAvatarSkill | undefined = skills.find((skill: ResolvedAvatarSkill): boolean => skill.kind === kinds[i]);
+      if (resolved === undefined || resolved.baseLevel < 1) { throw new Error('三项天赋的基础等级不完整'); }
+      const skill: CultivationSkillDraft = new CultivationSkillDraft();
+      skill.id = resolved.groupId; skill.groupId = resolved.groupId; skill.label = labels[i];
+      skill.current = resolved.baseLevel;
+      role.skills.push(skill);
+    }
+
+    const equipped: CultivationDraft = new CultivationDraft();
+    equipped.kind = 'weapon'; equipped.avatarId = detail.id; equipped.itemId = weapon.id;
+    equipped.name = weapon.name; equipped.icon = weapon.icon; equipped.sourceUid = uid; equipped.sourceAt = role.sourceAt;
+    equipped.current = detail.weapon.level; equipped.promote = detail.weapon.promoteLevel;
+    equipped.maxLevel = weapon.rankLevel <= 2 ? 70 : 90; equipped.target = equipped.maxLevel;
+    equipped.targetPromote = CultivationDraft.promoteFor(equipped.target, equipped.maxLevel);
+    CultivationDraft.validate(role);
+    CultivationDraft.validate(equipped);
+    return [role, equipped];
+  }
+
+  static applyBatchTargets(drafts: CultivationDraft[], targets: CultivationBatchTargets): CultivationDraft[] {
+    CultivationBatchTargets.validate(targets);
+    return drafts.map((draft: CultivationDraft): CultivationDraft => {
+      const result: CultivationDraft = CultivationDraft.copy(draft);
+      if (result.kind === 'weapon') {
+        result.target = Math.min(result.maxLevel, targets.levels[CultivationBatchField.WeaponLevel]);
+      } else {
+        result.target = targets.levels[CultivationBatchField.AvatarLevel];
+        const references: AvatarSkillReference[] = SkillLevelService.referenceSkills(result.avatarId);
+        for (const skill of result.skills) {
+          const reference: AvatarSkillReference | undefined = references.find((item: AvatarSkillReference): boolean => item.groupId === skill.groupId);
+          if (reference === undefined) { throw new Error(`${result.name} 的天赋映射已变更`); }
+          if (reference.kind === 'A') { skill.target = targets.levels[CultivationBatchField.SkillA]; }
+          else if (reference.kind === 'E') { skill.target = targets.levels[CultivationBatchField.SkillE]; }
+          else if (reference.kind === 'Q') { skill.target = targets.levels[CultivationBatchField.SkillQ]; }
+          else { throw new Error(`${result.name} 的天赋类型未知`); }
+        }
+      }
+      result.targetPromote = CultivationDraft.promoteFor(result.target, result.maxLevel);
+      CultivationDraft.validate(result);
+      return result;
+    });
+  }
+
   /** Strict ID merge: changed equipment or missing talents aborts the whole refresh. Targets never move. */
   static mergeCurrent(saved: CultivationDraft, current: CultivationDraft): CultivationDraft {
     CultivationDraft.validate(saved); CultivationDraft.validate(current);
@@ -112,6 +218,113 @@ export class CultivationService {
     }
     CultivationDraft.validate(result);
     return result;
+  }
+
+  /** Refresh current progress for the project's avatar entries from the game record. */
+  static async prepareProjectProgress(uid: string, entries: CultivateEntry[]): Promise<CultivationProgressUpdate> {
+    if (!/^\d{9,10}$/.test(uid)) { throw new Error('请先登录并选择游戏 UID'); }
+    const update: CultivationProgressUpdate = new CultivationProgressUpdate();
+    const saved: CultivationDraft[] = [];
+    const ids: Set<number> = new Set<number>();
+    for (const entry of entries) {
+      if (entry.avatarId < 10000000) { continue; }
+      try {
+        const draft: CultivationDraft = CultivationDraft.decode(entry.inputJson);
+        if (draft.kind !== 'avatar' || draft.itemId !== entry.avatarId || draft.avatarId !== entry.avatarId
+          || (draft.sourceUid.length > 0 && draft.sourceUid !== uid)) {
+          update.skipped++;
+          continue;
+        }
+        draft.entryId = entry.id;
+        draft.expectedInput = entry.inputJson;
+        saved.push(draft);
+        ids.add(draft.avatarId);
+      } catch (e) { update.skipped++; }
+    }
+    const details: Map<number, CharacterDetail> = await CultivationService.fetchProgressDetails(uid, Array.from(ids));
+    const changed: CultivationDraft[] = [];
+    for (const draft of saved) {
+      const detail: CharacterDetail | undefined = details.get(draft.avatarId);
+      const next: CultivationDraft | undefined = detail !== undefined
+        ? CultivationService.progressFromDetail(draft, detail, uid) : undefined;
+      if (next === undefined) { update.skipped++; }
+      else { changed.push(next); }
+    }
+    update.entries = await CultivationService.calculate(changed);
+    return update;
+  }
+
+  private static async fetchProgressDetails(uid: string, ids: number[], isCurrent?: () => boolean): Promise<Map<number, CharacterDetail>> {
+    const details: Map<number, CharacterDetail> = new Map<number, CharacterDetail>();
+    const duplicates: Set<number> = new Set<number>();
+    for (let i: number = 0; i < ids.length; i += 20) {
+      if (isCurrent !== undefined && !isCurrent()) { throw new Error('账号已切换，请重新选择角色'); }
+      const batch: number[] = ids.slice(i, i + 20);
+      for (const detail of await CharacterService.getInstance().fetchDetail(uid, batch)) {
+        if (!batch.includes(detail.id) || duplicates.has(detail.id)) { continue; }
+        if (details.has(detail.id)) { details.delete(detail.id); duplicates.add(detail.id); }
+        else { details.set(detail.id, detail); }
+      }
+    }
+    return details;
+  }
+
+  private static progressFromDetail(saved: CultivationDraft, detail: CharacterDetail, uid: string): CultivationDraft | undefined {
+    const next: CultivationDraft = CultivationDraft.copy(saved);
+    next.current = detail.level;
+    next.promote = detail.promoteLevel;
+    const skills: ResolvedAvatarSkill[] = SkillLevelService.resolve(detail);
+    let changed: boolean = next.current !== saved.current || next.promote !== saved.promote;
+    for (const input of next.skills) {
+      const skill: ResolvedAvatarSkill | undefined = skills.find((value: ResolvedAvatarSkill): boolean => value.groupId === input.groupId);
+      if (skill === undefined || skill.baseLevel < 1) { return undefined; }
+      changed = changed || input.current !== skill.baseLevel;
+      input.current = skill.baseLevel;
+    }
+    if (!changed) { return undefined; }
+    next.sourceUid = uid;
+    next.sourceAt = Date.now();
+    try { CultivationDraft.validate(next); } catch (e) { return undefined; }
+    return next;
+  }
+
+  /** Use the calculator's available catalog so inventory sync also works with an empty project. */
+  static async inventoryCalculatorInputs(catalog: CalculateInventoryCatalog): Promise<CalAvatarDelta[]> {
+    const deltas: CalAvatarDelta[] = [];
+    for (const avatar of await WikiMetaService.getAvatars()) {
+      if (!catalog.avatarIds.includes(avatar.id) || avatar.cultivationItems.length < 6) { continue; }
+      const skills: AvatarSkillReference[] = SkillLevelService.referenceSkills(avatar.id);
+      if (skills.length !== 3) { continue; }
+      const delta: CalAvatarDelta = new CalAvatarDelta();
+      delta.avatarId = avatar.id;
+      delta.levelCurrent = 1;
+      delta.levelTarget = 90;
+      for (const reference of skills) {
+        const skill: CalSkillDelta = new CalSkillDelta();
+        skill.id = reference.groupId;
+        skill.levelCurrent = 1;
+        skill.levelTarget = 10;
+        delta.skills.push(skill);
+      }
+      deltas.push(delta);
+    }
+    let weaponIndex: number = 0;
+    for (const meta of await WikiMetaService.getWeapons()) {
+      if (!catalog.weaponIds.includes(meta.id) || meta.rankLevel < 4 || meta.rankLevel > 5) { continue; }
+      const weapon: CalWeaponDelta = new CalWeaponDelta();
+      weapon.id = meta.id;
+      weapon.levelCurrent = 1;
+      weapon.levelTarget = 90;
+      if (weaponIndex >= deltas.length) {
+        const delta: CalAvatarDelta = new CalAvatarDelta();
+        delta.levelTarget = 0;
+        deltas.push(delta);
+      }
+      deltas[weaponIndex].weapon = weapon;
+      weaponIndex++;
+    }
+    if (deltas.length === 0) { throw new Error('没有可用于同步库存的计算器目录'); }
+    return deltas;
   }
 
   static calculatorInputs(drafts: CultivationDraft[], uid: string): CalAvatarDelta[] {
@@ -180,7 +393,8 @@ export class CultivationService {
     return results;
   }
 
-  static async save(projectId: number, prepared: CultivationPreparedEntry[], overwrite: boolean): Promise<CultivationSaveReport> {
-    return CultivationRepo.saveDrafts(projectId, prepared, overwrite);
+  static async save(projectId: number, prepared: CultivationPreparedEntry[], overwrite: boolean,
+    createNew: boolean = false): Promise<CultivationSaveReport> {
+    return CultivationRepo.saveDrafts(projectId, prepared, overwrite, createNew);
   }
 }

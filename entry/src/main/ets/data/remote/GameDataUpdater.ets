@@ -78,10 +78,13 @@ export class GameDataUpdater {
     if (GameDataUpdater.initializing === undefined) { GameDataUpdater.initializing = GameDataUpdater.initialize(); }
     return GameDataUpdater.initializing;
   }
-  private static async verify(mode: string, id: string = '', item: string = '', hash: string = ''): Promise<string[]> {
+  private static runWorker(mode: string, id: string, item: string, hash: string): Promise<Object> {
     const task: taskpool.Task = new taskpool.Task(prepareGameDataSnapshot, AppContextProvider.getFilesDir(), mode, id, item, hash);
-    const configs: taskpool.Configs = { timeout: mode === 'selection' || mode === 'file' ? 15000 : 60000 };
-    return await taskpool.execute(task, configs) as string[];
+    const configs: taskpool.Configs = { timeout: mode === 'stage' || mode === 'rollback' ? 60000 : 15000 };
+    return taskpool.execute(task, configs);
+  }
+  private static async verify(mode: string, id: string = '', item: string = '', hash: string = ''): Promise<string[]> {
+    return await GameDataUpdater.runWorker(mode, id, item, hash) as string[];
   }
   private static async initialize(): Promise<void> {
     let lock: fileIo.File | undefined = undefined;
@@ -126,6 +129,20 @@ export class GameDataUpdater {
     // Legacy community domains have no slot in the verified cohort and use their bundled fallback.
     try { GameDataManifestPolicy.validatePath(path, ItemType.Text); } catch (_) { return ''; }
     return current?.metadata.get(path) ?? '';
+  }
+  static async readLanguageMetadata(path: string): Promise<string> {
+    const snapshot: GameDataSnapshot | undefined = GameDataUpdater.store().current();
+    if (snapshot === undefined || !GameDataManifestPolicy.isLanguagePath(path)) { return ''; }
+    const item: GameDataItem | undefined = snapshot.manifest.items.find((entry: GameDataItem): boolean => entry.path === path);
+    if (item === undefined) { return ''; }
+    try {
+      const bytes: Object = await GameDataUpdater.runWorker('language', snapshot.id, JSON.stringify(item), item.sha256);
+      if (!(bytes instanceof ArrayBuffer) || bytes.byteLength !== item.size) { throw new Error('语言文件与校验收据不一致'); }
+      return GameDataManifestPolicy.stripBom(GameDataUpdater.io().decode(new Uint8Array(bytes)));
+    } catch (error) {
+      Logger.warn(TAG, `metadata ${path} unavailable: ${(error as Error).message}`);
+      return '';
+    }
   }
   static metadataPath(relPath: string): string {
     const current: GameDataSnapshot | undefined = GameDataUpdater.store().current();
@@ -288,7 +305,8 @@ export class GameDataUpdater {
   private static async transferItem(operation: GameDataUpdateOperation, item: GameDataItem, staging: string,
     reservation: GameDataFileReservation): Promise<void> {
     GameDataUpdater.checkOperation(operation);
-    const bytes: Uint8Array = await GameDataUpdater.getBytes(item.url, item.size > 0 ? item.size : GameDataManifestPolicy.MAX_FILE_BYTES, operation);
+    const limit: number = item.size > 0 ? item.size : GameDataManifestPolicy.maxFileBytes(item.path);
+    const bytes: Uint8Array = await GameDataUpdater.getBytes(item.url, limit, operation);
     GameDataUpdater.checkOperation(operation);
     operation.received += bytes.length; operation.snapshotReserved -= reservation.snapshot; reservation.snapshot = 0;
     const hash: string = await GameDataUpdater.io().sha256Async(bytes);
@@ -316,7 +334,8 @@ export class GameDataUpdater {
         GameDataUpdater.checkOperation(operation);
         if (operation.next >= manifest.items.length) { return; }
         const item: GameDataItem = manifest.items[operation.next];
-        if (!GameDataUpdater.reserve(operation, item.size > 0 ? item.size : GameDataManifestPolicy.MAX_FILE_BYTES, reservation)) { return; }
+        const limit: number = item.size > 0 ? item.size : GameDataManifestPolicy.maxFileBytes(item.path);
+        if (!GameDataUpdater.reserve(operation, limit, reservation)) { return; }
         operation.next++; operation.status.current = item.path; GameDataUpdater.notify(operation);
         await GameDataUpdater.transferItem(operation, item, staging, reservation);
         GameDataUpdater.checkOperation(operation);

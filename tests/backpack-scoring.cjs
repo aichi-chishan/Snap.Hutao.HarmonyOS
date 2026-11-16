@@ -11,6 +11,7 @@ const archives = [{ id: 1, name: 'first', uid: '100000001', isSelected: true }, 
 let items = [];
 const mocks = {
   PreferencesStore: { getString: (key, fallback) => preferences.get(key) ?? fallback,
+    getNumber: (key, fallback) => preferences.get(key) ?? fallback,
     setString: (key, value) => preferences.set(key, value) },
   BackpackService: { getArchives: async () => archives, getProjects: async () => [], getItems: async () => items },
 };
@@ -76,6 +77,8 @@ test('every scaling preset uses the expected coefficient and unknown affixes nev
 });
 test('local profile save/clone/reload/delete enforces one active choice and safe fallback', () => {
   preferences.clear();
+  assert.equal(Settings.save(Profile.create(0), 0).profiles.length, 0);
+  assert.equal(preferences.size, 0);
   const profile = Profile.create(2); profile.name = 'HP build';
   let state = Settings.save(profile, 0);
   assert.equal(state.profiles.length, 1); assert.ok(state.activeId.length > 0);
@@ -85,10 +88,29 @@ test('local profile save/clone/reload/delete enforces one active choice and safe
   state = Settings.save(draft, state.revision); assert.equal(state.activeId, id); assert.equal(state.profiles.length, 1);
   assert.throws(() => Settings.save(draft, 0), /已改变/);
   state = Settings.save(Profile.create(4), state.revision); assert.equal(state.profiles.length, 2);
-  state = Settings.remove(state.activeId, state.revision); assert.equal(state.activeId, '');
+  assert.equal(Profile.displayName(Settings.active(state)), '精通流');
+  state = Settings.save(Profile.create(0), state.revision, [state.activeId]); assert.equal(state.activeId, '');
   assert.deepEqual(Settings.active(Settings.load()).weights, Profile.create(0).weights);
   assert.equal(state.profiles[0].id, id);
-  assert.throws(() => Settings.remove('missing', state.revision), /不存在/);
+});
+test('character options bind by preset or saved configuration ID and fall back after deletion', () => {
+  preferences.clear();
+  let state = Settings.save(Profile.create(1), 0);
+  const attackId = state.activeId;
+  const option = id => Settings.characterOption(id, state, Settings.characterOptions(state));
+  assert.deepEqual(Settings.characterOptions(state).map(o => o.label),
+    ['米游社推荐属性', '通用', '攻双暴', '生双暴', '防双暴', '精通流', '攻双暴']);
+  assert.equal(option(10000001).key, 'recommend');
+  Settings.setCharacterOption(10000001, 'preset:2');
+  assert.deepEqual(option(10000001).profile.weights, Profile.create(2).weights);
+  preferences.set('relic.score.algorithm.10000002', 2);
+  assert.equal(option(10000002).key, `saved:${attackId}`);
+  state = Settings.save(Profile.create(4), state.revision);
+  assert.equal(option(10000002).key, `saved:${attackId}`);
+  state = Settings.save(Profile.create(0), state.revision, [attackId]);
+  assert.equal(option(10000002).key, 'recommend');
+  assert.equal(option(10000001).key, 'preset:2');
+  assert.equal(Profile.displayName(Settings.active(state)), '精通流');
 });
 test('corrupt or unsupported settings remain unchanged and disable writes', () => {
   for (const raw of ['{bad', '{"version":2,"revision":0,"activeId":"","profiles":[]}',
@@ -101,16 +123,19 @@ test('corrupt or unsupported settings remain unchanged and disable writes', () =
   }
   preferences.clear();
 });
-test('score ordering is stable by instance, zero is known, unknowns last, filters preserved', () => {
+test('score ordering uses full precision and breaks ties by relic level, with missing scores last', () => {
   const high = relic('high', [501202, 501222]);
   const low = relic('low', [501202]);
   const twin = relic('twin', [501202]);
+  twin.level = 21;
   const unknown = relic('unknown', [999]);
   const zero = relic('zero', [501021]); zero.isLocked = true;
   const all = [unknown, twin, zero, high, low];
   const before = all.map(item => item.rawJson);
   const filter = new BackpackFilter(); filter.sort = 'score';
-  assert.deepEqual(BackpackCatalog.filter(all, filter).map(item => item.instanceId), ['high', 'low', 'twin', 'zero', 'unknown']);
+  assert.deepEqual(BackpackCatalog.filter(all, filter).map(item => item.instanceId), ['high', 'twin', 'low', 'zero', 'unknown']);
+  filter.sort = 'score-ascending';
+  assert.deepEqual(BackpackCatalog.filter(all, filter).map(item => item.instanceId), ['zero', 'twin', 'low', 'high', 'unknown']);
   filter.lockedOnly = true; assert.deepEqual(BackpackCatalog.filter(all, filter).map(item => item.instanceId), ['zero']);
   filter.lockedOnly = false; filter.keyword = 'twin'; assert.equal(BackpackCatalog.filter(all, filter)[0].instanceId, 'twin');
   assert.deepEqual(all.map(item => item.rawJson), before);
@@ -130,11 +155,16 @@ test('editor writes are bound to archive/generation; cancel and stale saves cann
   assert.equal(model.allItems[0].rawJson, before);
   assert.throws(() => model.saveScore(edit, Profile.create(2)), /已改变/);
   edit = model.beginScoreEdit(); model.invalidate();
-  assert.throws(() => model.deleteScore(edit, model.scoreSettings.activeId), /档案或页面已改变/);
+  assert.throws(() => model.saveScore(edit, Profile.create(0), [model.scoreSettings.activeId]), /档案或页面已改变/);
 });
-test('UI exposes configuration, zero/unavailable score, and score-aware list keys', () => {
+test('both pages use the scoring editor and the backpack refreshes score-aware list keys', () => {
   const source = fs.readFileSync(path.join(root, 'pages/BackpackPage.ets'), 'utf8');
-  assert.match(source, /Button\('评分设置'\)/); assert.match(source, /Slider\(\{ value: this\.scoreDraft\.weights\[index\], min: 0, max: 1, step: 0\.1 \}\)/);
+  const character = fs.readFileSync(path.join(root, 'pages/CharacterPage.ets'), 'utf8');
+  const editor = fs.readFileSync(path.join(root, 'components/ReliquaryScoreEditor.ets'), 'utf8');
+  assert.match(source, /Button\('评分设置'[,)]/);
+  assert.match(source, /\.onClick\(\(\) => this\.openScore\(\)\)/);
+  assert.match(source, /ReliquaryScoreEditor\(/); assert.match(character, /ReliquaryScoreEditor\(/);
+  assert.match(editor, /Slider\(\{ value: this\.draft\.weights\[index\], min: 0, max: 1, step: 0\.1 \}\)/);
   assert.match(source, /this\.vm\.scoreSettings\.revision/); assert.match(source, /BackpackScoring\.label\(item\.score\)/);
-  assert.match(source, /this\.vm\.saveScore\(this\.scoreEdit, this\.scoreDraft\)/);
+  assert.match(source, /this\.vm\.saveScore\(this\.scoreEdit, profile, deletedIds\)/);
 });

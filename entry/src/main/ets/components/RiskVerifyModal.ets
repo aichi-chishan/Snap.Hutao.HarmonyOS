@@ -3,7 +3,7 @@
  * 全局人机验证浮层（挂载于 EntryAbility OverlayManager，覆盖所有页面）：
  *   - game_record 1034 / 签到体内极验（kind='gt'）
  *   - passport 登录 aigis 会话（kind='aigis'）
- * 视觉：沉浸光感材质（API 26 门控 systemMaterial，低版本回退 backgroundEffect）、
+ * 视觉：统一全局浮层材质、
  *       spring 弹性进出、蒙层渐显、状态呼吸点。结果回传 RiskVerifyService。
  *
  * ⚠ 踩坑记录：
@@ -16,11 +16,9 @@
  *      面板/WebView 由窗口尺寸自适应（本文件），页面内再按实际验证码尺寸等比缩放到视口
  *      （HTML 里的 fit()，通过 onFrame 桥回传测量结果）。
  */
-import { GuardedMaterialModifier } from '../common/GuardedMaterialModifier';
-import { UiSurface, SurfaceClass } from '../common/UiSurface';
+import { AppButtonModifier, UiSurface, OverlaySurfaceModifier } from '../common/UiSurface';
 import { webview } from '@kit.ArkWeb';
-import { curves, uiMaterial } from '@kit.ArkUI';
-import { deviceInfo } from '@kit.BasicServicesKit';
+import { curves } from '@kit.ArkUI';
 import { RiskVerifyService, RiskVerifyRequest, KEY_RISK_SHOW, KEY_RISK_REQ } from '../service/RiskVerifyService';
 import { Logger } from '../common/Logger';
 import { NavIcon } from './NavIcon';
@@ -29,6 +27,8 @@ const TAG: string = 'RiskVerifyModal';
 
 /** 极验脚本所在域：同时作为 Web 文档的 baseUrl/historyUrl（给页面一个真实 https 源） */
 const GEETEST_BASE_URL: string = 'https://static.geetest.com/';
+const GEETEST_BRIDGE_PERMISSION: string = '{"javascriptProxyPermission":{"urlPermissionList":' +
+  '[{"scheme":"https","host":"static.geetest.com","port":"443","path":""}]}}';
 /** 面板留白：左右各 12vp；上下留给标题行+状态行+内边距 */
 const PANEL_EDGE: number = 24;
 const PANEL_CHROME_H: number = 140;
@@ -72,21 +72,13 @@ class VerifyJsProxy {
   }
 }
 
-/** API 26 沉浸光感可用性（运行时门控；保留给深浅色自适应分支使用） */
-function immersiveAvailable(): boolean {
-  try {
-    return deviceInfo.apiAvailable('26.0.0');
-  } catch (e) {
-    return false;
-  }
-}
-
 @Component
 export struct RiskVerifyModal {
-  @StorageProp('isDarkMode') isDark: boolean = false;
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   @StorageProp('reduceMotion') reduceMotion: boolean = false;
-  @StorageLink(KEY_RISK_SHOW) isShow: boolean = false;
-  @StorageLink(KEY_RISK_REQ) req: RiskVerifyRequest = new RiskVerifyRequest();
+  @StorageLink(KEY_RISK_SHOW) @Watch('onVerifyStateChanged') isShow: boolean = false;
+  @StorageLink(KEY_RISK_REQ) @Watch('onVerifyStateChanged') req: RiskVerifyRequest = new RiskVerifyRequest();
   @State statusText: string = '';
   /** 加载失败：展示「重新加载」而不是留一块空白 */
   @State loadFailed: boolean = false;
@@ -104,7 +96,9 @@ export struct RiskVerifyModal {
     (json: string): void => {
       this.handleFrame(json);
     });
-  private material: uiMaterial.Material | undefined = undefined;
+  private currentMaterial(): OverlaySurfaceModifier {
+    return new OverlaySurfaceModifier(this.surfaceMode, this.surfaceLevel);
+  }
   /** Web 组件是否已绑定控制器（未绑定前调用 loadData 会抛 17100001） */
   private webAttached: boolean = false;
   /** 待加载的验证参数（Web 未就绪时先缓存，onControllerAttached 后补发） */
@@ -112,11 +106,21 @@ export struct RiskVerifyModal {
   private challenge: string = '';
   /** 已成功回传验证结果（避免 onError 二次覆盖） */
   private solved: boolean = false;
+  private loadedSequence: number = 0;
 
   aboutToAppear(): void {
-    // 全局浮层材质走 UiSurface 统一令牌（普通材质模式返回 undefined → 纯 scrim+面板底）
-    this.material = UiSurface.material(SurfaceClass.OVERLAY_MODAL);
+    this.onVerifyStateChanged();
   }
+
+  private onVerifyStateChanged(): void {
+    if (!this.isShow || this.req.seq <= 0 || this.req.seq === this.loadedSequence) { return; }
+    if (this.loadedSequence > 0) { this.controller = new webview.WebviewController(); }
+    this.webAttached = false;
+    this.loadedSequence = this.req.seq;
+    this.loadCaptcha(this.req.gt, this.req.challenge);
+  }
+
+  private ownsRequest(seq: number): boolean { return this.isShow && seq === this.loadedSequence; }
 
   /** 面板宽度：至少容纳验证码宽度 + 内边距，且不超过可用宽度（小窗自动收窄，页面再等比缩放适配） */
   private panelWidth(): number {
@@ -124,7 +128,7 @@ export struct RiskVerifyModal {
     if (this.availW <= 0) {
       return need;
     }
-    return Math.max(280, Math.min(480, Math.max(need, this.availW - PANEL_EDGE)));
+    return Math.max(0, Math.min(480, this.availW - PANEL_EDGE));
   }
 
   /** WebView 高度：验证区尽量给足（页面透明，多出的空间不可见），只在窗口不够时才收缩 */
@@ -164,7 +168,7 @@ export struct RiskVerifyModal {
     }
     try {
       this.controller.registerJavaScriptProxy(this.proxy, 'hutaoVerifyBridge',
-        ['onValidate', 'onLog', 'onFrame']);
+        ['onValidate', 'onLog', 'onFrame'], [], GEETEST_BRIDGE_PERMISSION);
     } catch (e) {
       Logger.warn(TAG, `register proxy fail ${(e as Error).message}`);
     }
@@ -185,6 +189,8 @@ export struct RiskVerifyModal {
   private handleValidate(json: string): void {
     try {
       const obj = JSON.parse(json) as Record<string, Object>;
+      if (!this.isShow || this.solved || Number(obj['request_seq']) !== this.loadedSequence) { return; }
+      if (obj['ready'] === true) { this.statusText = '请完成下方人机验证'; return; }
       const err: Object = obj['error'];
       if (err !== undefined && err !== null && String(err).length > 0) {
         this.loadFailed = true;
@@ -198,7 +204,8 @@ export struct RiskVerifyModal {
       }
       this.solved = true;
       this.statusText = '验证成功，正在继续...';
-      RiskVerifyService.getInstance().submitValidate(validate);
+      const challenge: string = String(obj['geetest_challenge'] ?? obj['challenge'] ?? this.challenge);
+      RiskVerifyService.getInstance().submitValidate(validate, challenge, this.loadedSequence);
     } catch (e) {
       Logger.warn(TAG, `handleValidate fail: ${(e as Error).message}`);
       this.statusText = '验证处理失败，请重试';
@@ -217,6 +224,8 @@ export struct RiskVerifyModal {
   }
 
   private buildHtml(gt: string, challenge: string): string {
+    const gtJson: string = JSON.stringify(gt).replace(/</g, '\\u003c');
+    const challengeJson: string = JSON.stringify(challenge).replace(/</g, '\\u003c');
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -230,6 +239,11 @@ export struct RiskVerifyModal {
 <body>
 <div id="captcha"></div>
 <script>
+  function deliver(result) {
+    if (!result || !window.hutaoVerifyBridge) { return; }
+    result.request_seq = ${this.loadedSequence};
+    window.hutaoVerifyBridge.onValidate(JSON.stringify(result));
+  }
   // 页面侧诊断回传（脚本加载/初始化/JS 异常都能在宿主状态栏看到，便于真机排查）
   function log(msg) {
     try { if (window.hutaoVerifyBridge && window.hutaoVerifyBridge.onLog) { window.hutaoVerifyBridge.onLog(String(msg)); } } catch (e) {}
@@ -252,27 +266,27 @@ export struct RiskVerifyModal {
       if (!st || st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) === 0) continue;
       var r = el.getBoundingClientRect();
       if (r.width < 2 || r.height < 2) continue;
-      if (r.width >= vw - 4 && r.height >= vh - 4) continue; // 全屏遮罩层
+      if (Math.abs(r.width - vw) < 4 && Math.abs(r.height - vh) < 4 &&
+          Math.abs(r.left) < 4 && Math.abs(r.top) < 4) continue; // 全屏遮罩层，不能排除超出视口的验证码
       if (r.left < minX) minX = r.left;
       if (r.top < minY) minY = r.top;
       if (r.right > maxX) maxX = r.right;
       if (r.bottom > maxY) maxY = r.bottom;
     }
     if (maxX <= minX || maxY <= minY) return null;
-    return { w: Math.ceil(maxX - minX), h: Math.ceil(maxY - minY) };
+    return { w: Math.ceil(maxX - Math.min(0, minX)), h: Math.ceil(maxY - Math.min(0, minY)) };
   }
 
   /** 验证码大于视口时等比缩小（zoom 会同步缩放命中区域，点击坐标仍然正确），
    *  再把实际尺寸回传宿主，便于其调整面板大小。 */
   function fit() {
+    // 每次按原尺寸重算，窗口重新变宽时也能恢复到 1 倍。
+    document.body.style.zoom = '1';
     var m = measure();
     if (!m) return;
     var vw = window.innerWidth, vh = window.innerHeight;
     var k = Math.min(1, (vw - 4) / m.w, (vh - 4) / m.h);
-    if (k < 0.98) {
-      var cur = parseFloat(document.body.style.zoom || '1') || 1;
-      document.body.style.zoom = String(Math.max(0.5, cur * k));
-    }
+    document.body.style.zoom = String(Math.max(0.1, k));
     try {
       if (window.hutaoVerifyBridge && window.hutaoVerifyBridge.onFrame) {
         window.hutaoVerifyBridge.onFrame(JSON.stringify({ w: m.w, h: m.h, vw: vw, vh: vh }));
@@ -288,7 +302,9 @@ export struct RiskVerifyModal {
   // 极验插入 DOM 的过程是异步多步的：用 MutationObserver 持续跟随，尺寸稳定后自动收敛
   var mo = null;
   try {
-    mo = new MutationObserver(scheduleFit);
+    mo = new MutationObserver(function (records) {
+      if (records.some(function (record) { return record.target !== document.body; })) scheduleFit();
+    });
     mo.observe(document.body, { childList: true, subtree: true, attributes: true });
     // 验证码渲染完成后即可停止观察，避免长尾开销
     setTimeout(function () { try { mo.disconnect(); } catch (e) {} }, 20000);
@@ -304,40 +320,41 @@ export struct RiskVerifyModal {
   if (typeof initGeetest !== 'function') {
     log('验证脚本未加载(initGeetest 未定义)');
     if (window.hutaoVerifyBridge && window.hutaoVerifyBridge.onValidate) {
-      window.hutaoVerifyBridge.onValidate('{"error":"script_load_fail"}');
+      deliver({error: 'script_load_fail'});
     }
   } else {
     try {
       initGeetest({
         protocol: 'https://',
-        gt: '${gt}',
-        challenge: '${challenge}',
+        gt: ${gtJson},
+        challenge: ${challengeJson},
         new_captcha: true,
         product: 'bind',
         api_server: 'api.geetest.com'
       }, function (captchaObj) {
         captchaObj.onReady(function () {
           log('验证组件就绪');
+          deliver({ready: true});
           captchaObj.verify();
           scheduleFit();
         });
         captchaObj.onSuccess(function () {
           var result = captchaObj.getValidate();
           if (window.hutaoVerifyBridge) {
-            window.hutaoVerifyBridge.onValidate(JSON.stringify(result));
+            deliver(result);
           }
         });
         captchaObj.onError(function (err) {
           log('极验错误: ' + JSON.stringify(err));
           if (window.hutaoVerifyBridge) {
-            window.hutaoVerifyBridge.onValidate('{"error":"init_fail"}');
+            deliver({error: 'init_fail'});
           }
         });
       });
     } catch (e) {
       log('initGeetest 调用异常: ' + e);
       if (window.hutaoVerifyBridge && window.hutaoVerifyBridge.onValidate) {
-        window.hutaoVerifyBridge.onValidate('{"error":"init_exception"}');
+        deliver({error: 'init_exception'});
       }
     }
   }
@@ -356,17 +373,19 @@ export struct RiskVerifyModal {
   build() {
     Stack({ alignContent: Alignment.Center }) {
       if (this.isShow && this.req.seq > 0) {
+        ForEach([this.req], (activeReq: RiskVerifyRequest) => {
         // 蒙层（点击关闭 → 取消验证）
         Column()
           .width('100%')
           .height('100%')
           .backgroundColor($r('app.color.mask_scrim'))
           .onClick(() => {
-            RiskVerifyService.getInstance().cancel();
+            RiskVerifyService.getInstance().cancel(activeReq.seq);
           })
           .transition(this.reduceMotion ? TransitionEffect.IDENTITY.animation({ duration: 0 }) :
             TransitionEffect.OPACITY.animation({ duration: 220, curve: Curve.EaseOut }))
 
+        Scroll() {
         Column() {
           // 标题行
           Row({ space: 8 }) {
@@ -375,13 +394,17 @@ export struct RiskVerifyModal {
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.text_primary'))
             Blank()
-            NavIcon({ name: 'Close', iconSize: 16, symbolColor: $r('app.color.text_secondary') })
-              .padding(10)
+            Button({ type: ButtonType.Normal }) {
+              NavIcon({ name: 'Close', iconSize: 16, symbolColor: $r('app.color.text_secondary') })
+            }
+              .width(44).height(44)
+              .backgroundColor(Color.Transparent)
               .borderRadius(12)
               .accessibilityText('取消验证')
               .accessibilityLevel('yes')
+              .hoverEffect(HoverEffect.Highlight)
               .onClick(() => {
-                RiskVerifyService.getInstance().cancel();
+                RiskVerifyService.getInstance().cancel(activeReq.seq);
               })
           }
           .width('100%')
@@ -398,13 +421,12 @@ export struct RiskVerifyModal {
               .fontColor(this.loadFailed ? $r('app.color.danger') : $r('app.color.text_secondary'))
               .layoutWeight(1)
             if (this.loadFailed) {
-              Button('重新加载')
+              Button('重新加载', { type: ButtonType.Normal })
+                .attributeModifier(new AppButtonModifier(this.surfaceMode, this.surfaceLevel, true))
                 .fontSize(12)
-                .height(28)
-                .backgroundColor($r('app.color.app_primary_bg'))
-                .fontColor($r('app.color.app_primary_text'))
+                .constraintSize({ minHeight: 44 })
                 .onClick(() => {
-                  this.retry();
+                  if (this.ownsRequest(activeReq.seq)) { this.retry(); }
                 })
             }
           }
@@ -421,35 +443,33 @@ export struct RiskVerifyModal {
               // 验证图/背景图属于在线图片资源，显式放行（默认即 true，防止被误关）
               .imageAccess(true)
               .onlineImageAccess(true)
-              .mixedMode(MixedMode.All)
               .backgroundColor(Color.Transparent)
               .onControllerAttached(() => {
+                if (!this.ownsRequest(activeReq.seq)) { return; }
                 // 控制器绑定完成才可安全调用 loadData（此前调用会抛 17100001 → 真机白屏）
                 this.webAttached = true;
                 Logger.info(TAG, 'controller attached, start load');
                 this.startLoad();
               })
-              .onPageEnd(() => {
-                if (!this.loadFailed && !this.solved) {
-                  this.statusText = '请完成下方人机验证';
-                }
-              })
+              .onDisAppear(() => { if (activeReq.seq === this.loadedSequence) { this.webAttached = false; } })
               .onErrorReceive((event: OnErrorReceiveEvent) => {
+                if (!this.ownsRequest(activeReq.seq)) { return; }
                 const url: string = event.request.getRequestUrl();
                 const info: string = event.error.getErrorInfo();
                 const mainFrame: boolean = event.request.isMainFrame();
                 Logger.warn(TAG, `resource error main=${mainFrame} ${info} ${url}`);
                 // 主文档或极验脚本失败才提示（图片等子资源失败不打扰用户）
-                if (mainFrame || url.indexOf('geetest') >= 0) {
+                if (!this.solved && (mainFrame || url.indexOf('geetest') >= 0)) {
                   this.loadFailed = true;
                   this.statusText = `验证组件加载失败：${info}`;
                 }
               })
               .onHttpErrorReceive((event: OnHttpErrorReceiveEvent) => {
+                if (!this.ownsRequest(activeReq.seq)) { return; }
                 const url: string = event.request.getRequestUrl();
                 const code: number = event.response.getResponseCode();
                 Logger.warn(TAG, `http error ${code} ${url}`);
-                if (url.indexOf('geetest') >= 0) {
+                if (!this.solved && url.indexOf('geetest') >= 0) {
                   this.loadFailed = true;
                   this.statusText = `验证组件加载失败：HTTP ${code}`;
                 }
@@ -465,16 +485,7 @@ export struct RiskVerifyModal {
         .width(this.panelWidth())
         .padding({ left: 18, right: 12, top: 16, bottom: 14 })
         .borderRadius(24)
-        // API 26+ 沉浸光感材质；API 23/24 用 backgroundEffect 实时磨砂玻璃（材质观感一致）
-        .attributeModifier(new GuardedMaterialModifier(this.material))
-        .backgroundColor(this.material !== undefined ? Color.Transparent : $r('app.color.risk_modal_surface'))
-        .backgroundEffect(this.material !== undefined ? undefined : {
-          radius: 48,
-          color: $r('app.color.risk_modal_tint'),
-          saturation: 1.2,
-          brightness: this.isDark ? 0.9 : 1.1,
-        })
-        .shadow({ radius: 40, color: 'rgba(0,0,0,0.35)', offsetY: 12 })
+        .attributeModifier(this.currentMaterial())
         .alignItems(HorizontalAlign.Start)
         .transition(this.reduceMotion ? TransitionEffect.IDENTITY.animation({ duration: 0 }) : TransitionEffect.asymmetric(
           // 进场：spring 弹性放大 + 上浮 + 渐显
@@ -487,9 +498,11 @@ export struct RiskVerifyModal {
             .combine(TransitionEffect.OPACITY)
             .animation({ curve: curves.springMotion(0.34, 0.9) })
         ))
-        .onAppear(() => {
-          this.loadCaptcha(this.req.gt, this.req.challenge);
-        })
+        }
+        .width(this.panelWidth())
+        .constraintSize({ maxHeight: this.availH > 0 ? Math.max(0, this.availH - PANEL_EDGE) : undefined })
+        .scrollBar(BarState.Auto)
+        }, (activeReq: RiskVerifyRequest): string => String(activeReq.seq))
       }
     }
     .width('100%')

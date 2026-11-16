@@ -6,23 +6,27 @@
     },
     {
       "name": "app_primary",
-      "value": "#FF6B35"
+      "value": "#65559D"
     },
     {
       "name": "app_primary_bg",
-      "value": "#1AFF6B35"
+      "value": "#1A65559D"
     },
     {
       "name": "app_primary_text",
-      "value": "#C2410C"
+      "value": "#594889"
     },
     {
       "name": "on_accent",
-      "value": "#2B1206"
+      "value": "#FFFFFF"
     },
     {
       "name": "image_scrim",
       "value": "#99000000"
+    },
+    {
+      "name": "image_foreground",
+      "value": "#FFFFFFFF"
     },
     {
       "name": "image_scrim_soft",
@@ -77,6 +81,10 @@
       "value": "#9B7BFF"
     },
     {
+      "name": "three_star",
+      "value": "#3674B4"
+    },
+    {
       "name": "mask_scrim",
       "value": "#33F1F3F5"
     },
@@ -91,6 +99,14 @@
     {
       "name": "nav_border",
       "value": "#22000000"
+    },
+    {
+      "name": "nav_surface",
+      "value": "#18FFFFFF"
+    },
+    {
+      "name": "nav_selected",
+      "value": "#14000000"
     },
     {
       "name": "text_tertiary",

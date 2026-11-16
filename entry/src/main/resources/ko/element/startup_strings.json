@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "ui_startup_failed_title", "value": "시작할 수 없습니다" },
+    { "name": "ui_startup_failed_body", "value": "시작을 완료하지 못했습니다. 다시 시도해 주세요. 다시 시도해도 기존 데이터는 삭제되지 않습니다." }
+  ]
+}

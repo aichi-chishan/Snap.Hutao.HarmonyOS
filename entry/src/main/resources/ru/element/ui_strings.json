@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "Отмена"
+    },
+    {
+      "name": "common_confirm",
+      "value": "Подтвердить"
+    },
+    {
+      "name": "common_refresh",
+      "value": "Обновить"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "История молитв"
+    },
+    {
+      "name": "page_title_home",
+      "value": "Главная"
+    },
+    {
+      "name": "page_title_login",
+      "value": "Войти"
+    },
+    {
+      "name": "page_title_note",
+      "value": "Заметки в реальном времени"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "Настройки"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "История молитв"
+    },
+    {
+      "name": "tab_home",
+      "value": "Главная"
+    },
+    {
+      "name": "tab_mine",
+      "value": "Профиль"
+    },
+    {
+      "name": "tab_note",
+      "value": "Заметки в реальном времени"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "Экспортировать"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "Импорт"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "Сохранить"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "Generate analysis"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "Account history charts and AI insights"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "Stop generation"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "Test connection"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "Проверить обновления"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "Данные"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "Расписание"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "Система"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "Инструменты"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "Откройте приложение заново для применения языка системы"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "Системная"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "Витая Бездна"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "Достижения"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "Предметы инвентаря"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "Мрачный натиск"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "Мои персонажи"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "План развития"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "Game Launcher"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "Дневник путешественника"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Snap Hutao Паспорт"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "Имаджинариум"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "Вики: Персонажи"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "Вики: Монстры"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "Вики: Оружие"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "О приложении"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "Аккаунт"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "Внешний вид"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "Фоновое изображение"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "Видео на фоне"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "Копирование и восстановление"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "Календарь"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "Главная"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "Настройки области игровых событий на главной странице"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "Карточки главной страницы"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "Язык"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "Материал фона"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "Другое"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "Регистрация"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "Хранилище"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "Цветовая тема"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "Бесшовный CAPTCHA"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "История молитв"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "Перенос данных"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "Тёмная"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "Светлая"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "Версия Snap Hutao %s теперь доступна"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "Примечания к выпуску"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "Пропустить эту версию"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "Обновление приложения"
+    }
+  ]
+}

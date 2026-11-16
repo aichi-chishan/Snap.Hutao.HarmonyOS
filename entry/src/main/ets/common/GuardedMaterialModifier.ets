@@ -1,7 +1,7 @@
 import { uiMaterial } from '@kit.ArkUI';
 import { Motion } from './Motion';
 
-/** Keep the API26 method invocation itself outside the API24 rendering path. */
+/** 保留能力检查，同时支持在已挂载节点上清除材质。 */
 export class GuardedMaterialModifier implements AttributeModifier<CommonAttribute> {
   private material: uiMaterial.Material | undefined;
 
@@ -10,8 +10,8 @@ export class GuardedMaterialModifier implements AttributeModifier<CommonAttribut
   }
 
   applyNormalAttribute(instance: CommonAttribute): void {
-    if (Motion.detectImmersive() && this.material !== undefined) {
-      instance.systemMaterial(this.material);
+    if (Motion.detectImmersive()) {
+      instance.systemMaterial(this.material ?? uiMaterial.Material.empty);
     }
   }
 }

@@ -1,7 +1,8 @@
 import { relationalStore } from '@kit.ArkData';
 import { RelationalStoreHelper } from '../db/RelationalStoreHelper';
-import { BackpackArchive, BackpackItem, BackpackImport } from '../../model/BackpackData';
+import { BackpackArchive, BackpackArchiveSnapshot, BackpackItem, BackpackImport } from '../../model/BackpackData';
 import { UIIFCodec as UIIFService } from '../../model/UIIFCodec';
+import { InventoryMaterialReference } from '../../model/InventoryMaterialReference';
 
 /** A whole snapshot is validated before a write. All mutating transactions are synchronous. */
 export class BackpackRepo {
@@ -90,9 +91,15 @@ export class BackpackRepo {
     const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
     store.beginTransaction();
     try {
-      BackpackRepo.archiveSync(id);
+      const archive: BackpackArchive = BackpackRepo.archiveSync(id);
       store.deleteSync(BackpackRepo.itemPredicate(id));
-      store.deleteSync(BackpackRepo.archivePredicate(id));
+      if (store.deleteSync(BackpackRepo.archivePredicate(id)) !== 1) { throw new Error('删除背包档案失败'); }
+      if (archive.isSelected) {
+        const remaining: BackpackArchive[] = BackpackRepo.readArchives(store.querySync(
+          new relationalStore.RdbPredicates('backpack_archives').orderByAsc('id')));
+        if (remaining.length > 0 && store.updateSync({ 'is_selected': 1 }, BackpackRepo.archivePredicate(remaining[0].id)) !== 1) {
+          throw new Error('切换背包档案失败'); }
+      }
       store.commit();
     } catch (e) { store.rollBack(); throw new Error((e as Error).message); }
   }
@@ -120,7 +127,18 @@ export class BackpackRepo {
     return BackpackRepo.readItems(await RelationalStoreHelper.query(BackpackRepo.itemPredicate(id)));
   }
 
-  private static writeSnapshot(id: number, documentJson: string, items: BackpackItem[], source: string): void {
+  /** Capture document metadata and items without yielding between the reads. */
+  static readSnapshot(id: number): BackpackArchiveSnapshot {
+    const snapshot: BackpackArchiveSnapshot = new BackpackArchiveSnapshot();
+    snapshot.archive = BackpackRepo.archiveSync(id);
+    snapshot.items = BackpackRepo.readItems(RelationalStoreHelper.getStore().querySync(BackpackRepo.itemPredicate(id)));
+    return snapshot;
+  }
+
+  private static writeSnapshot(archive: BackpackArchive, documentJson: string, items: BackpackItem[], source: string): void {
+    const id: number = archive.id;
+    const updatedAt: number = Math.max(Date.now(), archive.updatedAt + 1);
+    if (!Number.isSafeInteger(updatedAt)) { throw new Error('背包档案版本无效'); }
     const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
     const rows: relationalStore.ValuesBucket[] = items.map((item: BackpackItem): relationalStore.ValuesBucket => {
       const row: relationalStore.ValuesBucket = {
@@ -135,7 +153,7 @@ export class BackpackRepo {
       if (store.batchInsertSync('backpack_items', chunk) !== chunk.length) { throw new Error('背包写入不完整'); }
     }
     const values: relationalStore.ValuesBucket = {
-      'document_json': documentJson, 'updated_at': Date.now(), 'source': source.substring(0, 200),
+      'document_json': documentJson, 'updated_at': updatedAt, 'source': source.substring(0, 200),
     };
     if (store.updateSync(values, BackpackRepo.archivePredicate(id)) !== 1) { throw new Error('背包档案已改变'); }
   }
@@ -143,6 +161,7 @@ export class BackpackRepo {
   static async replaceSnapshot(id: number, prepared: BackpackImport): Promise<void> {
     const archive: BackpackArchive = BackpackRepo.archiveSync(id);
     if (prepared.targetArchiveId !== 0 && (prepared.targetArchiveId !== id || prepared.targetUid !== archive.uid ||
+      (prepared.targetCreatedAt > 0 && prepared.targetCreatedAt !== archive.createdAt) ||
       prepared.targetUpdatedAt !== archive.updatedAt)) {
       throw new Error('目标档案已更改，请重新选择文件并确认导入');
     }
@@ -150,7 +169,7 @@ export class BackpackRepo {
     const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
     store.beginTransaction();
     try {
-      BackpackRepo.writeSnapshot(id, prepared.documentJson, prepared.items, prepared.source);
+      BackpackRepo.writeSnapshot(archive, prepared.documentJson, prepared.items, prepared.source);
       store.commit();
     } catch (e) { store.rollBack(); throw new Error((e as Error).message); }
   }
@@ -167,44 +186,55 @@ export class BackpackRepo {
       item.instanceId = `manual:${serial}`;
       items.push(item);
       UIIFService.validateSnapshot(archive.uid, archive.documentJson, items);
-      BackpackRepo.writeSnapshot(id, archive.documentJson, items, '手动编辑');
+      BackpackRepo.writeSnapshot(archive, archive.documentJson, items, '手动编辑');
       store.commit();
     } catch (e) { store.rollBack(); throw new Error((e as Error).message); }
   }
 
-  static async categorize(id: number, instanceId: string, category: number): Promise<void> {
+  private static editableItemIndex(items: BackpackItem[], instanceId: string, expectedRawJson?: string): number {
+    const index: number = items.findIndex((item: BackpackItem): boolean => item.instanceId === instanceId);
+    if (index < 0 || (expectedRawJson !== undefined && items[index].rawJson !== expectedRawJson)) {
+      throw new Error('此物品已被删除或替换，请重新选择');
+    }
+    return index;
+  }
+
+  static async categorize(id: number, instanceId: string, category: number, expectedRawJson?: string): Promise<void> {
     const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
     store.beginTransaction();
     try {
       const archive: BackpackArchive = BackpackRepo.archiveSync(id);
       const items: BackpackItem[] = BackpackRepo.readItems(store.querySync(BackpackRepo.itemPredicate(id)));
-      const item: BackpackItem | undefined = items.find((entry: BackpackItem): boolean => entry.instanceId === instanceId);
-      if (item === undefined || !UIIFService.validCategory(item.kind, category)) { throw new Error('物品分类无效'); }
+      const item: BackpackItem = items[BackpackRepo.editableItemIndex(items, instanceId, expectedRawJson)];
+      if (!UIIFService.validCategory(item.kind, category)) { throw new Error('物品分类无效'); }
       item.category = category;
       UIIFService.validateSnapshot(archive.uid, archive.documentJson, items);
-      BackpackRepo.writeSnapshot(id, archive.documentJson, items, archive.source);
+      BackpackRepo.writeSnapshot(archive, archive.documentJson, items, archive.source);
       store.commit();
     } catch (e) { store.rollBack(); throw new Error((e as Error).message); }
   }
 
-  private static editItem(id: number, instanceId: string, count: string | undefined): void {
+  private static editItem(id: number, instanceId: string, count: string | undefined, expectedRawJson?: string): void {
     const store: relationalStore.RdbStore = RelationalStoreHelper.getStore();
     store.beginTransaction();
     try {
       const archive: BackpackArchive = BackpackRepo.archiveSync(id);
       const items: BackpackItem[] = BackpackRepo.readItems(store.querySync(BackpackRepo.itemPredicate(id)));
-      const index: number = items.findIndex((item: BackpackItem): boolean => item.instanceId === instanceId);
-      if (index < 0) { throw new Error('此物品已被删除或替换，请重新选择'); }
+      const index: number = BackpackRepo.editableItemIndex(items, instanceId, expectedRawJson);
       if (count === undefined) { items.splice(index, 1); }
       else { items[index] = UIIFService.changeCount(items[index], count); }
       UIIFService.validateSnapshot(archive.uid, archive.documentJson, items);
-      BackpackRepo.writeSnapshot(id, archive.documentJson, items, '手动编辑');
+      BackpackRepo.writeSnapshot(archive, archive.documentJson, items, '手动编辑');
       store.commit();
     } catch (e) { store.rollBack(); throw new Error((e as Error).message); }
   }
 
-  static async updateCount(id: number, instanceId: string, count: string): Promise<void> { BackpackRepo.editItem(id, instanceId, count); }
-  static async removeItem(id: number, instanceId: string): Promise<void> { BackpackRepo.editItem(id, instanceId, undefined); }
+  static async updateCount(id: number, instanceId: string, count: string, expectedRawJson?: string): Promise<void> {
+    BackpackRepo.editItem(id, instanceId, count, expectedRawJson);
+  }
+  static async removeItem(id: number, instanceId: string, expectedRawJson?: string): Promise<void> {
+    BackpackRepo.editItem(id, instanceId, undefined, expectedRawJson);
+  }
 
   /** Read the chosen archive and project within one transaction; no login/account inference. */
   static async syncMaterials(id: number, projectId: number, replace: boolean): Promise<number> {
@@ -228,10 +258,14 @@ export class BackpackRepo {
           }
         } finally { current.close(); }
       }
-      let count: number = 0;
+      const incoming: Map<number, number> = new Map<number, number>();
       for (const item of items) {
-        if (item.kind === 'material') { inventory.set(item.itemId, item.count); count++; }
+        if (item.kind !== 'material' || !InventoryMaterialReference.includes(item.itemId) || (replace && item.count === 0)) { continue; }
+        const count: number = (incoming.get(item.itemId) ?? 0) + item.count;
+        if (!Number.isSafeInteger(count) || count > 4294967295) { throw new Error('材料库存数量超出范围'); }
+        incoming.set(item.itemId, count);
       }
+      incoming.forEach((count: number, itemId: number): void => { inventory.set(itemId, count); });
       const rows: relationalStore.ValuesBucket[] = [];
       inventory.forEach((value: number, itemId: number) => {
         const row: relationalStore.ValuesBucket = { 'project_id': projectId, 'item_id': itemId, 'count': value };
@@ -243,7 +277,7 @@ export class BackpackRepo {
         if (store.batchInsertSync('cultivate_inventory', chunk) !== chunk.length) { throw new Error('材料快照写入不完整'); }
       }
       store.commit();
-      return count;
+      return incoming.size;
     } catch (e) { store.rollBack(); throw new Error((e as Error).message); }
   }
 }

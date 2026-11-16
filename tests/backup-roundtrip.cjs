@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const ts = require(process.env.TYPESCRIPT_PATH || 'typescript');
 const base = path.resolve(__dirname, '../entry/src/main/ets');
 const cache = new Map();
+const uiState = new Map();
 let db, prefs, vault, failTable, failVault, writes, prefsFail, sessionReloads, journal, commitError, fenceCalls, cancelCalls, fenceFailure, fenceWait, events, vaultWrites, rollbackError, cleanupError;
 const clone = value => JSON.parse(JSON.stringify(value));
 const columns = {
@@ -37,7 +38,16 @@ const mocks = {
   '@kit.ArkData': {relationalStore:{TransactionType:{IMMEDIATE:1},RdbPredicates:class {constructor(table){this.table=table}}}},
   RelationalStoreHelper:{getStore:()=>store},
   TokenVault:{loadCookie:async id=>vault[id]??'',saveCookie:async(id,cookie)=>{vaultWrites++;events.push('vault');if(failVault)throw Error('injected vault failure');vault[id]=cookie},removeCookie:async id=>{if(cleanupError && id===1)throw Error('cleanup failure');delete vault[id]}},
-  PreferencesStore:{KEY_CURRENT_USER_ID:'app.current_user_id',KEY_CURRENT_UID:'app.current_uid',exportPortable:()=>{events.push('preferences');return clone(prefs)},getBackupJournal:()=>journal,saveBackupJournal:async text=>{journal=text},replacePortable:async value=>{prefs=clone(value);if(prefsFail){prefsFail=false;throw Error('injected preference failure')}},getRefreshIntervalMinutes:()=>30},
+  PreferencesStore:{KEY_CURRENT_USER_ID:'app.current_user_id',KEY_CURRENT_UID:'app.current_uid',exportPortable:()=>{events.push('preferences');return clone(prefs)},getBackupJournal:()=>journal,saveBackupJournal:async text=>{journal=text},replacePortable:async value=>{prefs=clone(value);if(prefsFail){prefsFail=false;throw Error('injected preference failure')}},getRefreshIntervalMinutes:()=>30,
+    getReduceMotionEnabled:()=>prefs['app.reduce_motion']===true,
+    getBackgroundImageType:()=>prefs['app.bg_image_type']??'local',
+    getBackgroundFolderPath:()=>prefs['app.bg_folder_path']??'',
+    getHomeActCalendar:()=>prefs['home.act_calendar_presented']??true,
+    getHomeActPreview:()=>prefs['home.act_preview_enabled']??false },
+  UiSurface:{publish(){uiState.set('materialMode',prefs['app.material.mode']??0);uiState.set('materialLevel',prefs['app.material.level']??-1)}},
+  Motion:{setReducedMotion:enabled=>uiState.set('reduceMotion',enabled)},
+  AppLocaleService:{applyCurrentPreference(){uiState.set('appliedLocale',prefs['app.help_locale']??'system');return true}},
+  BackgroundMediaService:{changed(){uiState.set('backgroundMediaVersion',(uiState.get('backgroundMediaVersion')??0)+1)}},
   DailyNoteService:{getInstance:()=>({isTimerRunning:()=>true,stopAutoRefresh(){},startAutoRefresh(){}})},
   UserService:{getInstance:()=>({beginLocalSessionReplacement:async()=>{fenceCalls++;events.push('fence');if(fenceWait)await fenceWait;if(fenceFailure)throw Error('invalidation failed');events.push('drained');return 42},cancelLocalSessionReplacement:revision=>{assert.equal(revision,42);assert.equal(journal,'');events.push('cancel');cancelCalls++},reloadLocalSession:async()=>{events.push('reload');sessionReloads++}})},
   Logger:{warn(){},info(){}}
@@ -48,12 +58,16 @@ function load(name) {
   const output=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
   const module={exports:{}};
   const req=id=>{if(id==='@kit.ArkData')return mocks[id];const key=path.basename(id);if(mocks[key])return {[key]:mocks[key]};return load(path.relative(base,path.resolve(path.dirname(file),id)));};
-  vm.runInNewContext(`(function(require,module,exports){${output}\n})`,{AppStorage:{setOrCreate(){}}})(req,module,module.exports);
+  vm.runInNewContext(`(function(require,module,exports){${output}\n})`,{AppStorage:{get:key=>uiState.get(key),setOrCreate:(key,value)=>uiState.set(key,value)}})(req,module,module.exports);
   cache.set(file,module.exports);return module.exports;
 }
 const {BackupService}=load('service/BackupService');
 const {BackupSnapshotValidator}=load('model/BackupSnapshot');
+const {PreferencesStore}=load('data/prefs/PreferencesStore');
+mocks.PreferencesStore.KEY_USER_ORDER=PreferencesStore.KEY_USER_ORDER;
+mocks.PreferencesStore.parseUserOrder=PreferencesStore.parseUserOrder;
 function reset(){
+  uiState.clear();
   db=Object.fromEntries(Object.keys(columns).map(name=>[name,[]]));
   db.backup_recovery=[];journal='';fenceCalls=0;cancelCalls=0;fenceFailure=false;fenceWait=undefined;events=[];vaultWrites=0;rollbackError=false;cleanupError=false;
   db.user_accounts=[{id:1,mid:'old-mid',aid:'old-aid',is_oversea:0,display_nickname:'fixture',avatar:'',created_at:1,is_selected:1,cookie_account_token:'',cookie_ltoken_ltuid:'',cookie_stoken_stuid:''}];
@@ -81,18 +95,32 @@ function reset(){
  reset();const old=clone(db);failTable='user_game_roles';assert.equal((await service.restoreFromText(text)).ok,false);assert.deepEqual(db,old);assert.deepEqual(vault,{1:'fixture-old-cookie'});
  reset();const oldPrefs=clone(prefs);prefsFail=true;assert.equal((await service.restoreFromText(text)).ok,false);assert.deepEqual(prefs,oldPrefs);assert.equal(db.user_accounts[0].id,1);assert.deepEqual(vault,{1:'fixture-old-cookie'});
  reset();assert.equal((await service.restoreFromText(text)).ok,true);assert.equal(db.user_accounts[0].id,11);assert.equal(db.user_game_roles[0].user_id,11);assert.equal(vault[11],'fixture-old-cookie');assert.equal(vault[1],undefined);assert.equal(prefs['app.current_user_id'],11);assert.equal(prefs['dailynote.tracked_11'],'["100000001"]');assert.equal(prefs['dailynote.tracked_1'],undefined);assert.equal(db.challenge_records[0].total_star,36);assert.equal(db.cultivate_projects[0].name,'fixture project');assert.equal(db.cultivate_entries[0].input_json,snapshot.tables.find(t=>t.name==='cultivate_entries').rows[0].input_json);assert.equal(sessionReloads,1);
+ reset();
+ const reordered=clone(snapshot);
+ const accounts=reordered.tables.find(table=>table.name==='user_accounts').rows;
+ accounts.push({...accounts[0],id:2,mid:'second-mid',aid:'second-aid',is_selected:0});
+ reordered.credentials.push({userId:2,cookie:'fixture-second-cookie'});
+ reordered.preferences['app.user_order']='[2,99,1,2,"3",0]';
+ assert.equal((await service.restoreFromText(JSON.stringify(reordered))).ok,true);
+ assert.equal(prefs['app.user_order'],'[12,11]');
+ assert.equal(prefs['app.current_user_id'],11);
+ assert.equal(JSON.parse(await service.buildBackupJson()).preferences['app.user_order'],'[12,11]');
  reset();const legacy={app:'snaphutao-harmonyos-backup',version:1,users:[],gacha:[],achievements:[],prefs:{themeMode:'system',refreshInterval:30,autoRefresh:true,ambientStrength:0.25,dailyBgEnabled:true,bgImageType:'none',bgFolderPath:'',geetestUrl:'',currentUid:''}};
  assert.equal((await service.restoreFromText(JSON.stringify(legacy))).ok,true);assert.equal(db.user_accounts.length,0);assert.equal(db.cultivate_projects.length,1);assert.equal(db.cultivate_entries[0].input_json,snapshot.tables.find(t=>t.name==='cultivate_entries').rows[0].input_json);assert.equal(db.challenge_records.length,1);assert.equal(prefs['app.current_uid'],'');
  reset();delete legacy.gacha;assert.equal((await service.restoreFromText(JSON.stringify(legacy))).ok,false);assert.equal(writes,0);
  reset();commitError=true;const uncertain=await service.restoreFromText(text);
  assert.equal(uncertain.ok,false);assert.equal(db.user_accounts[0].id,11);assert.equal(vault[11],'fixture-old-cookie');assert.equal(vault[1],'fixture-old-cookie');assert.notEqual(journal,'');
  assert.equal((await service.restoreFromText(text)).ok,false);commitError=false;await service.recoverInterruptedRestore();assert.equal(vault[11],'fixture-old-cookie');assert.equal(vault[1],undefined);assert.equal(journal,'');
- reset();const oldRecoveryPrefs=clone(prefs);const nextRecoveryPrefs={'app.current_user_id':11,'theme.mode':'light'};
+ reset();const oldRecoveryPrefs=clone(prefs);const nextRecoveryPrefs={'app.current_user_id':11,'theme.mode':'light','app.help_locale':'fr','app.material.mode':1,'app.material.level':2};
  journal=JSON.stringify({marker:'fixture-commit',oldPreferences:oldRecoveryPrefs,nextPreferences:nextRecoveryPrefs,oldUsers:[1],newUsers:[11]});
  vault[11]='fixture-staged';prefs=clone(nextRecoveryPrefs);await service.recoverInterruptedRestore();
  assert.deepEqual(prefs,oldRecoveryPrefs);assert.equal(vault[11],undefined);assert.equal(vault[1],'fixture-old-cookie');assert.equal(journal,'');
+ assert.equal(uiState.get('appliedLocale'),oldRecoveryPrefs['app.help_locale']??'system');
+ assert.equal(uiState.get('restoredPreferencesVersion'),1);
  reset();journal=JSON.stringify({marker:'fixture-commit',oldPreferences:oldRecoveryPrefs,nextPreferences:nextRecoveryPrefs,oldUsers:[1],newUsers:[11]});
  db.backup_recovery=[{id:1,marker:'fixture-commit'}];vault[11]='fixture-staged';await service.recoverInterruptedRestore();
  assert.deepEqual(prefs,nextRecoveryPrefs);assert.equal(vault[1],undefined);assert.equal(vault[11],'fixture-staged');assert.equal(journal,'');
- console.log('backup-roundtrip: PASS (complete snapshot, legacy, schema/shape/ref rejection, credential staging, transactional and preference failure recovery, account remap)');
+ assert.equal(uiState.get('appliedLocale'),'fr');assert.equal(uiState.get('materialMode'),1);assert.equal(uiState.get('materialLevel'),2);
+ assert.equal(uiState.get('restoredPreferencesVersion'),1);
+ console.log('backup-roundtrip: PASS (complete snapshot, legacy, schema/shape/ref rejection, credential staging, transactional and preference failure recovery, account and order remap)');
 })().catch(error=>{console.error(error);process.exitCode=1});

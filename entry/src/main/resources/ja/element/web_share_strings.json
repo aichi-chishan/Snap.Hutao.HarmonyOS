@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "ui_web_share_title",
+      "value": "共有の保存モード"
+    },
+    {
+      "name": "ui_web_share_description",
+      "value": "共有ボタンをクリックした後、画像を保存するモードを選択します"
+    },
+    {
+      "name": "ui_web_share_copy",
+      "value": "クリップボードにコピー"
+    },
+    {
+      "name": "ui_web_share_file",
+      "value": "ファイルとして保存"
+    }
+  ]
+}

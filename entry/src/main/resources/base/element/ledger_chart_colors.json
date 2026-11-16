@@ -1,0 +1,12 @@
+{
+  "color": [
+    { "name": "ledger_income_gold", "value": "#FFB13D" },
+    { "name": "ledger_income_blue", "value": "#4C9BE8" },
+    { "name": "ledger_income_green", "value": "#6DC96D" },
+    { "name": "ledger_income_violet", "value": "#B57BFF" },
+    { "name": "ledger_income_red", "value": "#FF8A8A" },
+    { "name": "ledger_income_teal", "value": "#35C4C4" },
+    { "name": "ledger_income_pink", "value": "#FF9ED2" },
+    { "name": "ledger_income_gray", "value": "#9AA5B1" }
+  ]
+}

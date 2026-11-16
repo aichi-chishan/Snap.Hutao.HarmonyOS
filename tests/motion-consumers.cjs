@@ -34,7 +34,9 @@ function compile(text, name) {
   const mod = { exports: {} };
   vm.runInNewContext(`(function(require,module,exports){${compiled.outputText}\n})`, environment)(id => {
     if (id === '@kit.ArkUI') return { curves };
+    if (id === '@kit.CoreFileKit') return { fileUri: { getUriFromPath: path => `file://${path}` } };
     if (id.endsWith('/Motion')) return { Motion };
+    if (id === './GachaType') return compile(source('model/GachaType'), 'gacha types');
     if (id.endsWith('/Logger')) return { Logger: { info() {}, warn() {} } };
     if (id.endsWith('/HutaoDailyImageService')) return { HutaoDailyImageService: {
       getInstance() { throw Error('wallpaper network must not run in this test'); },
@@ -106,7 +108,7 @@ const animating = target => {
   card.reduceMotion = false; card.onMotionChanged();
   for (const event of [1, 2]) {
     card.handleTouch(0); card.handleTouch(event); assert.equal(card.pressScale, 1);
-    assert.equal(presses.at(-1).duration, 260); assert.equal(presses.at(-1).curve.type, 'springCurve');
+    assert.equal(presses.at(-1).duration, 260); assert.equal(presses.at(-1).curve, 'fast');
   }
   card.pressScale = .95; card.aboutToAppear(); assert.equal(card.pressScale, 1);
   const pressSource = source('components/PressCard');
@@ -148,11 +150,22 @@ const animating = target => {
   }
 
   const home = source('components/HomeGachaCard');
+  const { GachaType } = compile(source('model/GachaType'), 'gacha types');
+  const { GachaPoolRules } = compile(source('model/GachaPoolRules'), 'gacha pool rules');
+  const { HomeGachaKeys } = compile(`export class HomeGachaKeys { ${method(home, 'private static archivePageKey')} }`,
+    'home gacha keys');
+  assert.equal(GachaPoolRules.fiveStarThreshold(GachaType.WEAPON_EVENT), 80);
+  assert.equal(GachaPoolRules.fiveStarThreshold(GachaType.AVATAR_EVENT), 90);
+  assert.match(home, /GachaPoolRules\.fiveStarThreshold\(summary\.gachaType\)/);
+  const archive = { uid: '100000001', pools: [{ gachaType: GachaType.WEAPON_EVENT, typeName: '武器活动祈愿', totalCount: 100,
+    sinceLastFive: 19, sinceLastFour: 6 }] };
+  const before = HomeGachaKeys.archivePageKey(archive);
+  archive.pools[0].sinceLastFour = 4;
+  assert.notEqual(HomeGachaKeys.archivePageKey(archive), before, 'same-total archive refresh includes updated pity');
   for (const reduced of [false, true]) {
     const state = { reduceMotion: reduced };
     assert.equal(evaluate(argumentsFor(home, '.duration')[0], state), reduced ? 0 : 240);
     assert.equal(evaluate(argumentsFor(home, '.curve')[0], state), reduced ? 'linear' : 'fast');
-    assert.equal(evaluate(argumentsFor(home, '.animation')[0], state).duration, reduced ? 0 : 150);
     assert.equal(evaluate(argumentsFor(home, '.effectMode')[0], state), reduced ? 'none' : 'spring');
     for (const expression of argumentsFor(home, '.edgeEffect'))
       assert.equal(evaluate(expression, state), reduced ? 'none' : 'spring');
@@ -173,8 +186,9 @@ const animating = target => {
   assert.equal(evaluate(pulse, { reduceMotion: false }).iterations, -1);
   assert.equal(evaluate(argumentsFor(risk, '.opacity')[0], { reduceMotion: true, statusText: '' }), 1);
   assert.equal(evaluate(argumentsFor(risk, '.opacity')[0], { reduceMotion: false, statusText: '' }), .35);
-  assert.equal((risk.match(/RiskVerifyService.getInstance\(\).cancel\(\)/g) || []).length, 2);
-  assert.match(risk, /\.onAppear\(\(\) => \{\s*this.loadCaptcha\(this.req.gt, this.req.challenge\)/);
+  assert.equal((risk.match(/RiskVerifyService.getInstance\(\).cancel\(activeReq.seq\)/g) || []).length, 2);
+  assert.match(risk, /@Watch\('onVerifyStateChanged'\)/);
+  assert.match(risk, /\.onControllerAttached\(\(\) => \{[\s\S]*?this\.startLoad\(\)/);
 
   const WallpaperLayer = component('WallpaperLayer');
   const wallpaper = new WallpaperLayer(); const fades = animating(wallpaper);

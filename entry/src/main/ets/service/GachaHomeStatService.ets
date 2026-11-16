@@ -10,10 +10,12 @@ import { GachaType } from '../model/GachaType';
 import { GachaItem } from '../model/GachaItem';
 
 /** 单池轻量统计行（Swiper 页内面板：名称/总抽/距保底橙紫，无重图） */
-export class GachaArchivePoolRow {
+export class HomePoolSummary {
   gachaType: number = 0;
   typeName: string = '';
   totalCount: number = 0;
+  fiveStarCount: number = 0;
+  fourStarCount: number = 0;
   sinceLastFive: number = 0;
   sinceLastFour: number = 0;
 }
@@ -21,7 +23,7 @@ export class GachaArchivePoolRow {
 /** 单归档统计页（FlipView 一页 = 一个 UID 的各池面板） */
 export class GachaArchiveStatPage {
   uid: string = '';
-  pools: GachaArchivePoolRow[] = [];
+  pools: HomePoolSummary[] = [];
 
   /** 面板总抽数（页脚指示可选用） */
   totalCount(): number {
@@ -39,48 +41,51 @@ export class GachaHomeStatService {
    * Index 仅在归档数 >= 2 时把结果交给主页祈愿卡翻页，单归档维持原单 UID 展示。
    */
   static async loadArchivePages(): Promise<GachaArchiveStatPage[]> {
-    const archives = await GachaRepo.getAllArchives();
+    const archives: GachaArchive[] = (await GachaRepo.getAllArchives())
+      .filter((archive: GachaArchive): boolean => archive.uid.length > 0);
+    // 单归档直接使用主页已有统计，不为不会显示的翻页再扫描一次记录。
+    if (archives.length < 2) { return []; }
     const pages: GachaArchiveStatPage[] = [];
     for (let i = 0; i < archives.length; i++) {
-      const uid: string = archives[i].uid;
-      if (uid.length === 0) {
-        continue;
-      }
-      pages.push(await GachaHomeStatService.buildPage(uid));
+      pages.push(await GachaHomeStatService.buildPage(archives[i]));
     }
     return pages;
   }
 
   /** 单归档页构建：常规池顺序（QUERY_ORDER）逐池统计，仅保留有数据的池 */
-  private static async buildPage(uid: string): Promise<GachaArchiveStatPage> {
+  private static async buildPage(archive: GachaArchive): Promise<GachaArchiveStatPage> {
     const page: GachaArchiveStatPage = new GachaArchiveStatPage();
-    page.uid = uid;
-    const archiveId: number = await GachaRepo.getOrCreateArchive(uid).then((a: GachaArchive) => a.id);
-    for (let i = 0; i < GachaType.QUERY_ORDER.length; i++) {
-      const type: number = GachaType.QUERY_ORDER[i];
-      const items: GachaItem[] = await GachaRepo.getItemsByType(archiveId, type);
-      if (items.length <= 0) {
-        continue;
-      }
-      const row: GachaArchivePoolRow = new GachaArchivePoolRow();
+    page.uid = archive.uid;
+    page.pools = GachaHomeStatService.summarize(await GachaRepo.getItemsByArchive(archive.id));
+    return page;
+  }
+
+  /** 输入按祈愿 ID 从旧到新排列。五星会累加四星垫数，四星只重置自身垫数。 */
+  static summarize(items: GachaItem[]): HomePoolSummary[] {
+    const pools: Map<number, HomePoolSummary> = new Map<number, HomePoolSummary>();
+    for (const type of GachaType.QUERY_ORDER) {
+      const row: HomePoolSummary = new HomePoolSummary();
       row.gachaType = type;
       row.typeName = GachaType.nameOf(type);
-      row.totalCount = items.length;
-      // 距上次五星/四星的垫抽数（与 HomeViewModel.loadGacha 同口径）
-      for (let j = items.length - 1; j >= 0; j--) {
-        if (items[j].rankType === 5) {
-          break;
-        }
+      pools.set(type, row);
+    }
+    for (const item of items) {
+      const row: HomePoolSummary | undefined = pools.get(GachaType.queryTypeOf(item.gachaType));
+      if (row === undefined) { continue; }
+      row.totalCount++;
+      if (item.rankType === 5) {
+        row.fiveStarCount++;
+        row.sinceLastFive = 0;
+        row.sinceLastFour++;
+      } else if (item.rankType === 4) {
+        row.fourStarCount++;
         row.sinceLastFive++;
-      }
-      for (let j = items.length - 1; j >= 0; j--) {
-        if (items[j].rankType === 4) {
-          break;
-        }
+        row.sinceLastFour = 0;
+      } else if (item.rankType === 3) {
+        row.sinceLastFive++;
         row.sinceLastFour++;
       }
-      page.pools.push(row);
     }
-    return page;
+    return Array.from(pools.values()).filter((row: HomePoolSummary): boolean => row.totalCount > 0);
   }
 }

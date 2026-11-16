@@ -10,7 +10,7 @@ export class CharacterExportService {
    * 生成角色导出文本。
    * propLabelFn：属性类型（FIGHT_PROP_*）→ 中文名，复用页面 CharacterPage.propLabel 避免映射重复。
    */
-  static buildExportText(d: CharacterDetail, propLabelFn: (type: string) => string): string {
+  static buildExportText(d: CharacterDetail, propLabelFn: (type: string) => string, weights?: number[]): string {
     const lines: string[] = [];
     lines.push('// =====================');
     // Windows: // {Name} [{Level}, ☆{Quality}, C{已激活命座数}] [{技能等级, ...}]
@@ -50,7 +50,8 @@ export class CharacterExportService {
       //           // [副词条: 值 ❶][...]（❶ = '\u2775' + 强化次数）
       for (const r of d.reliquaries) {
         lines.push('');
-        lines.push(`// ${CharacterExportService.posEmoji(r.pos)} ${propLabelFn(r.mainProperty.propertyType)}: ${r.mainProperty.value} [☆${r.rarity} +${r.level} ${r.setName || r.name}] 评分: ${CharacterExportService.relicScore(r, d)}`);
+        const score: string = ReliquaryScore.forCharacter(r, d, weights).toFixed(1);
+        lines.push(`// ${CharacterExportService.posEmoji(r.pos)} ${propLabelFn(r.mainProperty.propertyType)}: ${r.mainProperty.value} [☆${r.rarity} +${r.level} ${r.setName || r.name}] 评分: ${score} 分`);
         lines.push(`// ${CharacterExportService.formatSubProperties(r, propLabelFn)}`);
       }
     }
@@ -89,9 +90,4 @@ export class CharacterExportService {
     return s;
   }
 
-  /** 圣遗物评分（对齐页面 CharacterPage.relicScore：推荐词条加权，无推荐回退双爆分） */
-  private static relicScore(r: Reliquary, d: CharacterDetail): number {
-    return Math.round(ReliquaryScore.calculate(r.subProperties, d.recommend.subProperties,
-      d.recommend.energyType, ReliquaryScore.isCritEffective(d.id)) * 10) / 10;
-  }
 }

@@ -40,7 +40,7 @@ function harness() {
       emit({ state: 'cancelling', canCancel: false }); return cancel.promise; },
     clearRemote: () => { state.resets++; state.pending = 'bundled'; }, rollbackRemote: () => { state.rollbacks++; return rollback.promise; } };
   const U = { setManifestUrl: url => { if (url !== 'trusted-new') throw Error('untrusted source'); state.source = url; }, manifestUrl: () => state.source };
-  const m = { exports: {} }; vm.runInNewContext(`(function(exports){${code.outputText}\n})`, { GameDataService: G, GameDataUpdater: U, $r: x => x })(m.exports);
+  const m = { exports: {} }; vm.runInNewContext(`(function(exports){${code.outputText}\n})`, { GameDataService: G, GameDataUpdater: U, UiSurface: { dialogMaterial: () => undefined }, $r: x => x })(m.exports);
   const toasts = [], writes = [];
   const page = new m.exports.Page();
   Object.assign(page, { dataViewActive: false, dataGeneration: 0, dataOperationId: 0, dataCheckPending: false, dataUpdatePending: false,
@@ -161,9 +161,16 @@ async function test(name, run) { await run(); console.log(`PASS ${++count}: ${na
   });
   await test('bootstrap ordering and UI phase/cancel affordances remain connected', () => {
     const bootstrap = fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets', 'utf8');
-    const recovery = bootstrap.indexOf('await BackupService.getInstance().recoverInterruptedRestore()'), pin = bootstrap.indexOf('await GameDataService.initializeSnapshot()'), notify = bootstrap.indexOf('await NotificationHelper.init()');
-    assert(recovery < pin && pin < notify); assert.match(method('aboutToAppear'), /this\.attachDataUpdates\(\)/);
-    assert.match(source, /Button\(this\.dataCancelling \? '正在取消…' : '取消更新'\)/); assert.match(source, /Text\(this\.dataPhase\)/);
+    const recovery = bootstrap.indexOf('await BackupService.getInstance().recoverInterruptedRestore()');
+    const pin = bootstrap.indexOf('GameDataService.initializeSnapshot()');
+    const prepareEnd = bootstrap.indexOf('private static startDeferredServices()');
+    assert(recovery >= 0 && recovery < pin && pin < prepareEnd);
+    const loadIndex = bootstrap.indexOf("await windowStage.loadContent('pages/Index')");
+    const deferredStart = bootstrap.indexOf('EntryAbility.startDeferredServices();', loadIndex);
+    assert(loadIndex >= 0 && deferredStart > loadIndex, 'network maintenance starts after the local runtime and Index load');
+    assert.match(method('aboutToAppear'), /this\.attachDataUpdates\(\)/);
+    assert.match(source, /Button\(this\.dataCancelling \? \$r\('app\.string\.ui_settings_cancelling'\) : \$r\('app\.string\.ui_settings_cancel_update'\), \{ type: ButtonType\.Normal \}\)/);
+    assert.match(source, /Text\(this\.dataPhase\)/);
     assert(!source.includes('直连失败自动回退 ghfast/ghproxy'));
   });
   console.log(`game-data-page-integration: PASS ${count} production method cases (host UI boundary mocks)`);

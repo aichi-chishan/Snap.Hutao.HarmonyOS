@@ -8,6 +8,8 @@ import { CardSurfaceModifier } from '../common/UiSurface';
 
 @Component
 export struct AppBackButton {
+  @StorageProp('materialMode') surfaceMode: number = 0;
+  @StorageProp('materialLevel') surfaceLevel: number = -1;
   /** 图标按钮必须提供可读名称；调用方可传入自己的本地化文案。 */
   @Prop accessibilityLabel: string = '返回';
   /** 自定义返回动作（默认 router.back） */
@@ -30,7 +32,7 @@ export struct AppBackButton {
     .height(44)
     .accessibilityText(this.accessibilityLabel)
     .hoverEffect(HoverEffect.Highlight)
-    .attributeModifier(new CardSurfaceModifier())
+    .attributeModifier(new CardSurfaceModifier(this.surfaceMode, this.surfaceLevel))
     .shadow({
       radius: 10,
       color: $r('app.color.card_shadow'),

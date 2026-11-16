@@ -1,0 +1,284 @@
+{
+  "string": [
+    {
+      "name": "common_cancel",
+      "value": "취소"
+    },
+    {
+      "name": "common_confirm",
+      "value": "확인"
+    },
+    {
+      "name": "common_refresh",
+      "value": "동기화"
+    },
+    {
+      "name": "page_title_gacha",
+      "value": "기원 기록"
+    },
+    {
+      "name": "page_title_home",
+      "value": "홈페이지"
+    },
+    {
+      "name": "page_title_login",
+      "value": "로그인"
+    },
+    {
+      "name": "page_title_note",
+      "value": "실시간 메모"
+    },
+    {
+      "name": "page_title_setting",
+      "value": "설정"
+    },
+    {
+      "name": "tab_gacha",
+      "value": "기원 기록"
+    },
+    {
+      "name": "tab_home",
+      "value": "홈페이지"
+    },
+    {
+      "name": "tab_mine",
+      "value": "내 정보"
+    },
+    {
+      "name": "tab_note",
+      "value": "실시간 메모"
+    },
+    {
+      "name": "ui_action_export",
+      "value": "내보내기"
+    },
+    {
+      "name": "ui_action_import",
+      "value": "가져오기"
+    },
+    {
+      "name": "ui_action_save",
+      "value": "저장"
+    },
+    {
+      "name": "ui_ai_add_model",
+      "value": "Add Model"
+    },
+    {
+      "name": "ui_ai_copy",
+      "value": "Copy conversation"
+    },
+    {
+      "name": "ui_ai_generate",
+      "value": "Generate analysis"
+    },
+    {
+      "name": "ui_ai_insights",
+      "value": "Account history charts and AI insights"
+    },
+    {
+      "name": "ui_ai_new",
+      "value": "New chat"
+    },
+    {
+      "name": "ui_ai_regenerate",
+      "value": "Regenerate"
+    },
+    {
+      "name": "ui_ai_send",
+      "value": "Send"
+    },
+    {
+      "name": "ui_ai_stop",
+      "value": "Stop generation"
+    },
+    {
+      "name": "ui_ai_test",
+      "value": "Test connection"
+    },
+    {
+      "name": "ui_check_update",
+      "value": "업데이트 확인"
+    },
+    {
+      "name": "ui_group_data",
+      "value": "데이터"
+    },
+    {
+      "name": "ui_group_period",
+      "value": "주기"
+    },
+    {
+      "name": "ui_group_system",
+      "value": "시스템"
+    },
+    {
+      "name": "ui_group_tools",
+      "value": "도구"
+    },
+    {
+      "name": "ui_language_restart_system",
+      "value": "시스템 언어를 사용하려면 앱을 다시 여세요"
+    },
+    {
+      "name": "ui_language_system",
+      "value": "시스템 따르기"
+    },
+    {
+      "name": "ui_nav_abyss",
+      "value": "나선 비경"
+    },
+    {
+      "name": "ui_nav_achievement",
+      "value": "업적 관리"
+    },
+    {
+      "name": "ui_nav_backpack",
+      "value": "배낭 아이템"
+    },
+    {
+      "name": "ui_nav_challenge",
+      "value": "지맥 제압전"
+    },
+    {
+      "name": "ui_nav_character",
+      "value": "내 캐릭터"
+    },
+    {
+      "name": "ui_nav_cultivation",
+      "value": "육성 계획"
+    },
+    {
+      "name": "ui_nav_launch",
+      "value": "게임 시작"
+    },
+    {
+      "name": "ui_nav_ledger",
+      "value": "여행자 일기"
+    },
+    {
+      "name": "ui_nav_passport",
+      "value": "Snap Hutao Passport"
+    },
+    {
+      "name": "ui_nav_theater",
+      "value": "환상 진경 극시"
+    },
+    {
+      "name": "ui_nav_wiki_avatar",
+      "value": "캐릭터 자료"
+    },
+    {
+      "name": "ui_nav_wiki_monster",
+      "value": "몬스터 프로필"
+    },
+    {
+      "name": "ui_nav_wiki_weapon",
+      "value": "무기 자료"
+    },
+    {
+      "name": "ui_section_about",
+      "value": "정보"
+    },
+    {
+      "name": "ui_section_account",
+      "value": "계정"
+    },
+    {
+      "name": "ui_section_ai",
+      "value": "Model settings"
+    },
+    {
+      "name": "ui_section_appearance",
+      "value": "모습"
+    },
+    {
+      "name": "ui_section_background",
+      "value": "배경화면"
+    },
+    {
+      "name": "ui_section_background_video",
+      "value": "비디오 배경"
+    },
+    {
+      "name": "ui_section_backup",
+      "value": "백업 및 복원"
+    },
+    {
+      "name": "ui_section_calendar",
+      "value": "캘린더"
+    },
+    {
+      "name": "ui_section_home",
+      "value": "홈페이지"
+    },
+    {
+      "name": "ui_section_home_calendar",
+      "value": "메인 화면 게임 활동 영역 설정"
+    },
+    {
+      "name": "ui_section_home_cards",
+      "value": "홈 카드"
+    },
+    {
+      "name": "ui_section_language",
+      "value": "언어"
+    },
+    {
+      "name": "ui_section_material",
+      "value": "배경 테마"
+    },
+    {
+      "name": "ui_section_other",
+      "value": "기타"
+    },
+    {
+      "name": "ui_section_sign_in",
+      "value": "체크인"
+    },
+    {
+      "name": "ui_section_storage",
+      "value": "저장 공간"
+    },
+    {
+      "name": "ui_section_theme",
+      "value": "색상 테마"
+    },
+    {
+      "name": "ui_section_verification",
+      "value": "무감각 인증"
+    },
+    {
+      "name": "ui_section_wish",
+      "value": "기원 기록"
+    },
+    {
+      "name": "ui_section_wish_data",
+      "value": "데이터 마이그레이션"
+    },
+    {
+      "name": "ui_theme_dark",
+      "value": "어두운 테마"
+    },
+    {
+      "name": "ui_theme_light",
+      "value": "밝은 테마"
+    },
+    {
+      "name": "ui_update_available",
+      "value": "호두 %s 버전이 현재 사용 가능합니다"
+    },
+    {
+      "name": "ui_update_notes",
+      "value": "릴리스 노트"
+    },
+    {
+      "name": "ui_update_skip",
+      "value": "이 버전 건너뛰기"
+    },
+    {
+      "name": "ui_update_title",
+      "value": "앱 업데이트"
+    }
+  ]
+}

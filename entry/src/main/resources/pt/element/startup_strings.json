@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "ui_startup_failed_title", "value": "Não foi possível iniciar" },
+    { "name": "ui_startup_failed_body", "value": "Não foi possível concluir a inicialização. Tente novamente. Uma nova tentativa não apagará seus dados existentes." }
+  ]
+}

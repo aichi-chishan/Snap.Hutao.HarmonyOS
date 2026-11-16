@@ -33,7 +33,7 @@ export class RiskVerifyRequest {
   seq: number = 0;
 }
 
-/** 极验解题结果（challenge 为重放应使用的值：弹窗路径=原 challenge，自定义接口=返回的新 challenge） */
+/** 极验解题结果：使用验证组件或自定义接口返回的 challenge 重放。 */
 export class GeetestSolveResult {
   challenge: string = '';
   validate: string = '';
@@ -71,7 +71,7 @@ export class RiskVerifyService {
   /**
    * 发起 gt 极验并返回完整解题结果（challenge + validate）。
    * 自定义接口成功时 challenge 为接口返回的新 challenge（重放须用它，对齐 Windows GeetestData.Challenge）；
-   * 弹窗路径 challenge 为原始值。
+   * 弹窗路径使用 geetest_challenge。
    */
   async verifyGtFull(gt: string, challenge: string): Promise<GeetestSolveResult> {
     const solved: GeetestSolveResult | undefined = await this.tryCustomSolve(gt, challenge);
@@ -84,7 +84,7 @@ export class RiskVerifyService {
     req.challenge = challenge;
     const validate: string = await this.show(req, (v: string): string => v);
     const result: GeetestSolveResult = new GeetestSolveResult();
-    result.challenge = challenge;
+    result.challenge = req.challenge;
     result.validate = validate;
     return result;
   }
@@ -111,7 +111,7 @@ export class RiskVerifyService {
       if (v.length === 0) {
         return '';
       }
-      return AigisSession.buildAigisHeader(session.sessionId, session.challenge, v);
+      return AigisSession.buildAigisHeader(session.sessionId, req.challenge, v);
     });
     return validate;
   }
@@ -142,6 +142,8 @@ export class RiskVerifyService {
         Logger.info(TAG, `custom geetest solve fail retcode=${resp.retcode}`);
         return undefined;
       }
+      const envelope: Record<string, Object> = JSON.parse(resp.raw) as Record<string, Object>;
+      if (envelope['code'] !== undefined && envelope['code'] !== 0) { return undefined; }
       const data = resp.data as Record<string, Object>;
       const outChallenge: string = String(data['challenge'] ?? '');
       const validate: string = String(data['validate'] ?? '');
@@ -160,11 +162,13 @@ export class RiskVerifyService {
     }
   }
 
-  /** UI 弹窗完成：传入 geetest_validate（空串表示取消/失败） */
-  submitValidate(validate: string): void {
+  /** UI 回传绑定请求序号，已关闭的验证码不能完成下一次验证。 */
+  submitValidate(validate: string, challenge: string = '', seq?: number): void {
+    if (seq !== undefined && this.currentReq?.seq !== seq) { return; }
     if (this.pendingResolve === undefined) {
       return;
     }
+    if (challenge.length > 0 && this.currentReq !== undefined) { this.currentReq.challenge = challenge; }
     Logger.info(TAG, `verify done validate=${validate.length > 0}`);
     const resolve: ValidateCallback = this.pendingResolve;
     this.pendingResolve = undefined;
@@ -172,9 +176,9 @@ export class RiskVerifyService {
   }
 
   /** 用户关闭弹窗 */
-  cancel(): void {
+  cancel(seq?: number): void {
     Logger.info(TAG, 'verify cancelled by user');
-    this.submitValidate('');
+    this.submitValidate('', '', seq);
   }
 
   /** 是否有进行中的验证 */

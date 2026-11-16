@@ -20,7 +20,6 @@ export struct HomeChallengeCard {
     PressCard({
       onTap: () => {
       },
-      cardBg: $r('app.color.card_background'),
       radius: 12,
     }) {
       Column({ space: 8 }) {

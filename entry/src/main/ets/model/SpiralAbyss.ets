@@ -42,6 +42,7 @@ export class SpiralAbyssBattle {
 /** 深渊间目 */
 export class SpiralAbyssLevel {
   index: number = 0;
+  hasRecord: boolean = false;
   star: number = 0;
   maxStar: number = 0;
   battles: SpiralAbyssBattle[] = [];
@@ -50,6 +51,7 @@ export class SpiralAbyssLevel {
 /** 深渊层 */
 export class SpiralAbyssFloor {
   index: number = 0;
+  hasRecord: boolean = false;
   icon: string = '';
   isUnlock: boolean = false;
   star: number = 0;
@@ -60,6 +62,7 @@ export class SpiralAbyssFloor {
   static fromJson(obj: Object): SpiralAbyssFloor {
     const item = obj as Record<string, Object>;
     const f: SpiralAbyssFloor = new SpiralAbyssFloor();
+    f.hasRecord = true;
     f.index = num(item['index']);
     f.icon = String(item['icon'] ?? '');
     f.star = num(item['star']);
@@ -70,6 +73,7 @@ export class SpiralAbyssFloor {
       for (let i = 0; i < levels.length; i++) {
         const lv = levels[i] as Record<string, Object>;
         const l: SpiralAbyssLevel = new SpiralAbyssLevel();
+        l.hasRecord = true;
         l.index = num(lv['index']);
         l.star = num(lv['star']);
         l.maxStar = num(lv['max_star']);

@@ -36,10 +36,18 @@ export class BackpackItem {
   appendPropIds: number[] = [];
   isLocked: boolean | undefined = undefined;
   isMarked: boolean | undefined = undefined;
+  equippedAvatarId: number | undefined = undefined;
+  purchasedAppendPropIds: number[] | undefined = undefined;
   name: string = '';
   icon: string = '';
   iconCategory: string = 'ItemIcon';
   rarity: number = 0;
+  weaponType: number = 0;
+  equipType: number = 0;
+  setId: number = 0;
+  setName: string = '';
+  foodType: number = 0;
+  foodQuality: number = -1;
 }
 
 export class BackpackImport {
@@ -54,7 +62,13 @@ export class BackpackImport {
   /** UI-only ownership fence. Never populated from an imported file or exported as UIIF. */
   targetArchiveId: number = 0;
   targetUid: string = '';
+  targetCreatedAt: number = 0;
   targetUpdatedAt: number = 0;
+}
+
+export class BackpackArchiveSnapshot {
+  archive: BackpackArchive = new BackpackArchive();
+  items: BackpackItem[] = [];
 }
 
 export class BackpackFilter {
@@ -62,6 +76,31 @@ export class BackpackFilter {
   category: number = -1;
   lockedOnly: boolean = false;
   sort: string = 'id';
+  choices: BackpackFilterChoice[] = [];
+  sortRules: BackpackSortRule[] = [];
+}
+
+export enum BackpackFilterKind {
+  Rarity, WeaponType, EquipType, Set, FoodType, FoodQuality, Lock, Mark, Equipped, Purchased,
+}
+
+export class BackpackFilterChoice {
+  readonly kind: BackpackFilterKind;
+  readonly code: number;
+  readonly label: string;
+
+  constructor(kind: BackpackFilterKind, code: number, label: string) {
+    this.kind = kind;
+    this.code = code;
+    this.label = label;
+  }
+}
+
+export class BackpackSortRule {
+  key: string = 'id';
+  descending: boolean = false;
+
+  constructor(key: string, descending: boolean) { this.key = key; this.descending = descending; }
 }
 
 export class BackpackManualInput {
